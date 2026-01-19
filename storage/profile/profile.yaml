@@ -1,0 +1,197 @@
+version: "1.0"
+
+identity:
+  full_name: "Sreedeep Sreekanth"
+  tagline: "Data Analyst at NeoTaste GmbH | Valid EU Blue Card Visa"
+  email: "srdp.sk@gmail.com"
+  phone: "+49 157 83445448"
+  linkedin: "https://www.linkedin.com/in/sreedeep-sreekanth"
+  github: "https://github.com/srdpsrknth"
+  location: "Berlin, Germany"
+  visa_status: "Valid EU Blue Card Visa"
+
+summary_base:
+  - "Analytics professional with a strong technical foundation in A/B testing, data modeling, attribution strategy, and performance forecasting across high-growth startups."
+
+experience:
+  - company: "NeoTaste GmbH"
+    location: "Berlin, Germany"
+    role: "Marketing Business Analyst"
+    start_date: "2025-01"
+    end_date: "present"
+    bullets:
+      - "Own end-to-end marketing and growth analytics for a subscription-based mobile app operating across 51 cities."
+      - "Designed and implemented a demand forecasting model in Snowflake and dbt, enabling scenario-based budget planning and city-level growth forecasts."
+      - "Unified attribution, performance, and CRM metrics across marketing teams through standardized Power BI dashboards for leadership."
+      - "Built and maintained scalable fact and intermediate tables to combine performance marketing, CRM, and product event data."
+      - "Partner closely with Marketing, Product, and Operations stakeholders to translate ambiguous business questions into actionable insights."
+    selected_projects:
+      - name: "Marketing Demand Forecasting Model & Scenario Dashboard (51 cities)"
+        bullets:
+          - "Designed and implemented a city-level demand forecasting model to estimate new users and subscriptions based on marketing spend inputs."
+          - "Built scalable data models in Snowflake and dbt to combine historical performance marketing data with forecast assumptions."
+          - "Developed a Python-based interface to simulate budget allocation scenarios and assess expected impact on growth metrics."
+          - "Enabled leadership and marketing teams to compare trade-offs across cities and channels, supporting quarterly planning and budget decisions."
+    technologies:
+      - "Snowflake SQL"
+      - "dbt"
+      - "Python"
+      - "Power BI"
+      - "Adjust"
+      - "Braze"
+      - "GA4"
+
+  - company: "ecoligo GmbH"
+    location: "Berlin, Germany"
+    role: "Business Intelligence Analyst"
+    start_date: "2023-07"
+    end_date: "2025-01"
+    bullets:
+      - "Created a custom Markov chain based marketing attribution model, integrating data from key platforms including Google Ads, Facebook, MS, Hubspot and offline digital sources. Assited in optimizing resource allocation and CLTV calculation."
+      - "Created investor segmentation personas using K-means Clustering, enabling better churn rate cohort analysis and better targeted Advertising to different groups."
+      - "Creation, design and maintenance of Investment Performance, Performance Marketing and Product Analytics Dashboards using Looker."
+      - "Set up and designed the data warehouse in BigQuery to ingest and model user behavioral data and backend investment data. Data modeling and transformations were achieved through dbt."
+      - "Implemented session-level tracking using Snowplow and PostHog first-party tracking. This improved data accuracy and enabled the capture of detailed user behaviors across all ecoligo domains."
+      - "Implemented GTM server side on our platform to power Facebook Conversions API and Google Enhanced conversions. Created tags and events on our website to power these advertising networks."
+    selected_projects:
+      - name: "Conversational LLM Chatbot for Dynamic Database Querying"
+        bullets:
+          - "Developed an internal conversational analytics tool using OpenAI’s GPT API to dynamically generate SQL queries against Google BigQuery."
+          - "Enabled business stakeholders to query customer and investment data without SQL knowledge, improving access to insights."
+          - "Integrated direct API-based query execution and result visualization, reducing manual analysis effort for the data team."
+          - "Optimized prompt design and API usage to significantly reduce token consumption and operational costs."
+      - name: "Cashback and Bonus Payment Automation"
+        bullets:
+          - "Designed and implemented an automated pipeline to calculate voucher and cashback payouts from raw transactional data."
+          - "Built a Python-based workflow to transform data into SEPA-compatible payment files, reducing manual processing errors."
+          - "Integrated the process into the broader data orchestration setup using dbt and Y42 to ensure reproducibility and auditability."
+    technologies:
+      - "BigQuery SQL"
+      - "dbt"
+      - "Y42"
+      - "Python"
+      - "Looker"
+      - "Snowplow"
+      - "PostHog"
+      - "GTM"
+      - "HubSpot"
+
+  - company: "heycar (Mobility Trader GmbH)"
+    location: "Berlin, Germany"
+    role: "Data Analyst"
+    start_date: "2021-12"
+    end_date: "2023-05"
+    bullets:
+      - "Cross-functional projects across Marketing, Product and Sales analytics including A/B testing of product changes and search algorithm optimisation"
+      - "Create an internal custom multi-touch lead Attribution model to optimise the marketing mix and marketing spend across channels using Python and SQL"
+      - "Analyzed online user behavior, retention and customer journeys, funnel analysis, and multi-channel attribution"
+      - "Oversee data migration into new data structure with dbt as the base ensuring smooth transition between old and new models"
+      - "Create, monitor and maintain daily/weekly KPI dashboards on Looker to identify key drivers and trends in Paid, Organic and Brand Marketing Teams for senior management"
+    selected_projects:
+      - name: "Performance Marketing Channel Attribution"
+        bullets:
+          - "Developed a custom multi-touch attribution approach to redistribute untracked sessions and leads across paid marketing channels."
+          - "Combined session-level data and recent channel interaction shares to assign attribution using a U-shaped logic."
+          - "Automated ETL pipelines using Matillion to ensure consistent and scalable attribution reporting."
+          - "Enabled marketing teams to better evaluate channel performance and optimize budget allocation."
+    technologies:
+      - "PostgresSQL"
+      - "Python"
+      - "dbt"
+      - "Looker"
+      - "Matillion"
+
+  - company: "ORMIT (Traineeship)"
+    location: "Utrecht, The Netherlands"
+    role: "Marketing Analyst"
+    start_date: "2020-12"
+    end_date: "2021-11"
+    bullets: []
+    selected_projects: []
+    technologies: []
+
+  - company: "Unilever"
+    location: "Rotterdam, The Netherlands"
+    role: "Project Coordinator - Front of House"
+    start_date: "2019-03"
+    end_date: "2019-08"
+    bullets: []
+    selected_projects: []
+    technologies: []
+
+education:
+  - degree: "MScBA Master in Management"
+    institution: "Rotterdam School of Management, Erasmus University"
+    location: "Rotterdam, The Netherlands"
+    start_year: 2017
+    end_year: 2018
+
+  - degree: "Dual Degree (B.Tech + M.Tech) Metallurgy & Materials Engineering"
+    institution: "Indian Institute of Technology - Madras"
+    location: "Chennai, India"
+    start_year: 2010
+    end_year: 2015
+
+certifications:
+  - "IBM Certified Data Analyst Professional"
+  - "Google Analytics Individual Qualification"
+  - "Google Ads Certification"
+
+skills:
+  core_analytics_quant_methods:
+    - "Advanced SQL"
+    - "Python (Pandas, NumPy)"
+    - "Statistical Analysis"
+    - "Cohort & Funnel Analysis"
+    - "Customer Segmentation"
+    - "Forecasting"
+    - "Attribution Modeling"
+    - "Marketing Mix Modeling (MMM)"
+
+  product_growth_gtm:
+    - "A/B Testing & Experimentation"
+    - "Incrementality Testing"
+    - "Retention & Churn Analysis"
+    - "LTV / CAC"
+    - "Activation Metrics"
+    - "Subscription Analytics"
+    - "SaaS & Marketplace Metrics"
+    - "Go-To-Market (GTM) Analytics"
+
+  data_engineering_modeling_bi:
+    - "Snowflake"
+    - "BigQuery"
+    - "dbt"
+    - "Analytics Engineering"
+    - "Data Modeling & Semantic Layers"
+    - "Looker"
+    - "Power BI"
+
+  tracking_marketing_tech_product_analytics:
+    - "GA4"
+    - "Google Tag Manager (Client & Server-side)"
+    - "Adjust MMP"
+    - "Braze CRM"
+    - "HubSpot"
+    - "Amplitude"
+    - "Meta Ads"
+
+  automation_llms_advanced_tooling:
+    - "LLM APIs (OpenAI / GPT)"
+    - "SQL Generation with LLMs"
+    - "Workflow Automation"
+    - "Advanced Excel (Power Query, Pivot Models)"
+    - "Google Sheets Automation"
+
+  collaboration_communication:
+    - "Stakeholder Management"
+    - "Data Storytelling"
+    - "Git"
+    - "Jira"
+    - "Microsoft PowerPoint"
+
+languages:
+  - name: "English"
+    proficiency: "Fluent"
+  - name: "German"
+    proficiency: "Intermediate"
