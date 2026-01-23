@@ -47,7 +47,7 @@ experience:
     start_date: "2023-07"
     end_date: "2025-01"
     bullets:
-      - "Created a custom Markov chain based marketing attribution model, integrating data from key platforms including Google Ads, Facebook, MS, Hubspot and offline digital sources. Assited in optimizing resource allocation and CLTV calculation."
+      - "Created a custom Markov chain based marketing attribution model, integrating data from key platforms including Google Ads, Facebook, MS, Hubspot and offline digital sources. Assisted in optimizing resource allocation and CLTV calculation."
       - "Created investor segmentation personas using K-means Clustering, enabling better churn rate cohort analysis and better targeted Advertising to different groups."
       - "Creation, design and maintenance of Investment Performance, Performance Marketing and Product Analytics Dashboards using Looker."
       - "Set up and designed the data warehouse in BigQuery to ingest and model user behavioral data and backend investment data. Data modeling and transformations were achieved through dbt."
@@ -194,4 +194,4 @@ languages:
   - name: "English"
     proficiency: "Fluent"
   - name: "German"
-    proficiency: "Intermediate"
+    proficiency: "Basic"
