@@ -46,6 +46,7 @@ cv-tailor/
 - **Document Templating**: Jinja2 (LaTeX), docxtpl (DOCX)
 - **Data Format**: YAML (base profile)
 - **Python**: 3.10+
+- **Google AI SDK**: google-genai (2026 standard package for Google AI Studio)
 
 ---
 
@@ -178,21 +179,20 @@ PROFILE_PATH=storage/profile/profile.yaml
 
 ### Example API Call Pattern
 ```python
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    generation_config={
-        "temperature": 0.3,
-        "max_output_tokens": 8000,
-        "response_mime_type": "application/json"
-    }
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+response = client.models.generate_content(
+    model="gemini-1.5-flash",
+    contents=prompt,
+    config=types.GenerateContentConfig(
+        temperature=0.3,
+        max_output_tokens=8000,
+        response_mime_type="application/json"
+    )
 )
-
-response = model.generate_content([
-    {"role": "user", "parts": [prompt]}
-])
 ```
 
 ---
