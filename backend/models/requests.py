@@ -20,6 +20,8 @@ class TokenUsage(BaseModel):
     cl_output_tokens: int = 0
     total_tokens: int = 0
     estimated_cost_usd: float = 0.0
+    estimated_cost_eur: float = 0.0
+    currency: str = "USD"  # Google charges in USD, converted to EUR
 
 
 class TailorResponse(BaseModel):
