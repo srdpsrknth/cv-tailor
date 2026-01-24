@@ -15,6 +15,7 @@ BACKEND_URL = "http://localhost:8000"
 API_TAILOR = f"{BACKEND_URL}/api/tailor"
 API_DOWNLOAD_CV = f"{BACKEND_URL}/api/download/cv"
 API_DOWNLOAD_CL = f"{BACKEND_URL}/api/download/cover-letter"
+API_DOWNLOAD_CL_PDF = f"{BACKEND_URL}/api/download/cover-letter-pdf"
 API_PREVIEW_CV = f"{BACKEND_URL}/api/preview"
 
 # Page config
@@ -123,6 +124,7 @@ if generate_btn:
                     st.session_state.job_id = data["job_id"]
                     st.session_state.cv_path = data["cv_path"]
                     st.session_state.cover_letter_path = data["cover_letter_path"]
+                    st.session_state.cl_pdf_path = data.get("cl_pdf_path")  # May be None
                     st.session_state.token_usage = data["token_usage"]
                     st.session_state.generated = True
 
@@ -226,9 +228,10 @@ if "generated" in st.session_state and st.session_state.generated:
                 st.error(f"Download error: {str(e)}")
         
         with col_cl_pdf:
+            # Try the new dedicated PDF endpoint
             try:
                 cl_pdf_response = requests.get(
-                    f"{API_DOWNLOAD_CL}/{job_id}".replace(".docx", ".pdf"),
+                    f"{API_DOWNLOAD_CL_PDF}/{job_id}",
                     timeout=30
                 )
                 if cl_pdf_response.status_code == 200:
@@ -239,8 +242,10 @@ if "generated" in st.session_state and st.session_state.generated:
                         mime="application/pdf",
                         use_container_width=True
                     )
+                else:
+                    st.caption("(PDF not available - LibreOffice may not be installed)")
             except Exception:
-                st.caption("(PDF not available)")
+                st.caption("(PDF not available - LibreOffice may not be installed)")
         
 
     st.divider()

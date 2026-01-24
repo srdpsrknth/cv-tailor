@@ -30,6 +30,7 @@ class TailorResponse(BaseModel):
     status: str = "success"
     cv_path: str
     cover_letter_path: str
+    cl_pdf_path: Optional[str] = None
     token_usage: TokenUsage
     message: Optional[str] = None
 

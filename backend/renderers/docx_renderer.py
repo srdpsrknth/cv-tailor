@@ -47,8 +47,8 @@ class DocxRenderer:
         tailored_cl: TailoredCoverLetter,
         profile: Profile,
         job_position: Optional[str] = None,
-    ) -> str:
-        """Render a tailored cover letter to DOCX.
+    ) -> tuple[str, Optional[str]]:
+        """Render a tailored cover letter to DOCX and optionally PDF.
 
         Args:
             tailored_cl: Tailored cover letter content
@@ -56,7 +56,7 @@ class DocxRenderer:
             job_position: Optional job position to use in filename; defaults to tailored_cl.role_title
 
         Returns:
-            Path to generated DOCX file as string
+            Tuple of (docx_path, pdf_path_or_none) as strings
         """
         job_pos = job_position or tailored_cl.role_title
         company = tailored_cl.company_name
@@ -94,14 +94,15 @@ class DocxRenderer:
             pass
 
         # Generate PDF version as well
-        pdf_path: Optional[Path] = None
+        pdf_path: Optional[str] = None
         try:
-            pdf_path = self._export_pdf(output_path)
-        except Exception:
+            pdf_file = self._export_pdf(output_path)
+            pdf_path = str(pdf_file)
+        except Exception as e:
             # Non-fatal; DOCX is the primary output
             pass
 
-        return str(output_path)
+        return str(output_path), pdf_path
 
     def _build_context(self, tailored_cl: TailoredCoverLetter, profile: Profile) -> dict:
         paragraphs = tailored_cl.paragraphs or []

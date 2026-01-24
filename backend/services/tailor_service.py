@@ -234,9 +234,18 @@ def tailor_documents(
     input_tokens = input_tokens_cv + input_tokens_cl
     output_tokens = output_tokens_cv + output_tokens_cl
 
+    # Create job-specific folder
+    from uuid import uuid4
+    job_id = str(uuid4())[:8]
+    outputs_base = Path(__file__).resolve().parents[2] / "outputs"
+    job_folder = outputs_base / job_id
+    job_folder.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"Created job folder: {job_folder}")
+
     # Render documents
-    latex = create_latex_renderer()
-    docx = create_docx_renderer()
+    latex = create_latex_renderer(outputs_dir=str(job_folder))
+    docx = create_docx_renderer(outputs_dir=str(job_folder))
 
     job_position = role_title or tailored_output.cover_letter.role_title or tailored_output.cv.title
 
@@ -246,7 +255,7 @@ def tailor_documents(
         job_position=job_position,
     )
 
-    cl_path = docx.render_cover_letter(
+    cl_path, cl_pdf_path = docx.render_cover_letter(
         tailored_cl=tailored_output.cover_letter,
         profile=profile,
         job_position=job_position,
@@ -259,13 +268,12 @@ def tailor_documents(
         cl_output_tokens=0,
     )
 
-    job_id = Path(cv_path).stem
-
     return TailorResponse(
         job_id=job_id,
         status="success",
         cv_path=str(cv_path),
         cover_letter_path=str(cl_path),
+        cl_pdf_path=str(cl_pdf_path) if cl_pdf_path else None,
         token_usage=token_usage,
         message=None,
     )
