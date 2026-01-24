@@ -264,7 +264,7 @@ class DocxRenderer:
     def _generate_pdf_via_latex(self, docx_path: Path) -> Path:
         """
         Generate PDF from cover letter using LaTeX.
-        Extracts text from DOCX and renders as LaTeX PDF with proper formatting.
+        Extracts text from DOCX and renders as LaTeX PDF with proper letter formatting.
         
         Args:
             docx_path: Path to DOCX file
@@ -281,32 +281,34 @@ class DocxRenderer:
         doc = Document(str(docx_path))
         paragraphs = [para.text for para in doc.paragraphs]
         
-        # Build LaTeX content with proper formatting
+        # Build LaTeX content with proper letter formatting
         latex_content = r"""\documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage{setspace}
-\usepackage{enumitem}
 \setstretch{1.15}
+
+% Left aligned, justified text
+\raggedbottom
+\usepackage{ragged2e}
+
 \pagestyle{empty}
 
 \begin{document}
 
+% Enable justified text (full justification)
+\justify
+
 """
         
-        # Process paragraphs for proper formatting
-        prev_blank = False
+        # Process paragraphs for proper letter formatting
         for para_text in paragraphs:
             para_text = para_text.strip()
             
-            # Skip excessive blank lines
             if not para_text:
-                if not prev_blank:
-                    latex_content += "\n"
-                    prev_blank = True
+                # Empty line creates paragraph break
+                latex_content += "\n"
                 continue
-            
-            prev_blank = False
             
             # Escape LaTeX special characters
             para_text = para_text.replace("\\", r"\textbackslash{}")
@@ -320,7 +322,7 @@ class DocxRenderer:
             para_text = para_text.replace("~", r"\textasciitilde{}")
             para_text = para_text.replace("^", r"\textasciicircum{}")
             
-            # Add paragraph with proper spacing
+            # Add paragraph with proper spacing for letters
             latex_content += f"{para_text}\n\n"
         
         latex_content += r"""\end{document}"""
