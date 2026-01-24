@@ -4,6 +4,7 @@ DOCX renderer for tailored cover letters using docxtpl.
 from __future__ import annotations
 
 from datetime import date
+import logging
 import re
 import subprocess
 from pathlib import Path
@@ -15,6 +16,9 @@ from docx.shared import Pt
 
 from models.profile import Profile
 from models.tailored_output import TailoredCoverLetter
+
+
+logger = logging.getLogger(__name__)
 
 
 class DocxRendererError(Exception):
@@ -93,14 +97,15 @@ class DocxRenderer:
         except Exception:
             pass
 
-        # Generate PDF version as well
+        # Generate PDF version (required)
         pdf_path: Optional[str] = None
         try:
             pdf_file = self._export_pdf(output_path)
             pdf_path = str(pdf_file)
+            logger.info(f"Generated cover letter PDF: {pdf_path}")
         except Exception as e:
-            # Non-fatal; DOCX is the primary output
-            pass
+            logger.error(f"Failed to generate cover letter PDF: {e}")
+            raise DocxRendererError(f"PDF generation failed (required): {e}")
 
         return str(output_path), pdf_path
 

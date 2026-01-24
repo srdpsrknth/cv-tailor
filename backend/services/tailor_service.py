@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -25,6 +28,14 @@ load_dotenv(dotenv_path=ENV_PATH, override=True)
 PROMPT_CV_PATH = Path(__file__).resolve().parents[1] / "prompts" / "tailor_cv_prompt.md"
 PROMPT_CL_PATH = Path(__file__).resolve().parents[1] / "prompts" / "tailor_cl_prompt.md"
 STYLE_EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "cover_letter_examples"
+
+
+def _slugify(text: str) -> str:
+    """Convert text to filesystem-safe slug."""
+    text = text.strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text or "role"
 
 
 def tailor_documents(
@@ -234,14 +245,18 @@ def tailor_documents(
     input_tokens = input_tokens_cv + input_tokens_cl
     output_tokens = output_tokens_cv + output_tokens_cl
 
-    # Create job-specific folder
-    from uuid import uuid4
-    job_id = str(uuid4())[:8]
+    # Generate meaningful job_id: {year}_{company}_{role}_{timestamp}
+    year = datetime.now().year
+    company_slug = _slugify(company_name or tailored_output.cover_letter.company_name or "company")
+    role_slug = _slugify(role_title or tailored_output.cover_letter.role_title or "role")
+    timestamp = int(time.time())
+    job_id = f"{year}_{company_slug}_{role_slug}_{timestamp}"
+    
     outputs_base = Path(__file__).resolve().parents[2] / "outputs"
     job_folder = outputs_base / job_id
     job_folder.mkdir(parents=True, exist_ok=True)
     
-    logger.info(f"Created job folder: {job_folder}")
+    logger.info(f"Created job folder: {job_folder} for job_id: {job_id}")
 
     # Render documents
     latex = create_latex_renderer(outputs_dir=str(job_folder))
