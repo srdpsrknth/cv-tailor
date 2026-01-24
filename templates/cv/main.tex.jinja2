@@ -1,7 +1,11 @@
 \documentclass[10pt,a4paper,ragged2e]{altacv}
 
 % Page layout - ATS-friendly margins
-\geometry{left=1.2cm,right=1.2cm,marginparwidth=6.8cm,marginparsep=1.2cm,top=1cm,bottom=1cm}
+% Optimized for 2-page maximum with good spacing
+\geometry{left=1.5cm,right=1.5cm,marginparwidth=6.8cm,marginparsep=1.2cm,top=1.25cm,bottom=1.25cm}
+
+% Section integrity - prevent splitting across pages
+\usepackage{needspace}
 
 % Font configuration for ATS compatibility
 \ifxetexorluatex
@@ -14,6 +18,10 @@
 
 \usepackage{multicol}
 \usepackage{hyperref}
+
+% Spacing optimization for 2-page limit
+\setlength{\parskip}{0.5ex}
+\setlength{\parsep}{0pt}
 
 % Color scheme
 \definecolor{NavyBlue}{HTML}{00004d}
@@ -57,15 +65,21 @@
 
 % Professional Summary
 {% if summary %}
+\vspace{-1mm}
 \small {{ summary|join(' ') }}
+\vspace{1mm}
 {% endif %}
 
 \AtBeginEnvironment{itemize}{\small}
 
 % PROFESSIONAL EXPERIENCE
+% Ensure section doesn't split across pages (needs ~8cm for first entry)
+\needspace{8cm}
 \cvsection{Professional Experience}
 
 {% for exp in experience %}
+% Ensure each experience entry stays together (needs ~6cm minimum)
+\needspace{6cm}
 \cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
   {%- if exp.start_date -%}
     {{ exp.start_date|replace('-', ' ') }}
@@ -83,37 +97,65 @@
 \end{itemize}
 {% endif %}
 
-{% if exp.selected_project_names and exp.project_bullets %}
-\cvprojectsection{{ '{' }}Selected Projects{{ '}' }}
-\cvproject{{ '{' }}{{ '}' }}{{ '{' }}
-  {%- for project_name in exp.selected_project_names -%}
-    {{ project_name }}{% if not loop.last %}, {% endif %}
-  {%- endfor -%}
-{{ '}' }}{{ '{' }}
-\begin{{ '{' }}cvprojectlist{{ '}' }}
+{% if exp.projects %}
+% Selected Projects - new structure (each project has own bullets)
+\vspace{1mm}
+{\small\textbf{\textcolor{accent}{Selected Projects:}}}
+\vspace{0.5mm}
+
+{% for project in exp.projects %}
+{\small\textit{{ '{' }}{{ project.name }}{{ '}' }}}
+\begin{itemize}[topsep=1pt,itemsep=1pt]
+{% for bullet in project.bullets %}
+\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% if not loop.last %}\vspace{1mm}{% endif %}
+{% endfor %}
+
+{% elif exp.selected_project_names and exp.project_bullets %}
+% Selected Projects - legacy structure (backward compatibility)
+\vspace{1mm}
+{\small\textbf{\textcolor{accent}{Selected Projects:}}}
+\vspace{0.5mm}
+
+{% set project_count = exp.selected_project_names|length %}
+{% if project_count == 1 %}
+{\small\textit{{ '{' }}{{ exp.selected_project_names[0] }}{{ '}' }}}
+\begin{itemize}[topsep=1pt,itemsep=1pt]
 {% for bullet in exp.project_bullets %}
 \item {{ bullet }}
 {% endfor %}
-\end{{ '{' }}cvprojectlist{{ '}' }}
-{{ '}' }}
+\end{itemize}
+{% else %}
+{%- for project_name in exp.selected_project_names -%}
+{\small\textit{{ '{' }}{{ project_name }}{{ '}' }}}{% if not loop.last %}; {% endif %}
+{%- endfor -%}
+\begin{itemize}[topsep=1pt,itemsep=1pt]
+{% for bullet in exp.project_bullets %}
+\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
 {% endif %}
 
 {% if exp.technologies %}
-\textbf{Technologies:} {{ exp.technologies|join(', ') }}
-\vspace{-1mm}
+\vspace{1mm}
+{\small\textbf{Technologies:} {{ exp.technologies|join(', ') }}}
+\vspace{1mm}
 {% endif %}
 
 {% if not loop.last %}
 \divider
+\vspace{-1mm}
 {% endif %}
 
 {% endfor %}
 
-% PAGE BREAK if needed (uncomment for multi-page CVs)
-% \newpage
-
 % EDUCATION
 {% if education %}
+% Ensure education section doesn't split
+\needspace{4cm}
 \cvsection{Education}
 {% for edu in education %}
 \cveventsmall{{ '{' }}{{ edu.degree }}{{ '}' }}{{ '{' }}{{ edu.institution }}{{ '}' }}{{ '{' }} 
@@ -121,45 +163,50 @@
   {%- if edu.end_year %} -- {{ edu.end_year }}{% endif -%}
 {{ '}' }}{{ '{' }}{{ edu.location }}{{ '}' }}
 {% if not loop.last %}
-\vspace{{ '{' }}-2mm{{ '}' }}
+\vspace{-2mm}
 \divider
 {% else %}
-\vspace{{ '{' }}-2mm{{ '}' }}
+\vspace{-2mm}
 {% endif %}
 {% endfor %}
 {% endif %}
 
 % CERTIFICATIONS
 {% if certifications %}
+\needspace{3cm}
 \divider
-\cveventsmall{{ '{' }}Certifications:{{ '}' }}{{ '{' }}{{ '}' }}{{ '{' }}{{ '}' }}{{ '{' }}{{ '}' }}
-\vspace{{ '{' }}-5mm{{ '}' }}
+\cveventsmall{Certifications:}{}{}{}
+\vspace{-4mm}
 {% for cert in certifications %}
 \cvtag{{ '{' }}{{ cert }}{{ '}' }}
 {% endfor %}
+\vspace{1mm}
 {% endif %}
 
 % SKILLS
 {% if skills %}
-\cvsection{{ '{' }}Skills{{ '}' }}
+\needspace{5cm}
+\cvsection{Skills}
 
 {% for category, skill_list in skills.items() %}
-\textbf{{ '{' }}{{ category|replace('_', ' ')|title }}:{{ '}' }}
+{\small\textbf{{ '{' }}{{ category|replace('_', ' ')|title ~ ":" }}{{ '}' }}}
+\vspace{0.5mm}
 {% for skill in skill_list %}
 \cvtag{{ '{' }}{{ skill }}{{ '}' }}
 {% endfor %}
-\vspace{{ '{' }}2mm{{ '}' }}
+\vspace{1.5mm}
 
 {% endfor %}
 {% endif %}
 
 % LANGUAGES
 {% if languages %}
-\cvsection{{ '{' }}Languages{{ '}' }}
+\needspace{2cm}
+\cvsection{Languages}
 {% for lang in languages %}
-\cvtag{{ '{' }}{{ lang.name }}: {{ lang.proficiency }}{{ '}' }}
+\cvtag{{ '{' }}{{ lang.name ~ ": " ~ lang.proficiency }}{{ '}' }}
 {% endfor %}
-\vspace{{ '{' }}2mm{{ '}' }}
+\vspace{1mm}
 {% endif %}
 
 \end{document}

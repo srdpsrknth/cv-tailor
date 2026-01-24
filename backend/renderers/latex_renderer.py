@@ -142,17 +142,33 @@ class LaTeXRenderer:
         # Prepare experience data
         experiences = []
         for exp in tailored_cv.experience:
-            experiences.append({
+            exp_data = {
                 "company": self._escape_latex(exp.company),
                 "role": self._escape_latex(exp.role),
                 "start_date": exp.start_date,
                 "end_date": exp.end_date,
                 "location": self._escape_latex(self._get_location_for_company(exp.company, profile)),
                 "bullets": [self._escape_latex(b) for b in exp.bullets],
-                "selected_project_names": [self._escape_latex(p) for p in (exp.selected_project_names or [])],
-                "project_bullets": [self._escape_latex(b) for b in (exp.project_bullets or [])],
                 "technologies": [self._escape_latex(t) for t in self._get_technologies_for_company(exp.company, profile)]
-            })
+            }
+            
+            # Handle new projects structure
+            if exp.projects:
+                exp_data["projects"] = [
+                    {
+                        "name": self._escape_latex(proj.name),
+                        "bullets": [self._escape_latex(b) for b in proj.bullets]
+                    }
+                    for proj in exp.projects
+                ]
+            else:
+                exp_data["projects"] = []
+            
+            # Handle legacy structure for backward compatibility
+            exp_data["selected_project_names"] = [self._escape_latex(p) for p in (exp.selected_project_names or [])]
+            exp_data["project_bullets"] = [self._escape_latex(b) for b in (exp.project_bullets or [])]
+            
+            experiences.append(exp_data)
         
         return {
             "name": self._escape_latex(identity.full_name),

@@ -8,6 +8,14 @@ from pydantic import BaseModel, Field, ConfigDict
 # CV output (structured)
 # -------------------------
 
+class TailoredProject(BaseModel):
+    """Individual project with its own bullets."""
+    model_config = ConfigDict(extra="ignore")
+    
+    name: str
+    bullets: List[str] = Field(default_factory=list)
+
+
 class TailoredExperience(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -16,8 +24,11 @@ class TailoredExperience(BaseModel):
     start_date: str
     end_date: str
     bullets: List[str] = Field(default_factory=list)
+    # Legacy fields for backward compatibility
     selected_project_names: List[str] = Field(default_factory=list)
     project_bullets: List[str] = Field(default_factory=list)
+    # New field for proper project structure
+    projects: List[TailoredProject] = Field(default_factory=list)
 
 
 class TailoredCV(BaseModel):

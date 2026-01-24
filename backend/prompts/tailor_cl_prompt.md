@@ -26,16 +26,22 @@ The base profile is the **only** source of truth. Do not rely on prior knowledge
 
 ## OUTPUT FORMAT (JSON ONLY)
 
+**CRITICAL: The `paragraphs` array MUST contain EXACTLY 4 paragraphs in this order:**
+1. Opening paragraph (50-80 words)
+2. Body paragraph 1 (75-100 words)
+3. Body paragraph 2 (75-100 words)
+4. Closing paragraph (40-60 words)
+
 ```json
 {
   "cover_letter": {
     "role_title": "string",
     "company_name": "string",
     "paragraphs": [
-      "opening_paragraph",
-      "body_paragraph_1",
-      "body_paragraph_2",
-      "closing_paragraph"
+      "opening_paragraph (50-80 words)",
+      "body_paragraph_1 (75-100 words)",
+      "body_paragraph_2 (75-100 words)",
+      "closing_paragraph (40-60 words)"
     ],
     "highlight_bullets": ["achievement1", "achievement2"],
     "closing_line": "Sincerely,",
@@ -45,6 +51,8 @@ The base profile is the **only** source of truth. Do not rely on prior knowledge
   "notes": ["optional notes"]
 }
 ```
+
+**VALIDATION: Verify that `paragraphs` array has length == 4 before returning.**
 
 ---
 
@@ -110,10 +118,12 @@ Prefer:
 
 ### Closing Paragraph (40–60 words)
 
+* **REQUIRED** - This is the 4th and final paragraph before the signature
 * Reiterate why the candidate will be effective in THIS role at THIS company
 * Reference collaboration with cross-functional teams if supported by the base profile
 * End with a professional, confident invitation to continue the conversation
 * Avoid emotional language or sales-style closings
+* Example structure: "I am confident I can bring value to [company] as [role]. My experience with [key skill] and [key domain] aligns well with your needs. I look forward to discussing how I can contribute to [specific team/goal]."
 
 ---
 
@@ -156,8 +166,21 @@ Do NOT imitate startup marketing language or founder-style enthusiasm.
 
 ## TASK COMPLETION
 
+**BEFORE RETURNING YOUR JSON:**
+1. Count the paragraphs array - it MUST have exactly 4 elements
+2. Verify word counts for each paragraph match the specified ranges
+3. Ensure total word count is 300-350 words (excluding salutation and signature)
+4. Check that closing_line is ONLY the sign-off (e.g., "Sincerely,"), NOT a paragraph
+5. Verify the 4th paragraph (closing_paragraph) provides a clear, confident conclusion
+
 Return ONLY a valid JSON object matching the schema above.
 The JSON will be parsed and rendered into a DOCX template automatically.
 Accuracy, grounding, structure, and word count are critical.
+
+**COMMON MISTAKES TO AVOID:**
+- ❌ Returning only 3 paragraphs and putting the closing in closing_line
+- ❌ Making paragraphs too long (stick to word limits!)
+- ❌ Skipping the 4th closing paragraph
+- ✅ Always include exactly 4 paragraphs in the array
 
 ---

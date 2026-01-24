@@ -107,7 +107,8 @@
 \usetikzlibrary{arrows}
 \RequirePackage[skins]{tcolorbox}
 \RequirePackage{enumitem}
-\setlist{leftmargin=*,labelsep=0.5em,nosep,itemsep=0.25\baselineskip,after=\vskip0.25\baselineskip}
+% Optimized spacing for ATS compliance and readability
+\setlist{leftmargin=*,labelsep=0.5em,nosep,itemsep=0.3\baselineskip,after=\vskip0.2\baselineskip,topsep=0.2\baselineskip}
 \setlist[itemize]{label=\itemmarker}
 \RequirePackage{graphicx}
 \RequirePackage{etoolbox}
@@ -117,7 +118,8 @@
 % \RequirePackage{marginfix}
 
 \setlength{\parindent}{0pt}
-\newcommand{\divider}{\textcolor{body!30}{\hdashrule{\linewidth}{0.6pt}{0.5ex}}\medskip}
+% Optimized divider for section separation
+\newcommand{\divider}{\textcolor{body!30}{\hdashrule{\linewidth}{0.6pt}{0.5ex}}\vspace{1mm}}
 
 \newenvironment{fullwidth}{%
   \begin{adjustwidth}{}{\dimexpr-\marginparwidth-\marginparsep\relax}}
@@ -174,10 +176,10 @@
 \renewenvironment{quote}{\color{accent}\itshape\large}{\par}
 
 \newcommand{\cvsection}[2][]{%
-  \bigskip%
+  \vspace{0.5\baselineskip}%
   \ifstrequal{#1}{}{}{\marginpar{\vspace*{\dimexpr1pt-\baselineskip}\raggedright\input{#1}}}%
   {\color{heading}\Large\bfseries\MakeUppercase{#2}}\\[-1ex]%
-  {\color{heading}\rule{\linewidth}{2pt}\par}\smallskip
+  {\color{heading}\rule{\linewidth}{2pt}\par}\vspace{1mm}
 }
 
 \newcommand{\cvsubsection}[1]{%
@@ -221,13 +223,13 @@
 \newcommand{\cveventsmall}[4]{%
   \begingroup%
   \par\noindent%
-  % Title
-  {\normalsize\color{emphasis}\raggedright #1\par}%
-  \smallskip%
+  % Title - optimized for ATS
+  {\normalsize\color{emphasis}\raggedright\textbf{#1}\par}%
+  \vspace{1mm}%
 
   % Metadata row (force consistent size)
   {\small\noindent%
-    % Left block (#2)
+    % Left block (#2) - role
     \ifstrequal{#2}{}{}{%
       \makebox[0.5\linewidth][l]{%
         \parbox[t]{\dimexpr0.5\linewidth\relax}{\raggedright%
@@ -235,7 +237,7 @@
         }%
       }%
     }%
-    % Right block (#3 left, #4 fully right)
+    % Right block (#3 dates, #4 location)
     \makebox[0.5\linewidth][l]{%
       \ifstrequal{#3}{}{}{%
         \faCalendar\hspace{0.5em}#3%
@@ -248,7 +250,7 @@
     \par%
   }%
 
-  \medskip%
+  \vspace{1mm}%
   \endgroup%
 }
 

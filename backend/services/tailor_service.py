@@ -124,6 +124,15 @@ def tailor_documents(
             cv_data = data.get("cv", data)
             logger.info(f"[CV Gen Attempt {attempt+1}] CV data keys: {list(cv_data.keys())}")
             logger.info(f"[CV Gen Attempt {attempt+1}] Experience count: {len(cv_data.get('experience', []))}")
+            
+            # Debug: Check projects in first experience
+            if cv_data.get('experience'):
+                first_exp = cv_data['experience'][0]
+                logger.info(f"[CV Gen Attempt {attempt+1}] First experience keys: {list(first_exp.keys())}")
+                if 'projects' in first_exp:
+                    logger.info(f"[CV Gen Attempt {attempt+1}] Projects count in first exp: {len(first_exp['projects'])}")
+                    if first_exp['projects']:
+                        logger.info(f"[CV Gen Attempt {attempt+1}] First project: {first_exp['projects'][0]}")
 
             tailored_cv = TailoredCV.model_validate(cv_data)
             logger.info(f"[CV Gen Attempt {attempt+1}] ✅ Validation passed!")
@@ -183,7 +192,19 @@ def tailor_documents(
             logger.info(f"[CL Gen Attempt {attempt+1}] CL data keys: {list(cl_data.keys())}")
 
             tailored_cl = TailoredCoverLetter.model_validate(cl_data)
-            logger.info(f"[CL Gen Attempt {attempt+1}] ✅ Validation passed!")
+            
+            # Validate exactly 4 paragraphs as per prompt requirements
+            if len(tailored_cl.paragraphs) != 4:
+                error_msg = f"Expected exactly 4 paragraphs, got {len(tailored_cl.paragraphs)}"
+                logger.warning(f"[CL Gen Attempt {attempt+1}] ⚠️  {error_msg}")
+                if attempt < 2:  # Retry on validation failure
+                    cl_error_log.append(f"Attempt {attempt+1}: {error_msg}")
+                    continue
+                else:
+                    # On final attempt, log warning but accept it
+                    logger.warning(f"[CL Gen Attempt {attempt+1}] Accepting {len(tailored_cl.paragraphs)} paragraphs on final attempt")
+            
+            logger.info(f"[CL Gen Attempt {attempt+1}] ✅ Validation passed! Paragraphs count: {len(tailored_cl.paragraphs)}")
             break
 
         except Exception as e:

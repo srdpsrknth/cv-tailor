@@ -205,8 +205,17 @@ class GeminiService:
                             "start_date": {"type": "string"},
                             "end_date": {"type": "string"},
                             "bullets": {"type": "array", "items": {"type": "string"}},
-                            "selected_project_names": {"type": "array", "items": {"type": "string"}},
-                            "project_bullets": {"type": "array", "items": {"type": "string"}}
+                            "projects": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "bullets": {"type": "array", "items": {"type": "string"}}
+                                    },
+                                    "required": ["name", "bullets"]
+                                }
+                            }
                         },
                         "required": ["company", "role", "start_date", "end_date", "bullets"]
                     }
