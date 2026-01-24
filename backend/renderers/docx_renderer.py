@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import date
 import re
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -90,6 +91,14 @@ class DocxRenderer:
                 email=context.get("candidate_email", ""),
             )
         except Exception:
+            pass
+
+        # Generate PDF version as well
+        pdf_path: Optional[Path] = None
+        try:
+            pdf_path = self._export_pdf(output_path)
+        except Exception:
+            # Non-fatal; DOCX is the primary output
             pass
 
         return str(output_path)
@@ -195,6 +204,39 @@ class DocxRenderer:
                 changed = False
 
         docx.save(str(docx_path))
+
+    def _export_pdf(self, docx_path: Path) -> Path:
+        """
+        Convert DOCX to PDF using LibreOffice (if available).
+        Returns PDF path if successful; raises exception otherwise.
+        """
+        try:
+            pdf_path = docx_path.with_suffix(".pdf")
+            
+            # Try LibreOffice CLI
+            result = subprocess.run(
+                [
+                    "soffice",
+                    "--headless",
+                    "--convert-to", "pdf",
+                    "--outdir", str(self.outputs_dir),
+                    str(docx_path)
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0 and pdf_path.exists():
+                return pdf_path
+            else:
+                raise Exception(f"LibreOffice conversion failed: {result.stderr}")
+                
+        except FileNotFoundError:
+            # LibreOffice not installed; fallback: skip PDF generation
+            raise DocxRendererError("LibreOffice not found. DOCX export only.")
+        except Exception as e:
+            raise DocxRendererError(f"PDF export failed: {e}")
 
 
 def create_docx_renderer(
