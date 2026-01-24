@@ -1,0 +1,165 @@
+\documentclass[10pt,a4paper,ragged2e]{altacv}
+
+% Page layout - ATS-friendly margins
+\geometry{left=1.2cm,right=1.2cm,marginparwidth=6.8cm,marginparsep=1.2cm,top=1cm,bottom=1cm}
+
+% Font configuration for ATS compatibility
+\ifxetexorluatex
+  \setmainfont{Carlito}
+\else
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage[default]{lato}
+\fi
+
+\usepackage{multicol}
+\usepackage{hyperref}
+
+% Color scheme
+\definecolor{NavyBlue}{HTML}{00004d}
+\definecolor{SlateGrey}{HTML}{2E2E2E}
+\definecolor{LightGrey}{HTML}{666666}
+\colorlet{heading}{NavyBlue}
+\colorlet{accent}{NavyBlue}
+\colorlet{emphasis}{SlateGrey}
+\colorlet{body}{LightGrey}
+
+% Typography settings for better ATS parsing
+\tolerance=1
+\emergencystretch=\maxdimen
+\hyphenpenalty=10000
+\hbadness=10000
+
+\usepackage{paracol}
+
+% Bullet markers
+\renewcommand{\itemmarker}{{ '{' }}{\small\textbullet}{{ '}' }}
+\renewcommand{\ratingmarker}{\faCircle}
+
+\begin{document}
+
+% Header with personal information
+\name{{ '{' }}{{ name }}{{ '}' }}
+\tagline{{ '{' }}{{ tagline }}{{ '}' }}
+
+\personalinfo{{ '{' }}%
+  \email{\href{mailto:{{ email }}}{{ '{' }}{{ email }}{{ '}' }}}
+  \phone{\href{tel:{{ phone|replace(' ', '') }}}{{ '{' }}{{ phone }}{{ '}' }}}
+  {% if linkedin -%}
+  \linkedin{\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.linkedin.com/in/', '') }}{{ '}' }}}
+  {%- endif %}
+  {% if github -%}
+  \github{\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://github.com/', '') }}{{ '}' }}}
+  {%- endif %}
+{{ '}' }}
+
+\makecvheader
+
+% Professional Summary
+{% if summary %}
+\small {{ summary|join(' ') }}
+{% endif %}
+
+\AtBeginEnvironment{itemize}{\small}
+
+% PROFESSIONAL EXPERIENCE
+\cvsection{Professional Experience}
+
+{% for exp in experience %}
+\cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
+  {%- if exp.start_date -%}
+    {{ exp.start_date|replace('-', ' ') }}
+  {%- endif -%}
+  {%- if exp.end_date -%}
+    {%- if exp.end_date == 'present' %} -- present{% else %} -- {{ exp.end_date|replace('-', ' ') }}{% endif -%}
+  {%- endif -%}
+{{ '}' }}{{ '{' }}{{ exp.location }}{{ '}' }}
+
+{% if exp.bullets %}
+\begin{itemize}
+{% for bullet in exp.bullets %}
+\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+
+{% if exp.selected_project_names and exp.project_bullets %}
+\cvprojectsection{{ '{' }}Selected Projects{{ '}' }}
+\cvproject{{ '{' }}{{ '}' }}{{ '{' }}
+  {%- for project_name in exp.selected_project_names -%}
+    {{ project_name }}{% if not loop.last %}, {% endif %}
+  {%- endfor -%}
+{{ '}' }}{{ '{' }}
+\begin{{ '{' }}cvprojectlist{{ '}' }}
+{% for bullet in exp.project_bullets %}
+\item {{ bullet }}
+{% endfor %}
+\end{{ '{' }}cvprojectlist{{ '}' }}
+{{ '}' }}
+{% endif %}
+
+{% if exp.technologies %}
+\textbf{Technologies:} {{ exp.technologies|join(', ') }}
+\vspace{-1mm}
+{% endif %}
+
+{% if not loop.last %}
+\divider
+{% endif %}
+
+{% endfor %}
+
+% PAGE BREAK if needed (uncomment for multi-page CVs)
+% \newpage
+
+% EDUCATION
+{% if education %}
+\cvsection{Education}
+{% for edu in education %}
+\cveventsmall{{ '{' }}{{ edu.degree }}{{ '}' }}{{ '{' }}{{ edu.institution }}{{ '}' }}{{ '{' }} 
+  {%- if edu.start_year -%}{{ edu.start_year }}{%- endif -%}
+  {%- if edu.end_year %} -- {{ edu.end_year }}{% endif -%}
+{{ '}' }}{{ '{' }}{{ edu.location }}{{ '}' }}
+{% if not loop.last %}
+\vspace{{ '{' }}-2mm{{ '}' }}
+\divider
+{% else %}
+\vspace{{ '{' }}-2mm{{ '}' }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+% CERTIFICATIONS
+{% if certifications %}
+\divider
+\cveventsmall{{ '{' }}Certifications:{{ '}' }}{{ '{' }}{{ '}' }}{{ '{' }}{{ '}' }}{{ '{' }}{{ '}' }}
+\vspace{{ '{' }}-5mm{{ '}' }}
+{% for cert in certifications %}
+\cvtag{{ '{' }}{{ cert }}{{ '}' }}
+{% endfor %}
+{% endif %}
+
+% SKILLS
+{% if skills %}
+\cvsection{{ '{' }}Skills{{ '}' }}
+
+{% for category, skill_list in skills.items() %}
+\textbf{{ '{' }}{{ category|replace('_', ' ')|title }}:{{ '}' }}
+{% for skill in skill_list %}
+\cvtag{{ '{' }}{{ skill }}{{ '}' }}
+{% endfor %}
+\vspace{{ '{' }}2mm{{ '}' }}
+
+{% endfor %}
+{% endif %}
+
+% LANGUAGES
+{% if languages %}
+\cvsection{{ '{' }}Languages{{ '}' }}
+{% for lang in languages %}
+\cvtag{{ '{' }}{{ lang.name }}: {{ lang.proficiency }}{{ '}' }}
+{% endfor %}
+\vspace{{ '{' }}2mm{{ '}' }}
+{% endif %}
+
+\end{document}

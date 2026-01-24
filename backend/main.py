@@ -2,28 +2,32 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
-from openai import OpenAI
 
-from backend.models.tailored_output import TailoredOutput
-from backend.services.profile_loader import load_profile
-from backend.services.tailor_service import tailor_documents
+from models.requests import TailorRequest, TailorResponse
+from services.profile_loader import load_profile
+from services.tailor_service import tailor_documents
 
 
-# Force-load backend/.env for the API process as well (safe even if already loaded)
-ENV_PATH = Path(__file__).resolve().parent / ".env"
-load_dotenv(dotenv_path=ENV_PATH, override=True)
+load_dotenv(override=True)
 
 app = FastAPI(title="cv-tailor-backend", version="0.1.0")
 
+# Base outputs directory
+OUTPUTS_DIR = Path(__file__).resolve().parents[1] / "outputs"
 
-class TailorRequest(BaseModel):
-    job_description: str = Field(..., min_length=10)
+
+def _slugify(text: str) -> str:
+    """Filesystem-safe slug (match renderer behavior)."""
+    text = text.strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text or "role"
 
 
 @app.get("/health")
@@ -31,34 +35,87 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/health/openai")
-def health_openai():
-    """
-    Lightweight check: verifies the backend can talk to OpenAI with the configured key.
-    Note: If your account has no quota/billing, this may still fail with 429.
-    """
-    client = OpenAI()
-    try:
-        client.models.list()
-        return {"openai": "ok"}
-    except Exception as e:
-        return {"openai": "error", "detail": str(e)}
-
-
-@app.post("/tailor", response_model=TailoredOutput)
+@app.post("/api/tailor", response_model=TailorResponse)
 def tailor(req: TailorRequest):
     try:
         profile = load_profile()
-        result = tailor_documents(job_description=req.job_description, profile=profile)
+        result = tailor_documents(
+            job_description=req.job_description,
+            profile=profile,
+            company_name=req.company_name,
+            role_title=req.role_title,
+        )
         return result
 
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     except ValueError as e:
-        # Includes: empty JD, OpenAI auth/quota errors (mapped in tailor_service),
-        # JSON decode failures, and Pydantic validation errors
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+
+@app.get("/api/download/cv/{job_id}")
+def download_cv(job_id: str):
+    """Download the generated CV PDF by job_id (filename stem)."""
+    pdf_path = OUTPUTS_DIR / f"{job_id}.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail=f"CV PDF not found for job_id: {job_id}")
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        filename=pdf_path.name,
+    )
+
+
+@app.get("/api/preview/{job_id}")
+def preview_cv(job_id: str):
+    """Return the CV PDF for inline preview embedding."""
+    pdf_path = OUTPUTS_DIR / f"{job_id}.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail=f"CV PDF not found for job_id: {job_id}")
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        filename=pdf_path.name,
+    )
+
+
+@app.get("/api/download/cover-letter/{job_id}")
+def download_cover_letter(job_id: str):
+    """
+    Download the generated cover letter DOCX inferred from the CV job_id.
+
+    job_id format from renderer: {year}_CV_{full_name_slug}_{job_slug}
+    We map to DOCX: {year}_cover_letter_{company_slug}_{job_slug}.docx
+    """
+    # Extract year and job slug from job_id
+    try:
+        parts = job_id.split("_")
+        year = parts[0]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid job_id format")
+
+    profile = load_profile()
+    full_name_slug = _slugify(profile.identity.full_name)
+
+    prefix = f"{year}_CV_{full_name_slug}_"
+    if job_id.startswith(prefix):
+        job_slug = job_id[len(prefix):]
+    else:
+        # Fallback: use trailing part as job slug
+        job_slug = parts[-1]
+
+    # Find a matching DOCX: {year}_cover_letter_*_{job_slug}.docx
+    matches = list(OUTPUTS_DIR.glob(f"{year}_cover_letter_*_{job_slug}.docx"))
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Cover letter not found for job_id: {job_id}")
+
+    docx_path = matches[0]
+    return FileResponse(
+        path=str(docx_path),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=docx_path.name,
+    )

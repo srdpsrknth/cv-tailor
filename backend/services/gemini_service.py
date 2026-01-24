@@ -133,6 +133,9 @@ class GeminiService:
                 if response_schema:
                     config.response_mime_type = "application/json"
                     config.response_schema = response_schema
+                else:
+                    # Request JSON output without strict schema
+                    config.response_mime_type = "application/json"
                 
                 response = self.client.models.generate_content(
                     model=self.model,
