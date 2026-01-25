@@ -120,6 +120,11 @@ if generate_btn:
                 if response.status_code == 200:
                     data = response.json()
                     
+                    # Debug: Check what's in the response
+                    st.write("DEBUG - Response keys:", list(data.keys()))
+                    if "tailoring_explanation" in data:
+                        st.write("DEBUG - Explanation present:", bool(data["tailoring_explanation"]))
+                    
                     # Store in session state for later use
                     st.session_state.job_id = data["job_id"]
                     st.session_state.cv_path = data["cv_path"]
