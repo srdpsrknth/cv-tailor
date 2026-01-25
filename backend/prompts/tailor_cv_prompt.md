@@ -13,8 +13,10 @@ STRICT RULES FOR CV TAILORING:
 - Output MUST be valid JSON ONLY. No markdown, no commentary, no extra text.
 - Do NOT output LaTeX. All bullets must be plain text.
 - **CRITICAL: CV must be 1.8-2.0 A4 pages when rendered** (minimum 1.8, maximum 2.0)
-- **Target: 12-16 total experience bullets across all roles** (prioritize most relevant positions)
+- **Target: 16-20 total experience bullets across all roles** (prioritize most relevant positions)
 - **Keep bullets concise but descriptive: 1-2 lines each** (aim for 100-150 characters per bullet for detail)
+- **CRITICAL: Include ALL projects from the base profile** - Every project listed in "selected_projects" must appear in output
+- **Skills may be recategorized** if it better matches job requirements (reorder/reorganize but don't fabricate)
 
 OUTPUT FORMAT (JSON ONLY):
 ```json
@@ -44,7 +46,8 @@ OUTPUT FORMAT (JSON ONLY):
     "include_certifications": true
   },
   "confidence": "low|medium|high",
-  "notes": ["optional notes"]
+  "notes": ["optional notes"],
+  "tailoring_explanation": "REQUIRED: Detailed explanation of all changes made from the base profile, including: 1) How job description keywords influenced wording changes in bullets and summary, 2) Which projects were included and why, 3) How skills were reordered to match job requirements, 4) Specific examples of reworded bullets with before/after comparisons, 5) Overall tailoring strategy and confidence level. This field is MANDATORY and must be a comprehensive multi-paragraph explanation."
 }
 ```
 
@@ -61,9 +64,10 @@ DETAILED GUIDELINES FOR CV:
 - Outcome-focused: quantify impact where possible (e.g., "5+ years in marketing analytics, driving 30% uplift")
 - No fluff; every word counts
 
-### Experience Bullets (3-5 bullets per role, detailed and impactful)
-- **CRITICAL: Target 12-16 total bullets across ALL roles** to achieve 1.8-2.0 page length
+### Experience Bullets (4-6 bullets per role, detailed and impactful)
+- **CRITICAL: Target 16-20 total bullets across ALL roles** to achieve 1.8-2.0 page length
 - **Each bullet should be 100-150 characters** (descriptive but concise, 1-2 lines when rendered)
+- **QUANTITATIVE FOCUS**: Prioritize bullets with numbers, percentages, dollar amounts, timeframes
 - Outcome-oriented: start with action (verb + impact + context)
 - Reorder bullets from most to least relevant to the job description
 - Preserve ALL quantifiable metrics from the base profile (e.g., "51 cities," "10k records," "€2M ARR")
@@ -72,19 +76,22 @@ DETAILED GUIDELINES FOR CV:
   - Example: If JD requires "marketing attribution" and profile has "A/B testing," link them: "Designed A/B tests using Python and SQL to measure attribution across 5+ marketing channels, improving ROI tracking by 25%"
 - Use ATS-friendly language: SQL, Python, Looker, Power BI (avoid abbreviations)
 - Include metrics when available: "increased adoption by 40%," "reduced query time by 50%"
-- **Bullet distribution**: 
-  - Most recent role: 4-5 bullets
-  - Second most recent: 3-4 bullets
-  - Third most recent: 2-3 bullets
-  - Older roles: 1-2 bullets each
+- **Bullet distribution (to achieve 16-20 total)**: 
+  - Most recent role: 5-6 bullets
+  - Second most recent: 4-5 bullets
+  - Third most recent: 3-4 bullets
+  - Older roles: 2-3 bullets each
 
 ### Projects (include to reach target length)
+- **CRITICAL: Include ALL projects from base profile's "selected_projects"** - do not drop any projects
 - **Include 2-4 projects total across relevant roles** to help reach 1.8-2.0 page target
 - Select the MOST relevant projects matching the job description
 - Focus on most recent 2-3 roles for project inclusion
 - **Each role can have 1-2 projects** (use the `projects` array)
 - **Each project MUST be a separate object** with its own `name` and `bullets` list
-- **Each project should have 2-3 descriptive bullets** showing technical implementation and business impact
+- **Each project MUST have 3-4 descriptive bullets** (minimum 3, maximum 4) showing technical implementation and business impact
+- Project bullets must be impactful, detailed, and specific about work done and achievements
+- Include metrics and concrete outcomes in project bullets
 - Projects are properly separated in the output - each project name is distinct with its own bullet list
 - Rewrite project bullets to emphasize business impact and technical skills matching the JD
 - Example project structure:
@@ -109,8 +116,10 @@ DETAILED GUIDELINES FOR CV:
 - Projects are essential for achieving target page length while showcasing relevant work
 
 ### Skills
+- **You MAY recategorize skills** into different groupings if it better matches the job requirements
 - Organize into semantic categories (e.g., "Data Analysis & Modeling," "BI Tools & Platforms")
 - Reorder skills within each category: JD-matching skills first, then related skills
+- Reorganize and reorder skills to emphasize JD alignment, but do not fabricate skills
 - If JD asks for "Tableau" but profile has "Looker," keep "Looker" and note it as an alternative BI tool (do NOT invent Tableau)
 - Approximate JD matches are acceptable: SQL variants, Python flavors, similar BI tools
 - Do NOT add skills not in the base profile
@@ -123,8 +132,8 @@ DETAILED GUIDELINES FOR CV:
 - **MUST be between 1.8 and 2.0 A4 pages when rendered to PDF**
 - **Target content volume (to achieve 1.8-2.0 pages):**
   - Summary: 2-3 lines (80-120 words)
-  - Experience: 3-4 most relevant roles with total 12-16 bullets
-  - Projects: 2-4 projects across top 2-3 roles, 2-3 bullets each (6-10 project bullets total)
+  - Experience: 3-4 most relevant roles with total 16-20 bullets
+  - Projects: 2-4 projects across top 2-3 roles, 3-4 bullets each (9-16 project bullets total)
   - Skills: 25-35 skills total across all categories (well organized)
   - Education: Always include (typically 2-3 lines)
   - Certifications: Always include if present

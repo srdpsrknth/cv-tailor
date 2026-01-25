@@ -111,9 +111,6 @@ def tailor_documents(
             prompt = cv_prompt
             if attempt > 0:
                 prompt += "\n\nSTRICT: Return ONLY valid JSON matching the expected structure. No markdown, no comments, no trailing text."
-            
-            # Add explicit reminder about tailoring_explanation
-            prompt += "\n\nIMPORTANT: You MUST include the 'tailoring_explanation' field in your JSON response as a detailed string explaining all changes made."
 
             response_text_cv, input_tokens_cv, output_tokens_cv = service._call_gemini(
                 prompt,

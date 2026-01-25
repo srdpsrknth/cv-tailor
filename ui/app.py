@@ -237,7 +237,7 @@ if "generated" in st.session_state and st.session_state.generated:
                 st.error(f"Download error: {str(e)}")
         
         with col_cl_pdf:
-            # Try the new dedicated PDF endpoint
+            # Try the dedicated PDF endpoint
             try:
                 cl_pdf_response = requests.get(
                     f"{API_DOWNLOAD_CL_PDF}/{job_id}",
@@ -252,9 +252,9 @@ if "generated" in st.session_state and st.session_state.generated:
                         use_container_width=True
                     )
                 else:
-                    st.caption("(PDF not available - LibreOffice may not be installed)")
+                    st.caption("(PDF not available)")
             except Exception:
-                st.caption("(PDF not available - LibreOffice may not be installed)")
+                st.caption("(PDF not available)")
         
 
     st.divider()

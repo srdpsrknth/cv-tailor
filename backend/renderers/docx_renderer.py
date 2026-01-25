@@ -97,15 +97,15 @@ class DocxRenderer:
         except Exception:
             pass
 
-        # Generate PDF version (required)
+        # Generate PDF version using LaTeX (required)
         pdf_path: Optional[str] = None
         try:
-            pdf_file = self._export_pdf(output_path, tailored_cl, profile)
+            pdf_file = self._generate_pdf_via_latex(output_path, tailored_cl, profile)
             pdf_path = str(pdf_file)
             logger.info(f"Generated cover letter PDF: {pdf_path}")
         except Exception as e:
             logger.error(f"Failed to generate cover letter PDF: {e}")
-            raise DocxRendererError(f"PDF generation failed (required): {e}")
+            raise DocxRendererError(f"PDF generation failed: {e}")
 
         return str(output_path), pdf_path
 
@@ -231,60 +231,6 @@ class DocxRenderer:
                 changed = False
 
         docx.save(str(docx_path))
-
-    def _export_pdf(self, docx_path: Path, tailored_cl: TailoredCoverLetter, profile: Profile) -> Path:
-        """
-        Convert DOCX to PDF using LibreOffice (preferred) or LaTeX fallback.
-        Raises exception if both methods fail.
-        
-        Args:
-            docx_path: Path to DOCX file
-            tailored_cl: Tailored cover letter data
-            profile: Base profile for contact info
-        
-        Returns:
-            Path to generated PDF file
-            
-        Raises:
-            DocxRendererError: If PDF generation fails with all methods
-        """
-        pdf_path = docx_path.with_suffix(".pdf")
-        
-        # Method 1: Try LibreOffice
-        try:
-            logger.info(f"Attempting LibreOffice PDF conversion for {docx_path.name}")
-            result = subprocess.run(
-                [
-                    "soffice",
-                    "--headless",
-                    "--convert-to", "pdf",
-                    "--outdir", str(self.outputs_dir),
-                    str(docx_path)
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            if result.returncode == 0 and pdf_path.exists():
-                logger.info(f"✅ LibreOffice PDF generated: {pdf_path}")
-                return pdf_path
-        except FileNotFoundError:
-            logger.warning("LibreOffice not found, trying LaTeX fallback...")
-        except subprocess.TimeoutExpired:
-            logger.warning("LibreOffice timeout, trying LaTeX fallback...")
-        except Exception as e:
-            logger.warning(f"LibreOffice failed ({e}), trying LaTeX fallback...")
-        
-        # Method 2: LaTeX fallback - generate simple LaTeX from cover letter text
-        try:
-            logger.info(f"Attempting LaTeX PDF generation for {docx_path.name}")
-            pdf_path = self._generate_pdf_via_latex(docx_path, tailored_cl, profile)
-            logger.info(f"✅ LaTeX PDF generated: {pdf_path}")
-            return pdf_path
-        except Exception as e:
-            logger.error(f"LaTeX PDF generation also failed: {e}")
-            raise DocxRendererError(f"PDF generation failed (both LibreOffice and LaTeX): {e}")
 
     def _generate_pdf_via_latex(self, docx_path: Path, tailored_cl: TailoredCoverLetter, profile: Profile) -> Path:
         """
