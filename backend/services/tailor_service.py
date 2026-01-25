@@ -123,6 +123,7 @@ def tailor_documents(
             try:
                 data = json.loads(response_text_cv)
                 logger.info(f"[CV Gen Attempt {attempt+1}] JSON parsed successfully")
+                logger.info(f"[CV Gen Attempt {attempt+1}] Top-level keys: {list(data.keys())}")
             except json.JSONDecodeError as je:
                 logger.warning(f"[CV Gen Attempt {attempt+1}] JSON decode error at pos {je.pos}: {je.msg}")
                 # Try extracting JSON block
@@ -137,8 +138,12 @@ def tailor_documents(
             logger.info(f"[CV Gen Attempt {attempt+1}] CV data keys: {list(cv_data.keys())}")
             logger.info(f"[CV Gen Attempt {attempt+1}] Experience count: {len(cv_data.get('experience', []))}")
             
-            # Extract tailoring explanation if present
+            # Extract tailoring explanation if present (at root level of JSON)
             tailoring_explanation = data.get("tailoring_explanation")
+            if tailoring_explanation:
+                logger.info(f"[CV Gen Attempt {attempt+1}] Found tailoring_explanation: {len(tailoring_explanation)} chars")
+            else:
+                logger.warning(f"[CV Gen Attempt {attempt+1}] No tailoring_explanation in response")
             
             # Debug: Check projects in first experience
             if cv_data.get('experience'):
