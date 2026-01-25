@@ -78,8 +78,6 @@
 \cvsection{Professional Experience}
 
 {% for exp in experience %}
-% Ensure each experience entry stays together (needs ~6cm minimum)
-\needspace{6cm}
 \cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
   {%- if exp.start_date -%}
     {{ exp.start_date|replace('-', ' ') }}
@@ -90,6 +88,7 @@
 {{ '}' }}{{ '{' }}{{ exp.location }}{{ '}' }}
 
 {% if exp.bullets %}
+\nopagebreak
 \begin{itemize}
 {% for bullet in exp.bullets %}
 \item {{ bullet }}
@@ -99,8 +98,6 @@
 
 {% if exp.projects %}
 % Selected Projects - new structure (each project has own bullets)
-% Keep projects section together on same page
-\needspace{4cm}
 \vspace{1mm}
 {\small\textbf{\textcolor{accent}{Selected Projects:}}}
 \vspace{0.5mm}
@@ -117,8 +114,6 @@
 
 {% elif exp.selected_project_names and exp.project_bullets %}
 % Selected Projects - legacy structure (backward compatibility)
-% Keep projects section together on same page
-\needspace{4cm}
 \vspace{1mm}
 {\small\textbf{\textcolor{accent}{Selected Projects:}}}
 \vspace{0.5mm}
