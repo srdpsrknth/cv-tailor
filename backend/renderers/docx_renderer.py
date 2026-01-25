@@ -352,15 +352,15 @@ class DocxRenderer:
         for para in body_paras:
             # Escape LaTeX special characters
             escaped_para = self._escape_latex(para)
-            # Use \small font to reduce size compared to \large in macros
-            latex_content += f"{{\\small \\para{{{escaped_para}}}}}\n"
+            # Paragraphs handled by \para macro which includes left-justify
+            latex_content += f"\\para{{{escaped_para}}}\n"
         
-        # Add closing signature (greeting and name, without contact info)
+        # Add closing signature using the signature macro
         closing_line = tailored_cl.closing_line or "Best regards,"
         signature_name = tailored_cl.signature_name or candidate_name
         escaped_closing = self._escape_latex(closing_line)
         escaped_signature = self._escape_latex(signature_name)
-        latex_content += f"\n{{\\small \\par\\vspace{{2em}}\n{escaped_closing}\\par\\vspace{{1em}}\n{escaped_signature}}}\n"
+        latex_content += f"\n\\signature{{{escaped_closing}}}{{{escaped_signature}}}\n"
         
         # Add footer with contact info - NO LOCATION (empty string for first param)
         escaped_email = self._escape_latex(email)

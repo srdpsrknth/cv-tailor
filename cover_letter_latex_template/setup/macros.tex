@@ -21,8 +21,15 @@
 
 %%%%%%%%%%%%%%% Paragraph of a letter %%%%%%%%%%%%%%% 
 \newcommand{\para}[1]{
-    \normalsize #1
+    \normalsize \raggedright #1
     \normalsize \par \vspace{1em}
+}
+
+%%%%%%%%%%%%%%% Signature of the letter %%%%%%%%%%%%%%% 
+\newcommand{\signature}[2]{
+    \normalsize \par \vspace{2em}
+    \raggedright #1 \par \vspace{0.5em}
+    \raggedright #2
 }
 
 %%%%%%%%%%%%%%% Bottom of the letter %%%%%%%%%%%%%%% 
