@@ -126,6 +126,7 @@ if generate_btn:
                     st.session_state.cover_letter_path = data["cover_letter_path"]
                     st.session_state.cl_pdf_path = data.get("cl_pdf_path")  # May be None
                     st.session_state.token_usage = data["token_usage"]
+                    st.session_state.tailoring_explanation = data.get("tailoring_explanation")
                     st.session_state.generated = True
 
                     st.success("✅ Documents generated successfully!")
@@ -165,6 +166,14 @@ if "generated" in st.session_state and st.session_state.generated:
     with col_t4:
         st.metric("Est. Cost (EUR)", f"€{token_usage['estimated_cost_eur']:.4f}")
 
+    st.divider()
+
+    # Tailoring Explanation Section
+    if "tailoring_explanation" in st.session_state and st.session_state.tailoring_explanation:
+        with st.expander("📋 Tailoring Details & Changes Made", expanded=False):
+            st.markdown("### How Your CV & Cover Letter Were Tailored")
+            st.markdown(st.session_state.tailoring_explanation)
+    
     st.divider()
 
     # Preview and download

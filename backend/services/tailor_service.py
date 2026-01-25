@@ -103,6 +103,7 @@ def tailor_documents(
     input_tokens_cv = 0
     output_tokens_cv = 0
     tailored_cv = None
+    tailoring_explanation = None  # To store explanation from JSON
     cv_error_log = []
     
     for attempt in range(3):
@@ -135,6 +136,9 @@ def tailor_documents(
             cv_data = data.get("cv", data)
             logger.info(f"[CV Gen Attempt {attempt+1}] CV data keys: {list(cv_data.keys())}")
             logger.info(f"[CV Gen Attempt {attempt+1}] Experience count: {len(cv_data.get('experience', []))}")
+            
+            # Extract tailoring explanation if present
+            tailoring_explanation = data.get("tailoring_explanation")
             
             # Debug: Check projects in first experience
             if cv_data.get('experience'):
@@ -239,7 +243,8 @@ def tailor_documents(
         cv=tailored_cv,
         cover_letter=tailored_cl,
         confidence="high",
-        notes=[]
+        notes=[],
+        tailoring_explanation=tailoring_explanation  # From JSON response
     )
     
     input_tokens = input_tokens_cv + input_tokens_cl
@@ -290,6 +295,7 @@ def tailor_documents(
         cover_letter_path=str(cl_path),
         cl_pdf_path=str(cl_pdf_path) if cl_pdf_path else None,
         token_usage=token_usage,
+        tailoring_explanation=tailored_output.tailoring_explanation,
         message=None,
     )
 

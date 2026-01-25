@@ -64,3 +64,4 @@ class TailoredOutput(BaseModel):
     cover_letter: TailoredCoverLetter
     confidence: Literal["low", "medium", "high"] = "medium"
     notes: List[str] = Field(default_factory=list)
+    tailoring_explanation: Optional[str] = None

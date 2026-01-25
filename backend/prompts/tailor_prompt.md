@@ -48,7 +48,8 @@ Return a JSON object matching this structure:
     "signature_name": "Sreedeep Sreekanth"
   },
   "confidence": "low|medium|high",
-  "notes": ["... optional ..."]
+  "notes": ["... optional ..."],
+  "tailoring_explanation": "Detailed explanation of all changes made from the base profile, including: 1) How job description keywords influenced wording changes in bullets and summary, 2) Which projects were included/excluded and why (if applicable), 3) How skills were reordered to match job requirements, 4) Specific examples of reworded bullets with before/after comparisons, 5) Overall tailoring strategy and confidence level."
 }
 
 ADDITIONAL GUIDELINES:
@@ -59,6 +60,15 @@ ADDITIONAL GUIDELINES:
 - Ground every claim in the base profile: reference actual tools, metrics, outcomes, and responsibilities. Do not fabricate.
 - Mirror tone and structure of strong professional cover letters (e.g., warm opening, focused body with specifics, confident close). Be specific and concrete.
 - Cover letter body length: minimum 300 words, maximum 350 words (do not exceed 350). Avoid generic claims; be specific with technologies, metrics, and outcomes.
+
+TAILORING EXPLANATION:
+In the "tailoring_explanation" field, provide a comprehensive summary of all changes made:
+1. **Wording Changes**: List specific examples where bullet points or summary text was reworded to match job description keywords (include before/after examples)
+2. **Projects Included**: List ALL projects included for each company with brief reasoning for why they're relevant
+3. **Skills Reordering**: Explain how skills categories were reorganized to prioritize job requirements
+4. **Bullet Selection**: If any bullets were omitted or prioritized, explain why
+5. **Overall Strategy**: Summarize the tailoring approach and alignment with job requirements
+6. **Confidence Rationale**: Explain why you assigned the given confidence level
 
 better understand customer behavior, improve retention, and drive sustainable growth 
 STYLE EXAMPLE (tone/structure only — do NOT copy; output MUST be JSON only):

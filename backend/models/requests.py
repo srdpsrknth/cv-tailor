@@ -32,6 +32,7 @@ class TailorResponse(BaseModel):
     cover_letter_path: str
     cl_pdf_path: Optional[str] = None
     token_usage: TokenUsage
+    tailoring_explanation: Optional[str] = None
     message: Optional[str] = None
 
 
