@@ -340,10 +340,9 @@ class DocxRenderer:
 
     """
         
-        # Add name and role (use actual values from profile and cover letter)
-        escaped_name = self._escape_latex(candidate_name)
+        # Add title and job role (use "Cover Letter" as title, role as subtitle)
         escaped_role = self._escape_latex(role_title)
-        latex_content += f"\\name{{{escaped_name}}}{{{escaped_role}}}\n"
+        latex_content += f"\\name{{Cover Letter}}{{{escaped_role}}}\n"
         
         # Add receiver/company
         escaped_company = self._escape_latex(company_name)
