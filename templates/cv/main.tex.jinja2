@@ -99,6 +99,8 @@
 
 {% if exp.projects %}
 % Selected Projects - new structure (each project has own bullets)
+% Keep projects section together on same page
+\needspace{4cm}
 \vspace{1mm}
 {\small\textbf{\textcolor{accent}{Selected Projects:}}}
 \vspace{0.5mm}
@@ -115,6 +117,8 @@
 
 {% elif exp.selected_project_names and exp.project_bullets %}
 % Selected Projects - legacy structure (backward compatibility)
+% Keep projects section together on same page
+\needspace{4cm}
 \vspace{1mm}
 {\small\textbf{\textcolor{accent}{Selected Projects:}}}
 \vspace{0.5mm}
