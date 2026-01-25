@@ -9,7 +9,9 @@ STRICT RULES:
 - You MAY: rephrase bullets, choose the most relevant bullets, reorder sections, and tighten language.
 - Output MUST be valid JSON ONLY. No markdown. No commentary.
 - Do NOT output LaTeX. All bullets/paragraphs must be plain text.
-- CV length target: produce enough content to render more than 1.75 A4 pages and at most 2 pages in the provided LaTeX template. Preserve projects (do not drop them); you may reorder bullets/projects and rewrite bullets to better match the job description. Reorder skills to emphasize JD alignment, but do not fabricate skills.
+- CV length target: produce enough content to render more than 1.75 A4 pages and at most 2 pages in the provided LaTeX template.
+- IMPORTANT: Include ALL projects from the base profile's "selected_projects" field for each experience. Map each project to the "projects" array with its name and bullets. You may reword project bullets to align with the job description, but do NOT drop any projects.
+- Reorder skills to emphasize JD alignment, but do not fabricate skills.
 
 OUTPUT FORMAT:
 Return a JSON object matching this structure:
@@ -26,8 +28,12 @@ Return a JSON object matching this structure:
         "start_date": "YYYY-MM",
         "end_date": "YYYY-MM or present",
         "bullets": ["...", "..."],
-        "selected_project_names": ["..."],
-        "project_bullets": ["..."]
+        "projects": [
+          {
+            "name": "...",
+            "bullets": ["...", "..."]
+          }
+        ]
       }
     ],
     "include_education": true,
