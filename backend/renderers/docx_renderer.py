@@ -340,19 +340,34 @@ class DocxRenderer:
 
     """
         
-        # Add title and job role (use "Cover Letter" as title, role as subtitle)
+        # Add title with job role @ company as subtitle
         escaped_role = self._escape_latex(role_title)
-        latex_content += f"\\name{{Cover Letter}}{{{escaped_role}}}\n"
-        
-        # Add receiver/company
         escaped_company = self._escape_latex(company_name)
-        latex_content += f"\\receiver{{{escaped_company}}}\n\n"
+        subtitle = f"{escaped_role} @ {escaped_company}"
+        latex_content += f"\\name{{Cover Letter}}{{{subtitle}}}\n\n"
         
-        # Add all body paragraphs with smaller font size
+        # Extract salutation (first line if it starts with "Dear")
+        salutation = "Dear Hiring Manager,"
+        first_para = body_paras[0] if body_paras else ""
+        if first_para.startswith("Dear"):
+            # Split on first newline or use whole paragraph if no newline
+            lines = first_para.split('\n', 1)
+            salutation = lines[0]
+            # If there's content after salutation, replace first para with it
+            if len(lines) > 1:
+                body_paras[0] = lines[1]
+            else:
+                # Entire first paragraph is just salutation, remove it
+                body_paras = body_paras[1:]
+        
+        # Add salutation
+        escaped_salutation = self._escape_latex(salutation)
+        latex_content += f"\\para{{{escaped_salutation}}}\n\n"
+        
+        # Add all body paragraphs
         for para in body_paras:
             # Escape LaTeX special characters
             escaped_para = self._escape_latex(para)
-            # Paragraphs handled by \para macro which includes left-justify
             latex_content += f"\\para{{{escaped_para}}}\n"
         
         # Add closing signature using the signature macro
