@@ -112,9 +112,22 @@ def tailor_documents(
             if attempt > 0:
                 prompt += "\n\nSTRICT: Return ONLY valid JSON matching the expected structure. No markdown, no comments, no trailing text."
 
+            # Define response schema for structured output including tailoring_explanation
+            response_schema = {
+                "type": "object",
+                "properties": {
+                    "cv": {"type": "object"},
+                    "cover_letter": {"type": "object"},
+                    "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "notes": {"type": "array", "items": {"type": "string"}},
+                    "tailoring_explanation": {"type": "string"}
+                },
+                "required": ["cv", "cover_letter", "tailoring_explanation"]
+            }
+
             response_text_cv, input_tokens_cv, output_tokens_cv = service._call_gemini(
                 prompt,
-                response_schema=None,
+                response_schema=response_schema,
             )
 
             logger.info(f"[CV Gen Attempt {attempt+1}] Raw response length: {len(response_text_cv)} chars")
