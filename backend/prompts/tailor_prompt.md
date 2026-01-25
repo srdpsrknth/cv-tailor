@@ -9,9 +9,9 @@ STRICT RULES:
 - You MAY: rephrase bullets, choose the most relevant bullets, reorder sections, and tighten language.
 - Output MUST be valid JSON ONLY. No markdown. No commentary.
 - Do NOT output LaTeX. All bullets/paragraphs must be plain text.
-- CV length target: produce enough content to render more than 1.75 A4 pages and at most 2 pages in the provided LaTeX template.
-- IMPORTANT: Include ALL projects from the base profile's "selected_projects" field for each experience. Map each project to the "projects" array with its name and bullets. You may reword project bullets to align with the job description, but do NOT drop any projects.
-- Reorder skills to emphasize JD alignment, but do not fabricate skills.
+- CV length target: produce enough content to render between 1.9 and 2.0 A4 pages (aim for maximum 2 pages). Optimize content density while maintaining readability.
+- CRITICAL: Include ALL projects from the base profile's "selected_projects" field for each experience. Every project listed in the YAML must appear in the output. Map each project to the "projects" array with its name and bullets. You may reword project bullets to align with the job description, but NEVER drop any projects.
+- You MAY recategorize skills into different groupings if it better matches the job requirements. Reorder and reorganize skills to emphasize JD alignment, but do not fabricate skills.
 
 OUTPUT FORMAT:
 Return a JSON object matching this structure:
@@ -54,7 +54,8 @@ Return a JSON object matching this structure:
 
 ADDITIONAL GUIDELINES:
 - CV summary: 2–3 lines max.
-- CV experience bullets: 3–5 bullets for most relevant roles; keep bullets outcome-oriented.
+- CV experience bullets: Target 16-20 total bullets across all experiences combined. Prioritize most relevant roles with 4-6 bullets each. Keep bullets outcome-oriented with QUANTITATIVE achievements wherever possible (percentages, numbers, dollar amounts, timeframes).
+- Project bullets: Each project MUST have 3-4 bullet points (minimum 3, maximum 4). Project bullets should be impactful, detailed, and specific about work done and achievements. Include metrics and concrete outcomes.
 - Use ATS-friendly wording aligned to the job description.
 - Cover letter: 3–5 paragraphs; compelling, persuasive, and natural. Vary sentence openings and rhythm; avoid robotic phrasing and repetitive templates.
 - Ground every claim in the base profile: reference actual tools, metrics, outcomes, and responsibilities. Do not fabricate.
