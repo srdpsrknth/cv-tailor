@@ -148,14 +148,15 @@ def tailor_documents(
             else:
                 logger.warning(f"[CV Gen Attempt {attempt+1}] No tailoring_explanation in response")
             
-            # Debug: Check projects in first experience
+            # Debug: Check projects in ALL experiences (especially ecoligo)
             if cv_data.get('experience'):
-                first_exp = cv_data['experience'][0]
-                logger.info(f"[CV Gen Attempt {attempt+1}] First experience keys: {list(first_exp.keys())}")
-                if 'projects' in first_exp:
-                    logger.info(f"[CV Gen Attempt {attempt+1}] Projects count in first exp: {len(first_exp['projects'])}")
-                    if first_exp['projects']:
-                        logger.info(f"[CV Gen Attempt {attempt+1}] First project: {first_exp['projects'][0]}")
+                for i, exp_item in enumerate(cv_data['experience']):
+                    company = exp_item.get('company', 'Unknown')
+                    if 'ecoligo' in company.lower():
+                        projects_count = len(exp_item.get('projects', []))
+                        logger.info(f"[CV Gen Attempt {attempt+1}] >>> ECOLIGO found at index {i}: {projects_count} projects")
+                        for j, proj in enumerate(exp_item.get('projects', [])):
+                            logger.info(f"[CV Gen Attempt {attempt+1}]     Project {j+1}: {proj.get('name', 'No name')}")
 
             tailored_cv = TailoredCV.model_validate(cv_data)
             logger.info(f"[CV Gen Attempt {attempt+1}] ✅ Validation passed!")
