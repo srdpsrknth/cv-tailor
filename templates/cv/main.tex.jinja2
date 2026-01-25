@@ -78,6 +78,7 @@
 \cvsection{Professional Experience}
 
 {% for exp in experience %}
+\begin{samepage}
 \cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
   {%- if exp.start_date -%}
     {{ exp.start_date|replace('-', ' ') }}
@@ -88,12 +89,14 @@
 {{ '}' }}{{ '{' }}{{ exp.location }}{{ '}' }}
 
 {% if exp.bullets %}
-\nopagebreak
 \begin{itemize}
 {% for bullet in exp.bullets %}
 \item {{ bullet }}
 {% endfor %}
 \end{itemize}
+\end{samepage}
+{% else %}
+\end{samepage}
 {% endif %}
 
 {% if exp.projects %}
