@@ -139,6 +139,26 @@ class DocxRenderer:
         safe_job = self._slugify(job_position)
         return f"{year}_cover_letter_{safe_company}_{safe_job}.docx"
 
+    @staticmethod
+    def _escape_latex(text: str) -> str:
+        """Escape LaTeX special characters in text."""
+        # Order matters: backslash must be first
+        replacements = [
+            ("\\", r"\textbackslash{}"),
+            ("&", r"\&"),
+            ("%", r"\%"),
+            ("$", r"\$"),
+            ("#", r"\#"),
+            ("_", r"\_"),
+            ("{", r"\{"),
+            ("}", r"\}"),
+            ("~", r"\textasciitilde{}"),
+            ("^", r"\textasciicircum{}"),
+        ]
+        for char, replacement in replacements:
+            text = text.replace(char, replacement)
+        return text
+
     def _apply_aptos_font(self, docx_path: Path) -> None:
         """Set Aptos font for all paragraphs and the Normal style."""
         docx = Document(str(docx_path))
@@ -263,8 +283,8 @@ class DocxRenderer:
 
     def _generate_pdf_via_latex(self, docx_path: Path) -> Path:
         """
-        Generate PDF from cover letter using LaTeX.
-        Extracts text from DOCX and renders as LaTeX PDF with proper letter formatting.
+        Generate PDF from cover letter using professional LaTeX template.
+        Extracts text from DOCX and renders using the professional template.
         
         Args:
             docx_path: Path to DOCX file
@@ -275,60 +295,113 @@ class DocxRenderer:
         Raises:
             Exception: If LaTeX generation fails
         """
+        import shutil
         from docx import Document
         
         # Extract text from DOCX
         doc = Document(str(docx_path))
-        paragraphs = [para.text for para in doc.paragraphs]
+        paragraphs = [para.text.strip() for para in doc.paragraphs]
         
-        # Build LaTeX content with proper letter formatting
-        latex_content = r"""\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage[utf8]{inputenc}
-\usepackage{setspace}
-\setstretch{1.15}
-
-% Left aligned, justified text
-\raggedbottom
-\usepackage{ragged2e}
-
-\pagestyle{empty}
+        # Extract metadata from cover letter content
+        candidate_name = "Applicant"
+        title = "Application"
+        receiver = "Hiring Manager"
+        location = "Location"
+        phone = "+1 (555) 000-0000"
+        email = "applicant@example.com"
+        
+        # Find contact info (usually at end)
+        for line in paragraphs[-5:]:
+            if "@" in line and "." in line:
+                email = line.strip()
+            elif any(c.isdigit() for c in line) and "+" in line:
+                phone = line.strip()
+        
+        # Extract receiver/company from document
+        for para in paragraphs:
+            if "Application for" in para and ("at" in para or "with" in para):
+                try:
+                    # Try "Application for Role at Company" format
+                    if " at " in para:
+                        receiver = para.split(" at ")[-1].strip()
+                    elif " with " in para:
+                        receiver = para.split(" with ")[-1].strip()
+                except:
+                    pass
+                break
+        
+        # Get body paragraphs (skip metadata lines)
+        body_paras = []
+        skip_keywords = ["Dear ", "Sincerely", "Best regards", "Thank you", 
+                        "January", "February", "March", "April", "May", "June",
+                        "July", "August", "September", "October", "November", "December",
+                        "@", "phone", "cell", "+1", "location"]
+        
+        for para in paragraphs:
+            para = para.strip()
+            if not para or len(para) < 10:
+                continue
+            # Skip metadata lines
+            if any(keyword in para for keyword in skip_keywords):
+                continue
+            # Skip very short lines
+            if len(para) < 15 and para.isupper():
+                continue
+            body_paras.append(para)
+        
+        # Ensure we have salutation and enough body paragraphs
+        if not any("Dear" in p for p in body_paras):
+            body_paras.insert(0, "Dear Hiring Manager,")
+        
+        # Create temporary working directory for LaTeX compilation
+        work_dir = docx_path.parent / "latex_work"
+        work_dir.mkdir(exist_ok=True)
+        
+        # Copy template files to working directory
+        template_root = Path(__file__).resolve().parents[2] / "cover_letter_latex_template"
+        setup_dir = work_dir / "setup"
+        setup_dir.mkdir(exist_ok=True)
+        
+        try:
+            # Copy template files
+            if (template_root / "setup" / "preamble.tex").exists():
+                shutil.copy(template_root / "setup" / "preamble.tex", setup_dir / "preamble.tex")
+            if (template_root / "setup" / "macros.tex").exists():
+                shutil.copy(template_root / "setup" / "macros.tex", setup_dir / "macros.tex")
+        except Exception as e:
+            logger.warning(f"Failed to copy template files: {e}. Will attempt inline compilation.")
+        
+        # Create LaTeX content using the template structure
+        latex_content = r"""\input{setup/preamble.tex}
+\input{setup/macros.tex}
 
 \begin{document}
 
-% Enable justified text (full justification)
-\justify
-
-"""
+    """
         
-        # Process paragraphs for proper letter formatting
-        for para_text in paragraphs:
-            para_text = para_text.strip()
-            
-            if not para_text:
-                # Empty line creates paragraph break
-                latex_content += "\n"
-                continue
-            
+        # Add name and role
+        name_part = f"\\name{{{{{candidate_name}}}}}{{{{{title}}}}}"
+        latex_content += name_part + "\n"
+        
+        # Add receiver
+        receiver_part = f"\\receiver{{{{{receiver}}}}}"
+        latex_content += receiver_part + "\n\n"
+        
+        # Add body paragraphs with proper escaping
+        for para in body_paras[:5]:  # Limit to 5 paragraphs
             # Escape LaTeX special characters
-            para_text = para_text.replace("\\", r"\textbackslash{}")
-            para_text = para_text.replace("&", r"\&")
-            para_text = para_text.replace("%", r"\%")
-            para_text = para_text.replace("$", r"\$")
-            para_text = para_text.replace("#", r"\#")
-            para_text = para_text.replace("_", r"\_")
-            para_text = para_text.replace("{", r"\{")
-            para_text = para_text.replace("}", r"\}")
-            para_text = para_text.replace("~", r"\textasciitilde{}")
-            para_text = para_text.replace("^", r"\textasciicircum{}")
-            
-            # Add paragraph with proper spacing for letters
-            latex_content += f"{para_text}\n\n"
+            escaped_para = self._escape_latex(para)
+            para_part = f"\\para{{{{{escaped_para}}}}}"
+            latex_content += para_part + "\n"
         
+        # Add footer with contact info
+        footer_part = f"\\bottom{{{{{location}}}}}{{{{{phone}}}}}{{{{{email}}}}}"
+        latex_content += "\n" + footer_part + "\n"
         latex_content += r"""\end{document}"""
         
-        # Write LaTeX file
-        tex_path = docx_path.with_suffix(".tex")
+        # Write LaTeX file to working directory
+        tex_path = work_dir / "main.tex"
+        
         try:
             tex_path.write_text(latex_content, encoding="utf-8")
             logger.info(f"Created LaTeX file: {tex_path}")
@@ -341,42 +414,45 @@ class DocxRenderer:
                 [
                     "pdflatex",
                     "-interaction=nonstopmode",
-                    "-output-directory", str(self.outputs_dir),
+                    "-output-directory", str(work_dir),
                     str(tex_path)
                 ],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
+                cwd=str(work_dir)
             )
             
-            pdf_path = docx_path.with_suffix(".pdf")
+            pdf_src = work_dir / "main.pdf"
+            pdf_dst = docx_path.with_suffix(".pdf")
             
             if result.returncode != 0:
                 logger.warning(f"pdflatex returned code {result.returncode}")
-                if "error" in result.stderr.lower() and not pdf_path.exists():
+                logger.warning(f"stderr: {result.stderr[:500]}")
+                if "error" in result.stderr.lower() and not pdf_src.exists():
                     raise Exception(f"pdflatex error: {result.stderr[:200]}")
             
-            if not pdf_path.exists():
+            if not pdf_src.exists():
                 raise Exception("PDF not generated by pdflatex")
             
-            logger.info(f"Generated LaTeX PDF: {pdf_path}")
+            # Copy PDF to outputs directory
+            shutil.copy(pdf_src, pdf_dst)
+            logger.info(f"Generated professional template PDF: {pdf_dst}")
             
-            # Clean up temporary files
-            for ext in [".tex", ".aux", ".log"]:
-                temp_file = docx_path.with_suffix(ext)
-                try:
-                    if temp_file.exists():
-                        temp_file.unlink()
-                except:
-                    pass
+            # Clean up working directory
+            try:
+                shutil.rmtree(work_dir)
+            except:
+                pass
             
-            return pdf_path
+            return pdf_dst
             
         except FileNotFoundError:
             raise Exception("pdflatex not found. Install MiKTeX or TeX Live.")
         except subprocess.TimeoutExpired:
             raise Exception("pdflatex compilation timed out")
         except Exception as e:
+            logger.error(f"LaTeX compilation error: {e}")
             raise Exception(f"LaTeX compilation error: {e}")
 
 
