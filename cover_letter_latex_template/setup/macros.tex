@@ -21,7 +21,7 @@
 
 %%%%%%%%%%%%%%% Paragraph of a letter %%%%%%%%%%%%%%% 
 \newcommand{\para}[1]{
-    \large #1
+    \normalsize #1
     \normalsize \par \vspace{1em}
 }
 
@@ -30,7 +30,7 @@
     %%% Contact info in the footer %%%
     \fancyfoot{
         \normalsize
-        \raggedright #1 $\cdot$ #2 $\cdot$ \href{mailto:#3}{\underline{#3}} 
+        \raggedright #2 $\cdot$ \href{mailto:#3}{\underline{#3}} 
 
         %%% Draw a rule under the footer %%%
         \begin{tikzpicture}

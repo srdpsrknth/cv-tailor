@@ -100,7 +100,7 @@ class DocxRenderer:
         # Generate PDF version (required)
         pdf_path: Optional[str] = None
         try:
-            pdf_file = self._export_pdf(output_path)
+            pdf_file = self._export_pdf(output_path, tailored_cl, profile)
             pdf_path = str(pdf_file)
             logger.info(f"Generated cover letter PDF: {pdf_path}")
         except Exception as e:
@@ -232,10 +232,15 @@ class DocxRenderer:
 
         docx.save(str(docx_path))
 
-    def _export_pdf(self, docx_path: Path) -> Path:
+    def _export_pdf(self, docx_path: Path, tailored_cl: TailoredCoverLetter, profile: Profile) -> Path:
         """
         Convert DOCX to PDF using LibreOffice (preferred) or LaTeX fallback.
         Raises exception if both methods fail.
+        
+        Args:
+            docx_path: Path to DOCX file
+            tailored_cl: Tailored cover letter data
+            profile: Base profile for contact info
         
         Returns:
             Path to generated PDF file
@@ -274,20 +279,22 @@ class DocxRenderer:
         # Method 2: LaTeX fallback - generate simple LaTeX from cover letter text
         try:
             logger.info(f"Attempting LaTeX PDF generation for {docx_path.name}")
-            pdf_path = self._generate_pdf_via_latex(docx_path)
+            pdf_path = self._generate_pdf_via_latex(docx_path, tailored_cl, profile)
             logger.info(f"✅ LaTeX PDF generated: {pdf_path}")
             return pdf_path
         except Exception as e:
             logger.error(f"LaTeX PDF generation also failed: {e}")
             raise DocxRendererError(f"PDF generation failed (both LibreOffice and LaTeX): {e}")
 
-    def _generate_pdf_via_latex(self, docx_path: Path) -> Path:
+    def _generate_pdf_via_latex(self, docx_path: Path, tailored_cl: TailoredCoverLetter, profile: Profile) -> Path:
         """
         Generate PDF from cover letter using professional LaTeX template.
-        Extracts text from DOCX and renders using the professional template.
+        Uses structured data from TailoredCoverLetter for accurate, complete rendering.
         
         Args:
-            docx_path: Path to DOCX file
+            docx_path: Path to DOCX file (used for output naming only)
+            tailored_cl: Tailored cover letter data with all paragraphs
+            profile: Base profile for contact information
             
         Returns:
             Path to generated PDF file
@@ -296,62 +303,16 @@ class DocxRenderer:
             Exception: If LaTeX generation fails
         """
         import shutil
-        from docx import Document
         
-        # Extract text from DOCX
-        doc = Document(str(docx_path))
-        paragraphs = [para.text.strip() for para in doc.paragraphs]
+        # Extract structured data from TailoredCoverLetter and Profile
+        candidate_name = profile.identity.full_name or "Applicant"
+        role_title = tailored_cl.role_title or ""
+        company_name = tailored_cl.company_name or "Hiring Manager"
+        phone = profile.identity.phone or "+1 (555) 000-0000"
+        email = profile.identity.email or "applicant@example.com"
         
-        # Extract metadata from cover letter content
-        candidate_name = "Applicant"
-        title = "Application"
-        receiver = "Hiring Manager"
-        location = "Location"
-        phone = "+1 (555) 000-0000"
-        email = "applicant@example.com"
-        
-        # Find contact info (usually at end)
-        for line in paragraphs[-5:]:
-            if "@" in line and "." in line:
-                email = line.strip()
-            elif any(c.isdigit() for c in line) and "+" in line:
-                phone = line.strip()
-        
-        # Extract receiver/company from document
-        for para in paragraphs:
-            if "Application for" in para and ("at" in para or "with" in para):
-                try:
-                    # Try "Application for Role at Company" format
-                    if " at " in para:
-                        receiver = para.split(" at ")[-1].strip()
-                    elif " with " in para:
-                        receiver = para.split(" with ")[-1].strip()
-                except:
-                    pass
-                break
-        
-        # Get body paragraphs (skip metadata lines)
-        body_paras = []
-        skip_keywords = ["Dear ", "Sincerely", "Best regards", "Thank you", 
-                        "January", "February", "March", "April", "May", "June",
-                        "July", "August", "September", "October", "November", "December",
-                        "@", "phone", "cell", "+1", "location"]
-        
-        for para in paragraphs:
-            para = para.strip()
-            if not para or len(para) < 10:
-                continue
-            # Skip metadata lines
-            if any(keyword in para for keyword in skip_keywords):
-                continue
-            # Skip very short lines
-            if len(para) < 15 and para.isupper():
-                continue
-            body_paras.append(para)
-        
-        # Ensure we have salutation and enough body paragraphs
-        if not any("Dear" in p for p in body_paras):
-            body_paras.insert(0, "Dear Hiring Manager,")
+        # Use all paragraphs from the tailored cover letter (not limited to 3)
+        body_paras = tailored_cl.paragraphs or []
         
         # Create temporary working directory for LaTeX compilation
         work_dir = docx_path.parent / "latex_work"
@@ -379,24 +340,25 @@ class DocxRenderer:
 
     """
         
-        # Add name and role
-        name_part = f"\\name{{{{{candidate_name}}}}}{{{{{title}}}}}"
-        latex_content += name_part + "\n"
+        # Add name and role (use actual values from profile and cover letter)
+        escaped_name = self._escape_latex(candidate_name)
+        escaped_role = self._escape_latex(role_title)
+        latex_content += f"\\name{{{escaped_name}}}{{{escaped_role}}}\n"
         
-        # Add receiver
-        receiver_part = f"\\receiver{{{{{receiver}}}}}"
-        latex_content += receiver_part + "\n\n"
+        # Add receiver/company
+        escaped_company = self._escape_latex(company_name)
+        latex_content += f"\\receiver{{{escaped_company}}}\n\n"
         
-        # Add body paragraphs with proper escaping
-        for para in body_paras[:5]:  # Limit to 5 paragraphs
+        # Add all body paragraphs with smaller font size
+        for para in body_paras:
             # Escape LaTeX special characters
             escaped_para = self._escape_latex(para)
-            para_part = f"\\para{{{{{escaped_para}}}}}"
-            latex_content += para_part + "\n"
+            # Use \small font to reduce size compared to \large in macros
+            latex_content += f"{{\\small \\para{{{escaped_para}}}}}\n"
         
-        # Add footer with contact info
-        footer_part = f"\\bottom{{{{{location}}}}}{{{{{phone}}}}}{{{{{email}}}}}"
-        latex_content += "\n" + footer_part + "\n"
+        # Add footer with contact info - NO LOCATION (empty string for first param)
+        escaped_email = self._escape_latex(email)
+        latex_content += f"\n\\bottom{{}}{{{phone}}}{{{escaped_email}}}\n"
         latex_content += r"""\end{document}"""
         
         # Write LaTeX file to working directory
