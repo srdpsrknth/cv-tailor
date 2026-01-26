@@ -19,18 +19,19 @@ The base profile is the **only** source of truth. Do not rely on prior knowledge
 * If a detail is not present in the base profile, do not infer or embellish it.
 * Output MUST be valid JSON ONLY — no markdown, no commentary, no extra text.
 * Do NOT output HTML, LaTeX, or rich text. Plain text only.
-* Cover letter body (all paragraphs combined) MUST be **300–350 words exactly**.
+* Cover letter body (all paragraphs combined) MUST be **290–310 words exactly**.
 * Paragraph structure MUST follow the specified schema precisely.
+* **When mentioning past employers from base profile, use SHORT company names only** (e.g., "NeoTaste" not "NeoTaste GmbH", "Klarna" not "Klarna Bank AB"). Remove legal suffixes like GmbH, Inc., Ltd., AB, etc.
 
 ---
 
 ## OUTPUT FORMAT (JSON ONLY)
 
 **CRITICAL: The `paragraphs` array MUST contain EXACTLY 4 paragraphs in this order:**
-1. Opening paragraph (50-80 words)
-2. Body paragraph 1 (75-100 words)
-3. Body paragraph 2 (75-100 words)
-4. Closing paragraph (40-60 words)
+1. Opening paragraph (45-70 words)
+2. Body paragraph 1 (70-90 words)
+3. Body paragraph 2 (70-90 words)
+4. Closing paragraph (35-50 words)
 
 ```json
 {
@@ -38,17 +39,14 @@ The base profile is the **only** source of truth. Do not rely on prior knowledge
     "role_title": "string",
     "company_name": "string",
     "paragraphs": [
-      "opening_paragraph (50-80 words)",
-      "body_paragraph_1 (75-100 words)",
-      "body_paragraph_2 (75-100 words)",
-      "closing_paragraph (40-60 words)"
+      "opening_paragraph (45-70 words)",
+      "body_paragraph_1 (70-90 words)",
+      "body_paragraph_2 (70-90 words)",
+      "closing_paragraph (35-50 words)"
     ],
-    "highlight_bullets": ["achievement1", "achievement2"],
     "closing_line": "Sincerely,",
     "signature_name": "string"
-  },
-  "confidence": "low|medium|high",
-  "notes": ["optional notes"]
+  }
 }
 ```
 
@@ -82,7 +80,7 @@ Prefer:
 
 ## DETAILED GUIDELINES FOR COVER LETTER
 
-### Opening Paragraph (50–80 words)
+### Opening Paragraph (45–70 words)
 
 * Establish **fit through experience and domain alignment**, not emotion
 * Reference the company’s mission, product, or operational domain if present in the JD
@@ -91,7 +89,7 @@ Prefer:
 
 ---
 
-### Body Paragraph 1 (75–100 words)
+### Body Paragraph 1 (70–90 words)
 
 * Focus on the **most relevant role** from the base profile
 * Describe operational scope and scale:
@@ -104,7 +102,7 @@ Prefer:
 
 ---
 
-### Body Paragraph 2 (75–100 words)
+### Body Paragraph 2 (70–90 words)
 
 * Emphasize analytical craftsmanship and ways of working
 * Cover:
@@ -116,7 +114,7 @@ Prefer:
 
 ---
 
-### Closing Paragraph (40–60 words)
+### Closing Paragraph (35–50 words)
 
 * **REQUIRED** - This is the 4th and final paragraph before the signature
 * Reiterate why the candidate will be effective in THIS role at THIS company
@@ -127,25 +125,16 @@ Prefer:
 
 ---
 
-## HIGHLIGHT BULLETS (OPTIONAL)
-
-* 1–2 concise achievements from the base profile
-* Use metrics only if explicitly present
-* These should reinforce the role’s core requirements
-* If no strong bullets exist, return an empty array
-
----
-
 ## WORD COUNT & STRUCTURE RULES
 
 * Exactly **4 paragraphs**
 * Word limits per paragraph:
 
-  * Opening: 50–80 words
-  * Body 1: 75–100 words
-  * Body 2: 75–100 words
-  * Closing: 40–60 words
-* Combined total: **300–350 words exactly**
+  * Opening: 45–70 words
+  * Body 1: 70–90 words
+  * Body 2: 70–90 words
+  * Closing: 35–50 words
+* Combined total: **290–310 words exactly**
 * Do NOT include salutation or signature in the word count
 
 ---
@@ -169,7 +158,7 @@ Do NOT imitate startup marketing language or founder-style enthusiasm.
 **BEFORE RETURNING YOUR JSON:**
 1. Count the paragraphs array - it MUST have exactly 4 elements
 2. Verify word counts for each paragraph match the specified ranges
-3. Ensure total word count is 300-350 words (excluding salutation and signature)
+3. Ensure total word count is 290-310 words (excluding salutation and signature)
 4. Check that closing_line is ONLY the sign-off (e.g., "Sincerely,"), NOT a paragraph
 5. Verify the 4th paragraph (closing_paragraph) provides a clear, confident conclusion
 
