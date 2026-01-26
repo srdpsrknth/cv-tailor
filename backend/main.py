@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import re
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -18,16 +18,13 @@ load_dotenv(override=True)
 
 app = FastAPI(title="cv-tailor-backend", version="0.1.0")
 
-# Base outputs directory
-OUTPUTS_DIR = Path(__file__).resolve().parents[1] / "outputs"
-
-
-def _slugify(text: str) -> str:
-    """Filesystem-safe slug (match renderer behavior)."""
-    text = text.strip().lower()
-    text = re.sub(r"[^a-z0-9]+", "_", text)
-    text = re.sub(r"_+", "_", text).strip("_")
-    return text or "role"
+# Base outputs directory from environment or fallback
+outputs_dir_env = os.getenv("OUTPUTS_DIR", "").strip()
+if outputs_dir_env:
+    OUTPUTS_DIR = Path(outputs_dir_env)
+else:
+    OUTPUTS_DIR = Path(__file__).resolve().parents[1] / "outputs"
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.get("/health")
@@ -60,29 +57,6 @@ def tailor(req: TailorRequest):
 @app.get("/api/download/cv/{job_id}")
 def download_cv(job_id: str):
     """Download the generated CV PDF by job_id (in job-specific folder)."""
-    pdf_path = OUTPUTS_DIR / job_id / f"{job_id}.pdf"
-    
-    # Fallback: check for any PDF in the job folder
-    if not pdf_path.exists():
-        job_folder = OUTPUTS_DIR / job_id
-        if job_folder.exists():
-            pdfs = list(job_folder.glob("*.pdf"))
-            if pdfs:
-                pdf_path = pdfs[0]
-    
-    if not pdf_path.exists():
-        raise HTTPException(status_code=404, detail=f"CV PDF not found for job_id: {job_id}")
-    
-    return FileResponse(
-        path=str(pdf_path),
-        media_type="application/pdf",
-        filename=pdf_path.name,
-    )
-
-
-@app.get("/api/preview/{job_id}")
-def preview_cv(job_id: str):
-    """Return the CV PDF for inline preview embedding (from job-specific folder)."""
     pdf_path = OUTPUTS_DIR / job_id / f"{job_id}.pdf"
     
     # Fallback: check for any PDF in the job folder
@@ -152,3 +126,5 @@ def download_cover_letter_pdf(job_id: str):
         media_type="application/pdf",
         filename=pdf_path.name,
     )
+
+

@@ -12,7 +12,6 @@ from typing import Optional
 
 from docxtpl import DocxTemplate
 from docx import Document  # post-process font
-from docx.shared import Pt
 
 from models.profile import Profile
 from models.tailored_output import TailoredCoverLetter
@@ -121,9 +120,9 @@ class DocxRenderer:
             "body_paragraph_2": paragraphs[2] if len(paragraphs) > 2 else "",
             "closing_paragraph": paragraphs[3] if len(paragraphs) > 3 else "",
             "closing_line": tailored_cl.closing_line or "Sincerely,",
-            "candidate_name": (tailored_cl.signature_name or profile.identity.full_name),
+            "candidate_name": (tailored_cl.signature_name or profile.identity.full_name or "Applicant"),
             "candidate_phone": profile.identity.phone or "",
-            "candidate_email": profile.identity.email,
+            "candidate_email": profile.identity.email or "",
         }
 
     @staticmethod
