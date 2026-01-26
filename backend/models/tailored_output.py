@@ -1,7 +1,22 @@
 from __future__ import annotations
 
-from typing import List, Optional, Literal, Dict
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field, ConfigDict
+
+
+# -------------------------
+# Tailoring explanation (structured)
+# -------------------------
+
+class TailoringExplanation(BaseModel):
+    """Structured explanation of CV tailoring decisions."""
+    model_config = ConfigDict(extra="ignore")
+    
+    summary_changes: str = Field(default="", description="How the summary was crafted")
+    bullet_modifications: str = Field(default="", description="Key rewording decisions for bullets")
+    skill_reordering: str = Field(default="", description="How skills were prioritized")
+    project_selection: str = Field(default="", description="Which projects included and why")
+    overall_strategy: str = Field(default="", description="High-level tailoring approach")
 
 
 # -------------------------
@@ -24,10 +39,6 @@ class TailoredExperience(BaseModel):
     start_date: str
     end_date: str
     bullets: List[str] = Field(default_factory=list)
-    # Legacy fields for backward compatibility
-    selected_project_names: List[str] = Field(default_factory=list)
-    project_bullets: List[str] = Field(default_factory=list)
-    # New field for proper project structure
     projects: List[TailoredProject] = Field(default_factory=list)
 
 
@@ -52,7 +63,6 @@ class TailoredCoverLetter(BaseModel):
     role_title: str
     company_name: str
     paragraphs: List[str] = Field(default_factory=list)
-    highlight_bullets: List[str] = Field(default_factory=list)
     closing_line: str = "Sincerely,"
     signature_name: str = ""
 
@@ -62,6 +72,4 @@ class TailoredOutput(BaseModel):
 
     cv: TailoredCV
     cover_letter: TailoredCoverLetter
-    confidence: Literal["low", "medium", "high"] = "medium"
-    notes: List[str] = Field(default_factory=list)
-    tailoring_explanation: Optional[str] = None
+    tailoring_explanation: Optional[TailoringExplanation] = None

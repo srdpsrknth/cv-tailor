@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional, Callable
 
 from pypdf import PdfReader
 
@@ -38,11 +39,22 @@ def _slugify(text: str) -> str:
     return text or "role"
 
 
+def _count_pdf_pages(pdf_path: Path) -> int:
+    """Count number of pages in a PDF file."""
+    try:
+        reader = PdfReader(str(pdf_path))
+        return len(reader.pages)
+    except Exception as e:
+        logger.warning(f"Failed to count PDF pages: {e}")
+        return 0
+
+
 def tailor_documents(
     job_description: str,
     profile: Profile,
     company_name: Optional[str] = None,
     role_title: Optional[str] = None,
+    status_callback: Optional[Callable[[str], None]] = None,
 ) -> TailorResponse:
     """
     Use Gemini to tailor CV + cover letter, then render PDF/DOCX.
@@ -83,6 +95,87 @@ def tailor_documents(
 
     service = GeminiService()
 
+    cv_response_schema = {
+        "type": "object",
+        "properties": {
+            "cv": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "summary": {"type": "array", "items": {"type": "string"}},
+                    "skills": {
+                        "type": "object",
+                        "properties": {
+                            "Data Analysis & Statistical Modeling": {"type": "array", "items": {"type": "string"}},
+                            "Programming & Data Tools": {"type": "array", "items": {"type": "string"}},
+                            "BI & Data Platforms": {"type": "array", "items": {"type": "string"}},
+                            "Product & Marketing Analytics": {"type": "array", "items": {"type": "string"}},
+                            "Automation & Advanced Tooling": {"type": "array", "items": {"type": "string"}},
+                            "Collaboration & Communication": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
+                    "experience": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "company": {"type": "string"},
+                                "role": {"type": "string"},
+                                "start_date": {"type": "string"},
+                                "end_date": {"type": "string"},
+                                "bullets": {"type": "array", "items": {"type": "string"}},
+                                "projects": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "bullets": {"type": "array", "items": {"type": "string"}},
+                                        },
+                                        "required": ["name", "bullets"],
+                                    },
+                                },
+                            },
+                            "required": ["company", "role", "start_date", "end_date", "bullets"],
+                        },
+                    },
+                    "include_education": {"type": "boolean"},
+                    "include_certifications": {"type": "boolean"},
+                },
+                "required": ["summary", "skills", "experience"],
+            },
+            "tailoring_explanation": {
+                "type": "object",
+                "properties": {
+                    "summary_changes": {"type": "string"},
+                    "bullet_modifications": {"type": "string"},
+                    "skill_reordering": {"type": "string"},
+                    "project_selection": {"type": "string"},
+                    "overall_strategy": {"type": "string"},
+                },
+            },
+        },
+        "required": ["cv"],
+    }
+
+    cl_response_schema = {
+        "type": "object",
+        "properties": {
+            "cover_letter": {
+                "type": "object",
+                "properties": {
+                    "role_title": {"type": "string"},
+                    "company_name": {"type": "string"},
+                    "paragraphs": {"type": "array", "items": {"type": "string"}},
+                    "closing_line": {"type": "string"},
+                    "signature_name": {"type": "string"},
+                },
+                "required": ["role_title", "company_name", "paragraphs", "signature_name"],
+            }
+        },
+        "required": ["cover_letter"],
+    }
+
     def _extract_json_block(text: str) -> Optional[str]:
         """Best-effort extraction of the outermost JSON object from text."""
         if not text:
@@ -114,7 +207,7 @@ def tailor_documents(
 
             response_text_cv, input_tokens_cv, output_tokens_cv = service._call_gemini(
                 prompt,
-                response_schema=None,
+                response_schema=cv_response_schema,
             )
 
             logger.info(f"[CV Gen Attempt {attempt+1}] Raw response length: {len(response_text_cv)} chars")
@@ -141,7 +234,10 @@ def tailor_documents(
             # Extract tailoring explanation if present (at root level of JSON)
             tailoring_explanation = data.get("tailoring_explanation")
             if tailoring_explanation:
-                logger.info(f"[CV Gen Attempt {attempt+1}] Found tailoring_explanation: {len(tailoring_explanation)} chars")
+                if isinstance(tailoring_explanation, dict):
+                    logger.info(f"[CV Gen Attempt {attempt+1}] Found tailoring_explanation object with keys: {list(tailoring_explanation.keys())}")
+                else:
+                    logger.info(f"[CV Gen Attempt {attempt+1}] Found tailoring_explanation: {len(str(tailoring_explanation))} chars")
             else:
                 logger.warning(f"[CV Gen Attempt {attempt+1}] No tailoring_explanation in response")
             
@@ -190,7 +286,7 @@ def tailor_documents(
 
             response_text_cl, input_tokens_cl, output_tokens_cl = service._call_gemini(
                 prompt,
-                response_schema=None,
+                response_schema=cl_response_schema,
             )
 
             logger.info(f"[CL Gen Attempt {attempt+1}] Raw response length: {len(response_text_cl)} chars")
@@ -248,8 +344,6 @@ def tailor_documents(
     tailored_output = TailoredOutput(
         cv=tailored_cv,
         cover_letter=tailored_cl,
-        confidence="high",
-        notes=[],
         tailoring_explanation=tailoring_explanation  # From JSON response
     )
     
@@ -263,7 +357,13 @@ def tailor_documents(
     timestamp = int(time.time())
     job_id = f"{year}_{company_slug}_{role_slug}_{timestamp}"
     
-    outputs_base = Path(__file__).resolve().parents[2] / "outputs"
+    # Get outputs directory from environment or use default
+    outputs_dir_env = os.getenv("OUTPUTS_DIR", "").strip()
+    if outputs_dir_env:
+        outputs_base = Path(outputs_dir_env)
+    else:
+        outputs_base = Path(__file__).resolve().parents[2] / "outputs"
+    
     job_folder = outputs_base / job_id
     job_folder.mkdir(parents=True, exist_ok=True)
     
@@ -275,17 +375,92 @@ def tailor_documents(
 
     job_position = role_title or tailored_output.cover_letter.role_title or tailored_output.cv.title
 
+    # Initial CV generation
+    if status_callback:
+        status_callback("Generating CV (attempt 1)...")
+    
     cv_path = latex.render_cv(
         tailored_cv=tailored_output.cv,
         profile=profile,
         job_position=job_position,
     )
+    
+    # Check CV page count and iteratively reduce if needed
+    max_length_attempts = 5
+    for length_attempt in range(1, max_length_attempts + 1):
+        page_count = _count_pdf_pages(Path(cv_path))
+        logger.info(f"CV page count (attempt {length_attempt}): {page_count}")
+        
+        if page_count <= 2:
+            logger.info(f"✅ CV is {page_count} pages - within target")
+            if status_callback:
+                status_callback(f"✓ CV generated ({page_count} pages)")
+            break
+        
+        if length_attempt >= max_length_attempts:
+            logger.warning(f"⚠️ CV still {page_count} pages after {max_length_attempts} attempts")
+            if status_callback:
+                status_callback(f"⚠ CV is {page_count} pages (exceeded retry limit)")
+            break
+        
+        # CV is too long, regenerate with reduction instructions
+        logger.info(f"CV is {page_count} pages, reducing content (attempt {length_attempt + 1})...")
+        if status_callback:
+            status_callback(f"CV is {page_count} pages, reducing content (attempt {length_attempt + 1}/{max_length_attempts})...")
+        
+        # Add length reduction instruction to prompt
+        length_reduction_note = (
+            f"\n\nCRITICAL LENGTH REDUCTION (Attempt {length_attempt + 1}): "
+            f"Previous CV was {page_count} pages. MUST reduce to 2 pages or less by: "
+            f"1) Reduce total bullets to 12-14 (was too many), "
+            f"2) Shorten bullet length to 90-110 characters each, "
+            f"3) Remove 3-5 less relevant skills from skill categories."
+        )
+        
+        cv_prompt_reduced = cv_prompt + length_reduction_note
+        
+        # Regenerate CV
+        try:
+            response_text_cv_retry, input_tokens_retry, output_tokens_retry = service._call_gemini(
+                cv_prompt_reduced,
+                response_schema=None,
+            )
+            
+            data_retry = json.loads(response_text_cv_retry)
+            cv_data_retry = data_retry.get("cv", data_retry)
+            tailored_cv_retry = TailoredCV.model_validate(cv_data_retry)
+            
+            # Update token counts
+            input_tokens += input_tokens_retry
+            output_tokens += output_tokens_retry
+            
+            # Regenerate PDF with reduced CV
+            cv_path = latex.render_cv(
+                tailored_cv=tailored_cv_retry,
+                profile=profile,
+                job_position=job_position,
+            )
+            
+            # Update tailored_output with reduced CV
+            tailored_output.cv = tailored_cv_retry
+            
+        except Exception as e:
+            logger.error(f"Failed to regenerate CV on length attempt {length_attempt + 1}: {e}")
+            if status_callback:
+                status_callback(f"⚠ CV reduction attempt {length_attempt + 1} failed, using previous version")
+            break
 
+    if status_callback:
+        status_callback("Generating cover letter...")
+    
     cl_path, cl_pdf_path = docx.render_cover_letter(
         tailored_cl=tailored_output.cover_letter,
         profile=profile,
         job_position=job_position,
     )
+    
+    if status_callback:
+        status_callback("✓ Cover letter generated")
 
     token_usage = service.calculate_token_usage(
         cv_input_tokens=input_tokens,
@@ -294,6 +469,11 @@ def tailor_documents(
         cl_output_tokens=0,
     )
 
+    # Convert TailoringExplanation object to dict if present
+    explanation_dict = None
+    if tailored_output.tailoring_explanation:
+        explanation_dict = tailored_output.tailoring_explanation.model_dump()
+
     return TailorResponse(
         job_id=job_id,
         status="success",
@@ -301,7 +481,7 @@ def tailor_documents(
         cover_letter_path=str(cl_path),
         cl_pdf_path=str(cl_pdf_path) if cl_pdf_path else None,
         token_usage=token_usage,
-        tailoring_explanation=tailored_output.tailoring_explanation,
+        tailoring_explanation=explanation_dict,
         message=None,
     )
 

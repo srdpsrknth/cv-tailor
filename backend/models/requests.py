@@ -1,7 +1,7 @@
 """
 Request and response models for API endpoints.
 """
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -32,7 +32,7 @@ class TailorResponse(BaseModel):
     cover_letter_path: str
     cl_pdf_path: Optional[str] = None
     token_usage: TokenUsage
-    tailoring_explanation: Optional[str] = None
+    tailoring_explanation: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
 
 
