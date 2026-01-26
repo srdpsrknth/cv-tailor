@@ -20,7 +20,7 @@
 \usepackage{hyperref}
 
 % Spacing optimization for 2-page limit
-\setlength{\parskip}{0.5ex}
+\setlength{\parskip}{0.3ex}
 \setlength{\parsep}{0pt}
 
 % Color scheme
@@ -65,9 +65,9 @@
 
 % Professional Summary
 {% if summary %}
-\vspace{-1mm}
+\vspace{2mm}
 \small {{ summary|join(' ') }}
-\vspace{1mm}
+\vspace{2mm}
 {% endif %}
 
 \AtBeginEnvironment{itemize}{\small}
@@ -76,13 +76,15 @@
 \cvsection{Professional Experience}
 
 {% for exp in experience %}
+% Prevent page break within a role
+\needspace{3.5cm}
 \begin{samepage}
 \cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
   {%- if exp.start_date -%}
-    {{ exp.start_date|replace('-', ' ') }}
+    {{ exp.start_date|replace('-', ' - ') }}
   {%- endif -%}
   {%- if exp.end_date -%}
-    {%- if exp.end_date == 'present' %} -- present{% else %} -- {{ exp.end_date|replace('-', ' ') }}{% endif -%}
+    {%- if exp.end_date == 'present' %} -- present{% else %} -- {{ exp.end_date|replace('-', ' - ') }}{% endif -%}
   {%- endif -%}
 {{ '}' }}{{ '{' }}{{ exp.location }}{{ '}' }}
 
@@ -92,9 +94,6 @@
 \item {{ bullet }}
 {% endfor %}
 \end{itemize}
-\end{samepage}
-{% else %}
-\end{samepage}
 {% endif %}
 
 {% if exp.projects %}
@@ -112,31 +111,6 @@
 \end{itemize}
 {% if not loop.last %}\vspace{1mm}{% endif %}
 {% endfor %}
-
-{% elif exp.selected_project_names and exp.project_bullets %}
-% Selected Projects - legacy structure (backward compatibility)
-\vspace{1mm}
-{\small\textbf{\textcolor{accent}{Selected Projects:}}}
-\vspace{0.5mm}
-
-{% set project_count = exp.selected_project_names|length %}
-{% if project_count == 1 %}
-{\small\textit{{ '{' }}{{ exp.selected_project_names[0] }}{{ '}' }}}
-\begin{itemize}[topsep=1pt,itemsep=1pt]
-{% for bullet in exp.project_bullets %}
-\item {{ bullet }}
-{% endfor %}
-\end{itemize}
-{% else %}
-{%- for project_name in exp.selected_project_names -%}
-{\small\textit{{ '{' }}{{ project_name }}{{ '}' }}}{% if not loop.last %}; {% endif %}
-{%- endfor -%}
-\begin{itemize}[topsep=1pt,itemsep=1pt]
-{% for bullet in exp.project_bullets %}
-\item {{ bullet }}
-{% endfor %}
-\end{itemize}
-{% endif %}
 {% endif %}
 
 {% if exp.technologies %}
@@ -144,6 +118,8 @@
 {\small\textbf{Technologies:} {{ exp.technologies|join(', ') }}}
 \vspace{1mm}
 {% endif %}
+
+\end{samepage}
 
 {% if not loop.last %}
 \divider
