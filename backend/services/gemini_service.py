@@ -12,8 +12,6 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-from models.profile import Profile
-from models.tailored_output import TailoredCV, TailoredCoverLetter
 from models.requests import TokenUsage
 
 # Load environment variables
@@ -148,6 +146,9 @@ class GeminiService:
                 input_tokens = usage.prompt_token_count if usage else 0
                 output_tokens = usage.candidates_token_count if usage else 0
                 
+                if response_schema and getattr(response, "parsed", None) is not None:
+                    return json.dumps(response.parsed), input_tokens, output_tokens
+
                 return response.text, input_tokens, output_tokens
                 
             except Exception as e:
@@ -159,141 +160,6 @@ class GeminiService:
                     time.sleep(wait_time)
                 else:
                     raise GeminiServiceError(f"Gemini API call failed after {max_retries} attempts: {e}")
-    
-    def tailor_cv(
-        self, 
-        profile: Profile, 
-        job_description: str,
-        prompt_template: str
-    ) -> Tuple[TailoredCV, int, int]:
-        """
-        Tailor CV based on job description.
-        
-        Args:
-            profile: Base profile
-            job_description: Job description text
-            prompt_template: Prompt template with placeholders
-            
-        Returns:
-            Tuple of (TailoredCV, input_tokens, output_tokens)
-        """
-        # Build prompt
-        prompt = prompt_template.format(
-            profile=profile.model_dump_json(indent=2),
-            job_description=job_description
-        )
-        
-        # Define response schema for structured output
-        response_schema = {
-            "type": "object",
-            "properties": {
-                "summary": {"type": "array", "items": {"type": "string"}},
-                "skills": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                },
-                "experience": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "company": {"type": "string"},
-                            "role": {"type": "string"},
-                            "start_date": {"type": "string"},
-                            "end_date": {"type": "string"},
-                            "bullets": {"type": "array", "items": {"type": "string"}},
-                            "projects": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "bullets": {"type": "array", "items": {"type": "string"}}
-                                    },
-                                    "required": ["name", "bullets"]
-                                }
-                            }
-                        },
-                        "required": ["company", "role", "start_date", "end_date", "bullets"]
-                    }
-                }
-            },
-            "required": ["summary", "skills", "experience"]
-        }
-        
-        # Call API
-        response_text, input_tokens, output_tokens = self._call_gemini(
-            prompt, 
-            response_schema=response_schema
-        )
-        
-        # Parse response
-        try:
-            data = json.loads(response_text)
-            tailored_cv = TailoredCV(**data)
-            return tailored_cv, input_tokens, output_tokens
-        except (json.JSONDecodeError, ValueError) as e:
-            raise GeminiServiceError(f"Failed to parse CV response: {e}\nResponse: {response_text}")
-    
-    def generate_cover_letter(
-        self,
-        profile: Profile,
-        job_description: str,
-        company_name: str,
-        role_title: str,
-        prompt_template: str
-    ) -> Tuple[TailoredCoverLetter, int, int]:
-        """
-        Generate cover letter based on job description.
-        
-        Args:
-            profile: Base profile
-            job_description: Job description text
-            company_name: Company name
-            role_title: Role title
-            prompt_template: Prompt template with placeholders
-            
-        Returns:
-            Tuple of (TailoredCoverLetter, input_tokens, output_tokens)
-        """
-        # Build prompt
-        prompt = prompt_template.format(
-            profile=profile.model_dump_json(indent=2),
-            job_description=job_description,
-            company_name=company_name,
-            role_title=role_title
-        )
-        
-        # Define response schema
-        response_schema = {
-            "type": "object",
-            "properties": {
-                "role_title": {"type": "string"},
-                "company_name": {"type": "string"},
-                "paragraphs": {"type": "array", "items": {"type": "string"}},
-                "highlight_bullets": {"type": "array", "items": {"type": "string"}},
-                "closing_line": {"type": "string"},
-                "signature_name": {"type": "string"}
-            },
-            "required": ["role_title", "company_name", "paragraphs", "signature_name"]
-        }
-        
-        # Call API
-        response_text, input_tokens, output_tokens = self._call_gemini(
-            prompt,
-            response_schema=response_schema
-        )
-        
-        # Parse response
-        try:
-            data = json.loads(response_text)
-            cover_letter = TailoredCoverLetter(**data)
-            return cover_letter, input_tokens, output_tokens
-        except (json.JSONDecodeError, ValueError) as e:
-            raise GeminiServiceError(f"Failed to parse cover letter response: {e}\nResponse: {response_text}")
     
     def calculate_token_usage(
         self,
