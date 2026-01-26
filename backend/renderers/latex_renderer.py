@@ -6,7 +6,6 @@ import os
 import re
 import subprocess
 import shutil
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -108,7 +107,8 @@ class LaTeXRenderer:
             raise LaTeXRendererError(f"Template rendering failed: {e}")
         
         # Save .tex file
-        base_name = f"{year}_CV_Sreedeep_Sreekanth_{safe_job}"
+        name_slug = self._slugify(profile.identity.full_name or "applicant")
+        base_name = f"{year}_CV_{name_slug}_{safe_job}"
         tex_path = self.outputs_dir / f"{base_name}.tex"
         try:
             with open(tex_path, 'w', encoding='utf-8') as f:
@@ -163,16 +163,20 @@ class LaTeXRenderer:
                 ]
             else:
                 exp_data["projects"] = []
-            
-            # Handle legacy structure for backward compatibility
-            exp_data["selected_project_names"] = [self._escape_latex(p) for p in (exp.selected_project_names or [])]
-            exp_data["project_bullets"] = [self._escape_latex(b) for b in (exp.project_bullets or [])]
-            
+
             experiences.append(exp_data)
+        
+        # Build tagline with visa status
+        tagline_base = tailored_cv.title or identity.tagline or ""
+        # If there's a visa status and it's not already in the tagline, append it
+        if identity.visa_status and identity.visa_status not in tagline_base:
+            tagline = f"{tagline_base} | {identity.visa_status}" if tagline_base else identity.visa_status
+        else:
+            tagline = tagline_base
         
         return {
             "name": self._escape_latex(identity.full_name),
-            "tagline": self._escape_latex(tailored_cv.title or identity.tagline or ""),
+            "tagline": self._escape_latex(tagline),
             "email": identity.email,
             "phone": identity.phone or "",
             "linkedin": identity.linkedin or "",
