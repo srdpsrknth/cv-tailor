@@ -5,10 +5,6 @@ Provides an interactive interface for tailoring CVs and cover letters to job des
 
 import streamlit as st
 import requests
-import streamlit.components.v1 as components
-from pathlib import Path
-import base64
-from io import BytesIO
 
 # Configuration
 BACKEND_URL = "http://localhost:8000"
@@ -16,7 +12,6 @@ API_TAILOR = f"{BACKEND_URL}/api/tailor"
 API_DOWNLOAD_CV = f"{BACKEND_URL}/api/download/cv"
 API_DOWNLOAD_CL = f"{BACKEND_URL}/api/download/cover-letter"
 API_DOWNLOAD_CL_PDF = f"{BACKEND_URL}/api/download/cover-letter-pdf"
-API_PREVIEW_CV = f"{BACKEND_URL}/api/preview"
 
 # Page config
 st.set_page_config(
@@ -101,8 +96,22 @@ if generate_btn:
     if not job_description.strip():
         st.error("❌ Please provide a job description (at least 50 characters).")
     else:
+        # Show info about the process
+        st.info(
+            "ℹ️ **Generation Process:**\n\n"
+            "1. AI tailors CV and cover letter to job description\n"
+            "2. CV is rendered to PDF and checked for length (target: 2 pages)\n"
+            "3. If CV exceeds 2 pages, content is automatically reduced and regenerated\n"
+            "4. This process repeats up to 5 times until CV reaches 2 pages\n\n"
+            "*This may take 30-90 seconds depending on iterations needed...*"
+        )
+        
+        # Progress placeholder
+        progress_placeholder = st.empty()
+        status_placeholder = st.empty()
+        
         # Show spinner while generating
-        with st.spinner("🔄 Generating tailored documents... (this may take 30-60 seconds)"):
+        with st.spinner("🔄 Step 1/4: Generating CV content with AI..."):
             try:
                 # Call backend API
                 payload = {
@@ -114,7 +123,7 @@ if generate_btn:
                 response = requests.post(
                     API_TAILOR,
                     json=payload,
-                    timeout=120
+                    timeout=180  # Increased timeout for multiple iterations
                 )
 
                 if response.status_code == 200:
@@ -122,25 +131,32 @@ if generate_btn:
                     
                     # Store in session state for later use
                     st.session_state.job_id = data["job_id"]
-                    st.session_state.cv_path = data["cv_path"]
-                    st.session_state.cover_letter_path = data["cover_letter_path"]
-                    st.session_state.cl_pdf_path = data.get("cl_pdf_path")  # May be None
                     st.session_state.token_usage = data["token_usage"]
                     st.session_state.tailoring_explanation = data.get("tailoring_explanation")
                     st.session_state.generated = True
 
+                    progress_placeholder.empty()
+                    status_placeholder.empty()
                     st.success("✅ Documents generated successfully!")
                     st.rerun()
 
                 else:
                     error_msg = response.json().get("detail", "Unknown error")
+                    progress_placeholder.empty()
+                    status_placeholder.empty()
                     st.error(f"❌ Backend error: {error_msg}")
 
             except requests.exceptions.Timeout:
-                st.error("⏱️ Request timed out. Try again or check backend logs.")
+                progress_placeholder.empty()
+                status_placeholder.empty()
+                st.error("⏱️ Request timed out. The process may have needed multiple CV reduction iterations. Check backend logs.")
             except requests.exceptions.ConnectionError:
+                progress_placeholder.empty()
+                status_placeholder.empty()
                 st.error("🔌 Cannot connect to backend. Ensure uvicorn is running on http://localhost:8000")
             except Exception as e:
+                progress_placeholder.empty()
+                status_placeholder.empty()
                 st.error(f"❌ Unexpected error: {str(e)}")
 
 # ============================================================================
@@ -172,7 +188,37 @@ if "generated" in st.session_state and st.session_state.generated:
     if "tailoring_explanation" in st.session_state and st.session_state.tailoring_explanation:
         with st.expander("📋 Tailoring Details & Changes Made", expanded=False):
             st.markdown("### How Your CV & Cover Letter Were Tailored")
-            st.markdown(st.session_state.tailoring_explanation)
+            
+            explanation = st.session_state.tailoring_explanation
+            
+            # Format structured explanation nicely
+            if isinstance(explanation, dict):
+                if explanation.get("summary_changes"):
+                    st.markdown("**📝 Summary Changes:**")
+                    st.write(explanation["summary_changes"])
+                    st.markdown("")
+                
+                if explanation.get("bullet_modifications"):
+                    st.markdown("**🔧 Bullet Modifications:**")
+                    st.write(explanation["bullet_modifications"])
+                    st.markdown("")
+                
+                if explanation.get("skill_reordering"):
+                    st.markdown("**🔄 Skill Reordering:**")
+                    st.write(explanation["skill_reordering"])
+                    st.markdown("")
+                
+                if explanation.get("project_selection"):
+                    st.markdown("**📂 Project Selection:**")
+                    st.write(explanation["project_selection"])
+                    st.markdown("")
+                
+                if explanation.get("overall_strategy"):
+                    st.markdown("**🎯 Overall Strategy:**")
+                    st.write(explanation["overall_strategy"])
+            else:
+                # Fallback for plain text
+                st.markdown(str(explanation))
     
     st.divider()
 
@@ -209,14 +255,10 @@ if "generated" in st.session_state and st.session_state.generated:
 
     # Cover Letter Tab
     with tab_cl:
-        st.subheader("📧 Cover Letter - DOCX & PDF")
-        st.info(
-            "✅ Your cover letter has been generated in both DOCX (Word) and PDF formats. "
-            "Download whichever format you prefer and customize as needed."
-        )
+        st.subheader("???? Cover Letter Downloads")
 
         col_cl_docx, col_cl_pdf = st.columns(2)
-        
+
         with col_cl_docx:
             try:
                 cl_response = requests.get(
@@ -225,7 +267,7 @@ if "generated" in st.session_state and st.session_state.generated:
                 )
                 if cl_response.status_code == 200:
                     st.download_button(
-                        label="📥 Download as DOCX (Word)",
+                        label="???? Download as DOCX",
                         data=cl_response.content,
                         file_name=f"{job_id}_cover_letter.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -235,7 +277,7 @@ if "generated" in st.session_state and st.session_state.generated:
                     st.error("Could not download DOCX.")
             except Exception as e:
                 st.error(f"Download error: {str(e)}")
-        
+
         with col_cl_pdf:
             # Try the dedicated PDF endpoint
             try:
@@ -245,7 +287,7 @@ if "generated" in st.session_state and st.session_state.generated:
                 )
                 if cl_pdf_response.status_code == 200:
                     st.download_button(
-                        label="📥 Download as PDF",
+                        label="???? Download as PDF",
                         data=cl_pdf_response.content,
                         file_name=f"{job_id}_cover_letter.pdf",
                         mime="application/pdf",
@@ -255,13 +297,12 @@ if "generated" in st.session_state and st.session_state.generated:
                     st.caption("(PDF not available)")
             except Exception:
                 st.caption("(PDF not available)")
-        
 
     st.divider()
 
     # New generation button
     if st.button("🔄 Generate Another", use_container_width=True):
-        for key in ["generated", "job_id", "cv_path", "cover_letter_path", "token_usage"]:
+        for key in ["generated", "job_id", "token_usage", "tailoring_explanation"]:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
