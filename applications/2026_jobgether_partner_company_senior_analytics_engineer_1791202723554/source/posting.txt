@@ -1,0 +1,49 @@
+This position is listed on behalf of a partner company, who manages all applications and next steps. Our partner is looking for a Senior Analytics Engineer based in Netherlands.
+As a Senior Analytics Engineer, you will transform billions of daily events into reliable, scalable, and actionable data products. You’ll design pipelines, models, dashboards, and analytics tools that enable teams and customers to make confident, data-driven decisions. The role combines advanced technical expertise with strong business and product understanding, ensuring that data solutions answer meaningful questions rather than simply moving or storing information. You’ll work with SQL, Python, and distributed data systems operating at exceptional scale. Collaboration with analysts, engineers, and product managers will be central to translating business needs into high-quality data products. This is an opportunity to work in a remote, international environment at the forefront of large-scale ecommerce, search, personalization, and AI.
+Accountabilities
+Design, build, and maintain scalable data pipelines and data models that power analytics, reporting, and business decision-making.
+Develop dashboards, reports, and analytical tools that make complex behavioral data accessible, reliable, and actionable.
+Partner with business and product stakeholders to define, document, and validate meaningful business metrics rather than simply implementing predefined requirements.
+Ensure data quality, consistency, reliability, and performance across systems processing billions of events.
+Collaborate with analysts, software engineers, product managers, and other stakeholders to translate business questions into well-designed data models and solutions.
+Work extensively with SQL, Python, and distributed data technologies to process and model large-scale datasets.
+Build data products that support teams across the organization and, where relevant, customer-facing or embedded analytics experiences.
+Take ownership of analytics areas end-to-end, from understanding the underlying business problem through implementation, validation, and ongoing improvement.
+Contribute to the evolution of modern analytics infrastructure, modeling practices, orchestration, and data tooling.
+Requirements
+Strong professional experience building data pipelines, data models, analytics tooling, and other production-grade data solutions.
+Expert-level SQL skills and experience working with large-scale datasets and distributed data systems.
+Strong Python experience for data processing, automation, analytics, or internal tooling.
+Experience with modern analytics engineering stacks and tools such as dbt, Airflow, or comparable modeling and orchestration technologies.
+Strong understanding of business metrics, including how to define, validate, interpret, and communicate them effectively.
+Understanding of product funnels and ecommerce metrics such as revenue, conversion, engagement, and customer behavior.
+Ability to translate stakeholder requirements and business questions into robust data models, dashboards, reports, and analytical tools.
+Strong communication skills, with the ability to work effectively with both technical and non-technical stakeholders.
+Demonstrated ownership and ability to manage an analytics domain end-to-end in a fast-paced environment.
+Strong problem-solving mindset and attention to data quality, consistency, scalability, and performance.
+Experience developing customer-facing or embedded analytics is a plus.
+Previous experience working in ecommerce is a plus.
+Interest in working with large-scale behavioral data, search, personalization, AI, or other data-intensive products is a plus.
+Benefits
+Competitive base salary of $80,000–$120,000 USD, depending on knowledge, skills, experience, and interview results.
+Stock options offered in addition to base salary.
+Fully remote working environment, with flexibility to choose where you live.
+Unlimited vacation policy, with employees strongly encouraged to take at least three weeks of vacation each year.
+Work-from-home stipend to help create a productive and comfortable home office.
+Apple laptop provided for new employees.
+Annual training and professional development budget.
+Maternity and paternity leave for eligible employees.
+Regular team offsites designed to encourage collaboration, connection, and relationship building.
+Opportunity to work with talented, empathetic colleagues in a collaborative and continuously improving environment.
+Exposure to extremely large-scale data systems processing billions of events and supporting users across numerous markets and languages.
+Opportunity to contribute to cutting-edge applications of AI, search, personalization, analytics, and ecommerce technology.
+Fully distributed international team offering the flexibility and autonomy of remote work.
+How Jobgether Works
+We use an
+AI-powered matching process
+to ensure your application is reviewed quickly, objectively, and fairly against the role's core requirements. Our system identifies the top-fitting candidates, and this shortlist is then shared directly with the hiring company. The final decision and next steps (interviews, assessments) are managed by their internal team.
+We appreciate your interest and wish you the best!
+Why Apply Through Jobgether?
+Data Privacy Notice:
+By submitting your application, you acknowledge that Jobgether will process your personal data to evaluate your candidacy and share relevant information with the hiring employer. This processing is based on legitimate interest and pre-contractual measures under applicable data protection laws (including GDPR). You may exercise your rights (access, rectification, erasure, objection) at any time.
+We may use artificial intelligence (AI) tools to support parts of the hiring process, such as reviewing applications, analyzing resumes, or assessing responses and identifying potential inconsistencies or verification signals in application materials based on available information. These tools assist our recruitment team but do not replace human judgment. Final hiring decisions are ultimately made by humans. If you would like more information about how your data is processed, please contact us.

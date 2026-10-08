@@ -5,9 +5,13 @@ Provides an interactive interface for tailoring CVs and cover letters to job des
 
 import streamlit as st
 import requests
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Configuration
-BACKEND_URL = "http://localhost:8000"
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
 API_TAILOR = f"{BACKEND_URL}/api/tailor"
 API_DOWNLOAD_CV = f"{BACKEND_URL}/api/download/cv"
 API_DOWNLOAD_CL = f"{BACKEND_URL}/api/download/cover-letter"
@@ -40,12 +44,12 @@ with st.sidebar:
         2. (Optional) Enter company name and role title
         3. Click "Generate"
         4. Review, download, and apply!
-        
+
         **Tech Stack:**
         - Backend: FastAPI + Google Gemini
         - CV: LaTeX → PDF (pdflatex)
         - Cover Letter: DOCX (Aptos font)
-        
+
         **Free tier:** 15 requests/min, 1.5M tokens/day
         """
     )
@@ -78,13 +82,26 @@ with col2:
         key="role"
     )
 
+work_country_choice = st.selectbox(
+    "Country of employment",
+    ["Germany", "Netherlands", "Ireland", "Denmark", "United Kingdom", "Switzerland", "Other"],
+    key="work_country_choice",
+    help="Choose where you will work, rather than the company's headquarters. For remote roles, use your country of employment.",
+)
+work_country = (
+    st.text_input("Country name", key="work_country_other", placeholder="e.g., Sweden").strip()
+    if work_country_choice == "Other" else work_country_choice
+)
+if work_country and work_country != "Germany":
+    st.caption("The CV will show German EU Blue Card holder. The cover letter will mention employer support for local work authorization.")
+
 # Generate button
 col_btn_left, col_btn_center, col_btn_right = st.columns([1, 2, 1])
 with col_btn_center:
     generate_btn = st.button(
         "🚀 Generate CV & Cover Letter",
         use_container_width=True,
-        disabled=not job_description.strip() or len(job_description.strip()) < 50,
+        disabled=not job_description.strip() or len(job_description.strip()) < 50 or not work_country,
         type="primary"
     )
 
@@ -99,17 +116,18 @@ if generate_btn:
         # Show info about the process
         st.info(
             "ℹ️ **Generation Process:**\n\n"
-            "1. AI tailors CV and cover letter to job description\n"
+            "1. AI drafts and reviews CV wording against your profile\n"
             "2. CV is rendered to PDF and checked for length (target: 2 pages)\n"
             "3. If CV exceeds 2 pages, content is automatically reduced and regenerated\n"
-            "4. This process repeats up to 5 times until CV reaches 2 pages\n\n"
-            "*This may take 30-90 seconds depending on iterations needed...*"
+            "4. The app checks the cover letter structure and word count\n"
+            "5. Results are shown only after the CV is within 2 pages\n\n"
+            "*Review and layout checks may take several minutes.*"
         )
-        
+
         # Progress placeholder
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
-        
+
         # Show spinner while generating
         with st.spinner("🔄 Step 1/4: Generating CV content with AI..."):
             try:
@@ -118,21 +136,23 @@ if generate_btn:
                     "job_description": job_description,
                     "company_name": company_name.strip() if company_name else None,
                     "role_title": role_title.strip() if role_title else None,
+                    "work_country": work_country,
                 }
 
                 response = requests.post(
                     API_TAILOR,
                     json=payload,
-                    timeout=180  # Increased timeout for multiple iterations
+                    timeout=600  # Includes factual review and bounded layout retries
                 )
 
                 if response.status_code == 200:
                     data = response.json()
-                    
+
                     # Store in session state for later use
                     st.session_state.job_id = data["job_id"]
                     st.session_state.token_usage = data["token_usage"]
                     st.session_state.tailoring_explanation = data.get("tailoring_explanation")
+                    st.session_state.validation_message = data.get("message")
                     st.session_state.generated = True
 
                     progress_placeholder.empty()
@@ -166,21 +186,78 @@ if generate_btn:
 if "generated" in st.session_state and st.session_state.generated:
     st.divider()
     st.header("📑 Results")
+    if st.session_state.get("validation_message"):
+        st.success(st.session_state.validation_message)
 
     job_id = st.session_state.job_id
     token_usage = st.session_state.token_usage
 
     # Token usage and cost
-    st.subheader("💰 Token Usage & Cost")
-    col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+    st.subheader("💰 Token Usage & Cost Breakdown")
+
+    # Top-level metrics
+    col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
-        st.metric("Input Tokens", f"{token_usage['cv_input_tokens']}")
+        st.metric("Total Tokens", f"{token_usage['total_tokens']:,}")
     with col_t2:
-        st.metric("Output Tokens", f"{token_usage['cv_output_tokens']}")
+        st.metric("Estimated Cost", f"${token_usage['estimated_cost_usd']:.6f}")
     with col_t3:
-        st.metric("Total Tokens", f"{token_usage['total_tokens']}")
-    with col_t4:
-        st.metric("Est. Cost (EUR)", f"€{token_usage['estimated_cost_eur']:.4f}")
+        model_display = token_usage.get('model_name', 'gemini-2.5-flash')
+        st.metric("Model Used", model_display)
+
+    # Detailed breakdown in expander
+    with st.expander("📊 Detailed Token & Cost Breakdown", expanded=True):
+        st.markdown("### Generation Attempts")
+        col_att1, col_att2 = st.columns(2)
+        with col_att1:
+            st.info(f"**CV Generation:** {token_usage.get('cv_attempts', 1)} attempt(s)")
+        with col_att2:
+            st.info(f"**Cover Letter:** {token_usage.get('cl_attempts', 1)} attempt(s)")
+
+        st.markdown("### Token Usage")
+
+        # Create a breakdown table
+        breakdown_data = {
+            "Component": ["CV Input", "CV Output", "CL Input", "CL Output", "**Total**"],
+            "Tokens": [
+                f"{token_usage['cv_input_tokens']:,}",
+                f"{token_usage['cv_output_tokens']:,}",
+                f"{token_usage['cl_input_tokens']:,}",
+                f"{token_usage['cl_output_tokens']:,}",
+                f"**{token_usage['total_tokens']:,}**"
+            ]
+        }
+
+        import pandas as pd
+        df = pd.DataFrame(breakdown_data)
+        st.table(df)
+
+        st.markdown("### Cost Calculation")
+
+        # Get pricing info (this should match backend PRICING dict)
+        model_name = token_usage.get('model_name', 'gemini-2.5-flash')
+        pricing_info = {
+            'gemini-3.8-flash': {'input': 0.75, 'output': 3.75},
+            'gemini-2.5-flash': {'input': 0.30, 'output': 2.50},
+            'gemini-2.5-flash-lite': {'input': 0.10, 'output': 0.40},
+            'gemini-1.5-flash': {'input': 0.075, 'output': 0.30},
+        }
+
+        pricing = pricing_info.get(model_name, {'input': 0.30, 'output': 2.50})
+
+        total_input = token_usage['cv_input_tokens'] + token_usage['cl_input_tokens']
+        total_output = token_usage['cv_output_tokens'] + token_usage['cl_output_tokens']
+
+        input_cost = (total_input / 1_000_000) * pricing['input']
+        output_cost = (total_output / 1_000_000) * pricing['output']
+
+        st.markdown(f"""
+        - **Input tokens:** {total_input:,} × ${pricing['input']}/1M = **${input_cost:.6f}**
+        - **Output tokens:** {total_output:,} × ${pricing['output']}/1M = **${output_cost:.6f}**
+        - **Total cost:** **${token_usage['estimated_cost_usd']:.6f}**
+
+        💡 *All costs are in USD. Pricing is for {model_name} model.*
+        """)
 
     st.divider()
 
@@ -188,38 +265,38 @@ if "generated" in st.session_state and st.session_state.generated:
     if "tailoring_explanation" in st.session_state and st.session_state.tailoring_explanation:
         with st.expander("📋 Tailoring Details & Changes Made", expanded=False):
             st.markdown("### How Your CV & Cover Letter Were Tailored")
-            
+
             explanation = st.session_state.tailoring_explanation
-            
+
             # Format structured explanation nicely
             if isinstance(explanation, dict):
                 if explanation.get("summary_changes"):
                     st.markdown("**📝 Summary Changes:**")
                     st.write(explanation["summary_changes"])
                     st.markdown("")
-                
+
                 if explanation.get("bullet_modifications"):
                     st.markdown("**🔧 Bullet Modifications:**")
                     st.write(explanation["bullet_modifications"])
                     st.markdown("")
-                
+
                 if explanation.get("skill_reordering"):
                     st.markdown("**🔄 Skill Reordering:**")
                     st.write(explanation["skill_reordering"])
                     st.markdown("")
-                
+
                 if explanation.get("project_selection"):
                     st.markdown("**📂 Project Selection:**")
                     st.write(explanation["project_selection"])
                     st.markdown("")
-                
+
                 if explanation.get("overall_strategy"):
                     st.markdown("**🎯 Overall Strategy:**")
                     st.write(explanation["overall_strategy"])
             else:
                 # Fallback for plain text
                 st.markdown(str(explanation))
-    
+
     st.divider()
 
     # Preview and download
@@ -228,7 +305,7 @@ if "generated" in st.session_state and st.session_state.generated:
     # CV Tab
     with tab_cv:
         st.subheader("📄 CV Preview & Download")
-        
+
         try:
             # Fetch PDF for download/preview
             pdf_response = requests.get(
@@ -302,7 +379,7 @@ if "generated" in st.session_state and st.session_state.generated:
 
     # New generation button
     if st.button("🔄 Generate Another", use_container_width=True):
-        for key in ["generated", "job_id", "token_usage", "tailoring_explanation"]:
+        for key in ["generated", "job_id", "token_usage", "tailoring_explanation", "validation_message"]:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()

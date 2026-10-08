@@ -1,0 +1,22 @@
+{
+  "job_id": "2026_booking_com_data_platform_engineer_ii_business_intelligence_platform_1791194324",
+  "status": "success",
+  "token_usage": {
+    "cv_input_tokens": 14530,
+    "cv_output_tokens": 2329,
+    "cl_input_tokens": 0,
+    "cl_output_tokens": 0,
+    "total_tokens": 16859,
+    "estimated_cost_usd": 0.019631,
+    "cv_attempts": 1,
+    "cl_attempts": 1,
+    "model_name": "gemini-3.8-flash"
+  },
+  "message": null,
+  "artifact_filenames": {
+    "cv_path": "Sreedeep_Sreekanth_SAE_CV.pdf",
+    "cover_letter_path": "Sreedeep_Sreekanth_Booking_Cover_Letter.docx",
+    "cl_pdf_path": "Sreedeep_Sreekanth_Booking_Cover_Letter.pdf"
+  },
+  "review_status": "Reviewed and manually refined; initial AI metadata retained separately."
+}

@@ -1,0 +1,164 @@
+{
+  "company_name": "Datenna",
+  "role_title": "Analytics Engineer",
+  "work_country": "Netherlands",
+  "cv": {
+    "title": "Senior Analytics Engineer",
+    "work_authorization": "German EU Blue Card holder",
+    "summary": [
+      "Senior analytics professional with extensive experience across analytics engineering, data modeling, and business intelligence. Strong technical background in designing SQL and Python transformation pipelines, orchestration, automated data quality, and semantic context to deliver reliable data infrastructure for business decision-making."
+    ],
+    "skills": {
+      "Data Modeling & Engineering": [
+        "Advanced SQL",
+        "dbt",
+        "Data Modeling & Semantic Layers",
+        "Snowflake",
+        "BigQuery",
+        "Incremental ETL",
+        "Automated Data Quality & Data Contracts"
+      ],
+      "Programming & Orchestration": [
+        "Python (Pandas, NumPy)",
+        "Apache Airflow",
+        "GitLab CI",
+        "Docker",
+        "Git"
+      ],
+      "BI & AI Tools": [
+        "GoodData",
+        "Looker",
+        "Power BI",
+        "Claude",
+        "Cursor",
+        "Model Context Protocol (MCP)",
+        "LLM Semantic Context & Skills"
+      ],
+      "Analytics & Governance": [
+        "Attribution Modeling",
+        "Cohort & Funnel Analysis",
+        "Statistical Analysis",
+        "Stakeholder Management"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Aklamio GmbH",
+        "role": "Senior Analytical Engineer",
+        "start_date": "2026-02",
+        "end_date": "present",
+        "bullets": [
+          "Own and develop end-to-end data transformation pipelines from source ingestion through Snowflake transformations to consumption in downstream analytics tools.",
+          "Develop reusable SQL data models across landing, intermediate, and aggregated reporting layers, centralizing core business logic and calculations.",
+          "Maintain Airflow-orchestrated DAGs and version-controlled data workflows in GitLab, utilizing Cursor and custom skills to support continuous pipeline documentation.",
+          "Contribute to a YAML-configured data quality framework covering approximately 80 Snowflake tables across landing and integration layers, owning funnel and sales-channel checks.",
+          "Developing a Snowflake MCP integration and semantic context layer to expose warehouse definitions, relationships, and business logic for LLM-driven analytics workflows.",
+          "Developing an in-house dashboarding solution using Claude, building on Snowflake MCP integration and semantic context."
+        ],
+        "projects": [
+          {
+            "name": "Traffic Source & Customer Journey Attribution",
+            "bullets": [
+              "Led an end-to-end attribution initiative to identify which traffic sources drive customer performance, designing incremental event- and journey-grain enrichment pipelines for traffic source, integration type, and first-touch context.",
+              "Validated pipelines against production and safely released v2 across intermediate and aggregate data layers alongside v1, using controlled backfills without breaking existing reporting.",
+              "Updated the GoodData logical data model and KPI dashboards with multi-level category breakdowns and delivered documentation used by all customer success managers across 72 customer brands."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "NeoTaste GmbH",
+        "role": "Marketing Business Analyst",
+        "start_date": "2025-01",
+        "end_date": "2026-01",
+        "bullets": [
+          "Designed and maintained the analytics stack and data models across Snowflake and dbt to support growth reporting across 51 cities.",
+          "Partnered closely with leadership to translate operational and marketing requirements into scalable analytical data models and reliable dashboards.",
+          "Built predictive demand models linking marketing spend to customer growth, replacing manual spreadsheets with automated transformation pipelines."
+        ],
+        "projects": [
+          {
+            "name": "Marketing Demand Forecasting Model & Scenario Dashboard",
+            "bullets": [
+              "Replaced manual spreadsheet-based planning with dbt and Snowflake data models, improving quarterly planning accuracy by ~20% and enabling scenario-based budget allocation."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ecoligo GmbH",
+        "role": "Business Intelligence Analyst",
+        "start_date": "2023-07",
+        "end_date": "2025-01",
+        "bullets": [
+          "Collaborated in building data transformation pipelines from scratch using BigQuery and dbt, unifying behavioral, marketing, and backend transactional data.",
+          "Applied software engineering practices to analytics code, eliminating manual reporting workflows and saving ~10 hours weekly.",
+          "Designed and deployed attribution and customer segmentation models supporting platform analytics for multi-million-euro annual investment volumes."
+        ],
+        "projects": [
+          {
+            "name": "Conversational LLM Interface for Warehouse Querying",
+            "bullets": [
+              "Built a conversational analytics tool leveraging OpenAI's API to dynamically generate and execute SQL queries on BigQuery, enabling non-technical stakeholders to self-serve insights."
+            ]
+          },
+          {
+            "name": "Payout Data Pipeline Automation",
+            "bullets": [
+              "Integrated Python calculation scripts into dbt and Y42 pipelines to automate SEPA-compatible transactional payouts, ensuring auditability and reproducibility."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "heycar (Mobility Trader GmbH)",
+        "role": "Data Analyst",
+        "start_date": "2021-12",
+        "end_date": "2023-05",
+        "bullets": [
+          "Designed and maintained analytics data models and transformation pipelines using dbt, PostgreSQL, and Matillion across Marketing, Product, and Sales.",
+          "Implemented data quality and attribution frameworks that accurately redistributed untracked sessions, enabling six-figure quarterly marketing reallocations.",
+          "Built executive KPI reporting and semantic models in Looker to detect performance trends across business channels."
+        ],
+        "projects": [
+          {
+            "name": "Performance Marketing Channel Attribution Pipeline",
+            "bullets": [
+              "Automated ETL pipelines in Matillion and dbt using session-level behavior and U-shaped attribution logic, contributing to a 6–8% increase in qualified leads."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ORMIT (Traineeship)",
+        "role": "Marketing Analyst",
+        "start_date": "2020-12",
+        "end_date": "2021-11",
+        "bullets": [],
+        "projects": []
+      },
+      {
+        "company": "Unilever",
+        "role": "Project Coordinator - Front of House",
+        "start_date": "2019-03",
+        "end_date": "2019-08",
+        "bullets": [],
+        "projects": []
+      }
+    ],
+    "include_education": true,
+    "include_certifications": true
+  },
+  "cover_letter": {
+    "role_title": "Analytics Engineer",
+    "company_name": "Datenna",
+    "paragraphs": [
+      "I am applying for the Analytics Engineer role at Datenna. With over five years of analytics and data engineering experience, I specialize in building robust data transformation pipelines, scalable warehouse models, and rigorous quality frameworks. Combining advanced SQL, dbt, and Python, I transform complex data into actionable insights while upholding software engineering best practices across version control and orchestration systems.",
+      "Currently as Senior Analytical Engineer at Aklamio, I design end-to-end pipelines transforming ingested records through Snowflake data layers. I develop reusable SQL models across intermediate and aggregated layers to establish single sources of truth. My daily work includes maintaining Airflow-orchestrated DAGs, managing GitLab CI/CD workflows, and contributing to a YAML-configured data quality framework spanning roughly 80 tables, where I own funnel and sales-channel checks. I also utilize Cursor and Claude to build semantic definitions and model contexts for automated warehouse workflows.",
+      "In previous analytics engineering roles at NeoTaste, ecoligo, and heycar, I delivered modular data models using dbt, SQL, and Python across Snowflake, BigQuery, and PostgreSQL environments. At NeoTaste, I designed dbt models and automated pipelines that linked complex marketing data to growth metrics, replacing manual workflows and improving planning accuracy by 20%. At ecoligo, I built foundational warehouse pipelines from scratch using dbt and BigQuery, integrating behavioral and transactional sources while automating operational data workflows. Across these positions, I maintained clear data documentation, enforced testing routines, and collaborated with cross-functional stakeholders to deliver reliable reporting structures.",
+      "I would welcome the opportunity to discuss how my data modeling, transformation, and quality monitoring background can support Datenna's analytics platform. I hold a valid EU Blue Card issued by Germany and would require employer support for the appropriate work authorization in the Netherlands. I look forward to speaking with your team about this opening."
+    ],
+    "closing_line": "Sincerely,",
+    "signature_name": "Sreedeep Sreekanth"
+  }
+}

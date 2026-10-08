@@ -1,0 +1,50 @@
+
+COMPANY: Oliver Wyman
+ROLE: Data & Analytics - (Senior) Analyst
+WORK COUNTRY: Netherlands (confirmed by user)
+JOB DESCRIPTION:
+Company:
+Oliver Wyman
+Description:
+Who We Are
+Oliver Wyman is a global management consultancy working across all areas of industry, financial services, government, and non-profit organizations. Clients approach us with their most significant challenges, and we assemble teams of experts to address each facet of these complex issues. Together, we create breakthroughs that lead to remarkable impact.
+Within Oliver Wyman, the Data and Analytics (DNA) division was established in 2017 and is operating across the entire world, with a focus on Europe. We are a dynamic and rapidly growing team of quantitative analytics specialists, collaborating closely with colleagues across the firm to cover a global footprint, working across multiple industries including, but not limited to, Financial Services, Climate & Sustainability, Energy, Retail, and Transportation.
+We believe in the power of diverse perspectives and collaborative teams to drive innovation. Our team comes from a wide range of backgrounds and experiences, and we embrace the unique skills and insights they bring to our work. At Oliver Wyman and within DNA, we are proud of the
+values
+we uphold that guide us every day in how we work and collaborate. We are committed to fostering an inclusive environment where everyone can thrive and reach their full potential.
+What You Will Do
+As a member of Oliver Wyman’s Data & Analytics team, you will collaborate with colleagues and clients at all levels from your very first day, helping clients solve their most pressing challenges. Our DNA team is committed to developing tailored solutions for clients around the globe, including designing potential solutions for analytical challenges, implementing various prototypes while also assessing their effectiveness, and engaging in discussions with clients and colleagues to share ideas. Your contributions will be invaluable to delivering impactful results for our clients.
+Notable projects include:
+Developing an NLP-based machine learning toolkit to predict credit rating downgrades using news articles –
+click here for more information
+Modelling portfolio decarbonization strategies leveraging advanced analytics techniques for large European banks
+Optimizing and developing a promotional program using data from historical promotions for an Asian health & beauty chain by deploying a promotion analytics toolkit
+Validating a customer-facing GenAI chatbot for an American bank
+Developing probability of default and loss models in Python for European and UK-based banks
+Identifying supply chain risks by combining multiple live data feeds, and developing and applying a bespoke AI based risk methodology –
+click here for more information
+Developing a next best action model to reduce customer churn for a global telecom company
+Why Join Us?
+Expect a steep learning curve, as no two projects are ever the same. You’ll have the opportunity to travel internationally, gaining invaluable experiences and insights across different cultures and with access to the latest technologies, you’ll constantly expand your toolkit with each new endeavor.
+You won’t be alone on this journey; various colleagues will guide and coach you throughout your career. You’ll have a dedicated buddy, a career adviser, and a talent manager to help you navigate your professional path. We also care deeply about sustainable work-life quality, providing you with the flexibility to balance your career aspirations with your personal life.
+This role will empower you to embrace your curiosity and step out of your comfort zone. You will have the opportunity to work alongside genuine colleagues who measure success by the lasting impact we create together. If you’re excited by challenges and eager to make a meaningful impact, we look forward to welcoming you aboard!
+Who Can Apply?
+Bachelor's, Master’s, or PhD in a quantitative discipline from a top academic program (Data Science, Mathematics, Natural Sciences, Statistics, Computer Science, Engineering, etc.)
+Data-driven mindset and proficiency with numbers, paired with the ability to explain sophisticated data science concepts in an understandable manner to clients and colleagues
+Ideally, programming skills in Python or R, but more importantly, an eagerness to continuously extend your knowledge of technologies
+Strong commitment to teamwork and resilience in a creative and constantly changing environment
+Excellent command of the English language (verbal and written). Fluency in Dutch will be a plus.
+Interest and experience in financial services and risk management is a plus
+How to Apply?
+Please submit your
+CV, cover letter and transcripts. If you would like to find out more information about Oliver Wyman, please visit
+our website
+or
+alternatively, apply
+to attend one of our events, details of which can be found
+here
+.​
+Oliver Wyman, a business of Marsh McLennan (NYSE: MMC), is a management consulting firm combining deep industry knowledge with specialized expertise to help clients optimize their business, improve operations and accelerate performance. Marsh McLennan is a global leader in risk, strategy and people, advising clients in 130 countries across four businesses: Marsh, Guy Carpenter, Mercer and Oliver Wyman. With annual revenue of $24 billion and more than 90,000 colleagues, Marsh McLennan helps build the confidence to thrive through the power of perspective. For more information, visit oliverwyman.com, or follow on LinkedIn and X.
+Marsh McLennan is committed to creating a diverse, inclusive and flexible work environment. We aim to attract and retain the best people and embrace diversity of age, background, disability, ethnic origin, family duties, gender orientation or expression, marital status, nationality, parental status, personal or social status, political affiliation, race, religion and beliefs, sex/gender, sexual orientation or expression, skin color, or any other characteristic protected by applicable law.
+Marsh McLennan is committed to hybrid work, which includes the flexibility of working remotely and the collaboration, connections and professional development benefits of working together in the office. All Marsh McLennan colleagues are expected to be in their local office or working onsite with clients at least three days per week. Office-based teams will identify at least one “anchor day” per week on which their full team will be together in person.
+APPLICATION CONTEXT: Focus on quantitative consulting: solving ambiguous business problems, statistical analysis, Python, forecasting, segmentation, attribution, prototype development, validation, and explaining results to stakeholders. Emphasize engineering dual degree IIT Madras and MScBA Rotterdam School of Management, but do not invent coursework or new degrees. Use K-means investor segmentation, Markov attribution, city forecasting/scenarios, performance-gap decomposition, LLM query tool, quality checks and safe rollout. Select projects to prove analytical methods and business outcomes, not only infrastructure. Retain all employers and exact roles/dates. No verified Dutch fluency, R, NLP toolkit development, credit-risk PD/LGD models, banking consulting, portfolio decarbonization, or external consulting experience: do not claim these. Investor reporting and payment automation provide transferable financial-data exposure, not risk-management expertise. Aklamio MCP/dashboarding remain developing work. CV immigration label only German EU Blue Card holder; Dutch employer permit support only in cover letter.

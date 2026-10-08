@@ -81,10 +81,10 @@
 \begin{samepage}
 \cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
   {%- if exp.start_date -%}
-    {{ exp.start_date|replace('-', ' - ') }}
+    {{ exp.start_date }}
   {%- endif -%}
   {%- if exp.end_date -%}
-    {%- if exp.end_date == 'present' %} -- present{% else %} -- {{ exp.end_date|replace('-', ' - ') }}{% endif -%}
+     -- {{ exp.end_date }}
   {%- endif -%}
 {{ '}' }}{{ '{' }}{{ exp.location }}{{ '}' }}
 
@@ -98,6 +98,7 @@
 
 {% if exp.projects %}
 % Selected Projects - new structure (each project has own bullets)
+\needspace{1.8cm}
 \vspace{1mm}
 {\small\textbf{\textcolor{accent}{Selected Projects:}}}
 \vspace{0.5mm}

@@ -1,0 +1,24 @@
+{
+  "answers": [
+    {
+      "question": "Why are you interested in joining Vio?",
+      "answer": "Vio interests me because this role connects analytics directly to commercial decisions: understanding partner performance, identifying opportunities, and giving partnerships managers tools they can use independently. That is the kind of work I have delivered through customer benchmarking and channel recommendations at Aklamio and forecasting and scenario planning at NeoTaste. I am particularly interested in your approach to LLM-powered self-service. At ecoligo, I built an OpenAI-powered tool for querying BigQuery; at Aklamio, I am developing Snowflake MCP integration with semantic context and reusable business-logic skills. Vio’s emphasis on metric definitions, vetted queries, and domain knowledge closely matches that work. The opportunity to apply these capabilities to availability, price competitiveness, and partner economics would be a compelling next step.",
+      "words": 118
+    },
+    {
+      "question": "What has been your main learning in the past year and how has it improved your career?",
+      "answer": "My main learning has been that ownership of analytics needs to extend beyond producing a correct model or dashboard to making the result understandable and useful for a decision. At Aklamio, leading a traffic-source and customer-journey attribution initiative meant addressing upstream classification defects, validating the reporting logic, benchmarking 72 brands, and translating the findings into recommendations that customer success managers could use. It reinforced the importance of consistent definitions, reproducible evidence, and a clear path from analysis to action. I have also been applying this thinking to LLM-based analytics: semantic context and explicit business rules matter as much as query generation. This has broadened my approach from delivering analyses to developing reusable decision tools with clear definitions and quality checks.",
+      "words": 120
+    },
+    {
+      "question": "Considering this role, what is the most relevant and comparable role you had, and what were your achievements?",
+      "answer": "My current role as Senior Analytical Engineer at Aklamio is the closest match, particularly its customer performance analysis and stakeholder-facing reporting. I led a traffic-source and customer-journey attribution initiative from incremental Snowflake pipelines through GoodData dashboards to commercial recommendations. I analyzed 72 customer brands using peer benchmarks and decomposed performance gaps into mix, efficiency, and interaction effects. The resulting insights are used by all customer success managers to recommend improvements to clients’ channel setups. I also own funnel and sales-channel quality checks within an approximately 80-table framework and am developing LLM-based self-service using Snowflake MCP, semantic context, and reusable skills. My earlier role as NeoTaste’s sole marketing analyst adds relevant commercial scenario experience: forecasting across 51 cities improved planning accuracy by approximately 20% and supported budget decisions contributing to an 8–10% ROAS uplift.",
+      "words": 133
+    }
+  ],
+  "checkbox_answers": {
+    "English fluency": "Yes",
+    "Amsterdam relocation or eligible timezone": "Yes"
+  },
+  "review_note": "The learning answer is proposed wording based on the documented attribution and LLM work; the personal framing should be reviewed by the candidate."
+}

@@ -1,0 +1,39 @@
+About Marktlink Capital
+Marktlink Capital is a Private Equity, Venture Capital and Private Income fund manager headquartered at CitySide Amsterdam. We give entrepreneurs and private investors access to leading funds across Europe and North America.
+Our team of more than 70 professionals manages over €3.5 billion in capital commitments, invested by nearly 2,750 investors across more than 150 PE & VC funds.
+We are growing quickly, expanding internationally and integrating additional businesses into our platform. This creates a unique opportunity to build the data foundation that supports better decisions across the firm.
+
+The role
+As an Analytics Engineer, you will build the foundation for how Marktlink Capital uses data. Within the Data & Technology team, we ensure that colleagues across the organisation, as well as our investors, have access to accurate, timely financial and operational information. You will take data from our core systems, bring it into a governed data platform and turn it into reliable models, dashboards and data products that management and teams across the firm use every day.
+
+This is a genuine build role. We are establishing our analytics platform from the ground up using Fivetran, Snowflake and dbt. You will play a central role in designing, building and maintaining it. As Marktlink Capital scales, new systems, entities and definitions will continuously need to be integrated. This is not a one-off implementation project: you will build a platform that evolves with the business and ensures the right data and insights reach the right people at the right time.
+
+You will work in a compact team with short communication lines, significant ownership and active encouragement to bring forward ideas. The role is based in our Amsterdam office. You will own the development of a scalable, reliable and well-governed analytics platform.
+
+Concretely, you will:
+- Design and build our ELT platform using Fivetran, Snowflake and dbt, bringing data from CRM, fund administration, portfolio monitoring and investor systems into one central platform.
+- Model data into a reliable, tested and well-documented analytics layer, with clear ownership and agreed definitions for key metrics.
+- Build reporting and dashboards that teams across the firm genuinely rely on, replacing manual reporting processes where possible.
+- Establish the engineering fundamentals, including version control, testing, CI/CD, monitoring and documentation, so the platform remains maintainable and auditable as it grows.
+- Onboard new data sources and entities as we scale and integrate with other businesses.
+- Work directly with stakeholders across Investments, Investor Relations, Sales, Fund Management, Finance, Operations and HR to translate business questions into valuable data products.
+- Carry out hands-on analysis where this is the fastest and most effective route to an answer.
+- Own the architecture of the analytics platform as it matures and contribute to the wider Data & Technology roadmap.
+- Where it fits your skills and interests, build internal tools and automation beyond the data platform. We run our own internal AI Hub, and there is real scope to develop the role in that direction.
+Your profile
+You are a hands-on Analytics Engineer, Data Engineer or BI Engineer who enjoys building practical solutions in an entrepreneurial environment. You are comfortable operating independently, making architecture decisions and turning broad business questions into well-documented, useful products.
+You bring at least five years of relevant experience, including experience building a data platform or analytics capability from scratch, rather than only maintaining an existing environment.
+
+Additionally, you recognise yourself in the following:
+- Strong SQL skills and hands-on dbt experience, combined with confidence using Git and modern software engineering practices.
+- Experience with a cloud data warehouse, preferably Snowflake. Experience with Databricks, BigQuery or similar platforms also transfers well.
+- Comfort making architecture decisions: you will be building our Snowflake environment from an empty account rather than inheriting an established setup.
+- Experience with managed ingestion tooling such as Fivetran, with the judgement to know when a connector is not the right answer and a custom pipeline is needed.
+- Demonstrable dashboarding experience. We are intentionally open on tooling: Power BI, Streamlit, Tableau, Looker or similar all count. You will help shape the reporting layer.
+- Solid Python skills to build and maintain ingestion pipelines, automation and, if relevant, the reporting layer itself.
+- You already use AI coding tools such as Claude Code, Codex or Cursor in your work, or are keen to do so.
+- Experience combining data from business systems, such as CRM platforms including DealCloud or HubSpot, and finance, ERP or fund administration platforms.
+- The ability to take ownership of a problem from a loosely defined business question through to a delivered and documented product.
+- Strong prioritisation skills: you know which questions are worth answering first, rather than simply working through requests as they arrive.
+- Clear communication skills and the confidence to work with senior stakeholders, challenge assumptions and push back where it matters.
+- Affinity with Private Equity, Venture Capital or finance is a plus, but not essential.

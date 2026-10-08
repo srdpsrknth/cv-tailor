@@ -1,0 +1,171 @@
+{
+  "cv": {
+    "title": "Senior Analytics Engineer",
+    "work_authorization": null,
+    "summary": [
+      "Senior analytics professional with experience across analytics engineering, business intelligence, and growth analytics. Strong background in SQL, Python, reusable data modeling, and automated validation, with hands-on ownership of ETL pipelines and reporting. Experience translating business requirements into maintainable analytical solutions that improve planning, performance measurement, and stakeholder decision-making."
+    ],
+    "skills": {
+      "Analytics Engineering & Warehousing": [
+        "Advanced SQL",
+        "Data Modeling & Semantic Layers",
+        "Snowflake",
+        "BigQuery",
+        "PostgreSQL",
+        "Incremental ETL",
+        "Automated Data Quality & Data Contracts"
+      ],
+      "Pipelines & Orchestration": [
+        "Apache Airflow",
+        "dbt",
+        "Python (Pandas, NumPy)",
+        "GitLab CI",
+        "Docker",
+        "Matillion",
+        "Git"
+      ],
+      "BI & Analytics Delivery": [
+        "GoodData",
+        "Looker",
+        "Power BI",
+        "Attribution Modeling",
+        "Cohort & Funnel Analysis",
+        "Forecasting",
+        "Stakeholder Management"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Aklamio GmbH",
+        "role": "Senior Analytical Engineer",
+        "start_date": "2026-02",
+        "end_date": "present",
+        "bullets": [
+          "Own ETL pipelines from ingestion through Snowflake SQL transformations to GoodData reporting; maintain reusable models across landing, intermediate, and aggregated layers.",
+          "Maintain Airflow DAGs and GitLab workflows, using Cursor and reusable skills for continuous documentation.",
+          "Contribute to a YAML-configured quality framework covering approximately 80 tables; own funnel and sales-channel SQL checks for reconciliation, business logic, and join consistency.",
+          "Added live-event data-contract checks across 20 channel/CTA combinations and extended revenue checks for sales-channel propagation and orphan-source detection.",
+          "Developing Snowflake MCP integration and a Claude-powered dashboarding prototype, supported by semantic context and reusable business-logic skills."
+        ],
+        "projects": [
+          {
+            "name": "Traffic Source & Customer Journey Attribution",
+            "bullets": [
+              "Designed incremental event- and journey-grain enrichment pipelines in Snowflake to attribute performance across traffic sources, integration types, and first-touch context.",
+              "Validated pipelines against production and deployed across intermediate and reporting layers alongside legacy pipelines with controlled backfills and no breaking changes to dashboards.",
+              "Updated logical data models and KPI dashboards, delivering journey analytics analyzed across 72 customer brands and used by all customer success managers to optimize client setups."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "NeoTaste GmbH",
+        "role": "Marketing Business Analyst",
+        "start_date": "2025-01",
+        "end_date": "2026-01",
+        "bullets": [
+          "Designed and owned the marketing data modeling and analytics stack in Snowflake and dbt, supporting growth analytics across 51 cities.",
+          "Partnered directly with business leadership to translate commercial problem statements and budget scenarios into technical data solutions, tracking expected CAC, ROAS, and subscriber growth.",
+          "Delivered executive dashboards in Power BI to monitor market saturation and demand dynamics."
+        ],
+        "projects": [
+          {
+            "name": "City-Level Demand Forecasting Data Model",
+            "bullets": [
+              "Built scalable demand forecasting models using dbt and Snowflake, replacing manual spreadsheet-based planning and improving planning accuracy by ~20% across 51 cities.",
+              "Informed marketing budget allocation and city launches through demand saturation and payback analysis, contributing to an 8-10% ROAS uplift."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ecoligo GmbH",
+        "role": "Business Intelligence Analyst",
+        "start_date": "2023-07",
+        "end_date": "2025-01",
+        "bullets": [
+          "Co-built the data pipeline in a two-person analytics team, using BigQuery and dbt to unify behavioral, marketing, and investment data for a platform with 50k-70k monthly users.",
+          "Eliminated manual reporting workflows through automated pipelines, saving approximately 10 hours per week while improving data turnaround times.",
+          "Developed Markov-chain attribution and reporting that informed a 30% budget shift from Facebook to Google Ads and an 8% reduction in blended CAC.",
+          "Automated voucher and cashback calculations with Python and generated SEPA-compatible payment files within dbt/Y42 workflows.",
+          "Built an OpenAI-powered tool to generate and execute BigQuery SQL, enabling non-technical stakeholders to self-serve investor, marketing, and revenue insights."
+        ],
+        "projects": []
+      },
+      {
+        "company": "heycar (Mobility Trader GmbH)",
+        "role": "Data Analyst",
+        "start_date": "2021-12",
+        "end_date": "2023-05",
+        "bullets": [
+          "Delivered reporting and analytics across Marketing, Product, and Sales; maintained executive Looker dashboards for paid, organic, and brand performance.",
+          "Automated attribution ETL with Matillion and developed session-level models using U-shaped logic, informing six-figure quarterly budget reallocations and contributing to 6-8% more qualified leads.",
+          "Supported A/B testing and funnel analysis on product and search features to improve conversion performance."
+        ],
+        "projects": []
+      },
+      {
+        "company": "ORMIT (Traineeship)",
+        "role": "Marketing Analyst",
+        "start_date": "2020-12",
+        "end_date": "2021-11",
+        "bullets": [],
+        "projects": []
+      },
+      {
+        "company": "Unilever",
+        "role": "Project Coordinator - Front of House",
+        "start_date": "2019-03",
+        "end_date": "2019-08",
+        "bullets": [],
+        "projects": []
+      }
+    ],
+    "include_education": true,
+    "include_certifications": true
+  },
+  "cover_letter": {
+    "role_title": "Senior Analytics Engineer",
+    "company_name": "Delivery Hero",
+    "paragraphs": [
+      "I am applying for the Senior Analytics Engineer position within Quick Commerce at Delivery Hero. Your focus on dependable data foundations, reusable models, and collaboration across business and technical teams closely matches my work. My experience spans analytics engineering, business intelligence, and growth analytics, with hands-on delivery of SQL transformations, Python automation, and stakeholder reporting. I am based in Berlin and interested in contributing to the analytical systems behind Quick Commerce decisions.",
+      "At Aklamio, I own ETL pipelines from ingestion through Snowflake transformations to GoodData consumption. I develop reusable models across landing, intermediate, and reporting layers and maintain Airflow orchestration and GitLab workflows. I contribute to a YAML-configured quality framework covering approximately 80 tables, owning funnel and sales-channel checks for source reconciliation, business-logic accuracy, and join consistency. I also introduced live-event data-contract checks aligned with production filters to avoid false alarms, alongside ongoing documentation of pipeline changes.",
+      "For a released attribution initiative, I designed incremental event- and journey-grain enrichment pipelines, validated them against production, and managed backfills without breaking existing reporting. The resulting GoodData models and dashboards support analysis across 72 customer brands and recommendations used by all customer success managers. Previously, at NeoTaste, my Snowflake and dbt forecasting models improved planning accuracy by approximately 20% across 51 cities. At ecoligo, I co-built BigQuery and dbt pipelines and automated reporting workflows that saved approximately 10 hours weekly. At heycar, I automated attribution ETL with Matillion and supported product experimentation.",
+      "I would bring practical experience translating stakeholder requirements into maintainable models, reliable reporting, and repeatable validation. Python payment automation and a completed OpenAI-powered BigQuery query tool also demonstrate my ability to develop useful analytical tooling. I would welcome the opportunity to discuss how this background can support your Data Foundations team and its collaboration with regional, product, business, and analytics stakeholders."
+    ],
+    "closing_line": "Sincerely,",
+    "signature_name": "Sreedeep Sreekanth"
+  },
+  "company_name": "Delivery Hero",
+  "role_title": "Senior Analytics Engineer - Quick Commerce",
+  "work_country": "Germany",
+  "experience_technologies": {
+    "Aklamio GmbH": [
+      "Snowflake SQL",
+      "Airflow",
+      "GitLab CI",
+      "GoodData",
+      "Docker",
+      "YAML DQ"
+    ],
+    "NeoTaste GmbH": [
+      "Snowflake SQL",
+      "dbt",
+      "Python",
+      "Power BI"
+    ],
+    "ecoligo GmbH": [
+      "BigQuery SQL",
+      "dbt",
+      "Python",
+      "Y42",
+      "Looker"
+    ],
+    "heycar (Mobility Trader GmbH)": [
+      "PostgreSQL",
+      "Python",
+      "Matillion",
+      "Looker"
+    ]
+  }
+}

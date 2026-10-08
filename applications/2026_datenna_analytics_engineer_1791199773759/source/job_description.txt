@@ -1,0 +1,46 @@
+About Datenna
+Datenna is a fast-growing tech scale-up combining cutting-edge OSINT and AI technologies to provide governments with critical insights into China's techno-economic landscape. Our platform transforms open-source intelligence into actionable insights through advanced data processing and analysis.
+
+
+
+The Role: As an Analytics Engineer, you will be at the forefront of transforming raw data into actionable insights. You'll design and implement efficient data models and pipelines using modern tools like dbt, SQL, and Python. Working closely with stakeholders, you'll ensure data quality and governance while optimizing performance. Your expertise in data warehouses and CI/CD practices will be crucial in building a robust analytics infrastructure that drives decision-making across the organization.
+
+
+
+Your mission at Datenna:
+
+Design efficient data models using techniques like star schema and snowflake schema for analytics and reporting.
+
+Develop and maintain data transformation pipelines using dbt, SQL, and Python.
+
+Implement data quality checks and governance practices.
+
+Collaborate with stakeholders to understand data requirements and implement solutions.
+
+Maintain data documentation and catalogs to improve data discoverability.
+
+Apply software engineering best practices to analytics code.
+
+Optimize data models and pipelines for performance.
+
+
+
+What makes you a great candidate:
+
+Bachelor's degree in Computer Science, Engineering, or related field.
+
+5+ years of experience in analytics engineering, or data engineering with focus on data modelling and transformation.
+
+Strong SQL skills and experience with data modeling techniques.
+
+Proficiency in dbt, Databricks and Python for data transformation.
+
+Experience with AI coding assistants such as Claude Code or Codex is a plus.
+
+Strong problem-solving and communication skills.
+
+Experience with version control systems like Git.
+
+Experience with CI/CD practices for data pipelines.
+
+Experience with orchestrations frameworks, such as Dagster or Airflow.

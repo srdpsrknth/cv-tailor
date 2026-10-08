@@ -1,6 +1,9 @@
 # Environment variables
 .env
 .env.local
+.env.*
+!.env.example
+storage/profile/* copy.yaml
 
 # Python
 __pycache__/
@@ -39,6 +42,9 @@ ENV/
 .DS_Store
 
 # Output files
+outputs/**
+!outputs/.gitkeep
+.runtime/
 outputs/*.pdf
 outputs/*.docx
 outputs/*.tex

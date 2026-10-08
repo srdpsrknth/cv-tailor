@@ -1,0 +1,34 @@
+
+COMPANY: Google
+ROLE: Analytical Lead, Shopping Partners
+WORK COUNTRY: Ireland
+JOB DESCRIPTION:
+Analytical Lead, Shopping Partners
+Google
+Dublin, Ireland
+Minimum qualifications:
+Bachelor's degree in Business, Statistics, Computer Science, Mathematics, Engineering, Finance or equivalent practical experience.
+3 years of experience working as a data analyst, business analyst, consultant or similar role.
+Preferred qualifications:
+Experience in data manipulation, database and SQL(writing SQL scripts, data pipelines, data visualisation).
+Familiarity with Digital Advertising.
+Ability to understand and articulate the “big picture”.
+Excellent Google Spreadsheets skills.
+Excellent problem solving and structuring skills, with the ability to bring actionable insights through effective communication.
+About the job
+Analytical Leads are the strategic guide of our business, enabling sharp decision-making from high-level strategy to tactical execution. You will seamlessly navigate between granular details and the big picture, modeling complex scenarios, managing performance metrics, and creatively solving our challenges.
+As an Analytical Lead, you will partner directly at SPE Director and Management levels to deliver operational excellence, accelerate business velocity, and deliver tangible results. Providing dedicated analytical support to the SPE team, you will translate data into insights. You will build reporting infrastructure, run trading operations, and develop accurate lead identification models that directly power our business growth.
+Working within the broader Global Business Organization, the Shopping Partners EMEA (SPE) team is a critical function helping shape the Retail ecosystem in EMEA. This team focuses on nurturing high-value, strategic partnerships with industry leaders in the Retail sector. These collaborations are designed to unlock and amplify significant growth opportunities for our customer base, providing them with the strategic guidance they need to grow in the engaged market.
+Google's Large Customer Sales (LCS) teams are strategic partners and industry thought leaders to the world's leading brands and agencies. We continuously challenge how customers think about their business and how Google can support growth. We focus on helping these players navigate profound industry shifts and drive outsized business performance by competitively selling Google's full suite of advertising solutions across Search, YouTube, Measurement, and more. As a member of our LCS team, you'll have the unique opportunity to sell at the forefront of technology, collaborating with executives, influencing market-shaping strategies, and delivering tangible results that significantly impact major global businesses and drive the growth of Google.Individual pay is determined by factors including job-related skills, experience, and relevant education or training.
+Ireland: €96000 - €98000 (EUR) + 15% bonus target + equity + benefits
+Learn more about
+benefits at Google
+.
+Responsibilities
+Work with SPE Directors and their teams to identify and prioritise business needs, design solutions to fit these evolving needs and develop operational capabilities.
+Run trading processes, ensuring high operational rigour and taking actionable steps to increase sales velocity across the team.
+Develop reliable data pipelines and dashboards through Salesforce or business intelligence platform reporting design.
+Understand, analyze and interpret trends to generate insights for account management teams to help prioritize business activity.
+Build relationships with the EMEA Analyst and GTM communities to drive efficiency and scale best practices. Partner with GTM, Sales Finance, gTech and Sales Leaders to define business requirements for reporting.
+
+EDITORIAL CONTEXT: Prioritize digital advertising measurement, growth analytics, operational reporting, SQL pipelines, dashboards, scenario forecasting, translating stakeholder requirements and actionable recommendations for account teams. Strong examples: NeoTaste 51 cities monthly EUR 200k-500k budget, planning accuracy 20%, ROAS 8-10%; ecoligo Markov attribution 30% budget shift toward Google Ads and 8% CAC reduction; heycar qualified leads 6-8%; Aklamio 72-brand performance benchmarking used by all CSMs. Retain actual job titles, dates and all employers. Skills prioritize SQL, Python, BI, digital advertising analytics, GA4, Google Ads certification, attribution, forecasting, experimentation and business communication; retain relevant foundational data modeling skills. Do not claim Salesforce, Google Sheets expertise, retail partner sales, trading-operations ownership, direct Google account management, people management or lead identification modeling: these are not verified. Aklamio DQ contribution not whole-framework ownership; MCP and dashboarding developing only. Broad natural summary without third-person verbs. No unsupported achievements. Cover letter four paragraphs 290-310 words; final paragraph: I hold a valid German EU Blue Card and would require employer support for an Irish employment permit. No permit support in CV.

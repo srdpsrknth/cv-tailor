@@ -1,0 +1,26 @@
+{
+  "job_id": "2026_booking_com_data_platform_engineer_ii_business_intelligence_platform_1791194324",
+  "status": "success",
+  "cv_path": "C:\\Users\\srdps\\OneDrive\\Official\\Job Search\\Sonu\\2026\\Sreedeep Applications 2026\\2026_booking_com_data_platform_engineer_ii_business_intelligence_platform_1791194324\\2026_CV_sreedeep_sreekanth_data_platform_engineer_ii_business_intelligence_platform.pdf",
+  "cover_letter_path": "C:\\Users\\srdps\\OneDrive\\Official\\Job Search\\Sonu\\2026\\Sreedeep Applications 2026\\2026_booking_com_data_platform_engineer_ii_business_intelligence_platform_1791194324\\2026_cover_letter_booking_com_data_platform_engineer_ii_business_intelligence_platform.docx",
+  "cl_pdf_path": "C:\\Users\\srdps\\OneDrive\\Official\\Job Search\\Sonu\\2026\\Sreedeep Applications 2026\\2026_booking_com_data_platform_engineer_ii_business_intelligence_platform_1791194324\\2026_cover_letter_booking_com_data_platform_engineer_ii_business_intelligence_platform.pdf",
+  "token_usage": {
+    "cv_input_tokens": 14530,
+    "cv_output_tokens": 2329,
+    "cl_input_tokens": 0,
+    "cl_output_tokens": 0,
+    "total_tokens": 16859,
+    "estimated_cost_usd": 0.019631,
+    "cv_attempts": 1,
+    "cl_attempts": 1,
+    "model_name": "gemini-3.8-flash"
+  },
+  "tailoring_explanation": {
+    "summary_changes": "Positioned candidate as an analytics and data platform professional dedicated to building governed semantic layers, robust data quality frameworks, and AI-driven conversational BI systems.",
+    "bullet_modifications": "Highlighted Snowflake, dbt, semantic data modeling, data contracts, and LLM/MCP context integration to directly mirror Booking.com's BI & AI Analytics platform engineering priorities.",
+    "skill_reordering": "Reorganized skill groups to emphasize modern data platform infrastructure, semantic layers, and automation/LLM agent tooling aligned with Snowflake, ThoughtSpot, and agentic analytics.",
+    "project_selection": "Preserved all projects across the top 3 roles, emphasizing the Snowflake MCP integration, data observability contracts, and LLM SQL interfaces matching the required tech stack.",
+    "overall_strategy": "Presented a high-impact narrative showing deep experience in semantic data models, data quality governance, and cutting-edge LLM analytics integrations."
+  },
+  "message": null
+}

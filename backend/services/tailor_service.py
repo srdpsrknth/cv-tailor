@@ -1,52 +1,109 @@
-# cv-tailor/backend/services/tailor_service.py
+"""Generate, review, fit, and persist job application documents."""
 from __future__ import annotations
 
 import json
 import logging
 import os
 import re
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable, Optional
+from zoneinfo import ZoneInfo
 
 from pypdf import PdfReader
 
-from dotenv import load_dotenv
-
-from models.requests import TailorResponse, TokenUsage
-from models.tailored_output import TailoredOutput, TailoredCV, TailoredCoverLetter
 from models.profile import Profile
+from models.requests import TailorResponse
+from models.tailored_output import TailoredCV, TailoredCoverLetter, TailoringExplanation
 from renderers import create_latex_renderer, create_docx_renderer
-from services.gemini_service import GeminiService, GeminiServiceError
-
+from services.gemini_service import GeminiService
 
 logger = logging.getLogger(__name__)
-
-ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
-load_dotenv(dotenv_path=ENV_PATH, override=True)
-
-PROMPT_CV_PATH = Path(__file__).resolve().parents[1] / "prompts" / "tailor_cv_prompt.md"
-PROMPT_CL_PATH = Path(__file__).resolve().parents[1] / "prompts" / "tailor_cl_prompt.md"
-STYLE_EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "cover_letter_examples"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROMPT_CV_PATH = PROJECT_ROOT / "backend/prompts/tailor_cv_prompt.md"
+PROMPT_CL_PATH = PROJECT_ROOT / "backend/prompts/tailor_cl_prompt.md"
 
 
 def _slugify(text: str) -> str:
-    """Convert text to filesystem-safe slug."""
-    text = text.strip().lower()
-    text = re.sub(r"[^a-z0-9]+", "_", text)
-    text = re.sub(r"_+", "_", text).strip("_")
-    return text or "role"
+    return re.sub(r"[^a-z0-9]+", "_", text.strip().lower()).strip("_") or "role"
+
+
+def _parse_json_response(text: str) -> dict:
+    """Use the same parser for first drafts, reviews, and length retries.
+
+    Accept wrappers around complete JSON; never repair truncated document data.
+    """
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("The model returned an empty document.")
+    decoder = json.JSONDecoder()
+    for start in [0] + [match.start() for match in re.finditer(r"\{", text)]:
+        try:
+            value, _ = decoder.raw_decode(text[start:].lstrip())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict) and any(
+            key in value for key in ("cv", "cover_letter", "experience", "paragraphs")
+        ):
+            return value
+    raise ValueError("The model response did not contain a complete document JSON object.")
 
 
 def _count_pdf_pages(pdf_path: Path) -> int:
-    """Count number of pages in a PDF file."""
-    try:
-        reader = PdfReader(str(pdf_path))
-        return len(reader.pages)
-    except Exception as e:
-        logger.warning(f"Failed to count PDF pages: {e}")
-        return 0
+    # A missing/unreadable PDF must fail validation, never count as zero pages.
+    pages = len(PdfReader(str(pdf_path)).pages)
+    if pages < 1:
+        raise ValueError("Generated PDF has no pages.")
+    return pages
+
+
+def _validate_cv(cv: TailoredCV, profile: Profile) -> None:
+    expected = {exp.company: exp for exp in profile.experience}
+    companies = [exp.company for exp in cv.experience]
+    if len(companies) != len(set(companies)) or set(companies) != set(expected):
+        raise ValueError("Include each profile employer exactly once, including older roles.")
+    cv.experience.sort(key=lambda exp: list(expected).index(exp.company))
+    for exp in cv.experience:
+        base = expected[exp.company]
+        if (exp.role, exp.start_date, exp.end_date) != (base.role, base.start_date, base.end_date):
+            raise ValueError(f"Keep the exact profile title and dates for {exp.company}.")
+        if not base.bullets and not base.selected_projects and (exp.bullets or exp.projects):
+            raise ValueError(f"Do not invent responsibilities for {exp.company}.")
+        if "aklamio" in exp.company.lower():
+            if len(exp.projects) != 1 or len(exp.projects[0].bullets) != 3:
+                raise ValueError("Aklamio must have one attribution project with exactly three bullets; fold other projects into role bullets.")
+            name = exp.projects[0].name
+            if re.search(r"entrypoints|in progress|20\d{2}", name, re.I):
+                raise ValueError("Use a clear external attribution project name without dates or status labels.")
+            for bullet in exp.bullets:
+                if re.search(r"\bMCP\b", bullet) and not re.search(r"developing|development|working on", bullet, re.I):
+                    raise ValueError("Describe Aklamio MCP integration as ongoing development, not shipped work.")
+            if re.search(r"\b(lead|led|own|owned)\b[^.]{0,50}(framework|80)", " ".join(exp.bullets), re.I):
+                raise ValueError("Aklamio DQ framework is a contribution; ownership is limited to funnel/sales-channel checks.")
+    summary = " ".join(cv.summary)
+    if re.search(r"\b(combines|builds|aims|passionate|dedicated to)\b", summary, re.I):
+        raise ValueError("Use a factual career summary with 'experience across' or 'background in', not third-person verbs or aspirations.")
+    # Catch common keyword stuffing for technologies absent from this profile.
+    source = profile.model_dump_json().lower()
+    text = cv.model_dump_json().lower()
+    for tool in ("Fivetran", "Databricks", "Tableau", "ThoughtSpot", "DealCloud", "Cortex", "AWS"):
+        if re.search(r"\b" + re.escape(tool.lower()) + r"\b", text) and not re.search(r"\b" + re.escape(tool.lower()) + r"\b", source):
+            raise ValueError(f"Do not claim {tool} experience: it is not in the profile.")
+
+
+def _validate_cover_letter(cl: TailoredCoverLetter, profile: Profile) -> None:
+    words = sum(len(paragraph.split()) for paragraph in cl.paragraphs)
+    if len(cl.paragraphs) != 4 or not 290 <= words <= 310:
+        raise ValueError(f"Cover letter has {len(cl.paragraphs)} paragraphs and {words} words; return exactly four body paragraphs totaling 290-310 words.")
+    if cl.signature_name != profile.identity.full_name:
+        raise ValueError("Use the exact candidate name from the profile.")
+    if any(re.search(r"(?:^|\n)\s*(Dear Hiring|Sincerely|Best regards|Kind regards)", paragraph, re.I) for paragraph in cl.paragraphs):
+        raise ValueError("Body paragraphs must not contain a salutation or signature.")
+
+
+def _write_json(path: Path, value: dict) -> None:
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def tailor_documents(
@@ -55,484 +112,185 @@ def tailor_documents(
     company_name: Optional[str] = None,
     role_title: Optional[str] = None,
     status_callback: Optional[Callable[[str], None]] = None,
+    work_country: Optional[str] = None,
 ) -> TailorResponse:
-    """
-    Use Gemini to tailor CV + cover letter, then render PDF/DOCX.
-    """
     if not job_description or not job_description.strip():
         raise ValueError("Job description is empty.")
-
-    # Load CV and cover letter prompts separately
-    cv_prompt_template = PROMPT_CV_PATH.read_text(encoding="utf-8")
-    cl_prompt_template = PROMPT_CL_PATH.read_text(encoding="utf-8")
-    
-    # Extract style snippet for cover letter
-    style_snippet = _extract_style_snippet()
-    style_block = ""
-    if style_snippet:
-        style_block = (
-            "STYLE SNIPPET (tone/structure inspiration — do NOT copy; output MUST be JSON only):\n"
-            f"{style_snippet}\n"
-            "Note: Use this cadence and specificity as inspiration; personalize to the provided JD and base profile. Do NOT output this snippet. Return ONLY valid JSON.\n\n"
-        )
-
-    cv_prompt = (
-        f"{cv_prompt_template}\n\n"
-        f"COMPANY: {company_name or 'N/A'}\n"
-        f"ROLE: {role_title or 'N/A'}\n"
-        f"JOB DESCRIPTION:\n{job_description}\n\n"
-        f"BASE PROFILE (JSON):\n{profile.model_dump_json(indent=2)}"
-    )
-
-    cl_prompt = (
-        f"{cl_prompt_template}\n\n"
-        f"{style_block}"
-        f"COMPANY: {company_name or 'N/A'}\n"
-        f"ROLE: {role_title or 'N/A'}\n"
-        f"JOB DESCRIPTION:\n{job_description}\n\n"
-        f"BASE PROFILE (JSON):\n{profile.model_dump_json(indent=2)}"
-    )
-
     service = GeminiService()
-
-    cv_response_schema = {
-        "type": "object",
-        "properties": {
-            "cv": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "summary": {"type": "array", "items": {"type": "string"}},
-                    "skills": {
-                        "type": "object",
-                        "properties": {
-                            "Data Analysis & Statistical Modeling": {"type": "array", "items": {"type": "string"}},
-                            "Programming & Data Tools": {"type": "array", "items": {"type": "string"}},
-                            "BI & Data Platforms": {"type": "array", "items": {"type": "string"}},
-                            "Product & Marketing Analytics": {"type": "array", "items": {"type": "string"}},
-                            "Automation & Advanced Tooling": {"type": "array", "items": {"type": "string"}},
-                            "Collaboration & Communication": {"type": "array", "items": {"type": "string"}},
-                        },
-                    },
-                    "experience": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "company": {"type": "string"},
-                                "role": {"type": "string"},
-                                "start_date": {"type": "string"},
-                                "end_date": {"type": "string"},
-                                "bullets": {"type": "array", "items": {"type": "string"}},
-                                "projects": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": {"type": "string"},
-                                            "bullets": {"type": "array", "items": {"type": "string"}},
-                                        },
-                                        "required": ["name", "bullets"],
-                                    },
-                                },
-                            },
-                            "required": ["company", "role", "start_date", "end_date", "bullets"],
-                        },
-                    },
-                    "include_education": {"type": "boolean"},
-                    "include_certifications": {"type": "boolean"},
-                },
-                "required": ["summary", "skills", "experience"],
-            },
-            "tailoring_explanation": {
-                "type": "object",
-                "properties": {
-                    "summary_changes": {"type": "string"},
-                    "bullet_modifications": {"type": "string"},
-                    "skill_reordering": {"type": "string"},
-                    "project_selection": {"type": "string"},
-                    "overall_strategy": {"type": "string"},
-                },
-            },
-        },
-        "required": ["cv"],
-    }
-
-    cl_response_schema = {
-        "type": "object",
-        "properties": {
-            "cover_letter": {
-                "type": "object",
-                "properties": {
-                    "role_title": {"type": "string"},
-                    "company_name": {"type": "string"},
-                    "paragraphs": {"type": "array", "items": {"type": "string"}},
-                    "closing_line": {"type": "string"},
-                    "signature_name": {"type": "string"},
-                },
-                "required": ["role_title", "company_name", "paragraphs", "signature_name"],
-            }
-        },
-        "required": ["cover_letter"],
-    }
-
-    def _extract_json_block(text: str) -> Optional[str]:
-        """Best-effort extraction of the outermost JSON object from text."""
-        if not text:
-            return None
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            return None
-        candidate = text[start:end + 1]
-        try:
-            json.loads(candidate)
-            return candidate
-        except Exception:
-            return None
-
-    # ========== CV GENERATION ==========
-    response_text_cv = ""
-    input_tokens_cv = 0
-    output_tokens_cv = 0
-    tailored_cv = None
-    tailoring_explanation = None  # To store explanation from JSON
-    cv_error_log = []
-    
-    for attempt in range(3):
-        try:
-            prompt = cv_prompt
-            if attempt > 0:
-                prompt += "\n\nSTRICT: Return ONLY valid JSON matching the expected structure. No markdown, no comments, no trailing text."
-
-            response_text_cv, input_tokens_cv, output_tokens_cv = service._call_gemini(
-                prompt,
-                response_schema=cv_response_schema,
-            )
-
-            logger.info(f"[CV Gen Attempt {attempt+1}] Raw response length: {len(response_text_cv)} chars")
-            logger.info(f"[CV Gen Attempt {attempt+1}] First 200 chars: {response_text_cv[:200]}")
-
-            try:
-                data = json.loads(response_text_cv)
-                logger.info(f"[CV Gen Attempt {attempt+1}] JSON parsed successfully")
-                logger.info(f"[CV Gen Attempt {attempt+1}] Top-level keys: {list(data.keys())}")
-            except json.JSONDecodeError as je:
-                logger.warning(f"[CV Gen Attempt {attempt+1}] JSON decode error at pos {je.pos}: {je.msg}")
-                # Try extracting JSON block
-                extracted = _extract_json_block(response_text_cv)
-                if not extracted:
-                    cv_error_log.append(f"Attempt {attempt+1}: Could not extract JSON block. Raw error: {str(je)}")
-                    raise
-                logger.info(f"[CV Gen Attempt {attempt+1}] Extracted JSON block, length: {len(extracted)}")
-                data = json.loads(extracted)
-
-            cv_data = data.get("cv", data)
-            logger.info(f"[CV Gen Attempt {attempt+1}] CV data keys: {list(cv_data.keys())}")
-            logger.info(f"[CV Gen Attempt {attempt+1}] Experience count: {len(cv_data.get('experience', []))}")
-            
-            # Extract tailoring explanation if present (at root level of JSON)
-            tailoring_explanation = data.get("tailoring_explanation")
-            if tailoring_explanation:
-                if isinstance(tailoring_explanation, dict):
-                    logger.info(f"[CV Gen Attempt {attempt+1}] Found tailoring_explanation object with keys: {list(tailoring_explanation.keys())}")
-                else:
-                    logger.info(f"[CV Gen Attempt {attempt+1}] Found tailoring_explanation: {len(str(tailoring_explanation))} chars")
-            else:
-                logger.warning(f"[CV Gen Attempt {attempt+1}] No tailoring_explanation in response")
-            
-            # Debug: Check projects in ALL experiences (especially ecoligo)
-            if cv_data.get('experience'):
-                for i, exp_item in enumerate(cv_data['experience']):
-                    company = exp_item.get('company', 'Unknown')
-                    if 'ecoligo' in company.lower():
-                        projects_count = len(exp_item.get('projects', []))
-                        logger.info(f"[CV Gen Attempt {attempt+1}] >>> ECOLIGO found at index {i}: {projects_count} projects")
-                        for j, proj in enumerate(exp_item.get('projects', [])):
-                            logger.info(f"[CV Gen Attempt {attempt+1}]     Project {j+1}: {proj.get('name', 'No name')}")
-
-            tailored_cv = TailoredCV.model_validate(cv_data)
-            logger.info(f"[CV Gen Attempt {attempt+1}] ✅ Validation passed!")
-            break
-
-        except Exception as e:
-            error_msg = f"Attempt {attempt+1}: {type(e).__name__}: {str(e)}"
-            cv_error_log.append(error_msg)
-            logger.error(f"[CV Gen Attempt {attempt+1}] ❌ {error_msg}")
-            continue
-
-    if tailored_cv is None:
-        log_msg = "\n".join(cv_error_log)
-        full_error = (
-            f"Failed to generate valid CV JSON after 3 attempts.\n"
-            f"Errors:\n{log_msg}\n\n"
-            f"Last response (first 1000 chars):\n{response_text_cv[:1000]}"
-        )
-        logger.error(full_error)
-        raise ValueError(full_error)
-
-    # ========== COVER LETTER GENERATION ==========
-    response_text_cl = ""
-    input_tokens_cl = 0
-    output_tokens_cl = 0
-    tailored_cl = None
-    cl_error_log = []
-    
-    for attempt in range(3):
-        try:
-            prompt = cl_prompt
-            if attempt > 0:
-                prompt += "\n\nSTRICT: Return ONLY valid JSON matching the expected structure. No markdown, no comments, no trailing text."
-
-            response_text_cl, input_tokens_cl, output_tokens_cl = service._call_gemini(
-                prompt,
-                response_schema=cl_response_schema,
-            )
-
-            logger.info(f"[CL Gen Attempt {attempt+1}] Raw response length: {len(response_text_cl)} chars")
-            logger.info(f"[CL Gen Attempt {attempt+1}] First 200 chars: {response_text_cl[:200]}")
-
-            try:
-                data = json.loads(response_text_cl)
-                logger.info(f"[CL Gen Attempt {attempt+1}] JSON parsed successfully")
-            except json.JSONDecodeError as je:
-                logger.warning(f"[CL Gen Attempt {attempt+1}] JSON decode error at pos {je.pos}: {je.msg}")
-                # Try extracting JSON block
-                extracted = _extract_json_block(response_text_cl)
-                if not extracted:
-                    cl_error_log.append(f"Attempt {attempt+1}: Could not extract JSON block. Raw error: {str(je)}")
-                    raise
-                logger.info(f"[CL Gen Attempt {attempt+1}] Extracted JSON block, length: {len(extracted)}")
-                data = json.loads(extracted)
-
-            cl_data = data.get("cover_letter", data)
-            logger.info(f"[CL Gen Attempt {attempt+1}] CL data keys: {list(cl_data.keys())}")
-
-            tailored_cl = TailoredCoverLetter.model_validate(cl_data)
-            
-            # Validate exactly 4 paragraphs as per prompt requirements
-            if len(tailored_cl.paragraphs) != 4:
-                error_msg = f"Expected exactly 4 paragraphs, got {len(tailored_cl.paragraphs)}"
-                logger.warning(f"[CL Gen Attempt {attempt+1}] ⚠️  {error_msg}")
-                if attempt < 2:  # Retry on validation failure
-                    cl_error_log.append(f"Attempt {attempt+1}: {error_msg}")
-                    continue
-                else:
-                    # On final attempt, log warning but accept it
-                    logger.warning(f"[CL Gen Attempt {attempt+1}] Accepting {len(tailored_cl.paragraphs)} paragraphs on final attempt")
-            
-            logger.info(f"[CL Gen Attempt {attempt+1}] ✅ Validation passed! Paragraphs count: {len(tailored_cl.paragraphs)}")
-            break
-
-        except Exception as e:
-            error_msg = f"Attempt {attempt+1}: {type(e).__name__}: {str(e)}"
-            cl_error_log.append(error_msg)
-            logger.error(f"[CL Gen Attempt {attempt+1}] ❌ {error_msg}")
-            continue
-
-    if tailored_cl is None:
-        log_msg = "\n".join(cl_error_log)
-        full_error = (
-            f"Failed to generate valid cover letter JSON after 3 attempts.\n"
-            f"Errors:\n{log_msg}\n\n"
-            f"Last response (first 1000 chars):\n{response_text_cl[:1000]}"
-        )
-        logger.error(full_error)
-        raise ValueError(full_error)
-
-    # Create combined output
-    tailored_output = TailoredOutput(
-        cv=tailored_cv,
-        cover_letter=tailored_cl,
-        tailoring_explanation=tailoring_explanation  # From JSON response
+    work_country = (work_country or '').strip() or None
+    country_context = (
+        f"\nWORK COUNTRY (explicit user selection; overrides country inference): {work_country}. "
+        "Apply the work-authorization rules for this country. Company headquarters and past job locations are irrelevant.\n"
+        if work_country else "\nWORK COUNTRY: infer only from a clear actual job location; do not guess from company headquarters.\n"
     )
-    
-    input_tokens = input_tokens_cv + input_tokens_cl
-    output_tokens = output_tokens_cv + output_tokens_cl
+    context = (
+        f"\nCOMPANY: {company_name or 'Infer from job description'}\n"
+        f"ROLE: {role_title or 'Infer from job description'}\n"
+        + country_context +
+        f"JOB DESCRIPTION:\n{job_description}\n\n"
+        f"BASE PROFILE (authoritative JSON):\n{profile.model_dump_json(indent=2)}"
+    )
+    cv_prompt = PROMPT_CV_PATH.read_text(encoding="utf-8") + context
+    cl_prompt = PROMPT_CL_PATH.read_text(encoding="utf-8") + context
+    counts = {"cv": [0, 0, 0], "cover_letter": [0, 0, 0]}
+    drafts = []
+    explanation = None
 
-    # Generate meaningful job_id: {year}_{company}_{role}_{timestamp}
-    year = datetime.now().year
-    company_slug = _slugify(company_name or tailored_output.cover_letter.company_name or "company")
-    role_slug = _slugify(role_title or tailored_output.cover_letter.role_title or "role")
-    timestamp = int(time.time())
-    job_id = f"{year}_{company_slug}_{role_slug}_{timestamp}"
-    
-    # Get outputs directory from environment or use default
-    outputs_dir_env = os.getenv("OUTPUTS_DIR", "").strip()
-    if outputs_dir_env:
-        outputs_base = Path(outputs_dir_env)
-    else:
-        outputs_base = Path(__file__).resolve().parents[2] / "outputs"
-    
-    job_folder = outputs_base / job_id
-    job_folder.mkdir(parents=True, exist_ok=True)
-    
-    logger.info(f"Created job folder: {job_folder} for job_id: {job_id}")
+    def generate(prompt, kind):
+        last_error = ""
+        previous = ""
+        for _ in range(3):
+            counts[kind][2] += 1
+            feedback = f"\nCORRECTION REQUIRED: {last_error}\nPREVIOUS RESPONSE:\n{previous}\nReturn the corrected complete JSON document." if last_error else ""
+            response, inputs, outputs = service._call_gemini(prompt + feedback)
+            counts[kind][0] += inputs
+            counts[kind][1] += outputs
+            drafts.append({"component": kind, "response": response})
+            try:
+                data = _parse_json_response(response)
+                if kind == "cv":
+                    model = TailoredCV.model_validate(data.get("cv", data))
+                    # Keep immigration status separate from sponsorship wording.
+                    if work_country and 'blue card' in (profile.identity.visa_status or '').lower():
+                        model.work_authorization = None if work_country.lower() in ('germany', 'deutschland', 'de') else 'German EU Blue Card holder'
+                    if re.search(r'sponsorship|employer support|work permit support', model.model_dump_json(), re.I):
+                        raise ValueError('Sponsorship and work permit support requirements belong only in the cover letter, never in the CV.')
+                    _validate_cv(model, profile)
+                else:
+                    model = TailoredCoverLetter.model_validate(data.get("cover_letter", data))
+                    _validate_cover_letter(model, profile)
+                    if work_country and work_country.lower() not in ('germany', 'deutschland', 'de') and 'blue card' in (profile.identity.visa_status or '').lower():
+                        closing = model.paragraphs[-1]
+                        if not re.search(r'Blue Card', closing, re.I) or not re.search(r'employer support|sponsor', closing, re.I):
+                            raise ValueError(f'Include the German-issued EU Blue Card and employer permit support needed for {work_country} in the final cover-letter paragraph.')
+                        if work_country.lower() in ('ireland', 'denmark') and re.search(r'Irish (?:EU )?Blue Card|Danish (?:EU )?Blue Card', closing, re.I):
+                            raise ValueError('Ireland and Denmark do not issue EU Blue Cards; refer to the appropriate local employment permit.')
+                    if company_name:
+                        model.company_name = company_name
+                    if role_title:
+                        model.role_title = role_title
+                return model, data
+            except ValueError as error:
+                last_error = str(error)
+                previous = response
+                logger.warning("%s document validation failed: %s", kind, last_error)
+        raise ValueError(f"Could not produce a valid {kind} document after three attempts: {last_error}")
 
-    # Render documents
+    if status_callback:
+        status_callback("Drafting CV...")
+    cv, _ = generate(cv_prompt, "cv")
+    # The Booking workflow included editorial review. Apply it to UI generation too.
+    cv, data = generate(
+        cv_prompt
+        + "\nEDITORIAL AND FACTUAL REVIEW: Review the following draft against the profile. "
+        "Remove invented outcomes, tools, claims of sole ownership, and claims that developing projects are complete. "
+        "Improve plain-language writing and remove repeated responsibilities/project bullets. "
+        "Check alignment with the supplied role and job description: preserve natural supported keywords, "
+        "prioritize relevant examples, and retain profile-backed foundational skills expected for the role. "
+        "Treat the approved summary as a style reference, not mandatory identical wording. "
+        "Preserve work history and factual metrics. Return a complete revised CV JSON.\nDRAFT:\n"
+        + cv.model_dump_json(indent=2),
+        "cv",
+    )
+    explanation = data.get("tailoring_explanation")
+
+    # Generate the letter only once the CV's wording has passed validation.
+    cl, _ = generate(cl_prompt, "cover_letter")
+    year = datetime.now(ZoneInfo("Europe/Berlin")).year
+    job_id = f"{year}_{_slugify(company_name or cl.company_name)}_{_slugify(role_title or cl.role_title)}_{time.time_ns() // 1_000_000}"
+    job_folder = PROJECT_ROOT / "outputs" / job_id
+    source_folder = job_folder / "source"
+    source_folder.mkdir(parents=True)
+    _write_json(source_folder / "profile_snapshot.json", profile.model_dump())
+    (source_folder / "job_description.txt").write_text(job_description, encoding="utf-8")
+    _write_json(source_folder / "drafts.json", {"drafts": drafts})
     latex = create_latex_renderer(outputs_dir=str(job_folder))
     docx = create_docx_renderer(outputs_dir=str(job_folder))
+    position = role_title or cl.role_title
+    page_count = 0
+    history = []
 
-    job_position = role_title or tailored_output.cover_letter.role_title or tailored_output.cv.title
+    def save_content():
+        _write_json(source_folder / "content.json", {
+            "company_name": cl.company_name, "role_title": position,
+            "work_country": work_country,
+            "cv": cv.model_dump(), "cover_letter": cl.model_dump(),
+        })
 
-    # Initial CV generation
-    if status_callback:
-        status_callback("Generating CV (attempt 1)...")
-    
-    cv_path = latex.render_cv(
-        tailored_cv=tailored_output.cv,
-        profile=profile,
-        job_position=job_position,
-    )
-    
-    # Check CV page count and iteratively reduce if needed
-    max_length_attempts = 5
-    for length_attempt in range(1, max_length_attempts + 1):
-        page_count = _count_pdf_pages(Path(cv_path))
-        logger.info(f"CV page count (attempt {length_attempt}): {page_count}")
-        
-        if page_count <= 2:
-            logger.info(f"✅ CV is {page_count} pages - within target")
-            if status_callback:
-                status_callback(f"✓ CV generated ({page_count} pages)")
-            break
-        
-        if length_attempt >= max_length_attempts:
-            logger.warning(f"⚠️ CV still {page_count} pages after {max_length_attempts} attempts")
-            if status_callback:
-                status_callback(f"⚠ CV is {page_count} pages (exceeded retry limit)")
-            break
-        
-        # CV is too long, regenerate with reduction instructions
-        logger.info(f"CV is {page_count} pages, reducing content (attempt {length_attempt + 1})...")
-        if status_callback:
-            status_callback(f"CV is {page_count} pages, reducing content (attempt {length_attempt + 1}/{max_length_attempts})...")
-        
-        # Add length reduction instruction to prompt
-        length_reduction_note = (
-            f"\n\nCRITICAL LENGTH REDUCTION (Attempt {length_attempt + 1}): "
-            f"Previous CV was {page_count} pages. MUST reduce to 2 pages or less by: "
-            f"1) Reduce total bullets to 12-14 (was too many), "
-            f"2) Shorten bullet length to 90-110 characters each, "
-            f"3) Remove 3-5 less relevant skills from skill categories."
-        )
-        
-        cv_prompt_reduced = cv_prompt + length_reduction_note
-        
-        # Regenerate CV
-        try:
-            response_text_cv_retry, input_tokens_retry, output_tokens_retry = service._call_gemini(
-                cv_prompt_reduced,
-                response_schema=None,
-            )
-            
-            data_retry = json.loads(response_text_cv_retry)
-            cv_data_retry = data_retry.get("cv", data_retry)
-            tailored_cv_retry = TailoredCV.model_validate(cv_data_retry)
-            
-            # Update token counts
-            input_tokens += input_tokens_retry
-            output_tokens += output_tokens_retry
-            
-            # Regenerate PDF with reduced CV
-            cv_path = latex.render_cv(
-                tailored_cv=tailored_cv_retry,
-                profile=profile,
-                job_position=job_position,
-            )
-            
-            # Update tailored_output with reduced CV
-            tailored_output.cv = tailored_cv_retry
-            
-        except Exception as e:
-            logger.error(f"Failed to regenerate CV on length attempt {length_attempt + 1}: {e}")
-            if status_callback:
-                status_callback(f"⚠ CV reduction attempt {length_attempt + 1} failed, using previous version")
-            break
-
-    if status_callback:
-        status_callback("Generating cover letter...")
-    
-    cl_path, cl_pdf_path = docx.render_cover_letter(
-        tailored_cl=tailored_output.cover_letter,
-        profile=profile,
-        job_position=job_position,
-    )
-    
-    if status_callback:
-        status_callback("✓ Cover letter generated")
-
-    token_usage = service.calculate_token_usage(
-        cv_input_tokens=input_tokens,
-        cv_output_tokens=output_tokens,
-        cl_input_tokens=0,
-        cl_output_tokens=0,
-    )
-
-    # Convert TailoringExplanation object to dict if present
-    explanation_dict = None
-    if tailored_output.tailoring_explanation:
-        explanation_dict = tailored_output.tailoring_explanation.model_dump()
-
-    return TailorResponse(
-        job_id=job_id,
-        status="success",
-        cv_path=str(cv_path),
-        cover_letter_path=str(cl_path),
-        cl_pdf_path=str(cl_pdf_path) if cl_pdf_path else None,
-        token_usage=token_usage,
-        tailoring_explanation=explanation_dict,
-        message=None,
-    )
-
-
-def _extract_style_snippet(min_words: int = 120, max_words: int = 180) -> Optional[str]:
-    """
-    Extract a short text snippet from a cover letter example PDF to guide tone/structure.
-    Returns a single paragraph string or None if not available.
-    """
     try:
-        if not STYLE_EXAMPLES_DIR.exists():
-            return None
-
-        # Prefer a generic/example file if present
-        preferred = [
-            "2026_CoverLetter_GENERIC.pdf",
-        ]
-
-        pdf_path: Optional[Path] = None
-        for name in preferred:
-            candidate = STYLE_EXAMPLES_DIR / name
-            if candidate.exists():
-                pdf_path = candidate
+        for attempt in range(4):
+            save_content()
+            cv_path = latex.render_cv(cv, profile, job_position=position)
+            page_count = _count_pdf_pages(Path(cv_path))
+            history.append(page_count)
+            if page_count <= 2:
                 break
+            if attempt == 3:
+                raise ValueError(f"CV is still {page_count} pages after four layout attempts. Editable drafts are saved at {source_folder}; generation was not marked successful.")
+            if status_callback:
+                status_callback(f"CV is {page_count} pages; shortening content...")
+            # Revise the CURRENT candidate, with increasingly strong reductions.
+            # Use the identical complete-JSON parser and validation on every attempt.
+            budget = max(400, 650 - attempt * 100)
+            cv, data = generate(
+                cv_prompt
+                + f"\nLAYOUT CORRECTION: The current CV rendered to {page_count} pages. "
+                f"Reduce its body text to approximately {budget} words or fewer. "
+                "Prioritize concise responsibilities; reduce repetitive bullets and less relevant project detail. "
+                "Keep all employers and exact dates, education and core skills. "
+                "Keep one Aklamio attribution project with three concise bullets; other projects can be summarized in role bullets. "
+                "Do not change facts, shrink the font, or turn ongoing work into completed work. "
+                "Return the complete shorter CV JSON, not just changes.\nCURRENT CV:\n"
+                + cv.model_dump_json(indent=2),
+                "cv",
+            )
+            explanation = data.get("tailoring_explanation", explanation)
+        cl_path, cl_pdf_path = docx.render_cover_letter(cl, profile, job_position=position)
+        if not cl_pdf_path:
+            raise ValueError("Cover-letter PDF rendering failed.")
+        cl_pages = _count_pdf_pages(Path(cl_pdf_path))
+        if cl_pages != 1:
+            raise ValueError(f"Cover-letter PDF is {cl_pages} pages; expected one page.")
+    except Exception as error:
+        save_content()
+        _write_json(source_folder / "drafts.json", {"drafts": drafts})
+        _write_json(source_folder / "generation_result.json", {
+            "job_id": job_id, "status": "failed", "error": str(error),
+            "cv_page_history": history,
+        })
+        raise
 
-        if pdf_path is None:
-            pdfs = sorted(STYLE_EXAMPLES_DIR.glob("*.pdf"))
-            if not pdfs:
-                return None
-            pdf_path = pdfs[0]
-
-        reader = PdfReader(str(pdf_path))
-        text_chunks = []
-        for page in reader.pages:
-            try:
-                page_text = page.extract_text() or ""
-                if page_text:
-                    text_chunks.append(page_text)
-            except Exception:
-                continue
-
-        if not text_chunks:
-            return None
-
-        words = " ".join(text_chunks).split()
-        if len(words) < min_words:
-            return None
-
-        snippet_words = words[:max_words]
-        snippet = " ".join(snippet_words)
-        return snippet.strip()
-
-    except Exception:
-        return None
+    # Separate CV/letter usage and include every review and shortening attempt.
+    usage = service.calculate_token_usage(
+        cv_input_tokens=counts["cv"][0], cv_output_tokens=counts["cv"][1],
+        cl_input_tokens=counts["cover_letter"][0], cl_output_tokens=counts["cover_letter"][1],
+        cv_attempts=counts["cv"][2], cl_attempts=counts["cover_letter"][2],
+    )
+    explanation_dict = TailoringExplanation.model_validate(explanation).model_dump() if isinstance(explanation, dict) else None
+    result = TailorResponse(
+        job_id=job_id, cv_path=str(cv_path), cover_letter_path=str(cl_path),
+        cl_pdf_path=str(cl_pdf_path), token_usage=usage,
+        cv_page_count=page_count, cover_letter_page_count=cl_pages,
+        source_path=str(source_folder / "content.json"),
+        tailoring_explanation=explanation_dict,
+        message=f"CV checked: {page_count} pages. Cover letter: {cl_pages} page, {sum(len(p.split()) for p in cl.paragraphs)} words.",
+    )
+    _write_json(source_folder / "drafts.json", {"drafts": drafts})
+    configured = os.getenv("OUTPUTS_DIR", "").strip()
+    if configured:
+        external = Path(configured)
+        if not external.is_absolute():
+            external = PROJECT_ROOT / external
+        mirror = external.resolve() / job_id
+        if mirror != job_folder.resolve():
+            mirror.mkdir(parents=True, exist_ok=True)
+            for key in ("cv_path", "cover_letter_path", "cl_pdf_path"):
+                original = Path(getattr(result, key))
+                shutil.copy2(original, mirror / original.name)
+                setattr(result, key, str(mirror / original.name))
+            shutil.copytree(source_folder, mirror / "source", dirs_exist_ok=True)
+    _write_json(source_folder / "generation_result.json", {**result.model_dump(), "cv_page_history": history})
+    if configured and mirror != job_folder.resolve():
+        shutil.copy2(source_folder / "generation_result.json", mirror / "source/generation_result.json")
+    logger.info("Generated %s: %s CV pages; layout history %s", job_id, page_count, history)
+    return result

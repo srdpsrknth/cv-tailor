@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ConfigDict
 class TailoringExplanation(BaseModel):
     """Structured explanation of CV tailoring decisions."""
     model_config = ConfigDict(extra="ignore")
-    
+
     summary_changes: str = Field(default="", description="How the summary was crafted")
     bullet_modifications: str = Field(default="", description="Key rewording decisions for bullets")
     skill_reordering: str = Field(default="", description="How skills were prioritized")
@@ -26,7 +26,7 @@ class TailoringExplanation(BaseModel):
 class TailoredProject(BaseModel):
     """Individual project with its own bullets."""
     model_config = ConfigDict(extra="ignore")
-    
+
     name: str
     bullets: List[str] = Field(default_factory=list)
 
@@ -46,6 +46,7 @@ class TailoredCV(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     title: Optional[str] = None
+    work_authorization: Optional[str] = Field(default=None, description="Application-specific immigration label; None preserves profile status")
     summary: List[str] = Field(default_factory=list)
     skills: Dict[str, List[str]] = Field(default_factory=dict)
     experience: List[TailoredExperience] = Field(default_factory=list)

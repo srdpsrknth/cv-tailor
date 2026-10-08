@@ -1,0 +1,7 @@
+Source: https://careers.deliveryhero.com/job/senior-analytics-engineer-quick-commerce-in-berlin-germany-jid-11058
+Retrieved: 2026-10-05
+
+Senior Analytics Engineer - Quick Commerce
+Delivery Hero
+Berlin, Germany; full-time hybrid
+The Analytics Engineering function within Data Foundations supports worldwide Quick Commerce decision-making. Platform: Google Cloud, Apache Spark and Airflow. Responsibilities: design data pipelines, models and analytical solutions across DataMesh; define requirements with regional, business, product, data science and analytics teams; maintain ETL quality/integrity while reducing latency and processing time; simplify and refactor systems for performance/scalability; translate problem statements and metrics into technical solutions; create stakeholder dashboards; collaborate on data catalogs, access controls and governance; mentor peers and promote coding/process standards. Requirements: relevant bachelor degree; 5+ years in analytics/data engineering with large-scale processing tools such as Hadoop, Spark or SQL; strong Python/R/Java and SQL; data modeling, database design, warehousing and relational databases such as PostgreSQL/MySQL; technical and nontechnical communication; governance, quality and security principles. Preferred: related master degree and privacy-regulation familiarity (GDPR/CCPA).

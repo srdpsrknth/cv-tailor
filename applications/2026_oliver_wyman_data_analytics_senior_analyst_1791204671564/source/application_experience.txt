@@ -1,0 +1,39 @@
+Aklamio GmbH | Senior Analytical Engineer
+
+- Own ETL pipelines from ingestion to consumption in GoodData, building reusable Snowflake models across landing, intermediate and reporting layers.
+- Maintain Airflow orchestration and GitLab workflows, with automated data quality checks and continuous documentation.
+- Led the release of a traffic-source and customer-journey attribution model, including incremental enrichment pipelines, classification rules and GoodData dashboards.
+- Validated the release against production data and managed backfills without breaking existing reporting.
+- Analyzed 72 customer brands using peer benchmarks and performance-gap decomposition. All customer success managers use the findings to recommend improvements to client channel setups.
+- Contribute to a YAML-configured quality framework covering approximately 80 Snowflake tables; own funnel and sales-channel checks for reconciliation, business logic and join consistency.
+- Developing a Snowflake MCP integration, semantic context and reusable AI skills for business-aware SQL analysis, alongside a Claude-powered dashboarding prototype.
+
+NeoTaste GmbH | Marketing Business Analyst
+
+- Owned marketing analytics for a subscription-based mobile app across 51 cities, supporting EUR 200,000-500,000 in monthly marketing spend.
+- Built demand forecasts and budget scenarios linking marketing investment to subscriber growth, improving quarterly planning accuracy by approximately 20%.
+- Evaluated demand saturation and payback periods to inform city launches and budget allocation, contributing to an 8-10% improvement in return on advertising spend.
+- Developed Snowflake data models with dbt and Power BI dashboards to monitor acquisition, conversion and customer funnels.
+
+ecoligo GmbH | Business Intelligence Analyst
+
+- Built BigQuery pipelines and dbt models integrating customer behavior, investment transactions and campaign data.
+- Developed a Markov-chain attribution model that informed a 30% budget shift from Facebook to Google Ads and an 8% reduction in blended customer acquisition cost.
+- Applied K-means investor segmentation to support retention strategies, increasing repeat investment by 7% and reducing monthly churn by approximately 4%.
+- Automated voucher and cashback calculations and SEPA-compatible payment files with Python for a platform handling multi-million-euro annual investment volume.
+- Built an OpenAI-powered analytics tool that generated and executed BigQuery SQL, helping non-technical stakeholders access investor, marketing and revenue insights.
+
+heycar (Mobility Trader GmbH) | Data Analyst
+
+- Delivered analytics for Marketing, Product and Sales in an automotive marketplace.
+- Built a position-based attribution model using session-level clickstream data. The resulting budget reallocations increased qualified leads by 6-8%.
+- Supported A/B tests on product and search features to improve customer funnels and conversion performance.
+- Built and maintained Looker dashboards for executive reporting and multichannel acquisition analysis.
+
+ORMIT (Traineeship) | Marketing Analyst
+
+No verified responsibility details are available in the profile. Retain title, employer, location and dates; leave the description blank until confirmed.
+
+Unilever | Project Coordinator - Front of House
+
+No verified responsibility details are available in the profile. Retain title, employer, location and dates; leave the description blank until confirmed.

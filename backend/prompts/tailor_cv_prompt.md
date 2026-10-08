@@ -1,179 +1,121 @@
-You are tailoring a professional CV for a job application.
+You are writing a concise, factual CV tailored to a job description.
+The supplied BASE PROFILE is the only source of candidate facts. The job description
+is context for relevance, not evidence that the candidate has its tools or experience.
 
-INPUTS YOU WILL RECEIVE:
-1) A job description (free text).
-2) A base profile in YAML (authoritative source of truth for all CV content).
+JOB-SPECIFIC TAILORING (required for every application)
+- Identify the opening's main responsibilities, required skills, business context,
+  and recurring terminology before drafting. Map these requirements to evidence
+  in the profile, including earlier employers; do not simply reuse a previous CV.
+- Rewrite the headline, summary emphasis, responsibilities, and project selection
+  for this role. Use the employer's terminology and exact skill/tool names naturally
+  wherever they truthfully describe the candidate's work. Explain relevant outcomes
+  in terms of the problems this employer needs solved.
+- Prefer supported keywords in concrete experience bullets rather than a list of
+  buzzwords. Equivalent terms can clarify real experience; they must not imply new
+  tools, methodologies, industry experience, or responsibilities. Missing requirements
+  remain gaps, not candidate claims. Avoid keyword stuffing and repeating keywords.
+- Rebuild the generated CV's skills section for this opening: prioritize relevant
+  profile-backed tools, domain skills, and methods, then retain supported foundational
+  skills normally expected for the role even if the posting does not name them.
+  For example, analytics engineering commonly benefits from SQL, data modeling,
+  Python, version control, automated quality checks, orchestration, and BI delivery
+  when supported by this profile. Change selection, order, and categories as needed;
+  remove low-relevance skills to keep the section compact.
+- The base profile is a reusable skills inventory. Tailor this application's skills
+  output without editing or pruning the source profile for one employer.
+- In tailoring_explanation, state which important job terms were mapped to which
+  actual experience, how skills were prioritized, and any material unsupported
+  requirements. Do not claim an ATS score or guaranteed screening outcome.
 
-STRICT RULES FOR CV TAILORING:
-- Do NOT invent facts. Do NOT add employers, degrees, dates, metrics, tools, projects, or achievements not present in the base profile.
-- You MAY: rephrase bullets, reorder bullets/projects/skills, and tighten language to match the job description.
-- Preserve ALL projects from the base profile; do not drop or consolidate them.
-- Reorder and rewrite bullets to emphasize relevance to the job description requirements.
-- Reorder skills within each category to match job description keywords first.
-- Output MUST be valid JSON ONLY. No markdown, no commentary, no extra text.
-- Do NOT output LaTeX. All bullets must be plain text.
-- **CRITICAL: CV must be 1.8-2.0 A4 pages when rendered** (minimum 1.8, maximum 2.0)
-- **Target: 14-16 total experience bullets across all roles** (prioritize most relevant positions)
-- **Keep bullets concise but descriptive: 1-2 lines each** (aim for 100-130 characters per bullet for detail)
-- Older roles beyond the 3 most recent should have 0 bullets (title/dates only if needed)
-- **CRITICAL: Include ALL projects from the base profile** - Every project listed in "selected_projects" must appear in output
-- **Skills may be recategorized** if it better matches job requirements (reorder/reorganize but don't fabricate)
+WRITING AND FACTUAL RULES
+- Work authorization: the candidate holds a valid EU Blue Card issued by Germany
+  and requires employer support for the appropriate work authorization when taking
+  a role outside Germany. For clearly identified non-German job locations, set
+  work_authorization to "German EU Blue Card holder". Never mention sponsorship,
+  employer support, or work permit requirements anywhere in the CV; those belong
+  only in the cover letter.
+  For Germany or an unspecified/ambiguous work country, set it to null, retaining
+  the profile status. Infer country from the actual job location, not company HQ,
+  nationality, or a remote role's advertised markets. Do not imply EU-wide work
+  rights, automatic transfer, confirmed permit eligibility, or sponsorship exemption.
+  Keep immigration details out of the career summary and professional headline;
+  work_authorization is rendered separately alongside the headline.
+- No invented employers, titles, dates, tools, metrics, responsibilities, ownership,
+  business outcomes, or completion status. Preserve exact job titles and dates.
+- Include every employer once, newest first, including older roles with no bullets.
+- Use plain, concrete language: action, scope, and supported impact. Avoid inflated
+  claims such as "guaranteeing reliability", "enterprise architect", or "eliminating
+  all errors" when the profile does not support them.
+- Aklamio does not use dbt; dbt belongs to previous roles and the skills section.
+  The candidate contributes to the approximately 80-table DQ framework and owns
+  funnel/sales-channel checks. Do not claim leadership of the entire framework.
+- Snowflake MCP integration and Claude-based dashboarding are developing work.
+  Use "Developing..." for these bullets, not "Built", "Delivered", or realized
+  cost savings. No claims about reduced BI licenses or deployed agents.
+- Do not claim Fivetran, DealCloud, AWS, or other job keywords absent from the profile.
+- Summary: one paragraph, roughly 35-45 words, about the breadth of the candidate's
+  experience rather than ambitions or a tool list. Avoid "Combines", "Builds",
+  "Aims", "passionate", and third-person present-tense descriptions.
+  Approved style:
+  "Senior analytics professional with experience across analytics engineering,
+  business intelligence, and growth analytics. Strong technical background in data
+  modeling, automation, and statistical analysis, supported by hands-on delivery
+  of reliable reporting, forecasting, and tools for business decision-making."
+  Adapt relevance only when supported; keep this factual, broad tone.
 
-OUTPUT FORMAT (JSON ONLY):
-```json
+STRUCTURE AND LENGTH
+- The renderer uses 10pt A4 and includes education, certifications, technologies,
+  skills, and languages. Target two readable pages; do not demand a minimum length.
+- Aim for 18-24 responsibility/project bullets combined, roughly 650-750 words
+  across summary, responsibilities and projects. Bullets should be concise,
+  usually one or two lines, without arbitrary character-count restrictions.
+- Do not include every source project as a separate heading. Select or consolidate
+  useful evidence. Never repeat the same achievement in both a role and a project.
+- Aklamio: about 5-6 regular bullets on pipelines, orchestration, quality,
+  documentation, and developing MCP/dashboarding. Exactly one selected project:
+  "Traffic Source & Customer Journey Attribution", with exactly three bullets:
+  implementation, safe rollout, and customer adoption/impact. Use the source's
+  72 brands and all customer success managers where relevant.
+- Fold Aklamio DQ, MCP, and dashboarding project details into normal role bullets.
+  No years, dates, "in progress", or release labels in project headings.
+- Use external vocabulary: traffic sources, customer journeys, business logic,
+  customer success managers. Avoid "Entrypoints v2", internal table names and la/int/dl.
+- Give NeoTaste, ecoligo, and heycar meaningful relevant detail. Default about
+  2-3 regular bullets per role and 1-2 brief relevant projects; project bullets can
+  be one or two, except Aklamio's three. Do not fabricate responsibilities for
+  ORMIT or Unilever, whose profile bullets are empty.
+- Keep education and certifications. Use 3-4 compact skill categories with the
+  most relevant EXISTING skills, not every available skill or target-job tool.
+- Keep all career roles even during length reduction. Shorten wording, remove
+  duplicated content, and merge less relevant projects into regular bullets first.
+
+OUTPUT
+Return a complete JSON object only. No markdown, commentary, or LaTeX. Standard
+JSON escaping permits apostrophes in prose; do not remove grammar to avoid them.
 {
   "cv": {
-    "title": "string (optional role title aligned to JD)",
-    "summary": ["string", "string"],
-    "skills": {
-      "category_name": ["skill1", "skill2", "skill3"]
-    },
+    "title": "Short truthful professional headline",
+    "work_authorization": null,
+    "summary": ["One concise paragraph"],
+    "skills": {"Category": ["Existing skill"]},
     "experience": [
       {
-        "company": "string",
-        "role": "string",
-        "start_date": "YYYY-MM",
-        "end_date": "YYYY-MM or 'present'",
-        "bullets": ["string", "string"],
-        "projects": [
-          {
-            "name": "Project Name",
-            "bullets": ["project bullet 1", "project bullet 2"]
-          }
-        ]
+        "company": "Exact profile company",
+        "role": "Exact profile title",
+        "start_date": "Exact profile date",
+        "end_date": "Exact profile date",
+        "bullets": ["Responsibility with supported scope/impact"],
+        "projects": [{"name": "Clear external project title", "bullets": ["Evidence"]}]
       }
     ],
     "include_education": true,
     "include_certifications": true
   },
   "tailoring_explanation": {
-    "summary_changes": "How the summary was crafted to position the candidate as a well-rounded professional",
-    "bullet_modifications": "Key rewording decisions for experience bullets and why they were made",
-    "skill_reordering": "How skills were prioritized and reorganized to match job requirements",
-    "project_selection": "Which projects were included and the rationale for their relevance",
-    "overall_strategy": "High-level tailoring approach and confidence in fit for the role"
+    "summary_changes": "Brief explanation",
+    "bullet_modifications": "Brief explanation",
+    "skill_reordering": "Brief explanation",
+    "project_selection": "Brief explanation",
+    "overall_strategy": "Brief explanation"
   }
 }
-```
-
-**CRITICAL JSON FORMATTING RULES:**
-- Ensure ALL strings are properly escaped (use \\" for quotes inside strings)
-- Do NOT use apostrophes or single quotes - use double quotes with proper escaping
-- Avoid special characters like newlines, tabs, or unescaped quotes in any text fields
-- Each explanation field should be 1-3 sentences, clear and concise
-- All bullet text must be plain strings without special formatting
-
-**IMPORTANT: Project Structure**
-- Each project in the `projects` array must have its own `name` and `bullets` list
-- This allows multiple distinct projects per role with clear separation
-- Each project's bullets should only describe that specific project
-
-DETAILED GUIDELINES FOR CV:
-
-### Summary (2–3 lines maximum)
-- **Focus on career aims, ambitions, and professional identity** rather than listing tools or skills
-- Position the candidate's aspirations and goals within the data/analytics field
-- Emphasize what the candidate wants to achieve and contribute, not just what they've done
-- **Examples of good framing:**
-  - "Data professional focused on transforming complex datasets into strategic insights that drive business growth"
-  - "Analytics practitioner dedicated to building data infrastructure that empowers cross-functional decision-making"
-  - "Data analyst passionate about uncovering patterns in user behavior to optimize product experiences"
-- **Avoid tool-centric language** like "SQL expert" or "proficient in Python" - save technical details for skills section
-- Mention years of experience and domain context naturally (e.g., "5+ years enabling data-driven decisions in high-growth environments")
-- Use aspirational yet grounded language that reflects professional maturity
-- **The summary should answer: "What kind of data professional am I, and what do I aim to accomplish?"**
-- Keep it authentic, concise, and forward-looking
-- No fluff; every word should contribute to a clear professional narrative
-
-### Experience Bullets (3-6 bullets per role, detailed and impactful)
-- **CRITICAL: Target 14-16 total bullets across ALL roles** to achieve 1.8-2.0 page length
-- **Each bullet should be 100-130 characters** (descriptive but concise, 1-2 lines when rendered)
-- **QUANTITATIVE FOCUS**: Prioritize bullets with numbers, percentages, dollar amounts, timeframes
-- Outcome-oriented: start with action (verb + impact + context)
-- Reorder bullets from most to least relevant to the job description
-- Preserve ALL quantifiable metrics from the base profile (e.g., "51 cities," "10k records," "€2M ARR")
-- Add context and technical detail to bullets: tools used, scale, stakeholders, outcomes
-- Rewrite bullets to emphasize JD alignment without fabrication
-  - Example: If JD requires "marketing attribution" and profile has "A/B testing," link them: "Designed A/B tests using Python and SQL to measure attribution across 5+ marketing channels, improving ROI tracking by 25%"
-- Use ATS-friendly language: SQL, Python, Looker, Power BI (avoid abbreviations)
-- Include metrics when available: "increased adoption by 40%", "reduced query time by 50%"
-- **Bullet distribution (to achieve 14-16 total)**: 
-  - Most recent role: 5-6 bullets
-  - Second most recent: 4-5 bullets
-  - Third most recent: 3-5 bullets (only if needed to reach 14-16 total)
-  - Older roles (beyond 3rd): 0 bullets; include title/dates only if needed
-
-### Projects (include to reach target length)
-- **CRITICAL: Include ALL projects from base profile's "selected_projects"** - do not drop any projects
-- **Include 2-4 projects total across relevant roles** to help reach 1.8-2.0 page target
-- Select the MOST relevant projects matching the job description
-- Focus on most recent 2-3 roles for project inclusion
-- **Each role can have 1-2 projects** (use the `projects` array)
-- **Each project MUST be a separate object** with its own `name` and `bullets` list
-- **Each project MUST have 3-4 descriptive bullets** (minimum 3, maximum 4) showing technical implementation and business impact
-- Project bullets must be impactful, detailed, and specific about work done and achievements
-- Include metrics and concrete outcomes in project bullets
-- Projects are properly separated in the output - each project name is distinct with its own bullet list
-- Rewrite project bullets to emphasize business impact and technical skills matching the JD
-- Example project structure:
-  ```json
-  "projects": [
-    {
-      "name": "Marketing Attribution Model",
-      "bullets": [
-        "Built custom Markov chain attribution model integrating 5 data sources",
-        "Improved marketing ROI tracking accuracy by 30%"
-      ]
-    },
-    {
-      "name": "Customer Segmentation Dashboard", 
-      "bullets": [
-        "Designed K-means clustering model to segment 50k+ customers",
-        "Created Power BI dashboard enabling targeted campaigns"
-      ]
-    }
-  ]
-  ```
-- Projects are essential for achieving target page length while showcasing relevant work
-
-### Skills
-- **You MAY recategorize skills** into different groupings if it better matches the job requirements
-- **You MAY drop a few clearly irrelevant skills** to keep the CV focused on the job description (do not remove core domain skills)
-- Organize into semantic categories (e.g., "Data Analysis & Modeling," "BI Tools & Platforms")
-- Reorder skills within each category: JD-matching skills first, then related skills
-- Reorganize and reorder skills to emphasize JD alignment, but do not fabricate skills
-- If JD asks for "Tableau" but profile has "Looker," keep "Looker" and note it as an alternative BI tool (do NOT invent Tableau)
-- Approximate JD matches are acceptable: SQL variants, Python flavors, similar BI tools
-- Do NOT add skills not in the base profile
-
-### Education & Certifications
-- Include if present in base profile
-- No changes needed unless reordering for relevance
-
-### Length Requirement (CRITICAL)
-- **MUST be between 1.8 and 2.0 A4 pages when rendered to PDF**
-- **Target content volume (to achieve 1.8-2.0 pages):**
-  - Summary: 2-3 lines (80-120 words)
-  - Experience: 2-3 most relevant roles with total 14-16 bullets
-  - Projects: 2-4 projects across top 2-3 roles, 3-4 bullets each (9-16 project bullets total)
-  - Skills: 25-35 skills total across all categories (well organized)
-  - Education: Always include (typically 2-3 lines)
-  - Certifications: Always include if present
-  - Technologies: Include per role if present in base profile
-- **To reach minimum 1.8 pages**: 
-  - Include more bullets per recent role (4-5 for most recent)
-  - Add relevant projects with detailed bullets
-  - Include all skill categories from base profile
-  - Add technical context to bullets (tools, scale, methods)
-- **If approaching 2.0 page maximum**: 
-  - Slightly reduce bullet length (aim for 100-120 chars vs 130-150)
-  - Limit to 3 roles with detailed bullets, older roles with 1-2 bullets
-- **Balance**: Target is 1.9 pages - full content without excessive padding
-
-### Page Rendering
-- The LaTeX template provided expects: name, tagline, summary, experiences (with projects), education, skills, certifications, languages
-- Template automatically handles spacing and section breaks
-- Test that your output produces a professional 1.5-2 page CV when rendered
-
-TASK COMPLETION:
-Return ONLY a valid JSON object matching the format above. The JSON will be parsed and rendered to LaTeX → PDF automatically.

@@ -1,0 +1,164 @@
+{
+  "cv": {
+    "title": "Senior Data Analyst | Commercial & Marketplace Analytics",
+    "work_authorization": "German EU Blue Card holder",
+    "summary": [
+      "Senior analytics professional with experience across business intelligence, growth analytics, and analytics engineering. Strong background in SQL, statistical analysis, and automation, with hands-on delivery of forecasting, performance diagnostics, and self-service tools that support commercial and product decisions."
+    ],
+    "skills": {
+      "Commercial Analytics & Strategy": [
+        "Advanced SQL",
+        "Marketplace Metrics",
+        "Scenario Modeling",
+        "Forecasting",
+        "A/B Testing & Experimentation",
+        "Statistical Analysis",
+        "Cohort & Funnel Analysis",
+        "Stakeholder Management"
+      ],
+      "BI & Analytics Engineering": [
+        "Snowflake",
+        "BigQuery",
+        "dbt",
+        "Looker",
+        "Data Modeling & Semantic Layers",
+        "Power BI",
+        "GoodData",
+        "Automated Data Quality & Data Contracts"
+      ],
+      "Programming & LLM Tooling": [
+        "Python (Pandas, NumPy)",
+        "LLM APIs (OpenAI / GPT)",
+        "SQL Generation with LLMs",
+        "Model Context Protocol (MCP)",
+        "Claude",
+        "LLM Semantic Context & Skills",
+        "Apache Airflow",
+        "GitLab CI"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Aklamio GmbH",
+        "role": "Senior Analytical Engineer",
+        "start_date": "2026-02",
+        "end_date": "present",
+        "bullets": [
+          "Own end-to-end ETL pipelines and reusable SQL models in Snowflake, centralizing business logic and metric definitions for GoodData reporting.",
+          "Contribute to a YAML-configured data quality framework covering approximately 80 Snowflake tables, owning validation checks for funnel and sales-channel performance metrics.",
+          "Deliver dashboards and customer performance analysis that help customer success managers recommend improvements to client channel setups.",
+          "Developing a Snowflake Model Context Protocol (MCP) integration with Claude to enable natural-language, LLM-assisted SQL querying on the warehouse.",
+          "Create semantic context for key warehouse tables and reusable LLM skills describing data definitions, calculation rules, and business logic.",
+          "Developing an in-house Claude-based dashboarding solution built on warehouse MCP infrastructure to deliver self-serve analytics."
+        ],
+        "projects": [
+          {
+            "name": "Traffic Source & Customer Journey Attribution",
+            "bullets": [
+              "Designed incremental transformation pipelines and priority-ordered classification taxonomies to standardize multi-channel attribution and identify commercial performance drivers.",
+              "Validated reporting logic across intermediate and aggregate data layers alongside existing production pipelines, ensuring zero disruption to live commercial reporting.",
+              "Analyzed 72 customer brands using peer benchmarks and performance-gap decomposition; delivered insights used by all customer success managers to recommend channel setup changes."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "NeoTaste GmbH",
+        "role": "Marketing Business Analyst",
+        "start_date": "2025-01",
+        "end_date": "2026-01",
+        "bullets": [
+          "Owned growth and commercial analytics end-to-end for a mobile subscription app, partnering with leadership to evaluate performance across 51 cities.",
+          "Built commercial forecasting models to evaluate market launch potential, payback timelines, and demand saturation across new territories.",
+          "Designed self-serve reporting dashboards translating budget allocation scenarios into expected ROAS, CAC, and subscriber volumes."
+        ],
+        "projects": [
+          {
+            "name": "Demand Forecasting & Commercial Scenario Dashboard",
+            "bullets": [
+              "Modeled spend allocation scenarios that improved quarterly planning accuracy by ~20%, guiding investment shifts toward higher-ROI territories and driving an 8–10% ROAS uplift.",
+              "Supported 3–5% monthly CAC reductions since Q2 2025 through scenario-based budget planning."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ecoligo GmbH",
+        "role": "Business Intelligence Analyst",
+        "start_date": "2023-07",
+        "end_date": "2025-01",
+        "bullets": [
+          "Built unified reporting pipelines and BigQuery data models combining platform user behavior, conversion metrics, and investment performance.",
+          "Developed a Markov-chain attribution model that informed a 30% marketing spend shift from Facebook to Google Ads, reducing blended CAC by 8% within one quarter.",
+          "Automated voucher and cashback calculations with Python and dbt; eliminated manual reporting workflows across the role, saving approximately 10 hours per week."
+        ],
+        "projects": [
+          {
+            "name": "Conversational LLM Self-Serve Query Tool",
+            "bullets": [
+              "Built a conversational data tool using OpenAI's GPT API to generate and execute SQL queries against BigQuery, enabling non-technical stakeholders to self-serve revenue and customer insights."
+            ]
+          },
+          {
+            "name": "Investor Segmentation & Retention Analytics",
+            "bullets": [
+              "Performed K-means behavioral clustering and cohort analysis, uncovering retention drivers that increased repeat investment by 7%."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "heycar (Mobility Trader GmbH)",
+        "role": "Data Analyst",
+        "start_date": "2021-12",
+        "end_date": "2023-05",
+        "bullets": [
+          "Delivered cross-functional analytics across Product, Sales, and Marketing to support revenue growth in an automotive marketplace.",
+          "Maintained executive KPI dashboards in Looker, identifying performance trends across Paid, Organic, and Brand channels.",
+          "Supported A/B testing and experimentation on marketplace search and product features to improve funnel progression and downstream lead generation."
+        ],
+        "projects": [
+          {
+            "name": "Multi-Touch Marketplace Lead Attribution",
+            "bullets": [
+              "Developed a multi-touch attribution model redistributing untracked sessions, driving a six-figure quarterly spend reallocation and lifting qualified leads by 6–8%."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ORMIT (Traineeship)",
+        "role": "Marketing Analyst",
+        "start_date": "2020-12",
+        "end_date": "2021-11",
+        "bullets": [],
+        "projects": []
+      },
+      {
+        "company": "Unilever",
+        "role": "Project Coordinator - Front of House",
+        "start_date": "2019-03",
+        "end_date": "2019-08",
+        "bullets": [],
+        "projects": []
+      }
+    ],
+    "include_education": true,
+    "include_certifications": true
+  },
+  "cover_letter": {
+    "role_title": "Senior Data Analyst - Supply Analytics",
+    "company_name": "Vio",
+    "paragraphs": [
+      "I am applying for the Senior Data Analyst – Supply Analytics position at Vio. The opportunity to make supplier performance measurable and turn analysis into useful tools for partnerships managers appeals to me. My background spans commercial analytics, marketplace reporting, and analytics engineering, with experience translating business questions into metrics, forecasts, and self-service tools that support decisions rather than simply report numbers.",
+      "At Aklamio, I led a traffic-source and customer-journey attribution initiative from incremental Snowflake pipelines to GoodData dashboards and customer recommendations. I analyzed 72 brands using peer benchmarks and performance-gap decomposition; the insights are now used by all customer success managers to guide client channel setups. I contribute to a quality framework covering approximately 80 tables and own funnel and sales-channel checks. I am also developing Snowflake MCP integration, supported by semantic context and reusable skills encoding business definitions and calculation logic.",
+      "Previously, as NeoTaste’s sole marketing analyst, I owned analytics across 51 cities and built forecasting models and scenario dashboards to evaluate budget allocations and expansion opportunities. This improved planning accuracy by approximately 20% and contributed to an 8–10% ROAS uplift. At ecoligo, I built an OpenAI-powered BigQuery query tool for non-technical stakeholders and developed Python payment automation. At heycar, I maintained Looker dashboards and supported experimentation on marketplace and search features. These experiences provide a practical foundation for commercial scenarios, performance diagnosis, and stakeholder self-service. Strong SQL, data modeling, and statistical analysis underpin this work.",
+      "I would welcome the opportunity to bring this experience to Vio’s Supply Partnerships team, helping develop reliable partner metrics and accessible analytical tools. I hold a valid EU Blue Card issued by Germany and would require employer support for the appropriate work authorization in the Netherlands. I look forward to discussing how I can contribute to your supply analytics priorities."
+    ],
+    "closing_line": "Sincerely,",
+    "signature_name": "Sreedeep Sreekanth"
+  },
+  "company_name": "Vio",
+  "role_title": "Senior Data Analyst - Supply Analytics",
+  "work_country": "Netherlands"
+}

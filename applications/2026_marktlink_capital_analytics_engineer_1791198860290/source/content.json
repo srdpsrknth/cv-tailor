@@ -1,0 +1,168 @@
+{
+  "company_name": "Marktlink Capital",
+  "role_title": "Analytics Engineer",
+  "cv": {
+    "title": "Senior Analytics Engineer",
+    "summary": [
+      "Senior analytics professional with experience across analytics engineering, business intelligence, and growth analytics. Strong technical background in data modeling, automation, and statistical analysis, supported by hands-on delivery of reliable reporting, forecasting, and tools for business decision-making."
+    ],
+    "skills": {
+      "Analytics Engineering & Modeling": [
+        "Snowflake",
+        "dbt",
+        "BigQuery",
+        "Advanced SQL",
+        "Data Modeling & Semantic Layers",
+        "Incremental ETL",
+        "Automated Data Quality & Data Contracts"
+      ],
+      "Data Orchestration & Automation": [
+        "Python (Pandas, NumPy)",
+        "Apache Airflow",
+        "Git",
+        "GitLab CI",
+        "Docker",
+        "Workflow Automation"
+      ],
+      "Business Intelligence & Reporting": [
+        "Power BI",
+        "Looker",
+        "GoodData",
+        "Attribution Modeling",
+        "Cohort & Funnel Analysis",
+        "Forecasting"
+      ],
+      "Modern Tooling & LLM Integrations": [
+        "Claude",
+        "Cursor",
+        "Model Context Protocol (MCP)",
+        "LLM APIs (OpenAI / GPT)",
+        "SQL Generation with LLMs"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Aklamio GmbH",
+        "role": "Senior Analytical Engineer",
+        "start_date": "2026-02",
+        "end_date": "present",
+        "bullets": [
+          "Own and develop end-to-end ETL pipelines, orchestrating source ingestion through Snowflake transformations to consumption in GoodData and downstream workflows.",
+          "Develop reusable SQL data models across landing, intermediate, and aggregated layers, centralizing business logic, metric definitions, and calculations.",
+          "Maintain Airflow-orchestrated DAGs and version-controlled workflows in GitLab, using Cursor and custom development skills to support continuous documentation.",
+          "Contribute to a YAML-driven data quality framework covering approximately 80 Snowflake tables, owning business-logic and reconciliation checks across sales channels and funnels.",
+          "Developing a Snowflake MCP integration and semantic context to enable LLM-driven analytical SQL execution across warehouse tables.",
+          "Developing an in-house dashboarding solution using Claude to support governed data access."
+        ],
+        "projects": [
+          {
+            "name": "Traffic Source & Customer Journey Attribution",
+            "bullets": [
+              "Designed incremental event- and journey-grain enrichment pipelines in Snowflake, establishing a declarative taxonomy and correcting upstream classification defects.",
+              "Validated pipelines against production and deployed across intermediate and reporting layers with controlled backfills and no breaking changes to existing reporting.",
+              "Analyzed performance across 72 customer brands to decompose efficiency gaps, delivering analytics now used by all customer success managers to guide client setups."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "NeoTaste GmbH",
+        "role": "Marketing Business Analyst",
+        "start_date": "2025-01",
+        "end_date": "2026-01",
+        "bullets": [
+          "Designed and owned the end-to-end marketing analytics stack, data models, forecasting, and reporting across 51 cities supporting €200k–€500k in monthly spend.",
+          "Partnered directly with leadership to translate operational budget scenarios into expected acquisition, CAC, and subscriber growth outcomes."
+        ],
+        "projects": [
+          {
+            "name": "Marketing Demand Forecasting Model & Scenario Dashboard",
+            "bullets": [
+              "Built city-level forecasting models in Snowflake and dbt, replacing manual spreadsheet-based planning and improving planning accuracy by ~20%.",
+              "Delivered scenario-based dashboards that guided monthly capital allocation toward higher-ROI regions, driving an 8–10% ROAS uplift."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ecoligo GmbH",
+        "role": "Business Intelligence Analyst",
+        "start_date": "2023-07",
+        "end_date": "2025-01",
+        "bullets": [
+          "Built the company's data analytics platform from scratch as part of a 2-person team, enabling unified investor, revenue, and performance reporting.",
+          "Built BigQuery and dbt data models integrating transactional, behavioral, CRM, and investment platform data.",
+          "Eliminated manual reporting workflows through pipeline automation, saving approximately 10 hours per week across teams."
+        ],
+        "projects": [
+          {
+            "name": "Conversational LLM Query Interface",
+            "bullets": [
+              "Built an internal analytics tool using OpenAI's API to generate and execute SQL queries on BigQuery, enabling non-technical stakeholders to self-serve investor metrics."
+            ]
+          },
+          {
+            "name": "Payout Calculation Automation",
+            "bullets": [
+              "Automated voucher and cashback payout calculations from transactional investment data using Python and dbt pipelines, reducing operational errors."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "heycar (Mobility Trader GmbH)",
+        "role": "Data Analyst",
+        "start_date": "2021-12",
+        "end_date": "2023-05",
+        "bullets": [
+          "Delivered cross-functional analytics and executive KPI dashboards across Marketing, Product, and Sales in Looker.",
+          "Supported A/B testing and funnel experimentation on platform features to improve conversion rates and lead generation."
+        ],
+        "projects": [
+          {
+            "name": "Multi-Touch Attribution & Pipeline Automation",
+            "bullets": [
+              "Developed a custom attribution model and automated pipelines using Matillion, dbt, and PostgreSQL to redistribute untracked sessions and leads.",
+              "Provided data visibility that guided the reallocation of six-figure quarterly marketing budgets, contributing to a 6–8% lift in qualified leads."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "ORMIT (Traineeship)",
+        "role": "Marketing Analyst",
+        "start_date": "2020-12",
+        "end_date": "2021-11",
+        "bullets": [],
+        "projects": []
+      },
+      {
+        "company": "Unilever",
+        "role": "Project Coordinator - Front of House",
+        "start_date": "2019-03",
+        "end_date": "2019-08",
+        "bullets": [],
+        "projects": []
+      }
+    ],
+    "include_education": true,
+    "include_certifications": true,
+    "work_authorization": "German EU Blue Card holder"
+  },
+  "cover_letter": {
+    "role_title": "Analytics Engineer",
+    "company_name": "Marktlink Capital",
+    "paragraphs": [
+      "I am writing to apply for the Analytics Engineer position at Marktlink Capital. Having designed greenfield data platforms and established reliable, governed analytics layers in high-growth environments, I offer direct experience translating complex business requirements into tested models. My background across modern cloud data warehouses, disciplined data modeling, and automated quality frameworks aligns closely with your objective of establishing a scalable analytics foundation.",
+      "At Aklamio, I own end-to-end data transformation pipelines within Snowflake, developing structured SQL models across landing, intermediate, and aggregated layers. I maintain version-controlled workflows orchestrated via Airflow, utilizing Cursor for streamlined development. My responsibilities include contributing to an automated data quality framework covering approximately 80 Snowflake tables, where I personally own the verification logic for funnel stages and sales-channel attribution. Additionally, I am developing semantic context layers and Model Context Protocol integrations for LLM-driven analytics.",
+      "In prior positions, I gained substantial hands-on experience building foundational data architectures using dbt and modern cloud warehouses. At ecoligo, as part of a two-person analytics team, I built the central data platform from scratch, unifying investor, transactional, and marketing data using dbt and BigQuery to replace manual reporting workflows. I also developed Python-based payment automation for investor bonus distributions. Later at NeoTaste, I utilized dbt and Snowflake to establish structured demand forecasting models, standardizing core operational metrics and migrating business planning away from spreadsheets into maintainable Power BI dashboards.",
+      "I bring a practical, disciplined engineering mindset well suited to establishing Marktlink Capital's data warehouse from an empty setup. I hold a valid EU Blue Card issued by Germany and would require employer support for a Dutch EU Blue Card or the appropriate local work authorization. I welcome the opportunity to discuss how my technical experience can support your Data & Technology team in Amsterdam."
+    ],
+    "closing_line": "Sincerely,",
+    "signature_name": "Sreedeep Sreekanth"
+  },
+  "application_location": {
+    "city": "Amsterdam",
+    "country": "Netherlands"
+  }
+}

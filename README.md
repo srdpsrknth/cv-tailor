@@ -1,191 +1,43 @@
-# CV-Tailor
+# CV Tailor
 
-A tool that generates tailored CVs (LaTeX→PDF) and cover letters (DOCX) for job applications using Google Gemini AI.
+Generate job-specific CV PDFs and cover letters (DOCX and PDF) from the authoritative YAML profile, using Gemini, FastAPI and Streamlit.
 
-## 🎯 Features
+**Fresh Mac setup:** read [docs/MAC_SETUP.md](docs/MAC_SETUP.md). The assisting LLM should read [AGENTS.md](AGENTS.md) and the [application skill](.agents/skills/cv-tailor-application/SKILL.md).
 
-- **AI-Powered Tailoring**: Uses Google Gemini to intelligently adapt your CV and cover letter to job descriptions
-- **ATS-Compliant**: Generated CVs are optimized for Applicant Tracking Systems
-- **Professional Templates**: LaTeX-based CV compilation and Word document cover letters
-- **Cost Tracking**: Real-time token usage and cost estimation
-- **Preview & Download**: Streamlit UI for previewing and downloading outputs
-- **No Fabrication**: AI strictly rewords existing experiences without inventing facts
+## Quick start
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-1. **Python 3.10+** installed
-2. **Tectonic** LaTeX compiler installed ([Download](https://tectonic-typesetting.github.io/))
-3. **Google Gemini API Key** from [AI Studio](https://aistudio.google.com/app/apikey)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   cd d:\coding\cv-tailor
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate  # Windows
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables**
-   ```bash
-   copy .env.example .env
-   ```
-   Edit `.env` and add your `GEMINI_API_KEY`
-
-5. **Verify base profile**
-   Check `storage/profile/profile.yaml` contains your CV content
-
-### Running the Application
-
-1. **Start Backend** (Terminal 1)
-   ```bash
-   venv\Scripts\activate
-   cd backend
-   uvicorn main:app --reload --port 8000
-   ```
-
-2. **Start UI** (Terminal 2)
-   ```bash
-   venv\Scripts\activate
-   cd ui
-   streamlit run app.py
-   ```
-
-3. **Open browser**: http://localhost:8501
-
-## 📁 Project Structure
-
-```
-cv-tailor/
-├── backend/
-│   ├── main.py                 # FastAPI app
-│   ├── models/                 # Pydantic models
-│   ├── services/               # Business logic
-│   │   ├── gemini_service.py   # Gemini API integration
-│   │   ├── tailor_service.py   # CV/CL tailoring logic
-│   │   └── profile_loader.py   # YAML loading
-│   ├── renderers/              # Document generation
-│   │   ├── latex_renderer.py   # LaTeX → PDF
-│   │   └── docx_renderer.py    # DOCX generation
-│   └── prompts/                # Gemini prompts
-│       ├── tailor_cv_prompt.md
-│       └── tailor_cl_prompt.md
-├── ui/
-│   └── app.py                  # Streamlit UI
-├── templates/
-│   ├── cv/                     # LaTeX templates
-│   │   ├── main.tex.jinja2
-│   │   └── altacv.cls
-│   └── cover_letter/           # DOCX templates
-│       └── cover_letter.docx
-├── storage/
-│   └── profile/
-│       └── profile.yaml        # Base CV content
-├── outputs/                    # Generated files
-├── .env                        # Environment variables (not in git)
-└── requirements.txt
-```
-
-## 🔧 Configuration
-
-### Gemini Model Selection
-
-In `.env`, choose your model:
-- `gemini-1.5-flash` (recommended): Fast, cheap, good quality
-- `gemini-1.5-pro`: Higher quality, more expensive
-- `gemini-2.0-flash`: Latest, best performance/cost ratio
-
-### Cost Estimates (Gemini 1.5 Flash - Free Tier)
-
-- **Free Tier Limits**: 15 requests/minute, 1.5M tokens/day
-- **Per CV**: ~2,000-3,000 tokens (~$0.0015)
-- **Per Cover Letter**: ~1,000-1,500 tokens (~$0.0008)
-- **Total per application**: ~$0.002 (within free tier)
-
-## 📝 Usage
-
-1. **Input**: Paste job description in text area
-2. **Generate**: Click "Generate Tailored CV & Cover Letter"
-3. **Preview**: View PDF preview and cover letter text
-4. **Download**: Download both files
-5. **Check Costs**: See token usage and estimated costs
-
-## 🛠️ Development
-
-### Adding New Features
-
-Use GitHub Copilot with the instructions in `.github/copilot-instructions.md`
-
-### Testing
+Install Python 3.11+ (3.12 recommended), Git, and a full pdflatex distribution: MacTeX on Mac, MiKTeX on Windows, or TeX Live on Linux. Tectonic is not used.
 
 ```bash
-pytest
+git clone https://github.com/srdpsrknth/cv-tailor.git
+cd cv-tailor
+python3.12 scripts/setup.py
+# Enter GEMINI_API_KEY in .env
+.venv/bin/python scripts/check_setup.py
+.venv/bin/python -m pytest -q
+.venv/bin/python scripts/start.py
 ```
 
-### Validation
+On Windows, use `python scripts/setup.py` and `.venv/Scripts/python.exe` instead. Setup preserves existing .env files and installs the recorded working versions from requirements.lock.txt. Direct dependencies for intentional upgrades are in requirements.txt. Model availability and quota depend on the Gemini account.
 
-Validate profile YAML:
+Open http://localhost:8501; API docs: http://localhost:8000/docs. Keep the startup terminal open; Ctrl+C stops both services. Logs stay in .runtime/logs. Credentials are excluded from Git and must be configured per machine. Optional LibreOffice and Poppler are useful for visual QA; cover-letter PDF generation uses LaTeX.
+
+## Generation and revision
+
+Paste the posting and select company, role, and actual country of employment. The flow tailors wording and skills, reviews claims against the profile, renders documents, and retries oversize outputs. Success requires a CV of at most two pages and a one-page letter PDF with four body paragraphs and 290–310 words. Review the factual claims and layouts before applying; these checks do not guarantee screening outcomes.
+
+The source profile is storage/profile/profile.yaml. Country context overrides inferred location. Overseas CVs show German-issued Blue Card status; employer permit support belongs only in the cover letter.
+
+Each application lives in outputs/{year}_{company}_{role}_{timestamp}/. Final documents are at the top level; source/content.json is editable text, alongside the posting, profile snapshot, drafts and generation metadata. OUTPUTS_DIR defaults to outputs; an absolute path can mirror documents and editable sources elsewhere. Relative paths resolve against the repository root. Use a Mac-specific OneDrive path after moving machines.
+
 ```bash
-python backend/validate_profile.py
+.venv/bin/python scripts/render_application.py --project . --content outputs/<job_id>/source/content.json --mirror-configured
 ```
 
-## 📖 How It Works
+Add --cv-only or --cover-letter-only for scoped edits. Saved reviewed applications are versioned in applications/<job_id>/source/. Copy a saved application folder into outputs before rendering. If source/render_application.py exists, use it to retain application-specific page breaks and compact technology lists; otherwise use the generic helper. The Mac guide includes a complete restore example.
 
-1. **Load Base Profile**: Reads your CV from `profile.yaml`
-2. **Analyze Job Description**: Gemini extracts key requirements
-3. **Tailor Content**:
-   - Reorder/reword achievements to match job
-   - Adjust skills section relevance
-   - Keep experiences in reverse chronological order
-   - No fabrication of facts
-4. **Render Documents**:
-   - LaTeX template → Tectonic → PDF
-   - DOCX template → python-docx → Word document
-5. **Return Outputs**: Preview and download
+## Repository contents and checks
 
-## ⚙️ Customization
+Included: profile, code, prompts, Word/LaTeX templates, tests, setup/start scripts, dependency lock, reusable agent skill, and reviewed application sources. Excluded from new commits: API credentials, virtual environments, duplicate profile backups, logs, QA images and generated PDF/DOCX outputs. Three adjoe documents were already tracked historically and remain available.
 
-### Editing Base Profile
-
-Edit `storage/profile/profile.yaml` with your experiences, skills, education, etc.
-
-### Customizing Templates
-
-- **CV**: Modify `templates/cv/main.tex.jinja2`
-- **Cover Letter**: Edit `templates/cover_letter/cover_letter.docx`
-
-### Adjusting Prompts
-
-Fine-tune AI behavior in `backend/prompts/`
-
-## 🔒 Security
-
-- ✅ API key stored in backend `.env` only
-- ✅ Never exposed to frontend/Streamlit
-- ✅ `.gitignore` prevents committing secrets
-
-## 📄 License
-
-MIT License - see LICENSE file
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Use GitHub Copilot with project instructions
-4. Submit pull request
-
----
-
-**Note**: This tool is for personal use. Generated CVs should be reviewed before submission.
+GitHub Actions runs unit tests on Python 3.12. Tests do not require API calls or LaTeX. Full validation also requires rendering and inspecting both CV pages and letter PDF; render DOCX separately with LibreOffice because its layout differs. Fonts, dates, TeX versions, and model output can vary across environments. The exact Windows outputs are not a guarantee of identical Mac rendering.

@@ -73,7 +73,8 @@ class DocxRenderer:
         context = self._build_context(tailored_cl, profile)
 
         try:
-            doc.render(context)
+            # Preserve XML-sensitive characters in company names and prose.
+            doc.render(context, autoescape=True)
             doc.save(output_path)
         except Exception as e:  # pragma: no cover - render/save issues
             raise DocxRendererError(f"Failed to render DOCX: {e}")
@@ -235,39 +236,39 @@ class DocxRenderer:
         """
         Generate PDF from cover letter using professional LaTeX template.
         Uses structured data from TailoredCoverLetter for accurate, complete rendering.
-        
+
         Args:
             docx_path: Path to DOCX file (used for output naming only)
             tailored_cl: Tailored cover letter data with all paragraphs
             profile: Base profile for contact information
-            
+
         Returns:
             Path to generated PDF file
-            
+
         Raises:
             Exception: If LaTeX generation fails
         """
         import shutil
-        
+
         # Extract structured data from TailoredCoverLetter and Profile
         candidate_name = profile.identity.full_name or "Applicant"
         role_title = tailored_cl.role_title or ""
         company_name = tailored_cl.company_name or "Hiring Manager"
         phone = profile.identity.phone or "+1 (555) 000-0000"
         email = profile.identity.email or "applicant@example.com"
-        
+
         # Use all paragraphs from the tailored cover letter (not limited to 3)
         body_paras = tailored_cl.paragraphs or []
-        
+
         # Create temporary working directory for LaTeX compilation
         work_dir = docx_path.parent / "latex_work"
         work_dir.mkdir(exist_ok=True)
-        
+
         # Copy template files to working directory
         template_root = Path(__file__).resolve().parents[2] / "cover_letter_latex_template"
         setup_dir = work_dir / "setup"
         setup_dir.mkdir(exist_ok=True)
-        
+
         try:
             # Copy template files
             if (template_root / "setup" / "preamble.tex").exists():
@@ -276,7 +277,7 @@ class DocxRenderer:
                 shutil.copy(template_root / "setup" / "macros.tex", setup_dir / "macros.tex")
         except Exception as e:
             logger.warning(f"Failed to copy template files: {e}. Will attempt inline compilation.")
-        
+
         # Create LaTeX content using the template structure
         latex_content = r"""\input{setup/preamble.tex}
 \input{setup/macros.tex}
@@ -284,13 +285,13 @@ class DocxRenderer:
 \begin{document}
 
     """
-        
+
         # Add title with job role @ company as subtitle
         escaped_role = self._escape_latex(role_title)
         escaped_company = self._escape_latex(company_name)
         subtitle = f"{escaped_role} @ {escaped_company}"
         latex_content += f"\\name{{Cover Letter}}{{{subtitle}}}\n\n"
-        
+
         # Extract salutation (first line if it starts with "Dear")
         salutation = "Dear Hiring Manager,"
         first_para = body_paras[0] if body_paras else ""
@@ -304,43 +305,45 @@ class DocxRenderer:
             else:
                 # Entire first paragraph is just salutation, remove it
                 body_paras = body_paras[1:]
-        
+
         # Add salutation
         escaped_salutation = self._escape_latex(salutation)
         latex_content += f"\\para{{{escaped_salutation}}}\n\n"
-        
+
         # Add all body paragraphs
         for para in body_paras:
             # Escape LaTeX special characters
             escaped_para = self._escape_latex(para)
             latex_content += f"\\para{{{escaped_para}}}\n"
-        
+
         # Add closing signature using the signature macro
         closing_line = tailored_cl.closing_line or "Best regards,"
         signature_name = tailored_cl.signature_name or candidate_name
         escaped_closing = self._escape_latex(closing_line)
         escaped_signature = self._escape_latex(signature_name)
         latex_content += f"\n\\signature{{{escaped_closing}}}{{{escaped_signature}}}\n"
-        
+
         # Add footer with contact info - NO LOCATION (empty string for first param)
         escaped_email = self._escape_latex(email)
         latex_content += f"\n\\bottom{{}}{{{phone}}}{{{escaped_email}}}\n"
         latex_content += r"""\end{document}"""
-        
+
         # Write LaTeX file to working directory
         tex_path = work_dir / "main.tex"
-        
+
         try:
             tex_path.write_text(latex_content, encoding="utf-8")
             logger.info(f"Created LaTeX file: {tex_path}")
         except Exception as e:
             raise Exception(f"Failed to write LaTeX file: {e}")
-        
+
         # Compile with pdflatex
         try:
+            from renderers.latex_renderer import LaTeXRenderer
+            compiler = LaTeXRenderer()._resolve_pdflatex_path()
             result = subprocess.run(
                 [
-                    "pdflatex",
+                    compiler,
                     "-interaction=nonstopmode",
                     "-output-directory", str(work_dir),
                     str(tex_path)
@@ -350,31 +353,31 @@ class DocxRenderer:
                 timeout=30,
                 cwd=str(work_dir)
             )
-            
+
             pdf_src = work_dir / "main.pdf"
             pdf_dst = docx_path.with_suffix(".pdf")
-            
+
             if result.returncode != 0:
                 logger.warning(f"pdflatex returned code {result.returncode}")
                 logger.warning(f"stderr: {result.stderr[:500]}")
                 if "error" in result.stderr.lower() and not pdf_src.exists():
                     raise Exception(f"pdflatex error: {result.stderr[:200]}")
-            
+
             if not pdf_src.exists():
                 raise Exception("PDF not generated by pdflatex")
-            
+
             # Copy PDF to outputs directory
             shutil.copy(pdf_src, pdf_dst)
             logger.info(f"Generated professional template PDF: {pdf_dst}")
-            
+
             # Clean up working directory
             try:
                 shutil.rmtree(work_dir)
             except:
                 pass
-            
+
             return pdf_dst
-            
+
         except FileNotFoundError:
             raise Exception("pdflatex not found. Install MiKTeX or TeX Live.")
         except subprocess.TimeoutExpired:

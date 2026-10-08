@@ -22,6 +22,8 @@ app = FastAPI(title="cv-tailor-backend", version="0.1.0")
 outputs_dir_env = os.getenv("OUTPUTS_DIR", "").strip()
 if outputs_dir_env:
     OUTPUTS_DIR = Path(outputs_dir_env)
+    if not OUTPUTS_DIR.is_absolute():
+        OUTPUTS_DIR = Path(__file__).resolve().parents[1] / OUTPUTS_DIR
 else:
     OUTPUTS_DIR = Path(__file__).resolve().parents[1] / "outputs"
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -41,6 +43,7 @@ def tailor(req: TailorRequest):
             profile=profile,
             company_name=req.company_name,
             role_title=req.role_title,
+            work_country=req.work_country,
         )
         return result
 
@@ -58,18 +61,18 @@ def tailor(req: TailorRequest):
 def download_cv(job_id: str):
     """Download the generated CV PDF by job_id (in job-specific folder)."""
     pdf_path = OUTPUTS_DIR / job_id / f"{job_id}.pdf"
-    
-    # Fallback: check for any PDF in the job folder
+
+    # Generated CV filenames differ from job_id; exclude cover-letter PDFs.
     if not pdf_path.exists():
         job_folder = OUTPUTS_DIR / job_id
         if job_folder.exists():
-            pdfs = list(job_folder.glob("*.pdf"))
+            pdfs = [p for p in job_folder.glob("*.pdf") if "cover_letter" not in p.name.lower()]
             if pdfs:
                 pdf_path = pdfs[0]
-    
+
     if not pdf_path.exists():
         raise HTTPException(status_code=404, detail=f"CV PDF not found for job_id: {job_id}")
-    
+
     return FileResponse(
         path=str(pdf_path),
         media_type="application/pdf",
@@ -83,15 +86,15 @@ def download_cover_letter(job_id: str):
     Download the generated cover letter DOCX from job-specific folder.
     """
     job_folder = OUTPUTS_DIR / job_id
-    
+
     if not job_folder.exists():
         raise HTTPException(status_code=404, detail=f"Job folder not found: {job_id}")
-    
+
     # Find DOCX file in job folder
     docx_files = list(job_folder.glob("*.docx"))
     if not docx_files:
         raise HTTPException(status_code=404, detail=f"Cover letter DOCX not found for job_id: {job_id}")
-    
+
     docx_path = docx_files[0]
     return FileResponse(
         path=str(docx_path),
@@ -106,20 +109,20 @@ def download_cover_letter_pdf(job_id: str):
     Download the generated cover letter PDF from job-specific folder.
     """
     job_folder = OUTPUTS_DIR / job_id
-    
+
     if not job_folder.exists():
         raise HTTPException(status_code=404, detail=f"Job folder not found: {job_id}")
-    
+
     # Find PDF file in job folder (exclude CV PDF by looking for cover_letter pattern)
     pdf_files = [p for p in job_folder.glob("*.pdf") if "cover_letter" in p.name or p.stem.endswith("cover_letter")]
     if not pdf_files:
         # Fallback: any PDF that isn't the CV
         all_pdfs = list(job_folder.glob("*.pdf"))
         pdf_files = [p for p in all_pdfs if p.stem != job_id]
-    
+
     if not pdf_files:
         raise HTTPException(status_code=404, detail=f"Cover letter PDF not found for job_id: {job_id}")
-    
+
     pdf_path = pdf_files[0]
     return FileResponse(
         path=str(pdf_path),
