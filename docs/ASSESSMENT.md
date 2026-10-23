@@ -3,10 +3,19 @@
 **Date:** 2026-10-23
 **Branch:** `refactor/architecture-v2` (worktree `cv-tailor-next`)
 **Base commit assessed:** `1416177` — *Improve application tailoring and add portable Mac setup workflow*
-**Status:** Assessment complete. **Decisions approved 2026-10-23** (§11). Implementation not started.
+**Status:** Assessment complete. **Decisions approved 2026-10-23** (§11). Phase 1 implemented
+and complete; this document is retained as the Phase 0 record of what was found.
 
 > This document describes the system **as implemented today**, verified against source.
 > Findings are labelled **VERIFIED** (read or executed) or **HYPOTHESIS** (reasoned, not proven).
+>
+> **Status note (2026-10-23, after Phase 1):** this assessment describes the system as it was
+> at `1416177`. Phase 1 resolved several items below; each affected row is annotated in place
+> rather than deleted, so the record of what was found stays intact. Resolved in Phase 1:
+> **A-1** (rules are now profile-scoped), **A-3** (`tailor_documents` split),
+> **A-5** (single `Config`, no import-time reads), **A-9** (partially: see the row), and
+> **D-1, D-2, D-5, D-6, D-7, D-12**. See [`PROJECT_STATE.md`](PROJECT_STATE.md) §"Resolved in
+> Phase 1" and [`ROADMAP.md`](ROADMAP.md) §Phase 1 for the evidence.
 
 ---
 
@@ -67,10 +76,11 @@ tailor_documents()                             backend/services/tailor_service.p
 | Multi-profile | **Absent** | hardcoded single path `profile_loader.py:27` |
 | Job discovery / matching | **Absent** | — |
 | Application tracking | **Absent** | — |
-| CLI | **Absent** | only setup/start/render scripts |
+| CLI | **Works** *(Phase 1)* | `cvtailor` — `doctor`, `profile show`, `generate`, `render` |
 | Provider abstraction | **Absent** | Gemini hardwired `tailor_service.py:119` |
-| Structured output (JSON mode) | **Dead code** | `response_schema` never passed — see §3 D-1 |
-| `validate_api_key()` | **Dead code** | defined `gemini_service.py:265`, never called |
+| Structured output (JSON mode) | **Dead code, removed** | `response_schema` never passed — see §3 D-1 |
+| `validate_api_key()` | **Removed** *(Phase 1)* | Superseded by `cvtailor doctor --verify-key` |
+| Candidate-scoped rules | **Works** *(Phase 1)* | `rules:` block in the profile; see §2 A-1 |
 
 ---
 
@@ -88,16 +98,16 @@ tailor_documents()                             backend/services/tailor_service.p
 
 | # | Problem | Evidence | Impact |
 |---|---|---|---|
-| A-1 | **Candidate-specific business rules hardcoded in the validation layer** | `tailor_service.py:73-83` (Aklamio project/bullets/ownership), `:90` (banned tool list), `:154-167` (Blue Card/Ireland/Denmark) | Blocks multi-profile entirely. A second candidate is validated against the first candidate's facts. |
-| A-2 | **Same candidate facts duplicated across prompts, validators and skill docs** | `tailor_cv_prompt.md:49-86`, `tailor_cl_prompt.md:44-51`, `tailor_service.py:73-92`, `SKILL.md:25-29` | Four places to edit per fact; they already drift. |
-| A-3 | **Orchestration, validation, persistence and mirroring in one 296-line function** | `tailor_documents` `tailor_service.py:109-296` | Untestable in parts; every change risks the whole flow. |
-| A-4 | **No service layer between API and logic** | `main.py:41` calls `tailor_documents` directly; `ui/app.py` duplicates cost maths (`ui/app.py:239-252`) vs `gemini_service.py:28` | UI and backend implement the same pricing twice. |
-| A-5 | **Global config read at import time** | `gemini_service.py:21-24` module-level `os.getenv`; `main.py:22` | Cannot vary model per task/profile; hard to test. |
-| A-6 | **Dates are unvalidated strings** | `profile.py:41-42`; verified: `start_date='not-a-date'` is accepted | Multi-profile data integrity risk. |
-| A-7 | **Renderer mutates the caller's model** | `docx_renderer.py:304-307` mutates `cl.paragraphs` in place — **verified** | Re-render/retry yields different output than the first pass. |
-| A-8 | **Per-application custom render scripts monkey-patch renderer internals** | `applications/.../delivery_hero/source/render_application.py:10-31` replaces `LaTeXRenderer.__init__` and rewrites template text at runtime | Page-break tuning is unmodelled and unreproducible. |
-| A-9 | **`job_id` collision** | `tailor_service.py:200` — slug + ms timestamp of the *posting*, no candidate segment | Two candidates on one posting can overwrite each other. |
-| A-10 | **`--mirror-configured` writes anywhere** | `tailor_service.py:279-294`, `render_application.py:69-80`; `dirs_exist_ok=True` at `:291` | A typo'd absolute `OUTPUTS_DIR` can overwrite unrelated user files. |
+| A-1 | ~~**Candidate-specific business rules hardcoded in the validation layer**~~ **RESOLVED in Phase 1** | `tailor_service.py:73-83`, `:90`, `:154-167` | Rules are now a profile-scoped `rules` block, resolved by `ProfileRules.from_profile()`; the validator reads data, not constants. The authoritative profile declares them, with a test asserting they match the previous defaults. |
+| A-2 | **Same candidate facts duplicated across prompts, validators and skill docs** | `tailor_cv_prompt.md:49-86`, `tailor_cl_prompt.md:44-51`, `tailor_service.py:73-92`, `SKILL.md:25-29` | Four places to edit per fact; they already drift. Partly addressed: the validator no longer holds them. The prompts and `SKILL.md` remain. |
+| A-3 | ~~**Orchestration, validation, persistence and mirroring in one 296-line function**~~ **RESOLVED in Phase 1** | `tailor_documents` `tailor_service.py:109-296` | Split into `services/generation.py` (prompts, LLM, validation, retries) and `services/application_store.py` (folders, manifests, mirroring); `tailor_documents` is now a thin facade with an unchanged signature. |
+| A-4 | **No service layer between API and logic** | `main.py:41` calls `tailor_documents` directly; `ui/app.py` duplicates cost maths (`ui/app.py:239-252`) vs `gemini_service.py:28` | Partly addressed: a real service layer now exists. The UI still duplicates pricing (D-4). |
+| A-5 | ~~**Global config read at import time**~~ **RESOLVED in Phase 1** | `gemini_service.py:21-24` module-level `os.getenv`; `main.py:22` | One `Config` object, resolved at call time; no import-time reads, guarded by a test. See [ADR 0010](DECISIONS/0010-config-object.md). |
+| A-6 | **Dates are unvalidated strings** | `profile.py:41-42`; verified: `start_date='not-a-date'` is accepted | Multi-profile data integrity risk. **Still open.** |
+| A-7 | **Renderer mutates the caller's model** | `docx_renderer.py:304-307` mutates `cl.paragraphs` in place — **verified** | Re-render/retry yields different output than the first pass. **Still open.** |
+| A-8 | **Per-application custom render scripts monkey-patch renderer internals** | `applications/.../delivery_hero/source/render_application.py:10-31` replaces `LaTeXRenderer.__init__` and rewrites template text at runtime | Page-break tuning is unmodelled and unreproducible. **Still open.** |
+| A-9 | **`job_id` collision** | `tailor_service.py:200` — slug + ms timestamp of the *posting*, no candidate segment | **Partially addressed:** the generation is unchanged and now isolated in `ApplicationStore.make_job_id`, but it still carries no candidate segment. The real fix is `profile_id` in Phase 2. |
+| A-10 | **`--mirror-configured` writes anywhere** | `tailor_service.py:279-294`, `render_application.py:69-80`; `dirs_exist_ok=True` at `:291` | Partly addressed: mirroring is now one method, skips a self-mirror, and the CLI shows the resolved path and confirms before writing outside the job folder. A typo'd absolute path can still write elsewhere. |
 
 ---
 
@@ -107,21 +117,21 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 
 | ID | Finding | Evidence | Action |
 |---|---|---|---|
-| **D-1** | `response_schema` / JSON mode is **dead code**; no caller passes it. All parsing relies on `_parse_json_response` brace-scanning. | Only call site `tailor_service.py:145` passes prompt positionally. Dead branches `gemini_service.py:162-164,187-198,204` | **Fix.** Either enable JSON mode or delete the branches. |
-| **D-2** | `validate_api_key()` and `create_gemini_service()` never called | `gemini_service.py:265,285` | Delete or wire into `check_setup.py`. |
-| **D-3** | **Cost under-reported**: `calculate_token_usage` prices the *total* with one flat rate, ignoring `input_long`/`output_long` tiers it defines | `gemini_service.py:100-122` vs `PRICING` `:35-40` | Fix before trusting cost data. |
-| **D-4** | Pricing table duplicated and stale in UI | `ui/app.py:239-246` vs `gemini_service.py:28-71` | Single source of truth. |
-| **D-5** | Legacy model pricing retained (`gemini-1.5-*`, `gemini-2.5-*`) though `.env.example` configures `gemini-3.8-flash` | `gemini_service.py:47-70` | Prune; verify live pricing. |
-| **D-6** | Unused dependencies: `tiktoken`, `httpx`, `pandas` (only via UI table), `pydantic-settings`, `python-multipart`, `black`, `ruff`, `pytest-asyncio` | grep: no imports in `backend/` | Remove from `requirements.txt`. |
-| **D-7** | `ErrorResponse`, `TailoredOutput` defined and exported, never used | `requests.py:44`, `tailored_output.py:71`, `models/__init__.py:19,25` | Delete. |
-| **D-8** | `.github/copilot-instructions.md` (646 lines) describes a **different system**: Tectonic (not pdflatex), `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/` (87 files, absent), "Python 3.14+", `/api/preview` endpoint that does not exist | `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Rewrite as a pointer to `AGENTS.md`.** Highest-value doc fix. |
-| **D-9** | Three generated binaries tracked in `outputs/` despite `.gitignore:45` | `git ls-files` shows adjoe CV PDF + CL DOCX + PDF | `git rm --cached` (needs approval). |
-| **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | Delete file or strip to filenames. |
-| **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | Define one schema; migrate. |
-| **D-12** | Two near-identical `_escape_latex` and three `_slugify` implementations | `latex_renderer.py:349,357`, `docx_renderer.py:130,143`, `tailor_service.py:29` | Consolidate into one utility module. |
-| **D-13** | `outputs/<job_id>/latex_work/` scratch dir created inside the deliverable folder | `docx_renderer.py:264` | Use a temp dir. |
-| **D-14** | Failed generations leave a partial `outputs/<job_id>/` with no `generation_result.json` | verified in master worktree: adjoe dir lacks the manifest | Mark failures explicitly or clean up. |
-| **D-15** | `except:` bare clauses swallow errors | `latex_renderer.py:294`, `docx_renderer.py:97,376` | Narrow. |
+| **D-1** | ~~`response_schema` / JSON mode is **dead code**~~ **RESOLVED in Phase 1** | Dead branches `gemini_service.py:162-164,187-198,204` | **Deleted**, along with the unused `response_schema` parameter. The comment explaining why `response_mime_type` is not set was kept — that reasoning is still load-bearing. |
+| **D-2** | ~~`validate_api_key()` and `create_gemini_service()` never called~~ **RESOLVED in Phase 1** | `gemini_service.py:265,285` | **Deleted.** Key checking now lives in `cvtailor doctor`, which asserts presence only and verifies against Google just with `--verify-key`. |
+| **D-3** | **Cost under-reported**: `calculate_token_usage` prices the *total* with one flat rate, ignoring `input_long`/`output_long` tiers it defines | `gemini_service.py:100-122` vs `PRICING` `:35-40` | **Still open.** Fix before trusting cost data. |
+| **D-4** | Pricing table duplicated and stale in UI | `ui/app.py:239-246` vs `gemini_service.py:28-71` | **Still open** — single source of truth still needed. |
+| **D-5** | ~~Legacy model pricing retained~~ **RESOLVED in Phase 1** | `gemini_service.py:47-70` | **Pruned** after verifying names and prices against ai.google.dev (2026-10-23): `gemini-1.5-*` are delisted and `gemini-3-pro-preview` is shut down; the 2.5-series and `gemini-3.8-flash` prices were confirmed accurate. This exposed a latent `KeyError`: the fallback resolved through the deleted row. It now targets `DEFAULT_MODEL`, asserted by a test. |
+| **D-6** | Unused dependencies | grep: no imports in `backend/` | **Pruned:** `pydantic-settings`, `python-multipart`, `tiktoken`, `httpx`, `pytest-asyncio`, `black`, `ruff`. Kept `tzdata` (needed by `ZoneInfo` on Windows), `pytest`, `streamlit` and `requests` (used indirectly). **Correction:** `pandas` is *not* in `requirements.txt` and *is* used at `ui/app.py:231-232`; it arrives transitively via streamlit. |
+| **D-7** | ~~`ErrorResponse`, `TailoredOutput` defined and exported, never used~~ **RESOLVED in Phase 1** | `requests.py:44`, `tailored_output.py:71`, `models/__init__.py:19,25` | **Deleted**, including the exports. `TailoringExplanation` was kept — it is still used. |
+| **D-8** | `.github/copilot-instructions.md` (646 lines) describes a **different system**: Tectonic (not pdflatex), `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/` (87 files, absent), "Python 3.14+", `/api/preview` endpoint that does not exist | `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Still open.** Rewrite as a pointer to `AGENTS.md`. Highest-value remaining doc fix. |
+| **D-9** | Three generated binaries tracked in `outputs/` despite `.gitignore:45` | `git ls-files` shows adjoe CV PDF + CL DOCX + PDF | **Still open** — `git rm --cached` (needs approval). |
+| **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | **Still open.** |
+| **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | Define one schema; migrate. **Phase 2.** |
+| **D-12** | ~~Two near-identical `_escape_latex` and three `_slugify` implementations~~ **RESOLVED in Phase 1** | `latex_renderer.py:349,357`, `docx_renderer.py:130,143`, `tailor_service.py:29` | **Consolidated** into `utils/text.py`. Behaviour was verified identical to both originals across the escaping edge cases — including the pre-existing quirk where the braces in `\textbackslash{}` are themselves escaped — and that is now pinned by a test. |
+| **D-13** | `outputs/<job_id>/latex_work/` scratch dir created inside the deliverable folder | `docx_renderer.py:264` | **Still open.** Use a temp dir. |
+| **D-14** | Failed generations leave a partial `outputs/<job_id>/` with no `generation_result.json` | verified in master worktree: adjoe dir lacks the manifest | **Partially addressed:** failures write an explicit `status: failed` manifest through `ApplicationStore.save_failure`. Pinning this in a test was deferred — `docx_renderer.py:264` can still leave residue. |
+| **D-15** | `except:` bare clauses swallow errors | `latex_renderer.py:294`, `docx_renderer.py:97,376` | **Still open.** Narrow. |
 
 ---
 

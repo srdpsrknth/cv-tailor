@@ -1,8 +1,8 @@
 # Roadmap
 
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
-complete; implementation has not started. Phases may be reordered, split or parallelised when
-dependencies justify it.
+complete, Milestone 1.1 is complete, and **Phase 1 is complete**. Phases may be reordered, split
+or parallelised when dependencies justify it.
 
 Approved direction: **Option B — modular redesign, executed incrementally.** Keep the
 renderers, templates, prompts, the `content.json` contract and the page-count gate; introduce
@@ -54,7 +54,7 @@ without waiting for discovery or tracking.
 
 ---
 
-## Phase 1 — Core refactoring and CLI foundations
+## Phase 1 — Core refactoring and CLI foundations *(COMPLETE 2026-10-23)*
 
 - **Objective:** make the codebase simple and testable, and give it a real CLI.
 - **User value:** generate/re-render from the terminal; no browser, no API server.
@@ -70,6 +70,26 @@ without waiting for discovery or tracking.
 - **Testing:** characterization suite + CLI smoke tests.
 - **Risks:** breaking the render path while moving files — mitigated by the baseline.
 - **Effort:** Medium.
+- **Delivered** (six commits, `edb6efc`..`179bd83`; suite **141 → 190**; **no existing test
+  was modified**):
+  - **Bug fix** (`edb6efc`) — `tailoring_explanation` is read from a nested `cv` as well as
+    the top level; the nested case previously yielded `None` silently.
+  - **Dead code** (`b568990`) — D-1, D-2, D-7 removed; D-5 pricing pruned against verified
+    ai.google.dev data, which exposed and fixed a latent `KeyError` in the cost fallback;
+    D-6 dependencies pruned (a separate audit found `pandas` is *not* in `requirements.txt`
+    and *is* used, refuting that part of the assessment); D-12 helper copies consolidated.
+  - **Config** (`ef500b6`) — no import-time env reads; see [ADR 0010](DECISIONS/0010-config-object.md).
+  - **Service layer** (`dfe03ec`) — `tailor_documents` split into `services/generation.py`
+    (prompts, LLM, validation, retries) and `services/application_store.py` (folders,
+    manifests, mirroring), leaving a thin orchestration facade.
+  - **Profile rules** (`e05562e`) — candidate-specific validation rules moved out of the
+    validator into a profile-scoped `rules` block (A-1), the main blocker to Phase 2.
+  - **CLI** (`179bd83`) — `cvtailor doctor|profile show|generate|render` per
+    [ADR 0007](DECISIONS/0007-cli-framework.md).
+- **Deferred to a later phase, deliberately:** the `cv_tailor` package rename (the modules are
+  reorganised and importable, but `backend/` keeps its name so `master` stays comparable);
+  `main.py` tests; the `\needspace` project-heading tweak in the CLI's `render`; D-8, D-9,
+  D-10, D-13, D-14.
 
 ---
 

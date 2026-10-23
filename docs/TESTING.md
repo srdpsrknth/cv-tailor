@@ -1,17 +1,23 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **141 passed**, 1 warning, ~100 s, fully offline — no paid API calls.
+**Current baseline:** **190 passed**, 1 warning, ~110 s, fully offline — no paid API calls.
 
 | | |
 |---|---|
 | Baseline before Milestone 1.1 | 12 passed, ~2.5 s |
-| Baseline after Milestone 1.1 | **141 passed**, ~100 s |
+| Baseline after Milestone 1.1 | 141 passed, ~100 s |
+| Baseline after Phase 1 | **190 passed**, ~110 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
-The suite grew from 12 to 141 tests in Milestone 1.1. The runtime increase is almost
-entirely `pdflatex`: real rendering is now exercised instead of mocked.
+The suite grew 12 → 141 in Milestone 1.1 and 141 → 190 in Phase 1. The runtime increase is
+almost entirely `pdflatex`: real rendering is exercised instead of mocked.
+
+**No test that existed at `325c4d1` has been modified.** Every Phase 1 refactor was required to
+keep the pre-existing suite passing verbatim; where a refactor needed to preserve a test's
+assumptions (a monkeypatched zero-argument `GeminiService`, the underscored helper names), the
+production code was shaped to fit rather than the test being edited.
 
 ---
 
@@ -49,11 +55,17 @@ artifacts and may need an unconfined delete.
 # Everything (the baseline)
 .venv\Scripts\python.exe -m pytest -q
 
-# Fast lane: no pdflatex, ~6 s
+# Fast lane: no pdflatex, ~5 s
 .venv\Scripts\python.exe -m pytest -q -m "not requires_latex"
 
-# Only the new characterization suite
+# Only the characterization suite
 .venv\Scripts\python.exe -m pytest -q tests/test_profile_loading.py tests/test_tailoring_pipeline.py
+
+# Only the CLI
+.venv\Scripts\python.exe -m pytest -q tests/test_cli.py
+
+# Configuration behaviour
+.venv\Scripts\python.exe -m pytest -q tests/test_config.py
 
 # Only document output
 .venv\Scripts\python.exe -m pytest -q tests/test_renderers_documents.py tests/test_render_application_determinism.py
@@ -73,9 +85,11 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | File | Tests | Covers |
 |---|---|---|
 | `test_profile_loading.py` | 14 | Profile loading and validation: happy path, path forms, default-path resolution, missing file, `extra="forbid"`, missing required fields, malformed and unparseable YAML, empty file, the documented unvalidated-date gaps |
-| `test_tailoring_pipeline.py` | 70 | CV tailoring, cover-letter generation, LLM response parsing, factual validation, retry handling, error handling, token accounting, cross-profile isolation |
+| `test_tailoring_pipeline.py` | 84 | CV tailoring, cover-letter generation, LLM response parsing, factual validation, retry handling, error handling, token accounting, cross-profile isolation, **profile-scoped rules (A-1)**, shared helper behaviour (D-12), pricing-table invariants (D-5) |
 | `test_renderers_documents.py` | 34 | **Real** LaTeX CV and DOCX cover letters: page geometry, required sections, verbatim bullets, clipping, orphan headings, LaTeX escaping, word counts, page-count gate |
 | `test_render_application_determinism.py` | 11 | `scripts/render_application.py` end to end as a subprocess: identical content → identical page count *and* identical text, in-place stability, manifest handling, residue cleanup, failure paths |
+| `test_cli.py` | 22 | **New in Phase 1.** Guided default, exit codes, `doctor` (including its refusal to verify the key unless asked), `profile show`, and every `render`/`generate` failure path — plus two LaTeX-gated tests: one rendering without an API key, one asserting the CLI's page count equals the existing script's |
+| `test_config.py` | 13 | **New in Phase 1.** Defaults with an empty environment, call-time (not import-time) reads, relative vs absolute `OUTPUTS_DIR`, the placeholder-key case, immutability, override typos failing loudly, and a guard that importing the backend performs no environment read |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
 | `test_portability.py` | 2 | *(pre-existing)* pdflatex discovery and `LATEX_COMPILER` override |
@@ -104,7 +118,10 @@ behavioural test:
 | 12 | Page-count enforcement | `test_renderers_documents.py`, `test_render_application_determinism.py` |
 | 13 | Word-count enforcement | `test_tailoring_pipeline.py`, `test_renderers_documents.py` |
 | 14 | Application persistence | `test_tailoring_pipeline.py` (job folder, `content.json`, drafts, manifest) |
-| 15 | Saved-application restoration | `test_render_application_determinism.py` |
+| 15 | Saved-application restoration | `test_render_application_determinism.py`, `test_cli.py` (CLI render parity) |
+| 16 | Configuration (new in Phase 1) | `test_config.py` |
+| 17 | Candidate-scoped validation rules (new in Phase 1) | `test_tailoring_pipeline.py` (7 A-1 tests) |
+| 18 | Command-line interface (new in Phase 1) | `test_cli.py` |
 
 ---
 
@@ -115,8 +132,8 @@ behavioural test:
 
 | Path | Contents |
 |---|---|
-| `profiles/synthetic_analyst.yaml` | Profile A — includes an employer with no bullets, selected projects, certifications and a visa status |
-| `profiles/synthetic_marketer.yaml` | Profile B — deliberately different shape: no projects, no visa, no certifications |
+| `profiles/synthetic_analyst.yaml` | Profile A — includes an employer with no bullets, selected projects, certifications and a visa status. Declares **no** `rules` block, so it exercises the built-in defaults |
+| `profiles/synthetic_marketer.yaml` | Profile B — deliberately different shape: no projects, no visa, no certifications, **and its own `rules` block** (different banned tools, no visa label) so A-1 isolation is tested against genuinely divergent candidates |
 | `profiles/invalid/*.yaml` | Four rejection fixtures (unknown key, missing identity, malformed, unparseable) |
 | `job_descriptions/*.txt` | Three anonymised postings (Berlin / Amsterdam / Dublin) |
 | `llm_responses/<session>/*.json` | Recorded provider responses + a `responses.json` manifest; one step is Markdown-fenced |
@@ -136,14 +153,21 @@ validators before being written):
 ## What is NOT tested yet
 
 - **`backend/main.py` endpoints** — still zero API tests, including the `job_id` containment
-  question (§6). The `job_id` collision risk (A-9) is likewise unexercised.
+  question (§6). The `job_id` collision risk (A-9) is likewise unexercised. Phase 1 built the
+  service layer this needs, but deliberately left the API tests out to keep increments focused.
 - **`DocxRenderer` in-place mutation** (A-7) — `docx_renderer.py:304-307` mutates
   `cl.paragraphs`. The bug is still real and unfixed; there is no test pinning it.
 - **Cost/token accounting correctness** (D-3) — `calculate_token_usage` totals are asserted
   through `tailor_documents`, but the flat-rate pricing error itself is not caught. The
-  offline double replaces the real calculator.
-- **`--mirror-configured` end to end** — mirroring is asserted only for the *failure* case
-  (nothing is published). The success path is untested.
+  offline double replaces the real calculator. *(The pricing table's contents and its fallback
+  invariant are now tested; the flat-rate arithmetic is not.)*
+- **`--mirror-configured` end to end** — mirroring is asserted for the *failure* case (nothing
+  is published). The success path was verified manually during Phase 1 but has no test.
+- **The CLI's `generate` success path** — it needs a paid API call, so only the failure paths
+  (no key, short posting, missing file) are covered. The orchestration underneath is covered by
+  `test_tailoring_pipeline.py`.
+- **CLI page-count parity for a 2-page CV** — the parity test uses the fixture `content.json`,
+  which renders to one page. A 2-page case would exercise more of the render path.
 - **Live LLM quality** — deliberately out of scope; see the layers table below.
 - **Performance harness** (call count, tokens, wall time) — Milestone 1.1 did not add one.
   The recorded-response suite does assert call counts per scenario, which covers the
@@ -157,9 +181,14 @@ validators before being written):
 |---|---|---|
 | Unit / characterization | Yes | No |
 | Integration (fixtures, offline) | Yes | No |
-| CLI smoke tests | Yes | No |
+| CLI smoke tests (`test_cli.py`) | Yes | No |
 | Document output validation | Yes (skips without LaTeX) | No |
 | **LLM quality evaluation** | **No — opt-in** | **Yes, budget-capped** |
+
+`cvtailor generate` is the only tested entry point whose *success* path needs a paid call, so
+its tests cover only the failure paths; the pipeline beneath it is covered offline through
+recorded responses. `cvtailor doctor` verifies the API key against Google only with
+`--verify-key`; the default run never touches the network, and a test asserts that.
 
 Keep deterministic software testing and LLM quality evaluation strictly separate. CI
 (`.github/workflows/tests.yml`) must never require a paid API call.
@@ -171,10 +200,12 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | Metric | Value |
 |---|---|
 | `python -m pytest -q` (before M1.1) | 12 passed, 2.45 s |
-| `python -m pytest -q` (after M1.1) | **141 passed**, ~100 s |
-| Fast lane `-m "not requires_latex"` | 113 passed, 28 deselected, ~6 s |
+| `python -m pytest -q` (after M1.1) | 141 passed, ~100 s |
+| `python -m pytest -q` (**after Phase 1**) | **190 passed**, ~110 s |
+| Fast lane `-m "not requires_latex"` | 160 passed, 30 deselected, ~5 s |
 | `test_renderers_documents.py` | 34 passed, ~20 s |
 | `test_render_application_determinism.py` | 11 passed, ~73 s |
+| `test_cli.py` | 22 passed (20 offline in ~2 s, 2 LaTeX-gated in ~14 s) |
 | Backend `import main` | ≈ 1.7–2.0 s |
 | `load_profile()` | 169 ms |
 | pdflatex per run | ≈ 2.9 s (run twice per compile) |
