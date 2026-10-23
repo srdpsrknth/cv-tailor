@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-23
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** *(this change)* — *test: establish regression baseline and golden fixtures*
+**Latest commit:** *(this change)* — *fix: read tailoring explanation from a nested response*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
@@ -11,6 +11,8 @@
 ## Active task
 
 **Milestone 1.1 — test baseline and golden fixtures. COMPLETE.**
+
+**Phase 1 — core refactoring and CLI foundations. IN PROGRESS.**
 
 Synthetic fixtures and a characterization suite now cover every workflow in
 [`ASSESSMENT.md`](ASSESSMENT.md) §1. Both renderers are exercised for real instead of being

@@ -50,6 +50,27 @@ def _parse_json_response(text: str) -> dict:
     raise ValueError("The model response did not contain a complete document JSON object.")
 
 
+def _extract_explanation(data: dict) -> Optional[dict]:
+    """Find the tailoring explanation wherever the model put it.
+
+    The prompt asks for it at the top level, but the more natural document shape --
+    and the one :class:`TailoredOutput` models -- nests it inside ``cv``. Reading only
+    the top level silently yields ``None`` for a nested response: the UI then shows no
+    explanation with no error. Accept both, preferring the documented top-level key.
+    """
+    if not isinstance(data, dict):
+        return None
+    top_level = data.get("tailoring_explanation")
+    if isinstance(top_level, dict):
+        return top_level
+    cv = data.get("cv")
+    if isinstance(cv, dict):
+        nested = cv.get("tailoring_explanation")
+        if isinstance(nested, dict):
+            return nested
+    return None
+
+
 def _count_pdf_pages(pdf_path: Path) -> int:
     # A missing/unreadable PDF must fail validation, never count as zero pages.
     pages = len(PdfReader(str(pdf_path)).pages)
@@ -192,7 +213,7 @@ def tailor_documents(
         + cv.model_dump_json(indent=2),
         "cv",
     )
-    explanation = data.get("tailoring_explanation")
+    explanation = _extract_explanation(data)
 
     # Generate the letter only once the CV's wording has passed validation.
     cl, _ = generate(cl_prompt, "cover_letter")
@@ -244,7 +265,7 @@ def tailor_documents(
                 + cv.model_dump_json(indent=2),
                 "cv",
             )
-            explanation = data.get("tailoring_explanation", explanation)
+            explanation = _extract_explanation(data) or explanation
         cl_path, cl_pdf_path = docx.render_cover_letter(cl, profile, job_position=position)
         if not cl_pdf_path:
             raise ValueError("Cover-letter PDF rendering failed.")

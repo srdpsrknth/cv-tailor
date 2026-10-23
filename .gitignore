@@ -67,6 +67,10 @@ cover_letter_examples/
 .coverage
 htmlcov/
 .tox/
+# pytest temp-tree leftovers (sandbox artifacts; never source)
+pytest-of-*/
+pytest-cache-files-*/
+.runtime-probe/
 
 # Streamlit
 .streamlit/secrets.toml

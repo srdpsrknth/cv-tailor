@@ -156,6 +156,53 @@ def test_tailoring_explanation_is_carried_through(
     assert result.tailoring_explanation['overall_strategy'] == expected['overall_strategy']
 
 
+def test_nested_tailoring_explanation_is_read_from_inside_cv(
+    isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
+):
+    """A response that nests the explanation under ``cv`` must not silently yield None.
+
+    The documented shape puts it at the top level (covered above), but models often
+    nest it inside ``cv`` -- the shape ``TailoredOutput`` models. Before the fix this
+    produced ``tailoring_explanation is None`` with no error at all.
+    """
+    review = json.loads(analyst_session.step_text('cv_editorial_review'))
+    nested = review.pop('tailoring_explanation')
+    review['cv']['tailoring_explanation'] = nested
+    offline_service([
+        analyst_session.step_text('cv_draft'), json.dumps(review),
+        analyst_session.step_text('cover_letter'),
+    ])
+    stub_renderers([2])
+
+    result = service.tailor_documents(
+        analyst_session.job_description_text, analyst_profile,
+        company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
+    )
+    assert result.tailoring_explanation is not None
+    assert result.tailoring_explanation['overall_strategy'] == nested['overall_strategy']
+
+
+def test_top_level_explanation_still_wins_over_a_nested_one(
+    isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
+):
+    """Precedence is unchanged: the documented top-level key is authoritative."""
+    review = json.loads(analyst_session.step_text('cv_editorial_review'))
+    review['cv']['tailoring_explanation'] = {'overall_strategy': 'nested decoy'}
+    offline_service([
+        analyst_session.step_text('cv_draft'), json.dumps(review),
+        analyst_session.step_text('cover_letter'),
+    ])
+    stub_renderers([2])
+
+    result = service.tailor_documents(
+        analyst_session.job_description_text, analyst_profile,
+        company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
+    )
+    assert result.tailoring_explanation['overall_strategy'] != 'nested decoy'
+    assert result.tailoring_explanation['overall_strategy'] == \
+        review['tailoring_explanation']['overall_strategy']
+
+
 def test_layout_retry_explanation_takes_precedence_when_supplied(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
