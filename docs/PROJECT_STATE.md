@@ -3,8 +3,8 @@
 **Last updated:** 2026-10-23
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `1416177` — *Improve application tailoring and add portable Mac setup workflow*
-**Stable branch:** `master` (`D:\coding\cv-tailor`), same commit — **usable for real applications**
+**Latest commit:** `c3839da` — *docs: record approved architecture decisions and agent continuity workflow*
+**Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
@@ -43,16 +43,18 @@ Re-confirm each decision when its phase begins.
 
 | Area | State |
 |---|---|
-| Stable app on `master` | Working, untouched, has its own `.venv` and `.env` |
-| Dev branch | Created from `master`; **no commits yet** — identical to `master` |
-| Dev worktree runnable? | **No** — missing `.venv` and `.env` (see Blockers) |
-| Test baseline | **12 passed** (unconfined); see `TESTING.md` for the sandbox caveat |
-| Assessment | Complete — `docs/ASSESSMENT.md` |
-| Roadmap | Proposed — `docs/ROADMAP.md` |
+| Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
+| Dev branch | 2 commits ahead of `master` — documentation only, no code changes |
+| Dev worktree runnable? | **Yes** — `.venv` with all 91 locked deps, `.env` (ports 8001/8502) |
+| Test baseline | **12 passed** in the new dev venv |
+| Assessment | Complete and committed — `docs/ASSESSMENT.md` |
+| Decisions | 9 approved and committed — `docs/DECISIONS/` |
+| Roadmap | Approved — `docs/ROADMAP.md` |
 
 ### Verified baseline facts
 
-- `python -m pytest -q` → **12 passed, 1 warning** (2.45 s), offline, no API calls.
+- `.venv\Scripts\python.exe -m pytest -q` → **12 passed, 1 warning** (2.45 s), offline.
+- `scripts/check_setup.py` → profile, timezone, LaTeX compiler and templates all OK.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
 - LLM calls per application: **3 min / 4 typical / 6 max-successful / 18 worst**.
 - Estimated cost per application (`gemini-3.8-flash`): **$0.027 / $0.049 / $0.092**.
@@ -62,16 +64,19 @@ Re-confirm each decision when its phase begins.
 
 ## Blockers and unresolved issues
 
-1. **Dev worktree cannot run.** `cv-tailor-next` has no `.venv` and no `.env`. Required
-   before any milestone. Fix documented in [`DEVELOPMENT.md`](DEVELOPMENT.md).
-2. **Privacy model undecided** (assessment §11-1). Real personal data — including
-   immigration status — is committed to a **public** repo, alongside 64 application files.
-   Adding a second real candidate before resolving this is not acceptable.
+1. **`GEMINI_API_KEY` is not set in this worktree's `.env`.** `scripts/check_setup.py` stops
+   there. The owner must enter it directly — never paste it into a chat. Live generation in
+   this worktree is blocked until then; rendering and tests are not.
+2. **Privacy model not yet implemented** ([ADR 0002](DECISIONS/0002-privacy-model.md)). Real
+   personal data — including immigration status — is still committed to a **public** repo,
+   alongside 64 application files. This must be implemented before a second real candidate is
+   added. Do not rewrite history without approval.
 3. **Sandbox caveat:** 8 of 12 tests error under the DSH `workspace-write` sandbox because
-   pytest cannot set ACLs on its temp trees. Environment artifact, not a code fault. Run the
-   suite unconfined; recorded in `TESTING.md`.
+   pytest cannot set ACLs on its temp trees. Environment artifact, not a code fault. Also:
+   `git commit` in this worktree needs unconfined access, because its git metadata lives in
+   `D:\coding\cv-tailor\.git`, outside the sandbox. Recorded in `TESTING.md` and `DEVELOPMENT.md`.
 4. **Renderers are mocked** in the only integration test, so real LaTeX/DOCX output is not
-   regression-protected. This is why Milestone 1.1 comes first.
+   regression-protected. This is exactly what Milestone 1.1 addresses.
 5. **`docx_renderer.py:304-307` mutates the caller's model** — verified real bug, unfixed.
 
 ---
