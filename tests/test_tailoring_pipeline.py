@@ -300,6 +300,139 @@ def test_truncated_json_is_never_repaired_into_a_document():
         service._parse_json_response('{"cv":{"summary":["incomplete')
 
 
+# --- candidate-scoped validation rules (A-1) -----------------------------------------
+
+def test_analyst_defaults_come_from_the_profile_rules_or_the_legacy_default(
+    analyst_profile, marketer_profile,
+):
+    """A profile with no rules block keeps the original single-candidate behaviour."""
+    from services.generation import DEFAULT_PROFILE_RULES, ProfileRules
+
+    assert ProfileRules.from_profile(analyst_profile) is DEFAULT_PROFILE_RULES
+    # The marketer declares its own, so it must NOT get the analyst defaults.
+    marketer_rules = ProfileRules.from_profile(marketer_profile)
+    assert marketer_rules is not DEFAULT_PROFILE_RULES
+    assert 'Fivetran' not in marketer_rules.banned_tools
+
+
+def test_profile_rules_replace_rather_than_extend_the_banned_tool_list(
+    analyst_profile, marketer_profile,
+):
+    """The marketer may not claim Salesforce Pardot; the analyst's list must not leak in."""
+    from services.generation import ProfileRules
+
+    marketer = ProfileRules.from_profile(marketer_profile)
+    analyst = ProfileRules.from_profile(analyst_profile)
+
+    assert 'Salesforce Pardot' in marketer.banned_tools
+    assert 'Salesforce Pardot' not in analyst.banned_tools
+    assert 'Fivetran' in analyst.banned_tools
+    assert 'Fivetran' not in marketer.banned_tools
+
+
+def test_a_candidates_banned_tool_does_not_apply_to_another(marketer_profile):
+    """The core A-1 property: one candidate's facts must not police another."""
+    from services.generation import ProfileRules, validate_cv
+    from models.tailored_output import TailoredCV
+
+    cv = TailoredCV.model_validate(_minimal_cv(marketer_profile, summary=['Factual summary.']))
+
+    # Valid under the marketer's own rules.
+    validate_cv(cv, marketer_profile, ProfileRules.from_profile(marketer_profile))
+
+    # And still valid under the analyst's rules: AWS is not on the marketer's CV.
+    from services.generation import DEFAULT_PROFILE_RULES
+    validate_cv(cv, marketer_profile, DEFAULT_PROFILE_RULES)
+
+
+def test_marketer_banned_tool_is_rejected_on_the_marketer_cv(marketer_profile):
+    from services.generation import ProfileRules, validate_cv
+    from models.tailored_output import TailoredCV
+
+    payload = _minimal_cv(
+        marketer_profile,
+        summary=['Analyst with experience across reporting.'],
+        extra_bullet='Built reporting in Salesforce Pardot.',
+    )
+    cv = TailoredCV.model_validate(payload)
+
+    with pytest.raises(ValueError, match='Salesforce Pardot'):
+        validate_cv(cv, marketer_profile, ProfileRules.from_profile(marketer_profile))
+
+
+def test_a_profile_can_declare_its_own_visa_label(analyst_profile):
+    """Visa wording is per candidate, not a constant in the validator."""
+    from models.profile import Profile
+    from services.generation import ProfileRules
+
+    data = analyst_profile.model_dump()
+    data['rules'] = {
+        'visa_label': 'Synthetic Work Permit',
+        'home_countries': ['netherlands'],
+    }
+    variant = Profile.model_validate(data)
+
+    rules = ProfileRules.from_profile(variant)
+    assert rules.visa_label == 'Synthetic Work Permit'
+    assert rules.home_countries == ('netherlands',)
+    # The analyst's own profile is unaffected.
+    assert ProfileRules.from_profile(analyst_profile).visa_label == 'German EU Blue Card holder'
+
+
+def _minimal_cv(profile, summary, extra_bullet=None):
+    """A CV payload that satisfies the structural rules for one employer."""
+    experience = []
+    for index, exp in enumerate(profile.experience):
+        bullets = list(exp.bullets)
+        if index == 0 and extra_bullet:
+            bullets = bullets + [extra_bullet]
+        experience.append({
+            'company': exp.company, 'role': exp.role,
+            'start_date': exp.start_date, 'end_date': exp.end_date,
+            'bullets': bullets, 'projects': [],
+        })
+    return {'summary': summary, 'experience': experience}
+
+
+REAL_PROFILE = Path(__file__).resolve().parents[1] / 'storage' / 'profile' / 'profile.yaml'
+
+
+def test_the_real_profile_declares_rules_identical_to_the_legacy_defaults():
+    """A-1 migration guard for the authoritative profile.
+
+    storage/profile/profile.yaml now declares its validation rules explicitly rather
+    than relying on the validator's hardcoded defaults. If the two ever diverge,
+    generation quality changes silently -- so assert they are equal.
+    """
+    from services.generation import DEFAULT_PROFILE_RULES, ProfileRules
+    from services.profile_loader import load_profile
+
+    real = load_profile(str(REAL_PROFILE))
+    declared = ProfileRules.from_profile(real)
+
+    assert declared is not DEFAULT_PROFILE_RULES, 'the real profile should declare its own rules'
+    assert declared.special_employers == DEFAULT_PROFILE_RULES.special_employers
+    assert declared.banned_tools == DEFAULT_PROFILE_RULES.banned_tools
+    assert declared.summary_forbidden_verbs == DEFAULT_PROFILE_RULES.summary_forbidden_verbs
+    assert declared.visa_label == DEFAULT_PROFILE_RULES.visa_label
+    assert declared.home_countries == DEFAULT_PROFILE_RULES.home_countries
+    assert declared.local_permit_countries == DEFAULT_PROFILE_RULES.local_permit_countries
+
+
+def test_the_real_profile_still_declares_its_facts():
+    """The migration must not have disturbed identity, employers, dates or education."""
+    from services.profile_loader import load_profile
+
+    real = load_profile(str(REAL_PROFILE))
+
+    assert real.identity.full_name and real.identity.email
+    assert len(real.experience) == 6
+    assert len(real.education) == 2
+    # Titles and dates are owner-maintained and must survive untouched.
+    for exp in real.experience:
+        assert exp.company and exp.role and exp.start_date and exp.end_date
+
+
 # --- factual validation --------------------------------------------------------------
 
 def test_cv_validation_accepts_the_recorded_fixture(analyst_profile, analyst_session):

@@ -69,3 +69,14 @@ languages:
     proficiency: "Fluent"
   - name: "Dutch"
     proficiency: "Basic"
+
+# Candidate-scoped validation rules (A-1). Deliberately different from the analyst
+# fixture so a test can prove one candidate's rules never leak into another's
+# validation: this candidate may claim tools the analyst may not, and has no
+# immigration label at all.
+rules:
+  banned_tools:
+    - "Salesforce Pardot"
+    - "Adobe Campaign"
+  summary_forbidden_verbs: '\b(combines|builds|aims|passionate|dedicated to)\b'
+  visa_label: null

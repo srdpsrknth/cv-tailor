@@ -257,3 +257,30 @@ languages:
     proficiency: "Fluent"
   - name: "German"
     proficiency: "Basic"
+
+# Candidate-scoped validation rules (A-1). These were previously hardcoded in
+# backend/services/tailor_service.py, which meant a second candidate would be
+# validated against THIS candidate's employers, tool list and visa wording.
+# Declaring them here keeps each candidate checked against their own facts, and is
+# the prerequisite for adding a second profile. Values are unchanged.
+rules:
+  employers:
+    aklamio:
+      project_count: 1
+      bullets_per_project: 3
+      forbidden_project_name: 'entrypoints|in progress|20\d{2}'
+      ongoing_tool: 'MCP'
+      ownership_pattern: '\b(lead|led|own|owned)\b[^.]{0,50}(framework|80)'
+      ownership_message: 'Aklamio DQ framework is a contribution; ownership is limited to funnel/sales-channel checks.'
+  banned_tools:
+    - 'Fivetran'
+    - 'Databricks'
+    - 'Tableau'
+    - 'ThoughtSpot'
+    - 'DealCloud'
+    - 'Cortex'
+    - 'AWS'
+  summary_forbidden_verbs: '\b(combines|builds|aims|passionate|dedicated to)\b'
+  visa_label: 'German EU Blue Card holder'
+  home_countries: ['germany', 'deutschland', 'de']
+  local_permit_countries: ['ireland', 'denmark']

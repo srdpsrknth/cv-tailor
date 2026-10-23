@@ -89,8 +89,10 @@ class ProfileRules:
 
     These used to be hardcoded in the validator, which meant a second candidate was
     checked against the first candidate's employers and tool list (A-1). They are
-    now data, supplied per profile. The defaults reproduce the original
-    single-candidate behaviour exactly.
+    now data, resolved from the profile's optional ``rules`` block.
+
+    The defaults below reproduce the original single-candidate behaviour exactly, so
+    a profile that declares no rules validates as it always did.
     """
 
     #: Employers needing bespoke project/ownership rules, keyed by a lowercase match.
@@ -99,16 +101,48 @@ class ProfileRules:
     #: Technologies the profile does not evidence; claiming one is an error.
     banned_tools: tuple = ()
 
-    #: Employer-level rule set applied when the company name matches.
-    summary_forbidden_verbs: str = r"\b(combines|builds|aims|passionate|dedicated to)\b"
+    #: Regex for third-person verbs and aspirations forbidden in the CV summary.
+    summary_forbidden_verbs: Optional[str] = None
 
-    #: Immigration labels for the CV, per work country (lowercase keys).
+    #: Immigration label for the CV, applied outside the home countries.
     visa_label: Optional[str] = None
     home_countries: tuple = ("germany", "deutschland", "de")
     local_permit_countries: tuple = ("ireland", "denmark")
 
+    @classmethod
+    def from_profile(cls, profile: Profile) -> "ProfileRules":
+        """Resolve rules for a profile, falling back to the original defaults.
+
+        A profile with no ``rules`` block gets :data:`DEFAULT_PROFILE_RULES`, which
+        keeps every previously-working profile and fixture behaving identically.
+        """
+        declared = getattr(profile, "rules", None)
+        if declared is None:
+            return DEFAULT_PROFILE_RULES
+        return cls(
+            special_employers={
+                key.lower(): _employer_rules_to_dict(value)
+                for key, value in (declared.employers or {}).items()
+            },
+            banned_tools=tuple(declared.banned_tools or ()),
+            summary_forbidden_verbs=declared.summary_forbidden_verbs,
+            visa_label=declared.visa_label,
+            home_countries=tuple(declared.home_countries or ()),
+            local_permit_countries=tuple(declared.local_permit_countries or ()),
+        )
+
+
+def _employer_rules_to_dict(rules) -> dict:
+    """Convert an EmployerRules model into the plain dict the validator reads."""
+    return {
+        key: value
+        for key, value in rules.model_dump().items()
+        if value is not None
+    }
+
 
 #: The original candidate's rules, preserved as the default so behaviour is unchanged.
+#: A profile may override any part of this by declaring its own ``rules`` block.
 DEFAULT_PROFILE_RULES = ProfileRules(
     special_employers={
         "aklamio": {
@@ -125,6 +159,7 @@ DEFAULT_PROFILE_RULES = ProfileRules(
     },
     banned_tools=("Fivetran", "Databricks", "Tableau", "ThoughtSpot", "DealCloud",
                   "Cortex", "AWS"),
+    summary_forbidden_verbs=r"\b(combines|builds|aims|passionate|dedicated to)\b",
     visa_label="German EU Blue Card holder",
 )
 
@@ -194,9 +229,21 @@ def _validate_summary(cv: TailoredCV, rules: ProfileRules) -> None:
         )
 
 
+def _profile_facts_json(profile: Profile) -> str:
+    """Serialize only the profile's evidence, excluding the rules block.
+
+    A tool named in ``rules.banned_tools`` must not count as evidence that the
+    candidate has used it -- otherwise declaring a tool banned would silently
+    un-ban it.
+    """
+    data = profile.model_dump()
+    data.pop("rules", None)
+    return json.dumps(data, ensure_ascii=False)
+
+
 def _validate_no_banned_tools(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     """Catch keyword stuffing for technologies absent from this profile."""
-    source = profile.model_dump_json().lower()
+    source = _profile_facts_json(profile).lower()
     text = cv.model_dump_json().lower()
     for tool in rules.banned_tools:
         if re.search(r"\b" + re.escape(tool.lower()) + r"\b", text) and not re.search(
@@ -319,7 +366,9 @@ class DocumentGenerator:
     ):
         self.service = service
         self.profile = profile
-        self.rules = rules or DEFAULT_PROFILE_RULES
+        # Resolve rules from the profile unless the caller supplied an explicit set,
+        # so a multi-profile setup validates each candidate against its own facts.
+        self.rules = rules or ProfileRules.from_profile(profile)
         self.status_callback = status_callback
         self.counts = {"cv": TokenCounts(), "cover_letter": TokenCounts()}
         self.drafts: list = []
