@@ -19,15 +19,12 @@ from models.requests import TailorResponse
 from models.tailored_output import TailoredCV, TailoredCoverLetter, TailoringExplanation
 from renderers import create_latex_renderer, create_docx_renderer
 from services.gemini_service import GeminiService
+from utils.text import slugify as _slugify
 
 logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_CV_PATH = PROJECT_ROOT / "backend/prompts/tailor_cv_prompt.md"
 PROMPT_CL_PATH = PROJECT_ROOT / "backend/prompts/tailor_cl_prompt.md"
-
-
-def _slugify(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", text.strip().lower()).strip("_") or "role"
 
 
 def _parse_json_response(text: str) -> dict:
@@ -53,10 +50,10 @@ def _parse_json_response(text: str) -> dict:
 def _extract_explanation(data: dict) -> Optional[dict]:
     """Find the tailoring explanation wherever the model put it.
 
-    The prompt asks for it at the top level, but the more natural document shape --
-    and the one :class:`TailoredOutput` models -- nests it inside ``cv``. Reading only
-    the top level silently yields ``None`` for a nested response: the UI then shows no
-    explanation with no error. Accept both, preferring the documented top-level key.
+    The prompt asks for it at the top level, but the more natural document shape nests it
+    inside ``cv``. Reading only the top level silently yields ``None`` for a nested
+    response: the UI then shows no explanation, with no error. Accept both, preferring
+    the documented top-level key.
     """
     if not isinstance(data, dict):
         return None

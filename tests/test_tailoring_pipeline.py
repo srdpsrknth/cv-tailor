@@ -162,8 +162,8 @@ def test_nested_tailoring_explanation_is_read_from_inside_cv(
     """A response that nests the explanation under ``cv`` must not silently yield None.
 
     The documented shape puts it at the top level (covered above), but models often
-    nest it inside ``cv`` -- the shape ``TailoredOutput`` models. Before the fix this
-    produced ``tailoring_explanation is None`` with no error at all.
+    nest it inside ``cv``. Before the fix this produced
+    ``tailoring_explanation is None`` with no error at all.
     """
     review = json.loads(analyst_session.step_text('cv_editorial_review'))
     nested = review.pop('tailoring_explanation')
@@ -624,3 +624,71 @@ def test_token_usage_is_attributed_per_component(
     assert usage.cv_input_tokens == 3000 and usage.cl_input_tokens == 1000
     assert usage.cv_output_tokens == 300 and usage.cl_output_tokens == 100
     assert usage.total_tokens == 4400
+
+
+# --- shared text helpers (D-12) ------------------------------------------------------
+
+def test_shared_slugify_matches_the_previous_renderer_behaviour():
+    """D-12 replaced three _slugify copies with one; the observable results must not drift."""
+    from utils.text import slugify
+
+    assert slugify('Nordwind Analytics GmbH') == 'nordwind_analytics_gmbh'
+    assert slugify('  Senior Data Analyst  ') == 'senior_data_analyst'
+    # Runs of punctuation collapse to a single underscore, and edges are trimmed.
+    assert slugify('Data / Engineering -- Lead') == 'data_engineering_lead'
+    assert slugify('C++ & Python') == 'c_python'
+    # The documented empty-input fallback.
+    assert slugify('') == 'role'
+    assert slugify('!!!') == 'role'
+
+
+def test_both_renderers_escape_latex_identically():
+    """The two renderers must agree, including the backslash-first ordering."""
+    from renderers.docx_renderer import DocxRenderer
+    from renderers.latex_renderer import LaTeXRenderer
+
+    sample = r'100% & 5_000 #1 $x {y} ~n ^c \d'
+    assert LaTeXRenderer._escape_latex(sample) == DocxRenderer._escape_latex(sample)
+    # Backslash is replaced first, so the braces in its own replacement text are then
+    # escaped too. That is the long-standing behaviour of both original copies and is
+    # pinned here so consolidating them (D-12) cannot silently change it.
+    assert LaTeXRenderer._escape_latex('\\') == r'\textbackslash\{\}'
+    assert LaTeXRenderer._escape_latex('a&b') == r'a\&b'
+    assert LaTeXRenderer._escape_latex('100%') == r'100\%'
+
+
+def test_escaping_is_idempotent_for_text_without_specials():
+    from utils.text import escape_latex
+
+    assert escape_latex('plain text 123') == 'plain text 123'
+    assert escape_latex('') == ''
+    # Non-string values pass through, as the renderers rely on for optional fields.
+    assert escape_latex(None) is None
+    assert escape_latex(42) == 42
+
+
+# --- pricing table -------------------------------------------------------------------
+
+def test_an_unknown_model_is_priced_without_crashing():
+    """A model missing from PRICING must fall back, never raise KeyError.
+
+    The fallback used to point at a legacy pricing row. Removing stale rows is only
+    safe while the fallback target is itself always present -- this test pins that.
+    """
+    from services.gemini_service import DEFAULT_MODEL, PRICING, GeminiService
+
+    assert DEFAULT_MODEL in PRICING, 'the fallback target must always be priced'
+
+    service_double = object.__new__(GeminiService)
+    service_double.model = 'a-model-that-does-not-exist'
+    cost = service_double._estimate_cost(1_000_000, 1_000_000)
+
+    assert cost == PRICING[DEFAULT_MODEL]['input'] + PRICING[DEFAULT_MODEL]['output']
+
+
+def test_no_retired_model_rows_remain_in_pricing():
+    """Legacy rows mispriced nothing but actively misled; they are gone (D-5)."""
+    from services.gemini_service import PRICING
+
+    for retired in ('gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-3-pro-preview'):
+        assert retired not in PRICING, f'{retired} is retired and must not be priced'

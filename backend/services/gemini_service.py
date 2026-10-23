@@ -3,10 +3,8 @@ Google Gemini API service for CV and cover letter tailoring.
 Handles API calls, token tracking, cost estimation, and error handling.
 """
 import os
-import json
 import time
-from typing import Dict, Any, Optional, Tuple
-from pathlib import Path
+from typing import Optional, Tuple
 
 from google import genai
 from google.genai import types
@@ -18,26 +16,22 @@ from models.requests import TokenUsage
 load_dotenv()
 
 # Gemini API Configuration
+DEFAULT_MODEL = "gemini-3.8-flash"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.3"))
 GEMINI_MAX_OUTPUT_TOKENS = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8000"))
 
-# Pricing (as of Feb 2026, per 1M tokens in USD)
+# Pricing (per 1M tokens in USD), verified against ai.google.dev on 2026-10-23.
 # Free tier: 15 requests/min, 1.5M tokens/day
 PRICING = {
-    # Introductory pricing through December 31, 2026.
+    # Introductory pricing through December 31, 2026; then $1.50 / $7.50.
     "gemini-3.8-flash": {
         "input": 0.75,
         "output": 3.75,
     },
-    # --- GEMINI 3 SERIES: Next-gen flagship (Latest) ---
-    "gemini-3-pro-preview": {
-        "input": 2.00,       # $2.00 / 1M (<= 200k context)
-        "input_long": 4.00,  # $4.00 / 1M (> 200k context)
-        "output": 12.00,     # $12.00 / 1M (<= 200k context)
-        "output_long": 18.00 # $18.00 / 1M (> 200k context)
-    },
+    # --- GEMINI 3 SERIES ---
+    # gemini-3-pro-preview was shut down and has been removed rather than mispriced.
     "gemini-3-flash-preview": {
         "input": 0.50,       # $0.50 / 1M
         "output": 3.00,      # $3.00 / 1M
@@ -58,16 +52,6 @@ PRICING = {
         "input": 0.10,       # $0.10 / 1M
         "output": 0.40,      # $0.40 / 1M
     },
-
-    # --- GEMINI 1.5 SERIES: Legacy / High-volume stable ---
-    "gemini-1.5-pro": {
-        "input": 1.25,       # $1.25 / 1M
-        "output": 5.00,      # $5.00 / 1M
-    },
-    "gemini-1.5-flash": {
-        "input": 0.075,      # $0.075 / 1M
-        "output": 0.30,      # $0.30 / 1M
-    }
 }
 
 
@@ -112,7 +96,9 @@ class GeminiService:
         Returns:
             Cost in USD
         """
-        pricing = PRICING.get(self.model, PRICING["gemini-1.5-flash"])
+        # An unlisted model must still be priced without crashing. Fall back to the
+        # configured default's rates rather than to a removed legacy model.
+        pricing = PRICING.get(self.model, PRICING[DEFAULT_MODEL])
 
         # Calculate cost per million tokens
         input_cost = (input_tokens / 1_000_000) * pricing["input"]
@@ -124,7 +110,6 @@ class GeminiService:
     def _call_gemini(
         self,
         prompt: str,
-        response_schema: Optional[Dict[str, Any]] = None,
         max_retries: int = 3,
         max_output_tokens: Optional[int] = None
     ) -> Tuple[str, int, int]:
@@ -133,7 +118,6 @@ class GeminiService:
 
         Args:
             prompt: The prompt to send
-            response_schema: Optional JSON schema for structured output
             max_retries: Maximum number of retry attempts
             max_output_tokens: Override max_output_tokens for this call (uses self.max_output_tokens if None)
 
@@ -156,13 +140,9 @@ class GeminiService:
                 if self.model == "gemini-3.8-flash":
                     config.thinking_config = types.ThinkingConfig(thinking_level="low")
 
-                # Add JSON mode if schema provided
-                # NOTE: response_mime_type="application/json" causes premature truncation
-                # Only use it if response_schema is provided
-                if response_schema:
-                    config.response_mime_type = "application/json"
-                    config.response_schema = response_schema
-
+                # Do not set response_mime_type="application/json": it causes premature
+                # truncation of long document responses. Parsing is handled by
+                # tailor_service._parse_json_response, which tolerates wrappers.
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,
@@ -183,33 +163,7 @@ class GeminiService:
                 input_tokens = usage.prompt_token_count if usage else 0
                 output_tokens = usage.candidates_token_count if usage else 0
 
-                # Try to use parsed response first (when response_schema is provided)
-                if response_schema:
-                    # Check if parsed attribute exists and is valid
-                    if hasattr(response, "parsed") and response.parsed is not None:
-                        try:
-                            # Convert parsed response to JSON string
-                            parsed_json = json.dumps(response.parsed)
-                            # Validate it can be loaded back
-                            json.loads(parsed_json)
-                            return parsed_json, input_tokens, output_tokens
-                        except (TypeError, json.JSONDecodeError) as e:
-                            print(f"Warning: parsed response is not valid JSON: {e}")
-                            # Fall through to use response.text
-
-                # Fallback to text response
-                response_text = response.text
-
-                # Validate JSON if we're expecting it
-                if config.response_mime_type == "application/json":
-                    try:
-                        json.loads(response_text)
-                    except json.JSONDecodeError as e:
-                        print(f"Warning: Response text is not valid JSON at position {e.pos}: {e.msg}")
-                        print(f"Response preview: {response_text[:500]}")
-                        # Don't raise here - let the caller handle it with their retry logic
-
-                return response_text, input_tokens, output_tokens
+                return response.text, input_tokens, output_tokens
 
             except Exception as e:
                 if attempt < max_retries - 1:
@@ -261,35 +215,3 @@ class GeminiService:
             cl_attempts=cl_attempts,
             model_name=self.model
         )
-
-    def validate_api_key(self) -> bool:
-        """
-        Validate that the API key works.
-
-        Returns:
-            True if valid, raises exception otherwise
-        """
-        try:
-            # Simple test call
-            self.client.models.generate_content(
-                model=self.model,
-                contents="Hello",
-                config=types.GenerateContentConfig(max_output_tokens=10)
-            )
-            return True
-        except Exception as e:
-            raise GeminiServiceError(f"API key validation failed: {e}")
-
-
-# Convenience function for external use
-def create_gemini_service(api_key: Optional[str] = None) -> GeminiService:
-    """
-    Create and return a GeminiService instance.
-
-    Args:
-        api_key: Optional API key (defaults to env var)
-
-    Returns:
-        Initialized GeminiService
-    """
-    return GeminiService(api_key=api_key)

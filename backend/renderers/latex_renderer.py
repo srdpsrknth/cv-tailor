@@ -14,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from models.tailored_output import TailoredCV
 from models.profile import Profile
+from utils.text import escape_latex, slugify
 
 
 class LaTeXRendererError(Exception):
@@ -348,32 +349,12 @@ class LaTeXRenderer:
     @staticmethod
     def _slugify(text: str) -> str:
         """Create filesystem-safe slug for filenames."""
-        text = text.strip().lower()
-        text = re.sub(r"[^a-z0-9]+", "_", text)
-        text = re.sub(r"_+", "_", text).strip("_")
-        return text or "role"
+        return slugify(text)
 
     @staticmethod
     def _escape_latex(value: str) -> str:
         """Escape LaTeX special characters in free text."""
-        if not isinstance(value, str):
-            return value
-        replacements = {
-            "\\": r"\textbackslash{}",
-            "&": r"\&",
-            "%": r"\%",
-            "$": r"\$",
-            "#": r"\#",
-            "_": r"\_",
-            "{": r"\{",
-            "}": r"\}",
-            "~": r"\textasciitilde{}",
-            "^": r"\textasciicircum{}",
-        }
-        escaped = value
-        for char, replacement in replacements.items():
-            escaped = escaped.replace(char, replacement)
-        return escaped
+        return escape_latex(value)
 
     @staticmethod
     def _format_date(date_str: str) -> str:

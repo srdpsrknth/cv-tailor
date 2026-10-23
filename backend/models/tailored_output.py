@@ -66,11 +66,3 @@ class TailoredCoverLetter(BaseModel):
     paragraphs: List[str] = Field(default_factory=list)
     closing_line: str = "Sincerely,"
     signature_name: str = ""
-
-
-class TailoredOutput(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    cv: TailoredCV
-    cover_letter: TailoredCoverLetter
-    tailoring_explanation: Optional[TailoringExplanation] = None

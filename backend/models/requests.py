@@ -39,10 +39,3 @@ class TailorResponse(BaseModel):
     token_usage: TokenUsage
     tailoring_explanation: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
-
-
-class ErrorResponse(BaseModel):
-    """Error response model."""
-    error: str
-    detail: str
-    status_code: int = 500

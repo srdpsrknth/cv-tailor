@@ -15,6 +15,7 @@ from docx import Document  # post-process font
 
 from models.profile import Profile
 from models.tailored_output import TailoredCoverLetter
+from utils.text import escape_latex, slugify
 
 
 logger = logging.getLogger(__name__)
@@ -128,10 +129,7 @@ class DocxRenderer:
 
     @staticmethod
     def _slugify(text: str) -> str:
-        text = text.strip().lower()
-        text = re.sub(r"[^a-z0-9]+", "_", text)
-        text = re.sub(r"_+", "_", text).strip("_")
-        return text or "role"
+        return slugify(text)
 
     def _format_filename(self, company: str, job_position: str) -> str:
         year = date.today().year
@@ -142,22 +140,7 @@ class DocxRenderer:
     @staticmethod
     def _escape_latex(text: str) -> str:
         """Escape LaTeX special characters in text."""
-        # Order matters: backslash must be first
-        replacements = [
-            ("\\", r"\textbackslash{}"),
-            ("&", r"\&"),
-            ("%", r"\%"),
-            ("$", r"\$"),
-            ("#", r"\#"),
-            ("_", r"\_"),
-            ("{", r"\{"),
-            ("}", r"\}"),
-            ("~", r"\textasciitilde{}"),
-            ("^", r"\textasciicircum{}"),
-        ]
-        for char, replacement in replacements:
-            text = text.replace(char, replacement)
-        return text
+        return escape_latex(text)
 
     def _apply_aptos_font(self, docx_path: Path) -> None:
         """Set Aptos font for all paragraphs and the Normal style."""
