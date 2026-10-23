@@ -8,19 +8,12 @@ from typing import Optional, Tuple
 
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
 
+from config import DEFAULT_MODEL, Config
 from models.requests import TokenUsage
 
-# Load environment variables
-load_dotenv()
-
-# Gemini API Configuration
-DEFAULT_MODEL = "gemini-3.8-flash"
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
-GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.3"))
-GEMINI_MAX_OUTPUT_TOKENS = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8000"))
+# Re-exported for callers that only need the model name.
+__all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL"]
 
 # Pricing (per 1M tokens in USD), verified against ai.google.dev on 2026-10-23.
 # Free tier: 15 requests/min, 1.5M tokens/day
@@ -63,23 +56,22 @@ class GeminiServiceError(Exception):
 class GeminiService:
     """Service for interacting with Google Gemini API."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, config: Optional[Config] = None, api_key: Optional[str] = None):
         """
         Initialize Gemini service.
 
         Args:
-            api_key: Google Gemini API key (defaults to env var)
+            config: resolved configuration. Built from the environment only when
+                omitted, so importing this module no longer fixes the model or key.
+            api_key: explicit key, overriding the configured one.
         """
-        self.api_key = api_key or GEMINI_API_KEY
-        if not self.api_key:
-            raise GeminiServiceError(
-                "GEMINI_API_KEY not found. Set it in .env file or pass to constructor."
-            )
+        self.config = config or Config.from_env()
+        self.api_key = api_key or self.config.require_api_key()
 
         self.client = genai.Client(api_key=self.api_key)
-        self.model = GEMINI_MODEL
-        self.temperature = GEMINI_TEMPERATURE
-        self.max_output_tokens = GEMINI_MAX_OUTPUT_TOKENS
+        self.model = self.config.model
+        self.temperature = self.config.temperature
+        self.max_output_tokens = self.config.max_output_tokens
 
     def _estimate_cost(
         self,

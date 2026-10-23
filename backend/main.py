@@ -2,31 +2,33 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from dotenv import load_dotenv
 
+from config import Config
 from models.requests import TailorRequest, TailorResponse
 from services.profile_loader import load_profile
 from services.tailor_service import tailor_documents
 
 
-load_dotenv(override=True)
-
 app = FastAPI(title="cv-tailor-backend", version="0.1.0")
 
-# Base outputs directory from environment or fallback
-outputs_dir_env = os.getenv("OUTPUTS_DIR", "").strip()
-if outputs_dir_env:
-    OUTPUTS_DIR = Path(outputs_dir_env)
-    if not OUTPUTS_DIR.is_absolute():
-        OUTPUTS_DIR = Path(__file__).resolve().parents[1] / OUTPUTS_DIR
-else:
-    OUTPUTS_DIR = Path(__file__).resolve().parents[1] / "outputs"
-OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+
+def get_config() -> Config:
+    """Resolve configuration per request rather than at import time.
+
+    Rebuilding it here means editing ``.env`` (or changing ``OUTPUTS_DIR``) takes
+    effect without restarting the process, and no environment read happens merely
+    by importing this module.
+    """
+    return Config.from_env()
+
+
+def outputs_dir() -> Path:
+    """The directory download endpoints resolve ``job_id`` against."""
+    return get_config().outputs_dir
 
 
 @app.get("/health")
@@ -60,11 +62,11 @@ def tailor(req: TailorRequest):
 @app.get("/api/download/cv/{job_id}")
 def download_cv(job_id: str):
     """Download the generated CV PDF by job_id (in job-specific folder)."""
-    pdf_path = OUTPUTS_DIR / job_id / f"{job_id}.pdf"
+    pdf_path = outputs_dir() / job_id / f"{job_id}.pdf"
 
     # Generated CV filenames differ from job_id; exclude cover-letter PDFs.
     if not pdf_path.exists():
-        job_folder = OUTPUTS_DIR / job_id
+        job_folder = outputs_dir() / job_id
         if job_folder.exists():
             pdfs = [p for p in job_folder.glob("*.pdf") if "cover_letter" not in p.name.lower()]
             if pdfs:
@@ -85,7 +87,7 @@ def download_cover_letter(job_id: str):
     """
     Download the generated cover letter DOCX from job-specific folder.
     """
-    job_folder = OUTPUTS_DIR / job_id
+    job_folder = outputs_dir() / job_id
 
     if not job_folder.exists():
         raise HTTPException(status_code=404, detail=f"Job folder not found: {job_id}")
@@ -108,7 +110,7 @@ def download_cover_letter_pdf(job_id: str):
     """
     Download the generated cover letter PDF from job-specific folder.
     """
-    job_folder = OUTPUTS_DIR / job_id
+    job_folder = outputs_dir() / job_id
 
     if not job_folder.exists():
         raise HTTPException(status_code=404, detail=f"Job folder not found: {job_id}")

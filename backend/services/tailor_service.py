@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import shutil
 import time
@@ -14,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from pypdf import PdfReader
 
+from config import Config
 from models.profile import Profile
 from models.requests import TailorResponse
 from models.tailored_output import TailoredCV, TailoredCoverLetter, TailoringExplanation
@@ -131,10 +131,18 @@ def tailor_documents(
     role_title: Optional[str] = None,
     status_callback: Optional[Callable[[str], None]] = None,
     work_country: Optional[str] = None,
+    config: Optional[Config] = None,
 ) -> TailorResponse:
     if not job_description or not job_description.strip():
         raise ValueError("Job description is empty.")
-    service = GeminiService()
+    # Resolved at call time (never at import), so the model, key and output path can
+    # differ per invocation -- and one test can override another's environment.
+    if config is None:
+        config = Config.from_env(load_env_file=False, overrides={"project_root": PROJECT_ROOT})
+        # Constructed with no arguments so an injected double can stand in for it.
+        service = GeminiService()
+    else:
+        service = GeminiService(config=config)
     work_country = (work_country or '').strip() or None
     country_context = (
         f"\nWORK COUNTRY (explicit user selection; overrides country inference): {work_country}. "
@@ -294,12 +302,10 @@ def tailor_documents(
         message=f"CV checked: {page_count} pages. Cover letter: {cl_pages} page, {sum(len(p.split()) for p in cl.paragraphs)} words.",
     )
     _write_json(source_folder / "drafts.json", {"drafts": drafts})
-    configured = os.getenv("OUTPUTS_DIR", "").strip()
-    if configured:
-        external = Path(configured)
-        if not external.is_absolute():
-            external = PROJECT_ROOT / external
-        mirror = external.resolve() / job_id
+    # Mirroring is read from the config at call time, never at import time.
+    mirror = None
+    if config.is_mirroring:
+        mirror = config.outputs_dir / job_id
         if mirror != job_folder.resolve():
             mirror.mkdir(parents=True, exist_ok=True)
             for key in ("cv_path", "cover_letter_path", "cl_pdf_path"):
@@ -308,7 +314,7 @@ def tailor_documents(
                 setattr(result, key, str(mirror / original.name))
             shutil.copytree(source_folder, mirror / "source", dirs_exist_ok=True)
     _write_json(source_folder / "generation_result.json", {**result.model_dump(), "cv_page_history": history})
-    if configured and mirror != job_folder.resolve():
+    if mirror is not None and mirror != job_folder.resolve():
         shutil.copy2(source_folder / "generation_result.json", mirror / "source/generation_result.json")
     logger.info("Generated %s: %s CV pages; layout history %s", job_id, page_count, history)
     return result
