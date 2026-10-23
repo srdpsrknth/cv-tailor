@@ -1,0 +1,36 @@
+Analytical Engineer (m/f/d) — Nordwind Analytics GmbH
+
+About the role
+Nordwind Analytics builds measurement tooling for mid-market e-commerce brands. Our
+platform ingests traffic and conversion events and turns them into channel-level
+performance reporting. We are hiring an Analytical Engineer to own the transformation
+layer between raw ingestion and the reporting models our customers see.
+
+What you will do
+- Own batch transformation pipelines end to end, from source ingestion through warehouse
+  modelling to the datasets consumed by reporting.
+- Build and document reusable SQL models across landing, intermediate and aggregated
+  layers so that business logic is defined once.
+- Keep orchestrated workflows reliable: scheduling, monitoring, backfills and change
+  control through version-controlled repositories.
+- Design data quality checks for completeness, uniqueness, validity and freshness, and
+  make failures visible before they reach a dashboard.
+- Partner with analysts and customer-facing teams to translate ambiguous measurement
+  questions into well-defined datasets.
+
+What we are looking for
+- Strong SQL and practical experience modelling in a cloud warehouse.
+- Experience with an orchestration tool such as Airflow.
+- Comfort with dbt or an equivalent transformation framework.
+- An interest in attribution and marketing measurement.
+- Clear written communication: you will document models for other people to reuse.
+
+Nice to have
+- Python for pipeline and reporting automation.
+- Experience with BI tools and semantic layers.
+- Exposure to A/B testing or incrementality measurement.
+
+Location and terms
+The role is based in Berlin, Germany, with a hybrid pattern of two days per week in the
+office. We are an equal-opportunity employer and welcome applications from candidates who
+require a work permit for Germany.

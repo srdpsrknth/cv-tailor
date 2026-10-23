@@ -1,0 +1,8 @@
+# SYNTHETIC FIXTURE — deliberately invalid.
+# `identity` is a required field on Profile; omitting it must fail validation.
+version: "1.0"
+
+summary_base:
+  - "This profile has no identity block at all."
+
+experience: []

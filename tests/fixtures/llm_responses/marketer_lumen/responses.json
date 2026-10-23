@@ -1,0 +1,22 @@
+{
+  "session": "marketer_lumen",
+  "profile": "profiles/synthetic_marketer.yaml",
+  "job_description": "job_descriptions/lumen_growth_analyst.txt",
+  "steps": [
+    {
+      "attempt": "cv_draft",
+      "file": "01_cv_draft.json",
+      "format": "json"
+    },
+    {
+      "attempt": "cv_editorial_review",
+      "file": "02_cv_editorial_review.json",
+      "format": "json"
+    },
+    {
+      "attempt": "cover_letter",
+      "file": "03_cover_letter.json",
+      "format": "json"
+    }
+  ]
+}

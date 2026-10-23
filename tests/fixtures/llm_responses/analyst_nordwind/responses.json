@@ -1,0 +1,27 @@
+{
+  "session": "analyst_nordwind",
+  "profile": "profiles/synthetic_analyst.yaml",
+  "job_description": "job_descriptions/nordwind_analytics_engineer.txt",
+  "steps": [
+    {
+      "attempt": "cv_draft",
+      "file": "01_cv_draft.json",
+      "format": "json"
+    },
+    {
+      "attempt": "cv_editorial_review",
+      "file": "02_cv_editorial_review.json",
+      "format": "json"
+    },
+    {
+      "attempt": "cover_letter",
+      "file": "03_cover_letter.json",
+      "format": "json"
+    },
+    {
+      "attempt": "cv_layout_retry",
+      "file": "04_cv_layout_retry.json",
+      "format": "fenced"
+    }
+  ]
+}

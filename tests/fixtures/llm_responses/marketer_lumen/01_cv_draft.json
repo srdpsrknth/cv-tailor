@@ -1,0 +1,50 @@
+{
+  "cv": {
+    "title": "Growth Analyst",
+    "work_authorization": null,
+    "summary": [
+      "Growth marketing analyst with experience across paid acquisition reporting, retention analysis and lifecycle experimentation in synthetic fixture organisations."
+    ],
+    "skills": {
+      "Marketing Analytics": [
+        "Campaign Reporting",
+        "Attribution Modeling",
+        "LTV / CAC",
+        "Retention & Churn Analysis"
+      ],
+      "Tooling": [
+        "GA4",
+        "Braze CRM",
+        "SQL",
+        "Power BI"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Initech Growth BV",
+        "role": "Growth Marketing Analyst",
+        "start_date": "2022-09",
+        "end_date": "present",
+        "bullets": [
+          "Report paid acquisition performance across fixture channels and campaigns.",
+          "Maintain lifecycle dashboards for retention and reactivation cohorts.",
+          "Design and read out fixture A/B tests on onboarding messaging."
+        ],
+        "projects": []
+      },
+      {
+        "company": "Globex Media NV",
+        "role": "Marketing Data Analyst",
+        "start_date": "2019-08",
+        "end_date": "2022-08",
+        "bullets": [
+          "Consolidated multi-channel fixture spend reporting into one scheduled model.",
+          "Automated recurring campaign reporting for the marketing team."
+        ],
+        "projects": []
+      }
+    ],
+    "include_education": true,
+    "include_certifications": true
+  }
+}

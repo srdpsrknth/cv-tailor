@@ -35,7 +35,7 @@ without waiting for discovery or tracking.
   runnable dev worktree.
 - **Status:** assessment complete and approved; dev worktree set up.
 
-### Milestone 1.1 — Test baseline and golden fixtures *(next)*
+### Milestone 1.1 — Test baseline and golden fixtures *(COMPLETE 2026-10-23)*
 
 - **Objective:** make it possible to prove behaviour is preserved before any refactor.
 - **Scope:** synthetic profiles + anonymised job descriptions + recorded LLM responses in
@@ -45,6 +45,11 @@ without waiting for discovery or tracking.
 - **Changes no production behaviour** — `tests/` and `docs/` only.
 - **Acceptance:** `python -m pytest -q` green and fully offline; every §1 workflow has a
   behavioural test; fixtures contain no real personal data.
+- **Delivered:** suite grew **12 → 141 tests** (~100 s). Two synthetic profiles, three
+  anonymised postings, recorded provider responses; real LaTeX/DOCX output asserted with
+  `pypdf` (page count, sections, verbatim bullets, clipping, orphan headings, escaping);
+  11 end-to-end determinism tests for `render_application.py`. Fast lane
+  `-m "not requires_latex"` runs 113 tests in ~6 s. See [`TESTING.md`](TESTING.md).
 - **Effort:** Small–Medium.
 
 ---

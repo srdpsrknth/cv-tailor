@@ -1,0 +1,71 @@
+version: "1.0"
+
+# SYNTHETIC FIXTURE — not a real person. Do not replace with real data.
+# Deliberately different in shape from synthetic_analyst.yaml: fewer employers,
+# no selected projects, no visa_status, no certifications.
+identity:
+  full_name: "Robin Example"
+  tagline: "Growth Marketing Analyst | Synthetic Fixture Profile"
+  email: "robin.example@example.invalid"
+  phone: "+31 000 000000"
+  linkedin: "https://www.linkedin.com/in/example-robin-example"
+  location: "Sampleburg, Netherlands"
+
+summary_base:
+  - "Growth marketing analyst with experience across paid acquisition reporting, retention analysis and lifecycle experimentation in synthetic fixture organisations."
+
+experience:
+  - company: "Initech Growth BV"
+    location: "Sampleburg, Netherlands"
+    role: "Growth Marketing Analyst"
+    start_date: "2022-09"
+    end_date: "present"
+    bullets:
+      - "Report paid acquisition performance across fixture channels and campaigns."
+      - "Maintain lifecycle dashboards for retention and reactivation cohorts."
+      - "Design and read out fixture A/B tests on onboarding messaging."
+    selected_projects: []
+    technologies:
+      - "GA4"
+      - "Braze"
+      - "Python"
+
+  - company: "Globex Media NV"
+    location: "Sampleburg, Netherlands"
+    role: "Marketing Data Analyst"
+    start_date: "2019-08"
+    end_date: "2022-08"
+    bullets:
+      - "Consolidated multi-channel fixture spend reporting into one scheduled model."
+      - "Automated recurring campaign reporting for the marketing team."
+    selected_projects: []
+    technologies:
+      - "PostgresSQL"
+      - "Power BI"
+
+education:
+  - degree: "BSc Synthetic Marketing Analytics"
+    institution: "Sampleburg University"
+    location: "Sampleburg, Netherlands"
+    start_year: 2015
+    end_year: 2018
+
+certifications: []
+
+skills:
+  marketing_analytics:
+    - "Campaign Reporting"
+    - "Attribution Modeling"
+    - "LTV / CAC"
+    - "Retention & Churn Analysis"
+  tooling:
+    - "GA4"
+    - "Braze CRM"
+    - "SQL"
+    - "Power BI"
+
+languages:
+  - name: "English"
+    proficiency: "Fluent"
+  - name: "Dutch"
+    proficiency: "Basic"

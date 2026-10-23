@@ -1,0 +1,95 @@
+version: "1.0"
+
+# SYNTHETIC FIXTURE — not a real person. Do not replace with real data.
+identity:
+  full_name: "Alex Sample"
+  tagline: "Analytical Engineer | Synthetic Fixture Profile"
+  email: "alex.sample@example.invalid"
+  phone: "+49 000 0000000"
+  linkedin: "https://www.linkedin.com/in/example-alex-sample"
+  github: "https://github.com/example-alex-sample"
+  location: "Sampletown, Germany"
+  visa_status: "Synthetic Residence Permit (fixture only)"
+
+summary_base:
+  - "Analytical engineer with experience across warehouse modelling, pipeline reliability and self-service reporting in synthetic fixture organisations."
+
+experience:
+  - company: "Northwind Analytics GmbH"
+    location: "Sampletown, Germany"
+    role: "Analytical Engineer"
+    start_date: "2023-04"
+    end_date: "present"
+    bullets:
+      - "Own end-to-end batch pipelines from ingestion through warehouse transformations to reporting consumption."
+      - "Document reusable SQL models across landing and aggregated layers to centralise fixture business logic."
+      - "Maintain orchestrated data workflows with version-controlled change history."
+    selected_projects:
+      - name: "Attribution Rebuild"
+        bullets:
+          - "Designed incremental enrichment pipelines for fixture traffic-source attribution."
+          - "Validated the rebuilt model against production output with controlled backfills."
+          - "Delivered a reproducible methodology note for the analytics team."
+    technologies:
+      - "Snowflake SQL"
+      - "Apache Airflow"
+      - "dbt"
+
+  - company: "Contoso Metrics Ltd"
+    location: "Sampletown, Germany"
+    role: "Business Intelligence Analyst"
+    start_date: "2021-01"
+    end_date: "2023-03"
+    bullets:
+      - "Built fixture reporting models spanning marketing and revenue domains."
+      - "Reduced manual reporting effort through scheduled model refreshes."
+    selected_projects: []
+    technologies:
+      - "BigQuery SQL"
+      - "Looker"
+
+  # Deliberately has no bullets and no projects. Exercises the validator rule
+  # that an employer with no profile bullets must not gain invented ones.
+  - company: "Fabrikam Internship"
+    location: "Sampletown, Germany"
+    role: "Analyst Intern"
+    start_date: "2020-06"
+    end_date: "2020-11"
+    bullets: []
+    selected_projects: []
+    technologies: []
+
+education:
+  - degree: "MSc Synthetic Analytics"
+    institution: "Sampletown Institute of Technology"
+    location: "Sampletown, Germany"
+    start_year: 2018
+    end_year: 2020
+
+certifications:
+  - "Synthetic Analytics Certificate"
+  - "Synthetic Reporting Qualification"
+
+skills:
+  core_analytics:
+    - "Advanced SQL"
+    - "Python (Pandas, NumPy)"
+    - "Statistical Analysis"
+    - "Cohort & Funnel Analysis"
+    - "Forecasting"
+  data_engineering:
+    - "Snowflake"
+    - "dbt"
+    - "Apache Airflow"
+    - "Incremental ETL"
+    - "Automated Data Quality"
+  collaboration:
+    - "Stakeholder Management"
+    - "Data Storytelling"
+    - "Git"
+
+languages:
+  - name: "English"
+    proficiency: "Fluent"
+  - name: "German"
+    proficiency: "Basic"

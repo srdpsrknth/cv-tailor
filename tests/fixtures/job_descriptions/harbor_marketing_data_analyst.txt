@@ -1,0 +1,33 @@
+Marketing Data Analyst — Harbor Retail Group
+
+About Harbor Retail Group
+Harbor Retail Group operates a portfolio of consumer retail brands. The central data team
+supports marketing, merchandising and finance with shared reporting and data models.
+
+The role
+We need a Marketing Data Analyst to consolidate campaign and channel reporting across the
+brand portfolio, replacing a patchwork of spreadsheets with governed, scheduled models.
+
+Key responsibilities
+- Consolidate multi-channel campaign and spend reporting into one governed model.
+- Define and maintain marketing data definitions so that two brands measure a metric the
+  same way.
+- Automate recurring reporting that is currently produced by hand each month.
+- Work with brand marketing teams to make sure tracking and naming are consistent.
+- Support ad-hoc analysis on channel performance and customer acquisition cost.
+
+Essential experience
+- Strong SQL and experience building reporting models.
+- A track record of automating manual reporting processes.
+- Experience working with marketing or campaign data.
+- Ability to work with non-technical stakeholders across several teams.
+
+Desirable
+- Experience with a BI platform and its semantic layer.
+- Familiarity with web analytics and tag management.
+- Exposure to retail or multi-brand environments.
+
+Location
+Dublin, Ireland, with a flexible hybrid arrangement. Candidates who require an employment
+permit for Ireland are welcome to apply and will be considered on the same basis as other
+applicants.

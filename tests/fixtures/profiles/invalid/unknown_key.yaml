@@ -1,0 +1,10 @@
+# SYNTHETIC FIXTURE — deliberately invalid.
+# `extra="forbid"` on every profile model must reject the unknown `notice_period` key.
+version: "1.0"
+
+identity:
+  full_name: "Alex Sample"
+  email: "alex.sample@example.invalid"
+  notice_period: "three months"
+
+experience: []

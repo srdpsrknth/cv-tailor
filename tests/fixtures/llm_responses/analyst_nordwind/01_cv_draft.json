@@ -1,0 +1,74 @@
+{
+  "cv": {
+    "title": "Analytical Engineer",
+    "work_authorization": null,
+    "summary": [
+      "Analytical engineer with experience across warehouse modelling, pipeline reliability and self-service reporting in synthetic fixture organisations."
+    ],
+    "skills": {
+      "Core Analytics": [
+        "Advanced SQL",
+        "Python (Pandas, NumPy)",
+        "Statistical Analysis",
+        "Cohort & Funnel Analysis",
+        "Forecasting"
+      ],
+      "Data Engineering": [
+        "Snowflake",
+        "dbt",
+        "Apache Airflow",
+        "Incremental ETL",
+        "Automated Data Quality"
+      ],
+      "Collaboration": [
+        "Stakeholder Management",
+        "Data Storytelling",
+        "Git"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Northwind Analytics GmbH",
+        "role": "Analytical Engineer",
+        "start_date": "2023-04",
+        "end_date": "present",
+        "bullets": [
+          "Own end-to-end batch pipelines from ingestion through warehouse transformations to reporting consumption.",
+          "Document reusable SQL models across landing and aggregated layers to centralise fixture business logic.",
+          "Maintain orchestrated data workflows with version-controlled change history."
+        ],
+        "projects": [
+          {
+            "name": "Attribution Rebuild",
+            "bullets": [
+              "Designed incremental enrichment pipelines for fixture traffic-source attribution.",
+              "Validated the rebuilt model against production output with controlled backfills.",
+              "Delivered a reproducible methodology note for the analytics team."
+            ]
+          }
+        ]
+      },
+      {
+        "company": "Contoso Metrics Ltd",
+        "role": "Business Intelligence Analyst",
+        "start_date": "2021-01",
+        "end_date": "2023-03",
+        "bullets": [
+          "Built fixture reporting models spanning marketing and revenue domains.",
+          "Reduced manual reporting effort through scheduled model refreshes."
+        ],
+        "projects": []
+      },
+      {
+        "company": "Fabrikam Internship",
+        "role": "Analyst Intern",
+        "start_date": "2020-06",
+        "end_date": "2020-11",
+        "bullets": [],
+        "projects": []
+      }
+    ],
+    "include_education": true,
+    "include_certifications": true
+  }
+}

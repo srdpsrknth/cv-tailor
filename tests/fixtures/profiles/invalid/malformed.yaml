@@ -1,0 +1,6 @@
+# SYNTHETIC FIXTURE — deliberately invalid.
+# Parses as YAML but is a list, not a mapping, so `Profile(**data)` cannot be constructed.
+- version: "1.0"
+- identity:
+    full_name: "Alex Sample"
+    email: "alex.sample@example.invalid"

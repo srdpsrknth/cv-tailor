@@ -1,0 +1,33 @@
+Growth Analyst — Lumen Consumer BV
+
+The team
+Lumen Consumer runs a subscription app across the Benelux region. Our growth team owns
+acquisition, onboarding and retention. We are looking for a Growth Analyst to be the
+analytical partner for the paid acquisition and lifecycle marketing managers.
+
+Responsibilities
+- Own performance reporting for paid acquisition channels and campaigns.
+- Build and maintain retention, churn and reactivation cohorts, and explain movement
+  between periods rather than just reporting it.
+- Design, size and read out A/B tests on onboarding and lifecycle messaging.
+- Translate budget scenarios into expected return, acquisition cost and subscriber
+  outcomes, and present the trade-offs to marketing leadership.
+- Improve data quality in the marketing stack: tracking, naming conventions and
+  attribution definitions.
+
+Requirements
+- 3+ years in an analytics role supporting marketing or growth.
+- Fluent SQL; comfortable working with event-level data.
+- Hands-on experience with a mobile measurement partner and a CRM or engagement platform.
+- A track record of turning analysis into a decision that changed spend or messaging.
+- Strong stakeholder communication in English.
+
+Nice to have
+- Forecasting or scenario modelling experience.
+- Familiarity with app analytics tooling.
+- Experience in a subscription or marketplace business.
+
+Practicalities
+Based in Amsterdam, Netherlands. Hybrid, three days in the office. We support candidates
+who need a permit to work in the Netherlands and will discuss sponsorship for the right
+applicant.

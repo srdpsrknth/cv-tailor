@@ -1,0 +1,5 @@
+# SYNTHETIC FIXTURE — deliberately invalid.
+# Unterminated flow mapping: yaml.safe_load raises a YAMLError.
+version: "1.0"
+
+identity: {full_name: "Alex Sample", email: "alex.sample@example.invalid"
