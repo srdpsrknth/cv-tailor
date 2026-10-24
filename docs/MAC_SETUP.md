@@ -4,7 +4,7 @@ This guide is for the owner and the LLM assisting on a fresh Mac. The project wa
 
 ## What is included
 
-The repository contains the latest profile, FastAPI backend, Streamlit UI, templates, prompts, tests, locked Python dependencies, a reusable agent skill, and reviewed application sources under `applications/`. API credentials and generated application PDFs/DOCX are not part of fresh output commits. Three adjoe documents were already tracked historically. Existing output files can also be transferred from OneDrive.
+The repository contains the FastAPI backend, Streamlit UI, templates, prompts, tests, locked Python dependencies and a reusable agent skill. It does **not** contain the real profile or the reviewed application sources — since Phase 2 those live in the **private profile store** (`CVTAILOR_STORE`), which is not this repository. API credentials are likewise never committed. If you are moving the owner's real work to the Mac, transfer the store as well as the clone: either copy the store directory, or clone its own private Git repository (ADR 0011).
 
 ## Prerequisites
 
@@ -28,6 +28,15 @@ Have the owner enter `GEMINI_API_KEY` into `.env` directly. Do not ask them to p
 
 Start with `OUTPUTS_DIR=outputs`. If mirroring to OneDrive, ask for the actual local Mac folder; Windows OneDrive paths are invalid. A relative outputs path resolves against the clone. Set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` if the shell does not find the compiler.
 
+Point the project at the store and name the candidate. Both are required; a missing profile id fails rather than guessing:
+
+```bash
+export CVTAILOR_STORE="$HOME/cv-tailor-data"   # wherever the store was transferred
+export CVTAILOR_PROFILE_ID=<profile_id>
+```
+
+`cvtailor profile list` shows the available ids; `cvtailor doctor` reports whether the store was found.
+
 ```bash
 .venv/bin/python scripts/check_setup.py
 .venv/bin/python -m pytest -q
@@ -38,17 +47,17 @@ Open http://localhost:8501 . The backend is at http://localhost:8000 and its int
 
 ## Validate rendering before spending API tokens
 
-Restore the reviewed Delivery Hero package:
+Restore the reviewed Delivery Hero package from the store:
 
 ```bash
-cp -R applications/2026_delivery_hero_senior_analytics_engineer_quick_commerce_1791209030470 outputs/
-.venv/bin/python outputs/2026_delivery_hero_senior_analytics_engineer_quick_commerce_1791209030470/source/render_application.py
+cp -R "$CVTAILOR_STORE"/applications/2026_delivery_hero_senior_analytics_engineer_quick_commerce_1791209030470 "$CVTAILOR_STORE"/outputs/"$CVTAILOR_PROFILE_ID"/
+.venv/bin/python "$CVTAILOR_STORE"/outputs/"$CVTAILOR_PROFILE_ID"/2026_delivery_hero_senior_analytics_engineer_quick_commerce_1791209030470/source/render_application.py
 ```
 
 Its application-specific script preserves compact technology lists and the deliberate ecoligo continuation heading. The archived script renders both documents. It derives all repository paths from the restored folder. Other packages can be restored in the same way; when no custom script exists:
 
 ```bash
-.venv/bin/python scripts/render_application.py --project . --content outputs/<job_id>/source/content.json --mirror-configured
+.venv/bin/python scripts/render_application.py --project . --profile-id "$CVTAILOR_PROFILE_ID" --content "$CVTAILOR_STORE"/outputs/"$CVTAILOR_PROFILE_ID"/<job_id>/source/content.json --mirror-configured
 ```
 
 Use `--cv-only` or `--cover-letter-only` for a scoped revision. `content.json` is the reviewed text authority; model drafts are historical evidence, not replacement text. Old result metadata is regenerated locally. Older Booking helper scripts are retained for reference; prefer the current editable JSON and renderer.

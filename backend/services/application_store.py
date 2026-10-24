@@ -7,9 +7,10 @@ application lives here, so the generation logic can be tested without a disk
 and the storage layout can change in one place.
 
 Since Phase 2 the layout carries the candidate (ADR 0003), so two profiles on the
-same posting cannot collide::
+same posting cannot collide. ``<outputs_root>`` is ``<store>/outputs`` when the
+store is authoritative (ADR 0011)::
 
-    outputs/<profile_id>/<job_id>/
+    <store>/outputs/<profile_id>/<job_id>/
         <rendered CV and cover-letter artifacts>
         source/
             content.json            the editable text authority
@@ -56,9 +57,14 @@ def write_json(path: Path, value) -> None:
 
 @dataclass
 class ApplicationStore:
-    """Owns the ``outputs/<profile_id>/<job_id>/`` folder for one generation run."""
+    """Owns the ``<outputs_root>/<profile_id>/<job_id>/`` folder for one generation run.
 
-    project_root: Path
+    ``outputs_root`` is the directory that *contains* the per-candidate segment --
+    in practice ``<store>/outputs`` (ADR 0011), so real documents never land in the
+    public repository. The candidate segment is appended here, not by the caller.
+    """
+
+    outputs_root: Path
     job_id: str
     #: Which candidate this application belongs to. Required (ADR 0003).
     profile_id: Optional[str] = None
@@ -66,10 +72,10 @@ class ApplicationStore:
     job_folder: Path = field(init=False)
 
     def __post_init__(self) -> None:
-        self.project_root = Path(self.project_root)
+        self.outputs_root = Path(self.outputs_root)
         # Fail closed: no candidate means no folder, never a shared one.
         self.profile_id = validate_profile_id(self.profile_id)
-        self.job_folder = self.project_root / "outputs" / self.profile_id / self.job_id
+        self.job_folder = self.outputs_root / self.profile_id / self.job_id
         self.source_folder = self.job_folder / "source"
 
     # --- creation ---------------------------------------------------------------------

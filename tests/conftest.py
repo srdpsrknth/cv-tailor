@@ -186,12 +186,29 @@ def stub_renderers(monkeypatch, tmp_path):
 
 @pytest.fixture
 def isolated_service(monkeypatch, tmp_path):
-    """Point `tailor_documents` at a temp project root and clear OUTPUTS_DIR mirroring."""
+    """Point `tailor_documents` at a temp project root and clear OUTPUTS_DIR mirroring.
+
+    Since the store is authoritative for generated documents (ADR 0011), a temp
+    project root needs its own store: this copies the synthetic profiles into
+    ``<project_root>/profiles`` and points ``CVTAILOR_STORE`` at the project root
+    itself. Outputs then land at ``<project_root>/outputs/<profile_id>/<job_id>/``,
+    which is what the pipeline tests assert, and nothing touches the owner's real store.
+    """
     from services import tailor_service as service
 
     project_root = tmp_path / 'project'
     project_root.mkdir(parents=True, exist_ok=True)
+    # Root the store at the project root so ``<store>/outputs/<id>/<job>`` is exactly
+    # ``<project_root>/outputs/<id>/<job>`` -- the path every pipeline test asserts.
+    store_root = project_root
+    for profile_id, fixture in (('analyst_a', 'synthetic_analyst'),
+                                ('marketer_b', 'synthetic_marketer')):
+        directory = store_root / 'profiles' / profile_id
+        directory.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(PROFILES / f'{fixture}.yaml', directory / 'profile.yaml')
+
     monkeypatch.setattr(service, 'PROJECT_ROOT', project_root)
+    monkeypatch.setenv('CVTAILOR_STORE', str(store_root))
     monkeypatch.delenv('OUTPUTS_DIR', raising=False)
     return project_root
 

@@ -19,6 +19,7 @@ renderers, and a throwaway store.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -303,3 +304,44 @@ def test_the_same_candidate_can_run_twice_without_colliding(
     assert Path(first.source_path).parent.parent.parent.name == 'analyst_a'
     assert Path(second.source_path).parent.parent.parent.name == 'analyst_a'
     assert first.job_id != second.job_id
+
+
+def test_documents_are_written_into_the_store_not_the_repository(
+    isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
+    monkeypatch,
+):
+    """ADR 0011 puts real documents in the store; writing them beside the code breaks it.
+
+    This went unnoticed because every other test asserted *a* path under the project
+    root rather than *which* root. Rooting ``ApplicationStore`` at ``PROJECT_ROOT``
+    still produced correct-looking folders, in the public repository's gitignored
+    ``outputs/`` -- one ``git add -f`` or one archive away from publishing a real CV.
+
+    The store is moved to a sibling directory so the two roots cannot coincide; when
+    the store sits at the project root the assertion would pass either way.
+    """
+    from config import Config
+
+    separate_store = Path(isolated_service).parent / 'separate-store'
+    shutil.copytree(
+        Path(isolated_service) / 'profiles', separate_store / 'profiles',
+        dirs_exist_ok=True,
+    )
+    monkeypatch.setenv('CVTAILOR_STORE', str(separate_store))
+
+    offline_service(analyst_session.texts())
+    stub_renderers([2])
+    result = _generate(analyst_profile, analyst_session, profile_id='analyst_a')
+
+    config = Config.from_env(load_env_file=False)
+    store_outputs = config.store.outputs_dir('analyst_a')
+    assert str(store_outputs).startswith(str(separate_store)), 'the store did not move'
+
+    source = Path(result.source_path)
+    assert store_outputs in source.parents, (
+        f'documents were written to {source}, outside the store at {store_outputs}'
+    )
+    # Exactly ``<store>/outputs/<profile_id>/<job_id>/source/content.json``: the
+    # candidate segment appears once. Passing ``outputs_dir(profile_id)`` straight to
+    # ApplicationStore nested the id twice and broke this silently.
+    assert source.relative_to(store_outputs) == Path(result.job_id) / 'source' / 'content.json'

@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-24
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `f583349` — *feat: key profiles and outputs by an explicit profile_id*
+**Latest commit:** `86b1a0d` — *feat: move real candidate data to a private store*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
@@ -40,18 +40,20 @@ and explicitly **not** resolved for already-published history.
 | Increment | Commit | Outcome |
 |---|---|---|
 | `profile_id` | `f583349` | `ProfileStore`, fail-closed threading, `outputs/<profile_id>/<job_id>/`, A-9 fixed, `profile list/new/import/export` |
-| Privacy split | *(this commit)* | Real profiles/applications/outputs untracked; private store created and populated; boundary asserted by tests |
+| Privacy split | `86b1a0d` | Real profiles/applications/outputs untracked; private store created and populated; boundary asserted by tests |
+| Documents in the store | "fix: write generated documents into the private store" (latest) | Generated documents now land in `<store>/outputs/<profile_id>/<job_id>/`; `doctor` and `render` follow the store |
 
 ### Acceptance criteria — verified
 
 | Criterion | Result |
 |---|---|
-| Two profiles generate independently, no cross-contamination | **Yes** — `tests/test_profile_isolation.py`, 11 tests |
+| Two profiles generate independently, no cross-contamination | **Yes** — `tests/test_profile_isolation.py`, 13 tests |
 | `profile_id` explicit and fail-closed; no code path defaults | **Yes** — `tests/test_profile_store.py`, 46 tests |
 | Migration preserves facts, titles, dates and `rules:` block | **Yes** — copied byte-for-byte, SHA-256 verified, then loaded through the store |
 | The real profile is not in the public repo | **Yes, for new commits** — untracked and gitignored, asserted by `tests/test_privacy_boundary.py`. **Not** removed from existing history |
-| 190 existing tests still pass | **Yes** — 190 unchanged in behaviour; 2 had path assertions updated (see below) |
-| `pytest -q` green and offline | **261 passed** in ~106 s, no paid API calls |
+| Generated documents land in the store, not the repo | **Yes** — `test_documents_are_written_into_the_store_not_the_repository` fails if `ApplicationStore` is rooted at `PROJECT_ROOT` again |
+| 190 existing tests still pass | **Yes** — all 190 still pass. Four *path assertions* across three tests in `test_tailoring_pipeline.py` and `test_tailor_service.py` were updated, because the output layout itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions about content and behaviour are unchanged |
+| `pytest -q` green and offline | **262 passed** in ~106 s, no paid API calls |
 
 ### What Phase 1 delivered
 
@@ -101,20 +103,24 @@ Re-confirm each decision when its phase begins.
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
 | Dev branch | 10 commits ahead of `master` — Phase 1 complete |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **261 passed** (~106 s); fast lane `-m "not requires_latex"` → 231 passed (~5 s) |
+| Test baseline | **262 passed** (~106 s); fast lane `-m "not requires_latex"` → 232 passed (~6 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
 | Private store | **`D:\coding\cv-tailor-data`** — its own Git repo, 70 tracked files (profile + 8 applications + outputs) |
+| Generated documents | Written to `<store>/outputs/<profile_id>/<job_id>/`; the repo's own `outputs/` holds only `.gitkeep` |
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
-| Decisions | 10 approved; **ADR 0011** added for the private store and the history decision |
+| Decisions | 11 approved; **ADR 0011** added for the private store and the history decision |
 | Roadmap | Phase 0, 1.1, **1 and 2 implemented**; Phase 2 tail (A-6, `main.py`) outstanding |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **190 passed**, 1 warning (~110 s), offline.
+- `.venv\Scripts\python.exe -m pytest -q` → **262 passed**, 1 warning (~106 s), offline.
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
-- **No existing test has been modified since `325c4d1`.** The suite grew 141 → 190.
+- **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1 and
+  190 → 262 in Phase 2. In Phase 2, four *path assertions* across three pre-existing tests were
+  updated because the output layout itself changed (`outputs/<job_id>/` →
+  `outputs/<profile_id>/<job_id>/`); their assertions about content are unchanged.
 - `tests/test_renderers_documents.py` renders **real** LaTeX and DOCX.
 - `tests/test_cli.py` asserts the CLI's page count equals `render_application.py`'s.
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
@@ -175,6 +181,10 @@ Re-confirm each decision when its phase begins.
   blocker 2. D-9 is resolved by the same change.
 - ~~A hardcoded `storage/profile/profile.yaml` in scripts and the CLI~~ — all call sites resolve
   through the store or an explicit `--profile`.
+- ~~Generated documents written into the repository's `outputs/`~~ — found while auditing the
+  docs: `ApplicationStore` was still rooted at `PROJECT_ROOT`, so a real CV landed in the
+  public repository's gitignored `outputs/`, contradicting ADR 0011. Now rooted at the store's
+  per-candidate outputs directory, with a regression test that fails if it moves back.
 
 ### Resolved in Phase 1
 
@@ -197,13 +207,18 @@ Re-confirm each decision when its phase begins.
   **Still unfixed.**
 - ~~Generated PDFs/DOCX are **tracked** in `outputs/` despite `.gitignore` (D-9)~~ — resolved in
   Phase 2 by untracking `outputs/` (ADR 0011). The three PDFs/DOCX and the `.gitkeep` are gone
-  from the index; generated documents now live in the private store.
+  from the index. Generated documents are written into the private store's
+  `outputs/<profile_id>/<job_id>/`; the repository's own `outputs/` now holds only `.gitkeep`.
 - `initial_generation_result.json:4-6` leaks absolute local paths incl. a third-party name
   (D-10). **Now untracked** with the rest of `applications/`, but still present in public
   history.
 - **`profile_id` is resolved before any paid work, on purpose.** A missing or unknown id must
   cost nothing and leave no folder behind. If you reorder `tailor_documents`, keep the
   resolution first — a test asserts no API call happens when it fails.
+- **`ApplicationStore` appends the candidate segment itself.** Pass it the *parent* of
+  `ProfileStore.outputs_dir(profile_id)` — that method already ends in the id, so passing it
+  directly nested the id twice (`<store>/outputs/<id>/<id>/<job_id>`) and broke the documented
+  layout silently. A regression test pins the exact relative path.
 - **`Config.profile_path` and `Config.profile_id` are different things and only one may be
   set.** `profile_path` means "the caller named a file" and deliberately bypasses the store
   lookup; `profile_id` means "look it up". Code that sets both is a bug.

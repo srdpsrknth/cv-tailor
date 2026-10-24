@@ -133,7 +133,7 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 | **D-6** | Unused dependencies | grep: no imports in `backend/` | **Pruned:** `pydantic-settings`, `python-multipart`, `tiktoken`, `httpx`, `pytest-asyncio`, `black`, `ruff`. Kept `tzdata` (needed by `ZoneInfo` on Windows), `pytest`, `streamlit` and `requests` (used indirectly). **Correction:** `pandas` is *not* in `requirements.txt` and *is* used at `ui/app.py:231-232`; it arrives transitively via streamlit. |
 | **D-7** | ~~`ErrorResponse`, `TailoredOutput` defined and exported, never used~~ **RESOLVED in Phase 1** | `requests.py:44`, `tailored_output.py:71`, `models/__init__.py:19,25` | **Deleted**, including the exports. `TailoringExplanation` was kept — it is still used. |
 | **D-8** | `.github/copilot-instructions.md` (646 lines) describes a **different system**: Tectonic (not pdflatex), `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/` (87 files, absent), "Python 3.14+", `/api/preview` endpoint that does not exist | `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Still open.** Rewrite as a pointer to `AGENTS.md`. Highest-value remaining doc fix. |
-| **D-9** | Three generated binaries tracked in `outputs/` despite `.gitignore:45` | `git ls-files` shows adjoe CV PDF + CL DOCX + PDF | **Still open** — `git rm --cached` (needs approval). |
+| **D-9** | ~~Three generated binaries tracked in `outputs/` despite `.gitignore:45`~~ **RESOLVED in Phase 2** | `git ls-files` showed adjoe CV PDF + CL DOCX + PDF | **Untracked** via `git rm --cached` and gitignored; the repository's `outputs/` now holds only `.gitkeep`. `tests/test_privacy_boundary.py` fails if real data is re-tracked. Still present in already-published history — not rewritten ([ADR 0011](DECISIONS/0011-private-store-location.md)). |
 | **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | **Still open.** |
 | **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | Define one schema; migrate. **Phase 2.** |
 | **D-12** | ~~Two near-identical `_escape_latex` and three `_slugify` implementations~~ **RESOLVED in Phase 1** | `latex_renderer.py:349,357`, `docx_renderer.py:130,143`, `tailor_service.py:29` | **Consolidated** into `utils/text.py`. Behaviour was verified identical to both originals across the escaping edge cases — including the pre-existing quirk where the braces in `\textbackslash{}` are themselves escaped — and that is now pinned by a test. |
@@ -253,6 +253,13 @@ and each layout retry re-sends the entire context *plus* the full previous CV JS
 ---
 
 ## 6. Security and privacy
+
+> **Historical audit (pre-Phase 2).** The bullets under "Verified" below describe the repository as
+> it stood when this assessment was written. Phase 2 moved all real candidate data out: profiles,
+> applications and generated documents are untracked, gitignored, and live in the private store
+> ([ADR 0011](DECISIONS/0011-private-store-location.md)), with the boundary asserted by
+> `tests/test_privacy_boundary.py`. The *history* below was not rewritten — anything already
+> published stays published — so these findings still describe what is retrievable from old commits.
 
 **Verified**
 - **No credential was ever committed.** `.env` never in history; secret-pattern scan over
@@ -385,6 +392,14 @@ Start with **YAML/JSON on disk keyed by `profile_id`** (`storage/profiles/<id>/p
 `storage/profiles/<id>/applications/<job_id>/`). It preserves git-diffability and the current
 editing workflow. Adopt SQLite only when job-discovery volume (Phase 4) makes file scanning
 painful — not before. **No database server.**
+
+> **Implemented in Phase 2**, with two deviations from the sketch above:
+> - The store is **outside the repository** (`CVTAILOR_STORE`, default `./storage`; on this
+>   machine `D:\coding\cv-tailor-data`), because ADR 0002 requires real data not to be committed
+>   here. The `<store>/profiles/<id>/profile.yaml` shape is as sketched.
+> - Applications are kept **shared** at `<store>/applications/<job_id>/`, not nested under the
+>   profile, because `job_id` is posting-derived and candidate-free. Generated documents go to
+>   `<store>/outputs/<profile_id>/<job_id>/`, where the candidate segment does isolate them.
 
 ---
 

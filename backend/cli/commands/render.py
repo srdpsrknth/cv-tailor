@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from cli.context import CliError, Console, EXIT_NOT_FOUND, EXIT_USAGE, human_pages
+from services.profile_store import resolve_profile_id
 
 
 def _load_file(path: Path):
@@ -30,17 +31,25 @@ def find_content(explicit, config) -> Path:
             )
         return path
 
-    # Fall back to the most recently modified saved application.
+    # Fall back to the most recently modified saved application for this candidate.
+    # Since ADR 0011 the documents live in the store, under a candidate segment, so a
+    # single ``*/source`` glob against the repository's outputs/ finds nothing.
+    profile_id = resolve_profile_id(config)
     candidates = sorted(
-        config.outputs_dir.glob("*/source/content.json"),
+        config.store.outputs_dir(profile_id).glob("*/source/content.json"),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
     if not candidates:
         raise CliError(
-            f"No saved applications under {config.outputs_dir}",
+            f"No saved applications for {profile_id!r} under "
+            f"{config.store.outputs_dir(profile_id)}",
             EXIT_NOT_FOUND,
-            hint="Pass --content <application>/source/content.json",
+            hint=(
+                "Pass --content <application>/source/content.json. Note that a job "
+                "folder without source/content.json (a partial or pre-Phase-2 folder) "
+                "has no editable text to render."
+            ),
         )
     return candidates[0]
 

@@ -32,7 +32,7 @@ def _this_files_own_candidate(tmp_path, monkeypatch, profile):
 
     from services.profile_store import ProfileStore
 
-    store_root = tmp_path / 'unit-profile-store'
+    store_root = tmp_path
     store = ProfileStore.at(store_root)
     directory = store.profiles_dir / 'unit_candidate'
     directory.mkdir(parents=True)
@@ -68,6 +68,8 @@ def write_pdf(path, pages):
 
 def configure(monkeypatch, tmp_path, profile, pages, responses):
     monkeypatch.setattr(service, 'PROJECT_ROOT', tmp_path)
+    # The autouse fixture roots the store at tmp_path, so ``<store>/outputs`` is
+    # ``<tmp_path>/outputs`` -- exactly what these tests assert against.
     monkeypatch.setenv('OUTPUTS_DIR', str(tmp_path / 'mirror'))
     fake = Mock()
     fake._call_gemini.side_effect = [(text, 100, 20) for text in responses]

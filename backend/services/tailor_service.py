@@ -188,20 +188,34 @@ def tailor_documents(
         company_name or cl.company_name, role_title or cl.role_title, slugify,
         profile_id=resolved_profile_id,
     )
-    store = ApplicationStore(
-        project_root=PROJECT_ROOT, job_id=job_id, profile_id=resolved_profile_id
+    # Root the job folder in the *store* when the store is authoritative. ADR 0011
+    # puts real candidate data outside the public repository, so writing documents to
+    # <repo>/outputs/ would contradict the privacy model even though that path is
+    # gitignored: a stray `git add -f`, a backup or an archive would publish them.
+    # A loose `--profile <path>` names no store, so it keeps the repository root.
+    #
+    # ``ApplicationStore`` appends the candidate segment itself, so it takes the
+    # parent of ``ProfileStore.outputs_dir()`` -- passing the per-profile directory
+    # would nest the id twice.
+    outputs_root = (
+        config.store.outputs_dir(resolved_profile_id).parent
+        if config.profile_path is None
+        else PROJECT_ROOT / "outputs"
     )
-    store.create(profile.model_dump(), job_description)
-    store.save_drafts(generator.drafts)
+    applications = ApplicationStore(
+        outputs_root=outputs_root, job_id=job_id, profile_id=resolved_profile_id
+    )
+    applications.create(profile.model_dump(), job_description)
+    applications.save_drafts(generator.drafts)
 
-    latex = create_latex_renderer(outputs_dir=str(store.job_folder))
-    docx = create_docx_renderer(outputs_dir=str(store.job_folder))
+    latex = create_latex_renderer(outputs_dir=str(applications.job_folder))
+    docx = create_docx_renderer(outputs_dir=str(applications.job_folder))
     position = role_title or cl.role_title
     page_count = 0
     history = []
 
     def save_content() -> None:
-        store.save_content({
+        applications.save_content({
             "company_name": cl.company_name, "role_title": position,
             "work_country": work_country,
             "cv": cv.model_dump(), "cover_letter": cl.model_dump(),
@@ -218,7 +232,7 @@ def tailor_documents(
             if attempt == MAX_LAYOUT_ATTEMPTS - 1:
                 raise ValueError(
                     f"CV is still {page_count} pages after four layout attempts. "
-                    f"Editable drafts are saved at {store.source_folder}; generation "
+                    f"Editable drafts are saved at {applications.source_folder}; generation "
                     "was not marked successful."
                 )
             cv, explanation = generator.shorten_cv(
@@ -234,8 +248,8 @@ def tailor_documents(
     except Exception as error:
         # Preserve everything editable, then mark the folder failed explicitly (D-14).
         save_content()
-        store.save_drafts(generator.drafts)
-        store.save_failure(str(error), history)
+        applications.save_drafts(generator.drafts)
+        applications.save_failure(str(error), history)
         raise
 
     # Separate CV/letter usage and include every review and shortening attempt.
@@ -249,18 +263,18 @@ def tailor_documents(
         job_id=job_id, cv_path=str(cv_path), cover_letter_path=str(cl_path),
         cl_pdf_path=str(cl_pdf_path), token_usage=usage,
         cv_page_count=page_count, cover_letter_page_count=cl_pages,
-        source_path=str(store.source_folder / "content.json"),
+        source_path=str(applications.source_folder / "content.json"),
         tailoring_explanation=explanation_dict,
         message=(
             f"CV checked: {page_count} pages. Cover letter: {cl_pages} page, "
             f"{sum(len(p.split()) for p in cl.paragraphs)} words."
         ),
     )
-    store.save_drafts(generator.drafts)
+    applications.save_drafts(generator.drafts)
     # Mirroring is read from the config at call time, never at import time.
-    mirror = store.mirror(result, config)
-    store.save_manifest(result.model_dump(), history)
+    mirror = applications.mirror(result, config)
+    applications.save_manifest(result.model_dump(), history)
     if mirror is not None:
-        store.save_manifest_copy(mirror)
+        applications.save_manifest_copy(mirror)
     logger.info("Generated %s: %s CV pages; layout history %s", job_id, page_count, history)
     return result

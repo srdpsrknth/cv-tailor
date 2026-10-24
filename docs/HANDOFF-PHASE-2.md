@@ -1,5 +1,11 @@
 # Handoff — start of Phase 2
 
+> **Status: DISCHARGED (2026-10-24).** Phase 2 is implemented, committed and pushed. This file
+> is kept as the historical record of how Phase 2 was planned and what hazards it warned
+> about — its entry conditions and order of work below have been carried out. For current
+> state, read [`PROJECT_STATE.md`](PROJECT_STATE.md) instead. The §4 privacy warning is
+> resolved for *new* data and explicitly **not** resolved for already-published history.
+
 **Written:** 2026-10-24, at the end of Phase 1.
 **Branch:** `refactor/architecture-v2` (worktree `D:\coding\cv-tailor-next`), at `3e779f5`.
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — untouched, still usable.
@@ -13,8 +19,10 @@ This file exists so a **new chat** can begin Phase 2 without the Phase 1 convers
 
 1. `git -C D:\coding\cv-tailor-next status --short` → clean.
 2. `git rev-parse --abbrev-ref HEAD` → `refactor/architecture-v2`.
-3. `.venv\Scripts\python.exe -m pytest -q` → **190 passed** in ~110 s (fully offline).
-4. Fast lane while iterating: `-m "not requires_latex"` → 160 passed in ~5 s.
+3. `.venv\Scripts\python.exe -m pytest -q` → **190 passed** in ~110 s when this was written
+   (**262 passed** now, after Phase 2).
+4. Fast lane while iterating: `-m "not requires_latex"` → 160 passed in ~5 s when this was
+   written (**232 passed** now).
 5. `git log --oneline -1` → `3e779f5` or later.
 
 If the suite is not 190 green, **stop and find out why** before changing anything. The whole

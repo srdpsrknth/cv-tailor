@@ -109,16 +109,38 @@ def check_profile(config) -> Check:
 
 
 def check_outputs(config) -> Check:
-    directory = Path(config.outputs_dir)
-    try:
-        directory.mkdir(parents=True, exist_ok=True)
-        probe = directory / ".doctor-write-probe"
-        probe.write_text("ok", encoding="utf-8")
-        probe.unlink()
-    except OSError as error:
-        return Check("outputs", FAIL, f"{directory}: {error}", "Check directory permissions.")
-    scope = "mirror configured" if config.is_mirroring else "default"
-    return Check("outputs", OK, f"{directory} ({scope})")
+    """Check the writable output locations.
+
+    Since ADR 0011 documents are written into the store, so the *primary* location is
+    ``<store>/outputs/<profile_id>``. ``config.outputs_dir`` remains the optional
+    mirror. Both are probed, and the message names them, because a failing mirror
+    alone should not read as "generation is broken".
+    """
+    profile_id = getattr(config, "profile_id", None)
+    primary = (
+        config.store.outputs_dir(profile_id)
+        if profile_id
+        else config.store.root / "outputs"
+    )
+    targets = [primary]
+    if config.is_mirroring:
+        targets.append(Path(config.outputs_dir))
+
+    for directory in targets:
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            probe = directory / ".doctor-write-probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+        except OSError as error:
+            return Check(
+                "outputs", FAIL, f"{directory}: {error}", "Check directory permissions."
+            )
+
+    detail = f"store: {primary}"
+    if config.is_mirroring:
+        detail += f"; mirror: {config.outputs_dir}"
+    return Check("outputs", OK, detail)
 
 
 def check_timezone() -> Check:

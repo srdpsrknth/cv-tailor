@@ -115,7 +115,7 @@ without waiting for discovery or tracking.
 - **Unblocked by Phase 1:** candidate rules are already profile-scoped (A-1), so no validator
   change is needed to support a second candidate.
 
-### Delivered (three commits, `f583349` + 2; suite **190 → 261**)
+### Delivered (three commits, `f583349` + `86b1a0d` + the store-outputs fix; suite **190 → 262**)
 
 - **`ProfileStore`** (`f583349`) — the store is the only place that decides where a profile
   lives, keyed by `profile_id` with the layout ADR 0004 approved. `profile_id` is threaded
@@ -127,6 +127,12 @@ without waiting for discovery or tracking.
   boundary and fails if it regresses.
 - **A-9 fixed** — `outputs/<profile_id>/<job_id>/`. Two candidates on one posting now write to
   different trees; the mirror path carries the candidate segment too.
+- **Documents land in the store** — found while auditing the documentation after Phase 2 was
+  declared complete: `ApplicationStore` was still rooted at `PROJECT_ROOT`, so real documents
+  were written into the public repository's gitignored `outputs/` rather than the store,
+  contradicting [ADR 0011](DECISIONS/0011-private-store-location.md). Now rooted at
+  `<store>/outputs/<profile_id>/`, with a regression test that fails if it moves back. `doctor`
+  and `render`'s fallback lookup follow the store as well.
 - **CLI** — `profile list | new | import | export` beside `show`, and `--profile-id`. `doctor`
   reports the store and which profiles it holds.
 - **Migration** — the real profile was copied byte-for-byte (verified by SHA-256) into
@@ -137,8 +143,9 @@ without waiting for discovery or tracking.
   a well-formed-but-nonexistent id created `outputs/<typo>/` and generated documents for an
   unnamed candidate; and `profile` + `profile_id` could be paired across two different
   candidates, filing the wrong person's documents under the wrong id.
-- **Deferred to a later increment, deliberately:** date validation (A-6), D-9 (generated
-  documents tracked in `outputs/` — resolved by the untracking above), the `outputs/`
+- **Resolved by the same change:** D-9 — generated PDFs/DOCX were tracked in `outputs/` despite
+  `.gitignore`; they left the index with the rest of the real data.
+- **Deferred to a later increment, deliberately:** date validation (A-6), the `outputs/`
   artifact-filename convention, and the `\needspace` parity gap.
 
 **Not undone:** the data already published in the public repository's history stays published.
