@@ -1,6 +1,0 @@
-{
-  "focus": "Digital advertising analytics, scenario forecasting, account-team recommendations and reliable reporting. Prioritized relevant SQL, Python, Google Sheets automation, BI, GA4 and foundational modeling skills.",
-  "unsupported_requirements": "No Salesforce, direct retail partner sales, trading-process ownership, lead-identification modeling, or management-level title claimed. Google Sheets Automation is explicitly present in the authoritative profile.",
-  "corrections": "Restored cities rather than markets, marketing budget rather than capital allocation, contributor wording for ROAS, separated reporting savings from payment automation, restored Python K-means rather than unverified BigQuery clustering, and attributed heycar lead gains to channel optimization rather than experimentation.",
-  "commercial_technical_revision": "Commercial outcomes moved ahead of methods: 72-brand CSM adoption, 51-city scenario decisions, budget shifts and lead gains. Retained SQL/Python, event/journey pipelines, leave-one-out benchmarking, Markov attribution, K-means, dbt/Airflow, reconciliation and semantic layers. Shortened application-specific technology lists without changing profile inventory; source/render_application.py reproduces overrides. Cover letter revised to explain Shopping Partners fit; 294 words."
-}

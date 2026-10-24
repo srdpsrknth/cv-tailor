@@ -58,6 +58,32 @@ python3.12 scripts/setup.py
 `scripts/setup.py` never overwrites an existing `.env`. Never copy a `.venv` between
 operating systems, and never commit one.
 
+### The private profile store
+
+Real candidate data does **not** live in this repository (ADR 0002, ADR 0011). It lives in a
+separate private store, named by `CVTAILOR_STORE`:
+
+```
+<store>/profiles/<profile_id>/profile.yaml
+<store>/outputs/<profile_id>/<job_id>/
+<store>/applications/<job_id>/source/
+```
+
+On this machine the store is `D:\coding\cv-tailor-data`, and it is its own Git repository.
+Point a worktree at it in `.env`:
+
+```
+CVTAILOR_STORE=D:/coding/cv-tailor-data
+CVTAILOR_PROFILE_ID=sreedeep
+```
+
+`profile_id` is required and fails closed: there is no default profile (ADR 0003). Use
+`cvtailor profile list` to see the ids in a store, and `cvtailor profile import <path>
+--profile-id <id>` to add one. The store's own `README.md` describes its layout.
+
+A fresh clone has no store; `CVTAILOR_STORE` then defaults to `./storage`, which is gitignored
+for exactly that reason — do not commit what ends up there.
+
 ### Known issue: `pip install` hangs on a stale HTTP cache
 
 On this machine, `pip install -r requirements.lock.txt` hung indefinitely — high CPU,

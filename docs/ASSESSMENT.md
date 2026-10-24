@@ -16,6 +16,14 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > **A-5** (single `Config`, no import-time reads), **A-9** (partially: see the row), and
 > **D-1, D-2, D-5, D-6, D-7, D-12**. See [`PROJECT_STATE.md`](PROJECT_STATE.md) §"Resolved in
 > Phase 1" and [`ROADMAP.md`](ROADMAP.md) §Phase 1 for the evidence.
+>
+> **Status note (2026-10-24, after Phase 2):** Phase 2 added profile identity and implemented
+> the privacy split. Newly resolved: **A-9** (the candidate segment is now in the output path),
+> **D-9** (generated documents are untracked) and the committed-data half of §6. Still open
+> after Phase 2: **A-6** (dates), **A-7** (renderer mutation), **A-8** (custom render scripts),
+> **A-10** (`--mirror-configured`), **D-4**, **D-8**, **D-10**, **D-11**, **D-13**, **D-14**.
+> **§6's recommendation is implemented but its history warning is not resolved**: the data
+> already committed remains in the public repository's history.
 
 ---
 
@@ -103,10 +111,10 @@ tailor_documents()                             backend/services/tailor_service.p
 | A-3 | ~~**Orchestration, validation, persistence and mirroring in one 296-line function**~~ **RESOLVED in Phase 1** | `tailor_documents` `tailor_service.py:109-296` | Split into `services/generation.py` (prompts, LLM, validation, retries) and `services/application_store.py` (folders, manifests, mirroring); `tailor_documents` is now a thin facade with an unchanged signature. |
 | A-4 | **No service layer between API and logic** | `main.py:41` calls `tailor_documents` directly; `ui/app.py` duplicates cost maths (`ui/app.py:239-252`) vs `gemini_service.py:28` | Partly addressed: a real service layer now exists. The UI still duplicates pricing (D-4). |
 | A-5 | ~~**Global config read at import time**~~ **RESOLVED in Phase 1** | `gemini_service.py:21-24` module-level `os.getenv`; `main.py:22` | One `Config` object, resolved at call time; no import-time reads, guarded by a test. See [ADR 0010](DECISIONS/0010-config-object.md). |
-| A-6 | **Dates are unvalidated strings** | `profile.py:41-42`; verified: `start_date='not-a-date'` is accepted | Multi-profile data integrity risk. **Still open.** |
+| A-6 | **Dates are unvalidated strings** | `profile.py:41-42`; verified: `start_date='not-a-date'` is accepted | Multi-profile data integrity risk. **Still open** — deliberately deferred out of the Phase 2 increment. Two tests pin the current (wrong) behaviour as tripwires. |
 | A-7 | **Renderer mutates the caller's model** | `docx_renderer.py:304-307` mutates `cl.paragraphs` in place — **verified** | Re-render/retry yields different output than the first pass. **Still open.** |
 | A-8 | **Per-application custom render scripts monkey-patch renderer internals** | `applications/.../delivery_hero/source/render_application.py:10-31` replaces `LaTeXRenderer.__init__` and rewrites template text at runtime | Page-break tuning is unmodelled and unreproducible. **Still open.** |
-| A-9 | **`job_id` collision** | `tailor_service.py:200` — slug + ms timestamp of the *posting*, no candidate segment | **Partially addressed:** the generation is unchanged and now isolated in `ApplicationStore.make_job_id`, but it still carries no candidate segment. The real fix is `profile_id` in Phase 2. |
+| A-9 | ~~**`job_id` collision**~~ **RESOLVED in Phase 2** | `tailor_service.py:200` — slug + ms timestamp of the *posting*, no candidate segment | Fixed by `outputs/<profile_id>/<job_id>/`: the candidate segment is now part of the path, so two profiles on one posting cannot collide. The slug itself stays candidate-free because the render filename convention depends on it; the folder carries the identity. Verified by `test_profile_isolation.py`. |
 | A-10 | **`--mirror-configured` writes anywhere** | `tailor_service.py:279-294`, `render_application.py:69-80`; `dirs_exist_ok=True` at `:291` | Partly addressed: mirroring is now one method, skips a self-mirror, and the CLI shows the resolved path and confirms before writing outside the job folder. A typo'd absolute path can still write elsewhere. |
 
 ---
@@ -277,6 +285,16 @@ which would break the plaintext UI and grep-ability.
 
 *History rewriting is not required to add profiles, but is required to un-disclose data
 already public. Do not rewrite history or change visibility without explicit approval.*
+
+**Implemented 2026-10-24 (Phase 2).** The split above is now real: real profiles,
+`applications/` and `outputs/` are untracked and gitignored, and live in a private sibling
+repository ([ADR 0011](DECISIONS/0011-private-store-location.md)). A test asserts the boundary
+and fails if it regresses.
+
+**The history warning above still stands.** Untracking stops *future* exposure; it does not
+un-publish anything. As this document predicted, un-disclosing the data already committed
+requires a history rewrite, which has **not** been approved or performed. Anyone who cloned the
+public repository before 2026-10-24 still has the profile and the 64 application files.
 
 ---
 

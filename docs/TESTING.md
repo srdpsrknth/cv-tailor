@@ -1,23 +1,43 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **190 passed**, 1 warning, ~110 s, fully offline — no paid API calls.
+**Current baseline:** **261 passed**, 1 warning, ~106 s, fully offline — no paid API calls.
 
 | | |
 |---|---|
 | Baseline before Milestone 1.1 | 12 passed, ~2.5 s |
 | Baseline after Milestone 1.1 | 141 passed, ~100 s |
-| Baseline after Phase 1 | **190 passed**, ~110 s |
+| Baseline after Phase 1 | 190 passed, ~110 s |
+| **Baseline after Phase 2** | **261 passed**, ~106 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
-The suite grew 12 → 141 in Milestone 1.1 and 141 → 190 in Phase 1. The runtime increase is
-almost entirely `pdflatex`: real rendering is exercised instead of mocked.
+The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, and 190 → 261 in Phase 2. The
+runtime increase is almost entirely `pdflatex`: real rendering is exercised instead of mocked.
+Phase 2's 71 new tests are all offline and add ~1 s.
 
-**No test that existed at `325c4d1` has been modified.** Every Phase 1 refactor was required to
-keep the pre-existing suite passing verbatim; where a refactor needed to preserve a test's
-assumptions (a monkeypatched zero-argument `GeminiService`, the underscored helper names), the
-production code was shaped to fit rather than the test being edited.
+**No test that existed at `325c4d1` has been modified in behaviour.** Two Phase 2 exceptions,
+both forced by the layout change the phase exists to make, and both **stricter** afterwards:
+
+| Test | Change | Why |
+|---|---|---|
+| `test_tailoring_pipeline.py::test_artifacts_are_persisted_under_the_job_folder` | asserted `outputs/<job_id>/`; now `outputs/<profile_id>/<job_id>/` and additionally asserts the id | The path *is* the feature (ADR 0003); the new claim is stronger, not weaker |
+| `test_tailor_service.py` + `test_tailoring_pipeline.py` glob patterns | `outputs/*/source/...` → `outputs/*/*/source/...` | Same reason: one more path segment now exists |
+
+Everything else passes unchanged. Rather than edit 32 call sites to thread a `profile_id` they
+are not about, `tests/conftest.py` sets `CVTAILOR_PROFILE_ID` and points `CVTAILOR_STORE` at a
+throwaway synthetic store once, for the whole suite.
+
+### Phase 2 additions
+
+| File | Tests | Covers |
+|---|---|---|
+| `test_profile_store.py` | 46 | The store layout; fail-closed resolution for missing/blank/malformed/unknown ids; path-traversal rejection; verbatim import; refuse-to-overwrite; listing; `Config` integration |
+| `test_profile_isolation.py` | 12 | ADR 0003's five hazards, one test each: separate folders for one posting, A-untouched-when-B-runs, per-candidate snapshots, per-candidate validation, per-candidate mirror paths — plus no cross-contamination in prompts, and fail-closed costing no API call |
+| `test_privacy_boundary.py` | 13 | The real profile, applications and `outputs/` are **not tracked**; they are gitignored; a broad `git add -A` cannot stage them; fixtures stay tracked and contain no real identity; no hardcoded private path in committed code |
+
+`test_privacy_boundary.py` was verified to **fail** when the real profile is re-tracked, so it
+is a real guard rather than a passing formality.
 
 ---
 
@@ -67,6 +87,15 @@ artifacts and may need an unconfined delete.
 # Configuration behaviour
 .venv\Scripts\python.exe -m pytest -q tests/test_config.py
 
+# Multi-profile: the store and its fail-closed rule (~0.4 s)
+.venv\Scripts\python.exe -m pytest -q tests/test_profile_store.py
+
+# Multi-profile: candidate isolation (~1 s)
+.venv\Scripts\python.exe -m pytest -q tests/test_profile_isolation.py
+
+# The public/private data boundary
+.venv\Scripts\python.exe -m pytest -q tests/test_privacy_boundary.py
+
 # Only document output
 .venv\Scripts\python.exe -m pytest -q tests/test_renderers_documents.py tests/test_render_application_determinism.py
 
@@ -90,6 +119,9 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | `test_render_application_determinism.py` | 11 | `scripts/render_application.py` end to end as a subprocess: identical content → identical page count *and* identical text, in-place stability, manifest handling, residue cleanup, failure paths |
 | `test_cli.py` | 22 | **New in Phase 1.** Guided default, exit codes, `doctor` (including its refusal to verify the key unless asked), `profile show`, and every `render`/`generate` failure path — plus two LaTeX-gated tests: one rendering without an API key, one asserting the CLI's page count equals the existing script's |
 | `test_config.py` | 13 | **New in Phase 1.** Defaults with an empty environment, call-time (not import-time) reads, relative vs absolute `OUTPUTS_DIR`, the placeholder-key case, immutability, override typos failing loudly, and a guard that importing the backend performs no environment read |
+| `test_profile_store.py` | 46 | **New in Phase 2.** The store, and the fail-closed rule in ADR 0003 |
+| `test_profile_isolation.py` | 12 | **New in Phase 2.** Two candidates cannot contaminate each other |
+| `test_privacy_boundary.py` | 13 | **New in Phase 2.** Real data stays out of the public repository |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
 | `test_portability.py` | 2 | *(pre-existing)* pdflatex discovery and `LATEX_COMPILER` override |
@@ -122,6 +154,17 @@ behavioural test:
 | 16 | Configuration (new in Phase 1) | `test_config.py` |
 | 17 | Candidate-scoped validation rules (new in Phase 1) | `test_tailoring_pipeline.py` (7 A-1 tests) |
 | 18 | Command-line interface (new in Phase 1) | `test_cli.py` |
+| 19 | Profile resolution and the store (new in Phase 2) | `test_profile_store.py` |
+| 20 | Cross-profile isolation (new in Phase 2) | `test_profile_isolation.py` |
+| 21 | Public/private data boundary (new in Phase 2) | `test_privacy_boundary.py` |
+
+### Isolation test caveat
+
+`test_profile_isolation.py` needs a genuine `profile_id`↔profile match, so it passes the
+candidate explicitly rather than relying on the suite-wide default. The suite-wide default in
+`conftest.py` is a convenience for tests that are *not* about identity; the isolation tests
+never depend on it, and `test_profile_store.py` removes it entirely so its fail-closed
+assertions cannot pass for the wrong reason.
 
 ---
 

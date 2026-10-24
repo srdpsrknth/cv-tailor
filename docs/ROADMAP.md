@@ -93,7 +93,7 @@ without waiting for discovery or tracking.
 
 ---
 
-## Phase 2 — Multi-profile architecture
+## Phase 2 — Multi-profile architecture *(IMPLEMENTED 2026-10-24)*
 
 - **Objective:** let several candidates each own their data.
 - **User value:** the headline feature; also enables anonymised testing.
@@ -114,6 +114,36 @@ without waiting for discovery or tracking.
   profile.
 - **Unblocked by Phase 1:** candidate rules are already profile-scoped (A-1), so no validator
   change is needed to support a second candidate.
+
+### Delivered (three commits, `f583349` + 2; suite **190 → 261**)
+
+- **`ProfileStore`** (`f583349`) — the store is the only place that decides where a profile
+  lives, keyed by `profile_id` with the layout ADR 0004 approved. `profile_id` is threaded
+  through `Config`, `tailor_documents`, `ApplicationStore` and the CLI, and **fails closed**:
+  missing, empty, malformed or unknown ids all raise. There is no default and no inference.
+- **The private-store split** — real profiles, `applications/` and `outputs/` are no longer
+  tracked (ADR 0002 implemented as [ADR 0011](DECISIONS/0011-private-store-location.md)); the
+  store lives in a sibling private repository. `tests/test_privacy_boundary.py` asserts the
+  boundary and fails if it regresses.
+- **A-9 fixed** — `outputs/<profile_id>/<job_id>/`. Two candidates on one posting now write to
+  different trees; the mirror path carries the candidate segment too.
+- **CLI** — `profile list | new | import | export` beside `show`, and `--profile-id`. `doctor`
+  reports the store and which profiles it holds.
+- **Migration** — the real profile was copied byte-for-byte (verified by SHA-256) into
+  `profiles/sreedeep/profile.yaml`, and loads through the store with all six roles, its two
+  degrees, its certifications and its complete `rules:` block intact. All 64 application files
+  and the generated `outputs/` artifacts moved with it.
+- **Two real defects found by writing the tests**, both silent:
+  a well-formed-but-nonexistent id created `outputs/<typo>/` and generated documents for an
+  unnamed candidate; and `profile` + `profile_id` could be paired across two different
+  candidates, filing the wrong person's documents under the wrong id.
+- **Deferred to a later increment, deliberately:** date validation (A-6), D-9 (generated
+  documents tracked in `outputs/` — resolved by the untracking above), the `outputs/`
+  artifact-filename convention, and the `\needspace` parity gap.
+
+**Not undone:** the data already published in the public repository's history stays published.
+Untracking is not un-disclosure; purging it needs a history rewrite and a force-push, which
+[ADR 0011](DECISIONS/0011-private-store-location.md) records as a separate unapproved decision.
 
 ---
 

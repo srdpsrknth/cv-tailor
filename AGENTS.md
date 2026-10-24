@@ -9,9 +9,11 @@ On a new Mac, read `docs/MAC_SETUP.md` first and follow its initialization and v
 
 Derive the project root from the clone. Use `.venv/bin/python` on macOS and `.venv/Scripts/python.exe` on Windows. Never assume this owner's Windows paths or copy an old virtual environment to a different OS. Do not print API keys or commit `.env`.
 
-The authoritative profile is `storage/profile/profile.yaml`. Preserve manual edits, titles, dates, factual ownership and ongoing-project status. Tailor wording and skills to each role without fabricating requirements. Keep sponsorship/support requirements only in overseas cover letters. Default CV limit: two pages; cover letter: four paragraphs, 290–310 body words, one page.
+**Profiles live in the private store, not in this repository** (ADR 0002, ADR 0011). The store is `CVTAILOR_STORE` (default `./storage`; on this machine `D:\coding\cv-tailor-data`), laid out as `<store>/profiles/<profile_id>/profile.yaml` with outputs at `<store>/outputs/<profile_id>/<job_id>/`. Never commit a real profile, application or generated document here — this repository is public. Preserve manual edits, titles, dates, factual ownership and ongoing-project status. Tailor wording and skills to each role without fabricating requirements. Keep sponsorship/support requirements only in overseas cover letters. Default CV limit: two pages; cover letter: four paragraphs, 290–310 body words, one page.
 
-Saved applications are in `applications/<job_id>/source/`. Copy the application into `outputs/<job_id>/` before regenerating; use its application-specific render script when present. Generic rendering: `python scripts/render_application.py --project . --content outputs/<job_id>/source/content.json --mirror-configured`. Do not overwrite profile facts to satisfy a posting.
+**`profile_id` is required and fails closed** (ADR 0003). Never default a profile, never infer one, never fall back to "the only one". Pass `--profile-id <id>` or set `CVTAILOR_PROFILE_ID`; run `cvtailor profile list` to see the ids.
+
+Saved applications are in `<store>/applications/<job_id>/source/`. Copy the application into `<store>/outputs/<profile_id>/<job_id>/` before regenerating; use its application-specific render script when present. Generic rendering: `python scripts/render_application.py --project . --profile-id <id> --content <store>/outputs/<profile_id>/<job_id>/source/content.json --mirror-configured`. Do not overwrite profile facts to satisfy a posting.
 
 Run `python -m pytest -q` after code changes. Inspect rendered pages after document edits: no orphan headings, broken bullets, clipping, or excessive forced whitespace. Keep actual font size readable. DOCX and LaTeX PDF layouts differ; check both when delivering Word files.
 

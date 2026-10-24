@@ -5,11 +5,17 @@ description: Generate and revise job-specific CV PDFs and cover letters with the
 
 # CV Tailor Application
 
-Use the existing cv-tailor project, at the Git repository root, its `.venv/Scripts/python.exe`, `storage/profile/profile.yaml`, and current templates. Read files before edits and preserve user changes. Do not change model settings or profile facts to match a job.
+Use the existing cv-tailor project, at the Git repository root, its `.venv/Scripts/python.exe`, its profile store, and current templates. Read files before edits and preserve user changes. Do not change model settings or profile facts to match a job.
+
+## Profile store (never in the public repository)
+
+Profiles live **outside** this repository, in the private store named by `CVTAILOR_STORE` (default `./storage`; on this machine `D:\coding\cv-tailor-data`), as `<store>/profiles/<profile_id>/profile.yaml`. Never commit a real profile, application or generated document: this repository is public (ADR 0002, ADR 0011).
+
+`profile_id` is **required and fails closed** — there is no default profile and nothing infers one (ADR 0003). Name it with `--profile-id <id>` or `CVTAILOR_PROFILE_ID`, and run `cvtailor profile list` to see what exists. If an id is missing or unknown, stop and ask rather than guessing.
 
 ## Application folder and editable content
 
-Each application lives in `outputs/{year}_{company_slug}_{role_slug}_{timestamp}/`, matching the backend job_id convention. Use the user's year/timezone and lowercase underscore-separated slugs. Revisions reuse the same folder; do not scatter drafts or duplicate finals at the outputs root.
+Each application lives in `<store>/outputs/<profile_id>/{year}_{company_slug}_{role_slug}_{timestamp}/`, matching the backend job_id convention. The **candidate segment is part of the path**: it is what keeps two profiles applying to the same posting from overwriting each other, so always include it. Use the user's year/timezone and lowercase underscore-separated slugs. Revisions reuse the same folder; do not scatter drafts or duplicate finals at the outputs root.
 
 Keep CV PDF, cover-letter DOCX, and cover-letter PDF at the application's top level. Use the renderer's filenames: `{year}_CV_{name_slug}_{role_slug}.pdf` and `{year}_cover_letter_{company_slug}_{role_slug}.{docx,pdf}`. Preserve user-renamed files; update an existing alias when it represents the same deliverable rather than leaving stale copies.
 
@@ -42,8 +48,10 @@ For an overseas CV, set `cv.work_authorization` to a short application-specific 
 Render saved content without calling Gemini again:
 
 ```powershell
-& .venv/Scripts/python.exe scripts/render_application.py --project . --content outputs/<job_id>/source/content.json --mirror-configured
+& .venv/Scripts/python.exe scripts/render_application.py --project . --profile-id <profile_id> --content <store>/outputs/<profile_id>/<job_id>/source/content.json --mirror-configured
 ```
+
+`--profile-id` is required (or `CVTAILOR_PROFILE_ID` must be set): the render path no longer reads a hardcoded profile, so a missing id fails rather than rendering the wrong candidate.
 
 Use `--cv-only` or `--cover-letter-only` for scoped edits. Resolve the skill path from its installation if different. `--mirror-configured` copies generated deliverables to the existing `.env` OUTPUTS_DIR under the same application folder name while retaining local files and editable source.
 
@@ -55,4 +63,4 @@ Finish with links to final documents, page count, and actual limitations. Keep e
 
 ## Restoring saved applications
 
-Versioned `applications/<job_id>/source/` folders preserve reviewed content and job context. Copy the application folder into ignored `outputs/` before rendering. Use its `source/render_application.py` when present to preserve application-specific technology lists and page breaks; otherwise use `scripts/render_application.py`. Keep the current `.env` and profile local configuration when restoring.
+Versioned `<store>/applications/<job_id>/source/` folders preserve reviewed content and job context. Copy the application folder into `<store>/outputs/<profile_id>/<job_id>/` before rendering. Use its `source/render_application.py` when present to preserve application-specific technology lists and page breaks; otherwise use `scripts/render_application.py`. Keep the current `.env` and profile local configuration when restoring.

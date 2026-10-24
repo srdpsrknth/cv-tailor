@@ -27,7 +27,12 @@ def main():
         parser.error('Keep editable content at <application-folder>/source/content.json')
     sys.path.insert(0, str(root / 'backend'))
     from dotenv import dotenv_values, load_dotenv
-    load_dotenv(root / '.env', override=True)
+    # override=False: an explicitly exported variable must beat the .env file.
+    # With override=True, a caller that set CVTAILOR_STORE or CVTAILOR_PROFILE_ID in
+    # its environment was silently ignored in favour of whatever this checkout's
+    # .env happens to point at -- which rendered a different candidate's profile
+    # with no error at all.
+    load_dotenv(root / '.env', override=False)
     from config import Config
     from services.profile_store import InvalidProfileIdError, UnknownProfileError
     from models.tailored_output import TailoredCV, TailoredCoverLetter

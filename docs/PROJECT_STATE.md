@@ -1,33 +1,57 @@
 # Project state
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-24
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `179bd83` — *feat: add the cvtailor CLI*
+**Latest commit:** `f583349` — *feat: key profiles and outputs by an explicit profile_id*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 1 — core refactoring and CLI foundations. COMPLETE (code + tests + docs).**
+**Phase 2 — multi-profile architecture. IMPLEMENTED (code + tests + migration + docs).**
 
-All six increments are implemented, tested and committed as six focused commits on
-`refactor/architecture-v2` (`edb6efc`..`179bd83`). `master` is untouched.
+`ProfileStore` is in place, `profile_id` is threaded end to end and fails closed, the real
+profile has migrated into the private store, and the real data is no longer tracked in the
+public repository. `master` is untouched.
 
-**Next action: begin Phase 2 — multi-profile architecture**
-(see [`ROADMAP.md`](ROADMAP.md) §Phase 2 and the dedicated
-[`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md), which lists the entry conditions, the order of
-work and the hazards). Phase 1 removed the blocker: candidate-specific validation rules are now
-profile-scoped data (A-1), so a second profile can be added without inheriting the first
-candidate's rules.
+**Next action: decide what Phase 2 still owes before it is called complete.** The mechanism is
+done and proven; the remaining item is deliberate, not accidental:
 
-**Read [`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md) before starting**: Phase 2 is the change that
-makes the still-unimplemented privacy model ([ADR 0002](DECISIONS/0002-privacy-model.md))
-urgent, because it introduces a second candidate's data.
+1. **`backend/main.py` is not multi-profile aware** (blocker 7 below). It still calls
+   `load_profile()` with no argument, so the FastAPI endpoint would fail closed and cannot
+   reach any profile in the store. This is the largest functional gap left, and it has no
+   tests at all.
+2. **Date validation (A-6)** — still unvalidated strings. A genuine multi-profile integrity
+   risk, left out of this increment to keep it reviewable.
+3. **The history question** — the data already published stays published until a rewrite is
+   approved. This is a decision for the owner, not an implementation task. See
+   [ADR 0011](DECISIONS/0011-private-store-location.md).
+4. **Adding a second real candidate** — now unblocked, since new data lands in the private
+   store from the start.
 
-Start Phase 2 by re-confirming the decisions listed under "Re-confirm each decision when its
-phase begins", then introduce `ProfileStore` keyed by `profile_id`.
+**Do not re-read [`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md) as a to-do list**: its entry
+conditions and order of work are discharged. Its §4 privacy warning is resolved for *new* data
+and explicitly **not** resolved for already-published history.
+
+### What Phase 2 delivered
+
+| Increment | Commit | Outcome |
+|---|---|---|
+| `profile_id` | `f583349` | `ProfileStore`, fail-closed threading, `outputs/<profile_id>/<job_id>/`, A-9 fixed, `profile list/new/import/export` |
+| Privacy split | *(this commit)* | Real profiles/applications/outputs untracked; private store created and populated; boundary asserted by tests |
+
+### Acceptance criteria — verified
+
+| Criterion | Result |
+|---|---|
+| Two profiles generate independently, no cross-contamination | **Yes** — `tests/test_profile_isolation.py`, 11 tests |
+| `profile_id` explicit and fail-closed; no code path defaults | **Yes** — `tests/test_profile_store.py`, 46 tests |
+| Migration preserves facts, titles, dates and `rules:` block | **Yes** — copied byte-for-byte, SHA-256 verified, then loaded through the store |
+| The real profile is not in the public repo | **Yes, for new commits** — untracked and gitignored, asserted by `tests/test_privacy_boundary.py`. **Not** removed from existing history |
+| 190 existing tests still pass | **Yes** — 190 unchanged in behaviour; 2 had path assertions updated (see below) |
+| `pytest -q` green and offline | **261 passed** in ~106 s, no paid API calls |
 
 ### What Phase 1 delivered
 
@@ -54,7 +78,9 @@ phase begins", then introduce `ProfileStore` keyed by `profile_id`.
 
 1. **Privacy** — real profiles/applications/outputs move to a **private store**; commit only
    synthetic examples. Reachability from any machine is handled later by a remote store
-   ([0006](DECISIONS/0006-remote-profile-access.md)).
+   ([0006](DECISIONS/0006-remote-profile-access.md)). **Implemented in Phase 2** — the store
+   is `D:\coding\cv-tailor-data`, its own private Git repository
+   ([0011](DECISIONS/0011-private-store-location.md)).
 2. **Architecture** — Option B, modular redesign, incrementally.
 3. **Storage** — files keyed by `profile_id`, **local first**, no database server.
 4. **CLI** — `argparse` plus a friendliness layer (guided default, prompts, `doctor`, `--json`).
@@ -75,12 +101,14 @@ Re-confirm each decision when its phase begins.
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
 | Dev branch | 10 commits ahead of `master` — Phase 1 complete |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **190 passed** (~110 s); fast lane `-m "not requires_latex"` → 160 passed (~5 s) |
-| CLI | **Working** — `python cvtailor.py <command>` (or `backend/cli/__main__.py`) |
-| Fixtures | Synthetic only — `tests/fixtures/`, verified free of real personal data |
+| Test baseline | **261 passed** (~106 s); fast lane `-m "not requires_latex"` → 231 passed (~5 s) |
+| CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
+| Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
+| Private store | **`D:\coding\cv-tailor-data`** — its own Git repo, 70 tracked files (profile + 8 applications + outputs) |
+| Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
-| Decisions | 9 approved; **ADR 0010** added for the config object |
-| Roadmap | Phase 0, 1.1 and **1 complete**; Phase 2 next |
+| Decisions | 10 approved; **ADR 0011** added for the private store and the history decision |
+| Roadmap | Phase 0, 1.1, **1 and 2 implemented**; Phase 2 tail (A-6, `main.py`) outstanding |
 
 ### Verified baseline facts
 
@@ -103,24 +131,50 @@ Re-confirm each decision when its phase begins.
 1. **`GEMINI_API_KEY` is not set in this worktree's `.env`.** `cvtailor doctor` reports it as
    the only real blocker. The owner must enter it directly — never paste it into a chat. Live
    generation in this worktree is blocked until then; rendering, the CLI and all tests are not.
-2. **Privacy model not yet implemented** ([ADR 0002](DECISIONS/0002-privacy-model.md)). Real
-   personal data — including immigration status — is still committed to a **public** repo.
-   This must be implemented before a second real candidate is added, which is exactly what
-   Phase 2 introduces. **Resolve this at the start of Phase 2, not after.**
-3. **Sandbox caveat:** under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
+2. **The already-published personal data is still public.** Untracking stopped *future*
+   exposure; it did not un-publish anything. `storage/profile/profile.yaml` — name, email,
+   mobile, city, immigration status, employment history — and the 64 application files remain
+   in the public repository's **history**, retrievable by anyone who clones it. Removing them
+   requires a history rewrite and a force-push, which
+   [ADR 0011](DECISIONS/0011-private-store-location.md) records as **separate and not yet
+   approved**. New data for any candidate is safe from here on.
+3. **A-6: dates are still unvalidated strings.** Deferred out of the Phase 2 increment. Two
+   existing tests deliberately pin the current wrong behaviour
+   (`test_start_date_is_not_validated_yet`, `test_reversed_date_range_is_not_validated_yet`);
+   they are tripwires to be inverted when the validation lands, not endorsements.
+4. **The private store is not backed up beyond its own Git history.** It is a local repository
+   with no remote. Losing `D:\coding\cv-tailor-data` loses every profile.
+5. **Sandbox caveat:** under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
    on ACL operations, and this session additionally saw the venv Python denied **write** access
    to `outputs/` and `storage/profile/profile.yaml` while PowerShell could write both. That is
    an environment artifact, not a code fault — recorded in [`TESTING.md`](TESTING.md).
    `git commit` in this worktree needs unconfined access, because its git metadata lives in
    `D:\coding\cv-tailor\\.git`, outside the sandbox.
-4. **`docx_renderer.py:304-307` mutates the caller's model** — verified real bug, still
+6. **`docx_renderer.py:304-307` mutates the caller's model** — verified real bug, still
    unfixed and **still untested** (deliberately: pinning it would bless it). Its practical
    impact is bounded by `test_docx_contains_every_body_paragraph`.
-5. **`backend/main.py` has no tests.** The service layer now exists, so this is a contained
-   piece of work — it was left out of Phase 1 to keep the increments focused.
-6. **`render_application.py` and the CLI's `render` now duplicate render logic.** The CLI's
+7. **`backend/main.py` has no tests, and it now bypasses the store.** Its `/api/tailor`
+   endpoint calls `load_profile()` with no argument, which still reads the pre-Phase-2
+   default path. The API is therefore **not** multi-profile aware and will not find a profile
+   once one is not at `storage/profile/profile.yaml`. It was out of scope for this increment;
+   it is the most important piece of Phase 2 still outstanding.
+8. **`render_application.py` and the CLI's `render` now duplicate render logic.** The CLI's
    `render` does not yet add the `\needspace` project-heading pagination tweak that the script
    applies, so a CV that depends on that tweak could paginate differently. Tracked below.
+
+### Resolved in Phase 2
+
+- ~~Both candidates sharing one profile file~~ — `ProfileStore` keyed by `profile_id` (A-9's
+  root cause), and `profile_id` fails closed.
+- ~~Two candidates colliding on one `outputs/` folder~~ — the candidate segment is now part of
+  the path, and of the mirror path.
+- ~~A draft validated against whichever profile happened to be loaded~~ — the supplied profile
+  is checked against the id's stored profile before anything is generated.
+- ~~Real personal data committed to the public repository (ADR 0002)~~ — untracked, gitignored
+  and migrated to the private store. **Caveat:** already-published history is unchanged; see
+  blocker 2. D-9 is resolved by the same change.
+- ~~A hardcoded `storage/profile/profile.yaml` in scripts and the CLI~~ — all call sites resolve
+  through the store or an explicit `--profile`.
 
 ### Resolved in Phase 1
 
@@ -141,8 +195,21 @@ Re-confirm each decision when its phase begins.
 - `.github/copilot-instructions.md` describes a **different system** (Tectonic, `gemini-1.5-flash`,
   a non-existent `/api/preview` endpoint). It is the most misleading document in the repo (D-8).
   **Still unfixed.**
-- Generated PDFs/DOCX are **tracked** in `outputs/` despite `.gitignore` (D-9). **Still unfixed.**
-- `initial_generation_result.json:4-6` leaks absolute local paths incl. a third-party name (D-10).
+- ~~Generated PDFs/DOCX are **tracked** in `outputs/` despite `.gitignore` (D-9)~~ — resolved in
+  Phase 2 by untracking `outputs/` (ADR 0011). The three PDFs/DOCX and the `.gitkeep` are gone
+  from the index; generated documents now live in the private store.
+- `initial_generation_result.json:4-6` leaks absolute local paths incl. a third-party name
+  (D-10). **Now untracked** with the rest of `applications/`, but still present in public
+  history.
+- **`profile_id` is resolved before any paid work, on purpose.** A missing or unknown id must
+  cost nothing and leave no folder behind. If you reorder `tailor_documents`, keep the
+  resolution first — a test asserts no API call happens when it fails.
+- **`Config.profile_path` and `Config.profile_id` are different things and only one may be
+  set.** `profile_path` means "the caller named a file" and deliberately bypasses the store
+  lookup; `profile_id` means "look it up". Code that sets both is a bug.
+- **`conftest` supplies `CVTAILOR_PROFILE_ID` and a synthetic store suite-wide.** That is why
+  32 pre-existing tests did not need editing. `tests/test_profile_store.py` removes both
+  again in its own autouse fixture, because it asserts the *absence* of an id.
 - **Removing a stale pricing row is only safe while the fallback target still exists.** The old
   fallback was `PRICING["gemini-1.5-flash"]`, so deleting that row would have raised `KeyError`
   for any unlisted model. The fallback is now `PRICING[DEFAULT_MODEL]`, and a test asserts
