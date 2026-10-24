@@ -1,3 +1,4 @@
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import Mock
@@ -7,6 +8,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'backend'))
 sys.path.insert(0, str(ROOT / 'tests'))
+
+PROFILES = ROOT / 'tests' / 'fixtures' / 'profiles'
 
 from support import (  # noqa: E402
     OfflineGemini,
@@ -23,10 +26,63 @@ def repo_root() -> Path:
     return ROOT
 
 
+@pytest.fixture(scope='session')
+def synthetic_store(tmp_path_factory) -> Path:
+    """A profile store holding both synthetic fixtures, outside the repository.
+
+    The suite must never read the owner's real profiles (ADR 0011), and the tests
+    need a store that is *populated* for the multi-profile paths to be exercised at
+    all. Both fixture profiles are copied in under their own ids.
+    """
+    root = tmp_path_factory.mktemp('profile-store')
+    profiles = root / 'profiles'
+    for profile_id, fixture in (('analyst_a', 'synthetic_analyst'),
+                                ('marketer_b', 'synthetic_marketer')):
+        directory = profiles / profile_id
+        directory.mkdir(parents=True)
+        shutil.copy2(PROFILES / f'{fixture}.yaml', directory / 'profile.yaml')
+    return root
+
+
+@pytest.fixture(autouse=True)
+def _select_a_profile(monkeypatch, synthetic_store):
+    """Give every test an explicit profile id and a synthetic store.
+
+    ``profile_id`` fails closed (ADR 0003), so ``tailor_documents`` raised for the
+    whole suite as soon as the store landed: the pre-existing tests call it with no
+    config and no id, which is now a genuine error rather than a default.
+
+    Rather than edit 32 test bodies to thread an argument they are not about, both
+    values are supplied here, once, in the environment the code reads at call time.
+
+    Two things matter about doing it this way:
+
+    * it does **not** weaken the rule -- the id is still explicit, just not written
+      in each test. ``tests/test_profile_store.py`` asserts the fail-closed paths
+      directly, with no fixture standing in the way;
+    * the store is a throwaway directory, so no test can read or write the owner's
+      real profiles.
+
+    A test that wants a different candidate sets ``CVTAILOR_PROFILE_ID`` itself.
+    """
+    monkeypatch.setenv('CVTAILOR_PROFILE_ID', 'analyst_a')
+    monkeypatch.setenv('CVTAILOR_STORE', str(synthetic_store))
+    return 'analyst_a'
+
+
+
 @pytest.fixture
 def analyst_profile():
     """Profile A — has an employer with no bullets, projects, certifications and a visa."""
     return load_profile('synthetic_analyst')
+
+
+@pytest.fixture
+def profile_store(synthetic_store):
+    """The throwaway store the suite is pointed at, holding both synthetic profiles."""
+    from services.profile_store import ProfileStore
+
+    return ProfileStore.at(synthetic_store)
 
 
 @pytest.fixture

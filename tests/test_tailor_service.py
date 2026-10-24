@@ -18,6 +18,32 @@ def profile():
                                 'end_date': 'present', 'bullets': ['Built reporting.']}])
 
 
+@pytest.fixture(autouse=True)
+def _this_files_own_candidate(tmp_path, monkeypatch, profile):
+    """Store this file's throwaway "Candidate" profile under its own id.
+
+    These tests build their own ``Profile`` rather than loading a fixture, and
+    ``profile_id`` is now checked against the store (ADR 0003): a profile whose
+    identity does not match the id it is filed under is exactly the cross-candidate
+    error that check exists to catch. Registering the profile under a dedicated id
+    keeps the check honest instead of disabling it for this file.
+    """
+    import yaml
+
+    from services.profile_store import ProfileStore
+
+    store_root = tmp_path / 'unit-profile-store'
+    store = ProfileStore.at(store_root)
+    directory = store.profiles_dir / 'unit_candidate'
+    directory.mkdir(parents=True)
+    (directory / 'profile.yaml').write_text(
+        yaml.safe_dump(profile.model_dump(), sort_keys=False), encoding='utf-8'
+    )
+    monkeypatch.setenv('CVTAILOR_STORE', str(store_root))
+    monkeypatch.setenv('CVTAILOR_PROFILE_ID', 'unit_candidate')
+    return 'unit_candidate'
+
+
 def cv_data(profile):
     return {'summary': ['Analytics professional with a background in business intelligence.'],
             'skills': {'Data': ['SQL']},
@@ -90,7 +116,8 @@ def test_three_page_cv_is_never_reported_as_success(monkeypatch, tmp_path, profi
               [cv, cv, json.dumps({'cover_letter': cl_data()}), cv, cv, cv])
     with pytest.raises(ValueError, match='not marked successful'):
         service.tailor_documents('A sufficiently detailed job description.', profile)
-    manifest = next((tmp_path / 'outputs').glob('*/source/generation_result.json'))
+    # Phase 2 layout: outputs/<profile_id>/<job_id>/source/... (ADR 0003).
+    manifest = next((tmp_path / 'outputs').glob('*/*/source/generation_result.json'))
     assert json.loads(manifest.read_text())['status'] == 'failed'
     assert not (tmp_path / 'mirror').exists()
 

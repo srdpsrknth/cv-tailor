@@ -8,7 +8,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from cli.context import CliError, Console, EXIT_NOT_FOUND, human_pages
+from cli.context import CliError, Console, EXIT_NOT_FOUND, EXIT_USAGE, human_pages
+
+
+def _load_file(path: Path):
+    from services.profile_loader import load_profile
+
+    return load_profile(str(path))
 
 
 def find_content(explicit, config) -> Path:
@@ -42,19 +48,39 @@ def find_content(explicit, config) -> Path:
 def run(args, console: Console, config) -> int:
     from models.tailored_output import TailoredCV, TailoredCoverLetter
     from renderers import create_latex_renderer, create_docx_renderer
-    from services.profile_loader import load_profile
+    from services.profile_store import (
+        InvalidProfileIdError,
+        UnknownProfileError,
+    )
 
     content_path = find_content(getattr(args, "content", None), config)
     folder = content_path.parent.parent
-    profile_path = Path(getattr(args, "profile_path", None) or config.profile_path)
-    if not profile_path.exists():
-        raise CliError(f"Profile not found: {profile_path}", EXIT_NOT_FOUND)
+
+    # The profile comes from the store (or from an explicit --profile file), never
+    # from a hardcoded path: the real profile no longer lives in the repository.
+    explicit = getattr(args, "profile_path", None)
+    profile_id = None
+    if explicit:
+        profile_path = Path(explicit)
+        if not profile_path.exists():
+            raise CliError(f"Profile not found: {profile_path}", EXIT_NOT_FOUND)
+        loader = lambda: _load_file(profile_path)  # noqa: E731
+    else:
+        try:
+            profile_id = config.require_profile_id()
+        except InvalidProfileIdError as error:
+            raise CliError(str(error), EXIT_USAGE,
+                           hint="Pass --profile-id <id>, or --profile <path>.")
+        loader = lambda: config.store.load(profile_id)  # noqa: E731
 
     try:
         data = json.loads(content_path.read_text(encoding="utf-8-sig"))
-        profile = load_profile(str(profile_path))
+        profile = loader()
         cv = TailoredCV.model_validate(data["cv"])
         cl = TailoredCoverLetter.model_validate(data["cover_letter"])
+    except UnknownProfileError as error:
+        raise CliError(str(error), EXIT_NOT_FOUND,
+                       hint="Run `cvtailor profile list` to see the available ids.")
     except KeyError as error:
         raise CliError(f"content.json is missing the {error} document", EXIT_NOT_FOUND)
     except (ValueError, OSError) as error:

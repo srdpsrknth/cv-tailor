@@ -6,9 +6,10 @@ orchestration, validation, layout retries, file writing and mirroring in one
 application lives here, so the generation logic can be tested without a disk
 and the storage layout can change in one place.
 
-The on-disk layout is unchanged::
+Since Phase 2 the layout carries the candidate (ADR 0003), so two profiles on the
+same posting cannot collide::
 
-    outputs/<job_id>/
+    outputs/<profile_id>/<job_id>/
         <rendered CV and cover-letter artifacts>
         source/
             content.json            the editable text authority
@@ -16,6 +17,9 @@ The on-disk layout is unchanged::
             job_description.txt     the posting
             drafts.json             every raw model response
             generation_result.json  success marker and manifest
+
+``profile_id`` is a required argument, not an optional one: a store that cannot
+name its candidate cannot isolate anything.
 """
 from __future__ import annotations
 
@@ -28,6 +32,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 from zoneinfo import ZoneInfo
+
+from services.profile_store import validate_profile_id
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +56,20 @@ def write_json(path: Path, value) -> None:
 
 @dataclass
 class ApplicationStore:
-    """Owns the ``outputs/<job_id>/`` folder for one generation run."""
+    """Owns the ``outputs/<profile_id>/<job_id>/`` folder for one generation run."""
 
     project_root: Path
     job_id: str
+    #: Which candidate this application belongs to. Required (ADR 0003).
+    profile_id: Optional[str] = None
     source_folder: Path = field(init=False)
     job_folder: Path = field(init=False)
 
     def __post_init__(self) -> None:
         self.project_root = Path(self.project_root)
-        self.job_folder = self.project_root / "outputs" / self.job_id
+        # Fail closed: no candidate means no folder, never a shared one.
+        self.profile_id = validate_profile_id(self.profile_id)
+        self.job_folder = self.project_root / "outputs" / self.profile_id / self.job_id
         self.source_folder = self.job_folder / "source"
 
     # --- creation ---------------------------------------------------------------------
@@ -124,7 +134,9 @@ class ApplicationStore:
         """
         if not config.is_mirroring:
             return None
-        destination = Path(config.outputs_dir) / self.job_id
+        # Carry the candidate segment into the mirror as well: a mirror that dropped
+        # it would reintroduce the very collision the job folder just stopped having.
+        destination = Path(config.outputs_dir) / self.profile_id / self.job_id
         if destination.resolve() == self.job_folder.resolve():
             return None
 
@@ -142,13 +154,20 @@ class ApplicationStore:
         return destination
 
 
-def make_job_id(company: str, role: str, slugify) -> str:
+def make_job_id(company: str, role: str, slugify, profile_id: Optional[str] = None) -> str:
     """Build ``<year>_<company>_<role>_<ms>`` using the Berlin calendar year.
 
-    The timestamp keeps concurrent applications to the same posting distinct. It is
-    the posting slug plus a millisecond clock; it carries no candidate segment, so
-    two profiles on one posting could still collide (A-9, deferred to Phase 2).
+    The timestamp keeps concurrent applications to the same posting distinct. The
+    candidate is carried by the *folder* (``outputs/<profile_id>/<job_id>/``), not
+    by this slug, so two profiles applying to one posting write to different trees
+    and cannot overwrite each other (A-9).
+
+    ``profile_id`` is validated when supplied so a caller cannot build a job id for
+    no one. The slug itself stays candidate-free: the filename convention is part of
+    the render contract and existing artifacts keep their names.
     """
+    if profile_id is not None:
+        validate_profile_id(profile_id)
     year = datetime.now(ZoneInfo("Europe/Berlin")).year
     milliseconds = time.time_ns() // 1_000_000
     return f"{year}_{slugify(company)}_{slugify(role)}_{milliseconds}"

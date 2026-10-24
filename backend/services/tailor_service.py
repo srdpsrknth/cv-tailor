@@ -25,6 +25,11 @@ from models.tailored_output import TailoringExplanation
 from renderers import create_latex_renderer, create_docx_renderer
 from services.application_store import ApplicationStore, make_job_id
 from services.gemini_service import GeminiService
+from services.profile_store import (
+    ProfileMismatchError,
+    UnknownProfileError,
+    resolve_profile_id,
+)
 from services.generation import (
     MAX_LAYOUT_ATTEMPTS,
     PROMPT_CL_PATH,
@@ -102,8 +107,14 @@ def tailor_documents(
     work_country: Optional[str] = None,
     config: Optional[Config] = None,
     rules: Optional[ProfileRules] = None,
+    profile_id: Optional[str] = None,
 ) -> TailorResponse:
     """Produce a two-page CV and a one-page cover letter, and persist them.
+
+    ``profile_id`` names the candidate whose folder receives the output and is
+    resolved **first**, so a call with no candidate fails before any paid work
+    (ADR 0003). It may be passed directly, or configured on ``config``; there is no
+    default and no inference from the profile object.
 
     Raises ValueError when the job description is empty, when a document cannot be
     validated within three attempts, or when the CV will not fit two pages. In every
@@ -121,6 +132,45 @@ def tailor_documents(
     else:
         service = GeminiService(config=config)
 
+    # Fail closed, and fail *early*: an unresolvable candidate must cost nothing and
+    # must not leave a half-written folder behind.
+    resolved_profile_id = resolve_profile_id(config, profile_id)
+
+    # A well-formed id is not the same as a real one. Without this check a typo would
+    # happily create `outputs/typo/...` and generate documents for an unnamed
+    # candidate -- the exact silent failure ADR 0003 exists to prevent. The check is
+    # skipped only when the caller named an explicit profile file, because then the
+    # profile did not come from the store and there is no store entry to match.
+    store = config.store
+    if config.profile_path is None:
+        # A well-formed id is not the same as a real one. Without this check a typo
+        # would happily create outputs/typo/... and generate documents for an unnamed
+        # candidate -- the exact silent failure ADR 0003 exists to prevent.
+        if not store.exists(resolved_profile_id):
+            raise UnknownProfileError(store.unknown_message(resolved_profile_id))
+
+        # The id and the profile are separate arguments, so nothing stops a caller
+        # pairing one candidate's id with another's profile -- which files those
+        # documents under the wrong person, silently and irreversibly. Where the
+        # store holds that id, the stored profile is authoritative and the supplied
+        # one must be that same person.
+        #
+        # Only the *name* is compared, deliberately. A caller may legitimately pass a
+        # profile it has edited in memory -- several tests do, and a future UI might
+        # let a user preview an edit before saving it. Comparing whole identity
+        # objects would reject those correct cases (a changed ``visa_status`` is not
+        # cross-contamination); comparing full names catches the case that matters,
+        # two different people under one id.
+        stored = store.load(resolved_profile_id)
+        if stored.identity.full_name != profile.identity.full_name:
+            raise ProfileMismatchError(
+                f"The profile for {resolved_profile_id!r} is "
+                f"{stored.identity.full_name!r}, but the profile passed in is "
+                f"{profile.identity.full_name!r}. Refusing to file one candidate's "
+                "documents under another candidate's id. Load the profile from the "
+                "store (`config.load_profile()`), or use that candidate's own id."
+            )
+
     work_country = (work_country or "").strip() or None
     context = build_context(job_description, profile, company_name, role_title, work_country)
     cv_prompt = PROMPT_CV_PATH.read_text(encoding="utf-8") + context
@@ -135,9 +185,12 @@ def tailor_documents(
     )
 
     job_id = make_job_id(
-        company_name or cl.company_name, role_title or cl.role_title, slugify
+        company_name or cl.company_name, role_title or cl.role_title, slugify,
+        profile_id=resolved_profile_id,
     )
-    store = ApplicationStore(project_root=PROJECT_ROOT, job_id=job_id)
+    store = ApplicationStore(
+        project_root=PROJECT_ROOT, job_id=job_id, profile_id=resolved_profile_id
+    )
     store.create(profile.model_dump(), job_description)
     store.save_drafts(generator.drafts)
 

@@ -1,7 +1,8 @@
 # 0002 — Separate public code from private candidate data
 
-**Status:** Approved (2026-10-23)
-**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §6, [0004](0004-storage.md), [0006](0006-remote-profile-access.md)
+**Status:** Approved (2026-10-23) — **implemented in Phase 2**; see [0011](0011-private-store-location.md)
+for the store's location and the history question
+**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §6, [0004](0004-storage.md), [0006](0006-remote-profile-access.md), [0011](0011-private-store-location.md)
 
 ## Context
 
@@ -47,3 +48,15 @@ not by keeping data in the public repo.
 - **Do not** rewrite Git history, delete data, or change repository visibility without
   explicit owner approval.
 - Adding a second real candidate waits until this is implemented.
+
+## Implementation note (2026-10-24)
+
+Implemented as decided, with the three open choices settled in
+[0011](0011-private-store-location.md). The honest summary of the outcome:
+
+- **Stopped:** real profiles, `applications/` and `outputs/` are no longer tracked. New data for
+  any candidate lands in the private store, so the "adding a second candidate" condition above is
+  satisfied **for new data**.
+- **Not undone:** the files already published remain in the public repository's past commits.
+  Untracking is not un-disclosure. Purging them needs a history rewrite and a force-push, which
+  [0011](0011-private-store-location.md) records as a separate, unapproved decision.

@@ -22,6 +22,13 @@ from cli.context import (
 MIN_JOB_DESCRIPTION = 50
 
 
+def _load(path: Path):
+    """Load a loose profile file named explicitly with ``--profile``."""
+    from services.profile_loader import load_profile
+
+    return load_profile(str(path))
+
+
 def read_job_description(args, console: Console) -> str:
     """Read the posting from a file, an inline argument, or stdin."""
     if getattr(args, "job_file", None):
@@ -43,14 +50,34 @@ def read_job_description(args, console: Console) -> str:
 
 
 def run(args, console: Console, config) -> int:
-    from services.profile_loader import load_profile
+    from services.profile_store import (  # noqa: F401
+        InvalidProfileIdError,
+        UnknownProfileError,
+    )
     from services.tailor_service import tailor_documents
 
-    profile_path = Path(getattr(args, "profile_path", None) or config.profile_path)
-    if not profile_path.exists():
-        raise CliError(f"Profile not found: {profile_path}", EXIT_NOT_FOUND)
+    # Resolve the candidate before anything else: a missing id must fail before any
+    # paid API call, and before a folder exists to write into (ADR 0003).
+    store = config.store
+    if getattr(args, "profile_path", None):
+        profile_id = None
+        profile_path = Path(args.profile_path)
+    else:
+        try:
+            profile_id = config.require_profile_id()
+        except InvalidProfileIdError as error:
+            raise CliError(str(error), EXIT_USAGE,
+                           hint="Run `cvtailor profile list` to see the ids you have.")
+        profile_path = store.profile_path(profile_id)
+
     try:
-        profile = load_profile(str(profile_path))
+        # A store id goes through the store; a loose --profile file is loaded directly.
+        profile = _load(profile_path) if profile_id is None else store.load(profile_id)
+    except UnknownProfileError as error:
+        raise CliError(str(error), EXIT_NOT_FOUND,
+                       hint="Run `cvtailor profile list` to see the available ids.")
+    except FileNotFoundError:
+        raise CliError(f"Profile not found: {profile_path}", EXIT_NOT_FOUND)
     except ValueError as error:
         raise CliError(f"Profile is invalid: {error}", EXIT_NOT_FOUND)
 
@@ -70,7 +97,8 @@ def run(args, console: Console, config) -> int:
         )
 
     if not console.as_json:
-        console.out(f"Profile:  {profile.identity.full_name}")
+        label = profile_id or str(profile_path)
+        console.out(f"Profile:  {profile.identity.full_name}  [{label}]")
         console.out(f"Model:    {config.model}")
         if getattr(args, "company", None):
             console.out(f"Company:  {args.company}")
@@ -92,6 +120,9 @@ def run(args, console: Console, config) -> int:
             status_callback=None if console.as_json else status,
             work_country=getattr(args, "country", None),
             config=config,
+            # Explicit, so the output folder is keyed to the candidate even when the
+            # config carries no id because a loose --profile file was used.
+            profile_id=profile_id,
         )
     except ValueError as error:
         raise CliError(f"Generation failed: {error}")

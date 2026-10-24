@@ -15,11 +15,18 @@ Only the owner can move a decision to **Approved**.
 | [0008](0008-job-sources.md) | Job sources: ToS-compliant APIs first, scraping last | **Approved in principle** — Phase 4 |
 | [0009](0009-interfaces-and-archive.md) | Keep FastAPI + Streamlit; `applications/` read-only until Phase 2 | **Approved** |
 | [0010](0010-config-object.md) | One explicit `Config` object; no import-time environment reads | **Approved** — implemented |
+| [0011](0011-private-store-location.md) | Private store is a sibling repo; untrack real data, do not rewrite history | **Approved** — Phase 2 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1
 implementation, because the shape of the config object is expensive to change once the CLI, the
 API and the service layer all depend on it.
+
+**Decisions approved 2026-10-24.** [0011](0011-private-store-location.md) was confirmed by the
+owner at the start of Phase 2, before any code was written. It records three separate choices: the
+private store's location, migrating the real profile/applications/outputs out of the public repo,
+and the explicit decision **not** to rewrite history — so the data already published remains
+published until a history rewrite is separately approved.
 
 ## Owner's stated preferences (recorded verbatim in intent)
 

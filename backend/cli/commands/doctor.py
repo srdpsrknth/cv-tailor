@@ -58,20 +58,54 @@ def check_venv(root: Path) -> Check:
     )
 
 
-def check_profile(config) -> Check:
-    from services.profile_loader import load_profile
+def check_store(config) -> Check:
+    """Report the private profile store and which profiles it holds.
 
-    path = Path(config.profile_path)
-    if not path.exists():
+    A missing ``--profile-id`` is a warning rather than a failure: ``doctor`` is the
+    command a caller runs *before* choosing, so refusing to run without an id would
+    make the tool unusable exactly when it is needed.
+    """
+    store = config.store
+    ids = store.list_ids()
+    scope = "ok" if config.profile_id else "no --profile-id set"
+    if not ids:
         return Check(
-            "profile", FAIL, f"missing {path}",
-            "Create storage/profile/profile.yaml (see docs/DEVELOPMENT.md).",
+            "store", WARN, f"{store.root} (empty; {scope})",
+            "Create one: cvtailor profile new <id>  "
+            "|  migrate: cvtailor profile import <path> --profile-id <id>",
         )
+    return Check("store", OK, f"{store.root} ({len(ids)}: {', '.join(ids)}; {scope})")
+
+
+def check_profile(config) -> Check:
+    """Report whether the selected profile loads. Fails closed on a bad id."""
+    from services.profile_store import InvalidProfileIdError, UnknownProfileError
+
+    if getattr(config, "profile_path", None):
+        path = Path(config.profile_path)
+        try:
+            profile = config.load_profile()
+        except ValueError as error:
+            return Check("profile", FAIL, str(error), "Fix the YAML at the path above.")
+        except FileNotFoundError:
+            return Check("profile", FAIL, f"missing {path}",
+                         "Point --profile at an existing profile.yaml.")
+        return Check("profile", OK, f"{profile.identity.full_name} (--profile {path.name})")
+
     try:
-        profile = load_profile(str(path))
+        profile = config.load_profile()
+    except InvalidProfileIdError as error:
+        return Check("profile", WARN, "no profile selected",
+                     f"{error} Then run `cvtailor profile list`.")
+    except UnknownProfileError as error:
+        return Check("profile", FAIL, str(error),
+                     "Run `cvtailor profile list` to see the available ids.")
     except ValueError as error:
         return Check("profile", FAIL, str(error), "Fix the YAML at the path above.")
-    return Check("profile", OK, f"{profile.identity.full_name} ({len(profile.experience)} roles)")
+    return Check(
+        "profile", OK,
+        f"{config.profile_id}: {profile.identity.full_name} ({len(profile.experience)} roles)",
+    )
 
 
 def check_outputs(config) -> Check:
@@ -147,6 +181,7 @@ def run(args, console: Console, config) -> int:
     checks = [
         check_python(),
         check_venv(root),
+        check_store(config),
         check_profile(config),
         check_timezone(),
         check_templates(root),

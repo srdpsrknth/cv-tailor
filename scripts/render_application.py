@@ -10,6 +10,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--project', required=True, type=Path)
     parser.add_argument('--content', required=True, type=Path)
+    parser.add_argument('--profile-id', default=None,
+                        help='Candidate whose profile renders this content. Defaults to '
+                             'CVTAILOR_PROFILE_ID; there is no implicit profile.')
+    parser.add_argument('--profile', dest='profile_path', default=None, type=Path,
+                        help='Explicit profile.yaml, bypassing the store.')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--cv-only', action='store_true')
     group.add_argument('--cover-letter-only', action='store_true')
@@ -23,13 +28,34 @@ def main():
     sys.path.insert(0, str(root / 'backend'))
     from dotenv import dotenv_values, load_dotenv
     load_dotenv(root / '.env', override=True)
-    from services.profile_loader import load_profile
+    from config import Config
+    from services.profile_store import InvalidProfileIdError, UnknownProfileError
     from models.tailored_output import TailoredCV, TailoredCoverLetter
     from renderers import create_latex_renderer, create_docx_renderer
     from pypdf import PdfReader
 
+    # ADR 0003: the candidate is explicit and never defaulted. The profile used to be
+    # read from a hardcoded storage/profile/profile.yaml, which both broke once real
+    # profiles moved to the private store (ADR 0011) and silently rendered the wrong
+    # candidate's facts when a profile id was given elsewhere.
+    env_file = root / '.env'
+    overrides = {'project_root': root}
+    if args.profile_path:
+        overrides['profile_path'] = args.profile_path
+    if args.profile_id:
+        overrides['profile_id'] = args.profile_id
+    config = Config.from_env(env_file=env_file if env_file.exists() else None,
+                             load_env_file=env_file.exists(), overrides=overrides)
+    try:
+        profile = config.load_profile()
+    except InvalidProfileIdError as error:
+        parser.error(str(error))
+    except UnknownProfileError as error:
+        parser.error(str(error))
+    except FileNotFoundError as error:
+        parser.error(str(error))
+
     data = json.loads(content_path.read_text(encoding='utf-8-sig'))
-    profile = load_profile(str(root / 'storage/profile/profile.yaml'))
     cv = TailoredCV.model_validate(data['cv'])
     cl = TailoredCoverLetter.model_validate(data['cover_letter'])
     role = data.get('role_title') or cl.role_title

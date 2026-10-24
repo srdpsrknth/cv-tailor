@@ -24,8 +24,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 #: asserted to contain it.
 DEFAULT_MODEL = "gemini-3.8-flash"
 
-#: Relative path of the authoritative profile.
-DEFAULT_PROFILE_PATH = PROJECT_ROOT / "storage" / "profile" / "profile.yaml"
+#: Directory used as the profile store when none is configured (ADR 0011 expects a
+#: sibling directory outside the repository; this keeps a bare checkout working).
+DEFAULT_STORE_DIRNAME = "storage"
+
+#: Retained for the single-profile layout of Phase 1: the pre-store location of the
+#: authoritative profile. Only used to *find* a profile to migrate, never to load one
+#: implicitly -- ``profile_id`` is required (ADR 0003).
+LEGACY_PROFILE_PATH = PROJECT_ROOT / "storage" / "profile" / "profile.yaml"
+
+#: Alias kept so Phase 1 callers and tests that referenced the old name still resolve.
+DEFAULT_PROFILE_PATH = LEGACY_PROFILE_PATH
 
 
 @dataclass(frozen=True)
@@ -42,7 +51,14 @@ class Config:
     model: str
     temperature: float
     max_output_tokens: int
-    profile_path: Path
+    #: Root of the private profile store (ADR 0004, ADR 0011).
+    profile_store_dir: Path
+    #: Which candidate this config acts for. ``None`` is a real, meaningful state:
+    #: it means "not chosen", and every consumer must fail closed (ADR 0003).
+    profile_id: Optional[str] = None
+    #: An explicit profile file, bypassing the store. Only ever set by a caller that
+    #: named a file on purpose (``--profile <path>``, tests). It is never inferred.
+    profile_path: Optional[Path] = None
 
     # --- construction -----------------------------------------------------------------
 
@@ -77,7 +93,27 @@ class Config:
             outputs = os.getenv("OUTPUTS_DIR", "").strip() or None
         outputs_dir = cls._resolve_path(outputs, project_root, default=project_root / "outputs")
 
-        profile = overrides.pop("profile_path", None) or DEFAULT_PROFILE_PATH
+        # The private store root. Resolved before the profile, because the profile
+        # path is derived from it. ``CVTAILOR_STORE`` is the multi-profile name;
+        # ``storage/`` inside the project is only a fallback for a bare checkout.
+        store = overrides.pop("profile_store_dir", None)
+        if store is None:
+            store = os.getenv("CVTAILOR_STORE", "").strip() or None
+        profile_store_dir = cls._resolve_path(
+            store, project_root, default=project_root / DEFAULT_STORE_DIRNAME
+        )
+
+        # profile_id is taken as given. A blank string is normalised to None, which
+        # means "not chosen" -- it never resolves to a profile (ADR 0003).
+        profile_id = overrides.pop("profile_id", None)
+        if profile_id is None:
+            profile_id = os.getenv("CVTAILOR_PROFILE_ID", "").strip() or None
+        if profile_id is not None and not str(profile_id).strip():
+            profile_id = None
+
+        # An explicit file is honoured only when the caller passed one. There is no
+        # branch that fills this in with a default path.
+        profile = overrides.pop("profile_path", None)
 
         config = cls(
             project_root=project_root,
@@ -88,7 +124,9 @@ class Config:
             max_output_tokens=int(
                 overrides.pop("max_output_tokens", None) or os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8000")
             ),
-            profile_path=Path(profile),
+            profile_store_dir=profile_store_dir,
+            profile_id=str(profile_id) if profile_id is not None else None,
+            profile_path=Path(profile) if profile else None,
         )
         if overrides:
             raise TypeError(f"Unknown config overrides: {sorted(overrides)}")
@@ -115,7 +153,55 @@ class Config:
                 changes["outputs_dir"], changes.get("project_root", self.project_root),
                 default=self.outputs_dir,
             )
+        if "profile_store_dir" in changes:
+            changes["profile_store_dir"] = self._resolve_path(
+                changes["profile_store_dir"],
+                changes.get("project_root", self.project_root),
+                default=self.profile_store_dir,
+            )
+        if "profile_path" in changes and changes["profile_path"] is not None:
+            changes["profile_path"] = Path(changes["profile_path"])
+        if "profile_id" in changes and changes["profile_id"] is not None:
+            changes["profile_id"] = str(changes["profile_id"])
         return replace(self, **changes)
+
+    # --- profiles ---------------------------------------------------------------------
+
+    @property
+    def store(self):
+        """The :class:`~services.profile_store.ProfileStore` for this config."""
+        from services.profile_store import ProfileStore
+
+        return ProfileStore.at(self.profile_store_dir)
+
+    def require_profile_id(self) -> str:
+        """Return the profile id, or fail closed.
+
+        There is deliberately no default. Callers that need a profile for a real
+        operation must name one; a missing id is a bug, not a cue to guess.
+        """
+        from services.profile_store import validate_profile_id
+
+        return validate_profile_id(self.profile_id)
+
+    def require_profile_path(self) -> Path:
+        """Return the ``profile.yaml`` this config acts for, or fail closed.
+
+        An explicitly configured file wins, because a caller named it on purpose.
+        Otherwise the id is resolved through the store -- which raises when the id
+        is missing or unknown rather than falling back (ADR 0003).
+        """
+        if self.profile_path is not None:
+            return Path(self.profile_path)
+        return self.store.profile_path(self.require_profile_id())
+
+    def load_profile(self):
+        """Load this config's profile. Fails closed; never returns another's."""
+        if self.profile_path is not None:
+            from services.profile_loader import load_profile
+
+            return load_profile(str(self.profile_path))
+        return self.store.load(self.require_profile_id())
 
     # --- convenience ------------------------------------------------------------------
 

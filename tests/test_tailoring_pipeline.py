@@ -77,7 +77,9 @@ def test_artifacts_are_persisted_under_the_job_folder(
         analyst_session.job_description_text, analyst_profile,
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
-    job_folder = isolated_service / 'outputs' / result.job_id
+    # Phase 2 layout: the candidate segment is part of the path (ADR 0003), so the
+    # assertion is now stricter than it was -- the job must be under *this* profile.
+    job_folder = isolated_service / 'outputs' / 'analyst_a' / result.job_id
     source = job_folder / 'source'
 
     assert Path(result.cv_path).exists()
@@ -235,6 +237,9 @@ def test_second_profile_generates_independently(
     result = service.tailor_documents(
         marketer_session.job_description_text, marketer_profile,
         company_name='Lumen Consumer BV', role_title='Growth Analyst',
+        # Explicit: this test is about candidate B, so it must not inherit the
+        # suite-wide default id (ADR 0003 requires an explicit candidate).
+        profile_id='marketer_b',
     )
     assert result.status == 'success'
     saved = json.loads(Path(result.source_path).read_text(encoding='utf-8'))
@@ -710,8 +715,12 @@ def test_failed_generation_records_a_manifest_and_skips_mirroring(
             company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
         )
 
-    manifests = list((isolated_service / 'outputs').glob('*/source/generation_result.json'))
+    # Phase 2 layout: outputs/<profile_id>/<job_id>/source/... (ADR 0003).
+    manifests = list(
+        (isolated_service / 'outputs').glob('*/*/source/generation_result.json')
+    )
     assert len(manifests) == 1
+    assert manifests[0].parts[-4] == 'analyst_a'
     manifest = read_json(manifests[0])
     assert manifest['status'] == 'failed'
     assert manifest['error']
@@ -732,7 +741,7 @@ def test_failure_still_preserves_the_editable_draft(
             company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
         )
 
-    source = next((isolated_service / 'outputs').glob('*/source'))
+    source = next((isolated_service / 'outputs').glob('*/*/source'))
     assert (source / 'content.json').exists()
     assert (source / 'drafts.json').exists()
     assert str(source) in str(error.value)
