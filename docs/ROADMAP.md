@@ -109,6 +109,11 @@ without waiting for discovery or tracking.
 - **Risks:** silent data overwrite — mitigate with explicit `profile_id` and fail-closed
   when absent.
 - **Effort:** Medium–High.
+- **Start here:** [`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md) — entry conditions, order of work,
+  worktree hazards, and why the privacy model must land with (or before) the first second
+  profile.
+- **Unblocked by Phase 1:** candidate rules are already profile-scoped (A-1), so no validator
+  change is needed to support a second candidate.
 
 ---
 

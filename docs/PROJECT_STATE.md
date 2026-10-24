@@ -16,9 +16,15 @@ All six increments are implemented, tested and committed as six focused commits 
 `refactor/architecture-v2` (`edb6efc`..`179bd83`). `master` is untouched.
 
 **Next action: begin Phase 2 — multi-profile architecture**
-(see [`ROADMAP.md`](ROADMAP.md) §Phase 2). Phase 1 removed the blocker: candidate-specific
-validation rules are now profile-scoped data (A-1), so a second profile can be added without
-inheriting the first candidate's rules.
+(see [`ROADMAP.md`](ROADMAP.md) §Phase 2 and the dedicated
+[`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md), which lists the entry conditions, the order of
+work and the hazards). Phase 1 removed the blocker: candidate-specific validation rules are now
+profile-scoped data (A-1), so a second profile can be added without inheriting the first
+candidate's rules.
+
+**Read [`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md) before starting**: Phase 2 is the change that
+makes the still-unimplemented privacy model ([ADR 0002](DECISIONS/0002-privacy-model.md))
+urgent, because it introduces a second candidate's data.
 
 Start Phase 2 by re-confirming the decisions listed under "Re-confirm each decision when its
 phase begins", then introduce `ProfileStore` keyed by `profile_id`.
