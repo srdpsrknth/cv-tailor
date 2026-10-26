@@ -3,12 +3,70 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `a0b431c` — *feat: make the API multi-profile aware and fail closed*
+**Latest commit:** `a746884` — *docs: close out Phase 2 and record the owner's D-item decisions*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
+
+**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increment 1 of 4 done.**
+
+Phase 3's scope is deliberately split across several chats. The agreed order is
+**4 → 2 → 1 → 3**, then a new chat for **6**, and **5** only once 1–4 have settled. Do not
+combine two of these items in one commit: each changes the LLM call-count baseline the
+others are verified against, so mixing them makes an intended change indistinguishable
+from a regression.
+
+| Item | State |
+|---|---|
+| **4. Serialise the profile once per application** | **DONE** — this increment; see below |
+| **2. Remove or merge the editorial-review pass** | **NEXT IN THE AGREED ORDER** |
+| 1. Targeted layout retry instead of full regeneration | Not started |
+| 3. Enable structured output (`response_schema`) | Not started |
+| 6. Provider interface, model routing, budget caps | Not started — new chat |
+| 5. Cache validated results | Not started — only after 1–4 have settled |
+
+### Phase 3, increment 1 — serialise the profile once per application (2026-10-26)
+
+**What changed.** `tailor_documents` serialized the profile once per call — once for the CV
+prompt and once for the cover-letter prompt — and `_validate_no_banned_tools` rebuilt the
+profile's facts block once per banned tool (7 tools with the original candidate's rules) on
+every validated CV, i.e. on the draft, the editorial review and every layout retry.
+
+- `generation.build_context()` gained an optional `profile_json` parameter. It selects
+  between two **identical** strings; its default reproduces the previous behaviour exactly.
+- `tailor_service.tailor_documents()` now serializes **once** per application and passes
+  those bytes in. The CV prompt, the letter prompt and every layout retry share that block.
+- `generation.profile_facts_json()` memoizes the rules-excluded facts block on the profile
+  object under a private attribute, so the seven-scan loop serializes once.
+
+**This is a de-duplication of work, not a prompt change.** The bytes sent to the model are
+unchanged, so the token and cost figures in ASSESSMENT.md §5 are unchanged too —
+**do not record this increment as a cost saving.** The measured saving is CPU only
+(≈0.044 ms per prompt serialization, ≈0.23 ms per facts rebuild on a 15k-character
+profile — single-digit milliseconds per application).
+
+**Two invariants were preserved deliberately, both with tests:**
+
+1. **The rendered prompt is byte-identical.** `tests/test_profile_serialization.py` asserts
+   the context with and without `profile_json` is the same string, for every branch of the
+   country header.
+2. **`rules` stays excluded from `_profile_facts_json`.** Declaring a tool banned must not
+   silently un-ban it. The memo caches that same rules-excluded text, and a test asserts the
+   banned-tool rejection still fires on the cached path.
+
+**Cache placement (do not "simplify" this).** The memo is a **private attribute on the
+profile object**, not a module-level map (no process-global state, no key to collide, entry
+collected with its profile) and **not a `Profile` field**. Pydantic admits an undeclared
+attribute only while its name is underscore-prefixed; a declared field would join
+`model_dump()`, which is both sent to the model *and* the input to `_profile_facts_json` —
+the block would contain itself. Setting it uses `object.__setattr__` with a recompute
+fallback, so caching is never a requirement.
+
+**Test count: 282 → 298 passed** (~112 s), fully offline. Fast lane 252 → **268 passed**
+(~7 s). **No existing test was modified**, and the new file is `tests/test_profile_serialization.py`
+(16 tests, 11 of which fail against the pre-increment code).
 
 **Phase 2 — multi-profile architecture. COMPLETE and CLOSED OUT (code + tests + migration +
 docs + clean-up).**
@@ -18,8 +76,10 @@ profile has migrated into the private store, the real data is no longer tracked 
 repository, and the API adapter now resolves through the store like everything else. `master`
 is untouched.
 
-**Next action: start Phase 3 (LLM and document-generation improvements), or Phase 5's
-application-schema migration.** Phase 2 owes nothing further. The close-out on 2026-10-26
+**Next action (Phase 2):** discharged — Phase 2 owes nothing further. **The next action for
+the project is Phase 3 increment 2: remove or merge the editorial-review pass.** It is a new
+chat by design, because it changes the call count from 3/4/6 to 2/3/5 and therefore must be
+verified against a baseline that increment 1 has now frozen. The close-out on 2026-10-26
 closed the last functional gap (`backend/main.py`) and settled the remaining D-items:
 
 1. **`backend/main.py` is multi-profile aware and tested** — closed in `a0b431c`; see
@@ -115,9 +175,9 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 17 commits ahead of `master` — Phases 1 and 2 complete, Phase 2 closed out |
+| Dev branch | 18 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increment 4 done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **282 passed** (~114 s); fast lane `-m "not requires_latex"` → 252 passed (~7 s) |
+| Test baseline | **298 passed** (~112 s); fast lane `-m "not requires_latex"` → 268 passed (~7 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
 | HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
@@ -126,16 +186,17 @@ Re-confirm each decision when its phase begins.
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
 | Decisions | 11 approved; ADR 0009 amended 2026-10-26 (D-11 → Phase 5) |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**; Phase 2 close-out done; next is Phase 3 or Phase 5's schema migration |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increment 4 of 6); next is Phase 3 increment 2 |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **282 passed**, 1 warning (~114 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **252 passed**,
+- `.venv\Scripts\python.exe -m pytest -q` → **298 passed**, 1 warning (~112 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **268 passed**,
   30 deselected (~7 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
 - **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
-  190 → 262 in Phase 2, and 262 → 282 in the 2026-10-26 close-out (all new files). In Phase 2,
+  190 → 262 in Phase 2, 262 → 282 in the 2026-10-26 close-out, and 282 → 298 in Phase 3
+  increment 1 (all new files). In Phase 2,
   four *path assertions* across three pre-existing tests were updated because the output layout
   itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
   about content are unchanged.
@@ -143,6 +204,11 @@ Re-confirm each decision when its phase begins.
 - `tests/test_cli.py` asserts the CLI's page count equals `render_application.py`'s.
 - `tests/test_api.py` (new) asserts the API resolves like the CLI: **16 of its 20 tests fail
   against the pre-close-out `main.py`**, verified by stashing the fix.
+- `tests/test_profile_serialization.py` (new, Phase 3 increment 1) asserts the profile is
+  serialized once per application and that the prompt bytes are unchanged: **11 of its 16
+  tests fail against the pre-increment code**, verified by stashing the change. The memo test
+  was additionally verified to fail when the cache lookup is neutered, so it measures work
+  rather than passing vacuously.
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.

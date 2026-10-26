@@ -172,7 +172,18 @@ def tailor_documents(
             )
 
     work_country = (work_country or "").strip() or None
-    context = build_context(job_description, profile, company_name, role_title, work_country)
+    # The profile is serialized exactly once per application and those bytes are
+    # reused by the CV prompt, the cover-letter prompt and every layout retry. The
+    # text sent to the model is unchanged -- this removes repeated work, not content.
+    #
+    # ``build_context`` is called with no ``profile_json`` in this project, but it
+    # keeps that parameter and its default so a caller wanting different bytes (a
+    # redacted variant, or a prompt experiment) can supply them without editing the
+    # function.
+    context = build_context(
+        job_description, profile, company_name, role_title, work_country,
+        profile_json=profile.model_dump_json(indent=2),
+    )
     cv_prompt = PROMPT_CV_PATH.read_text(encoding="utf-8") + context
     cl_prompt = PROMPT_CL_PATH.read_text(encoding="utf-8") + context
 

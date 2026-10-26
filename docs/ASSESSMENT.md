@@ -33,6 +33,14 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > (both recorded in §3). Removed as dead code: `backend/validate_profile.py` and two
 > self-referential `Config` path aliases. The suite is **282 passed**. Still open: **A-6**,
 > **A-7**, **A-8**, **A-10**, **D-3**, **D-4**, **D-13**, **D-14**, **D-15**.
+>
+> **Status note (2026-10-26, Phase 3 increment 1):** §5's optimisation **4 — "Serialize the
+> profile once per application rather than per call" — is implemented**. The prompt bytes sent
+> to the model are unchanged (it is a de-duplication of work, not a prompt change), so the
+> token figures in the §5 table are unchanged too; what fell is the *CPU* cost of building
+> them. Optimisations 1, 2, 3 and 5 remain open and are deliberately kept separate, because
+> each changes the call-count baseline the others are verified against. The suite is
+> **298 passed**.
 
 ---
 
@@ -262,11 +270,29 @@ and each layout retry re-sends the entire context *plus* the full previous CV JS
    prompt. Est. **~25%** of input tokens and one call.
 3. **Enable structured output** (`response_schema`) — removes the parse-failure retry loop,
    the dominant tail risk.
-4. **Serialize the profile once** per application rather than per call.
+4. ~~**Serialize the profile once** per application rather than per call.~~
+   **DONE — Phase 3, increment 1 (2026-10-26).** The context block is now built once per
+   application and reused by the CV prompt, the letter prompt and every layout retry
+   (`tailor_service.tailor_documents` → `generation.build_context(..., profile_json=...)`).
+   The *token* figures above are unchanged, because the bytes sent to the model are
+   byte-identical — this removes repeated work, not content. Measured on this machine:
+   `model_dump_json(indent=2)` ≈ 0.044 ms and the banned-tool facts block ≈ 0.23 ms per
+   call, against a typical run that rebuilt them 3–4 times and up to 8 times at the
+   worst (7 banned tools × one scan each). That is single-digit milliseconds per
+   application — real, but **not** a cost saving; the saving is that the work is no
+   longer repeated. Do not mistake this increment for a cost reduction.
 5. **Cache validated results** — re-rendering already costs 0 LLM calls; extend that
    principle to "same profile + same JD → reuse".
 
 *Do not add async, concurrency or caching infrastructure before 1–5 are exhausted.*
+
+**Measured effect of optimisation 4 (2026-10-26).** The prompt sent to the model is
+unchanged: `tests/test_profile_serialization.py` asserts the rendered context is
+byte-identical with and without the new `profile_json` argument, and asserts the pipeline
+serializes the profile exactly once per application. The call count is unchanged and is
+still pinned at 3 min / 4 typical / 6 max by `test_tailoring_pipeline.py`. The remaining
+optimisations 1, 2, 3 and 5 are each being done in their own increment precisely so that
+this baseline stays attributable.
 
 ---
 

@@ -41,6 +41,14 @@ LAYOUT_BUDGET_START = 650
 LAYOUT_BUDGET_STEP = 100
 LAYOUT_BUDGET_FLOOR = 400
 
+#: Private attribute that carries the serialized facts on the profile object.
+#: It is deliberately in this module's namespace, so it is neither a declared field
+#: of the ``Profile`` model nor something a serialized profile can contain. That
+#: matters twice over: the cached text can never leak into a prompt, and
+#: :func:`_profile_facts_json` -- which *does* serialize the model -- cannot see it
+#: and recurse into itself.
+_FACTS_CACHE_FIELD = "_cvtailor_facts_json"
+
 
 def parse_json_response(text: str) -> dict:
     """Use the same parser for first drafts, reviews, and length retries.
@@ -241,9 +249,46 @@ def _profile_facts_json(profile: Profile) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
+def profile_facts_json(profile: Profile) -> str:
+    """The profile's evidence as one JSON string, computed and cached per process.
+
+    ``_validate_no_banned_tools`` scans this text for **every** banned tool, and a
+    profile with the original candidate's rules has seven of them, so the same
+    ~15,000-character document used to be rebuilt up to seven times per validated
+    CV -- on every draft, review and layout retry. The value is a pure function of
+    the profile, so it is computed once and memoized on the object.
+
+    The cache is a *private* attribute on the ``Profile`` object, not a module-level
+    map: no process-global state, no key to collide, and the entry is collected with
+    its profile. The name must stay underscore-prefixed -- ``Profile`` sets
+    ``extra='forbid'``, and pydantic allows an undeclared attribute only while its
+    name is private. Declaring it as a field instead would put the cached text into
+    ``model_dump()``, which is both sent to the model and the input to this very
+    function.
+
+    Writing to a caller's profile is harmless for the same reason
+    ``docx_renderer``'s mutation is bounded: it is derived data, never a fact, and
+    nothing validates against the attribute. The cache never changes what is
+    returned -- only the *first* call does the work.
+    """
+    cached = getattr(profile, _FACTS_CACHE_FIELD, None)
+    if isinstance(cached, str):
+        return cached
+    facts = _profile_facts_json(profile)
+    try:
+        object.__setattr__(profile, _FACTS_CACHE_FIELD, facts)
+    except (AttributeError, TypeError, ValueError):
+        # ``object.__setattr__`` bypasses pydantic's ``__setattr__``, so this is
+        # belt-and-braces rather than an expected path: a profile-like object with
+        # ``__slots__`` that excludes ``__dict__`` simply recomputes, which is the
+        # pre-existing behaviour. Caching is an optimization, never a requirement.
+        logger.debug("Could not cache profile facts on %r; recomputing.", type(profile))
+    return facts
+
+
 def _validate_no_banned_tools(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     """Catch keyword stuffing for technologies absent from this profile."""
-    source = _profile_facts_json(profile).lower()
+    source = profile_facts_json(profile).lower()
     text = cv.model_dump_json().lower()
     for tool in rules.banned_tools:
         if re.search(r"\b" + re.escape(tool.lower()) + r"\b", text) and not re.search(
@@ -276,9 +321,22 @@ def build_context(
     company_name: Optional[str] = None,
     role_title: Optional[str] = None,
     work_country: Optional[str] = None,
+    profile_json: Optional[str] = None,
 ) -> str:
-    """The shared COMPANY/ROLE/country/posting/profile block both prompts append."""
+    """The shared COMPANY/ROLE/country/posting/profile block both prompts append.
+
+    ``profile_json`` lets a caller that already serialized the profile reuse those
+    exact bytes: the pipeline serializes once per application and every prompt --
+    CV, cover letter and each layout retry -- appends this same block. Serializing
+    the profile is pure cost, so it is done once rather than once per call.
+
+    The default reproduces the previous behaviour byte for byte, so a caller that
+    passes nothing gets exactly what it got before. This parameter carries **no**
+    prompt-wording change: it selects between two identical strings.
+    """
     work_country = (work_country or "").strip() or None
+    if profile_json is None:
+        profile_json = profile.model_dump_json(indent=2)
     country_context = (
         f"\nWORK COUNTRY (explicit user selection; overrides country inference): {work_country}. "
         "Apply the work-authorization rules for this country. Company headquarters and past job locations are irrelevant.\n"
@@ -290,7 +348,7 @@ def build_context(
         f"ROLE: {role_title or 'Infer from job description'}\n"
         + country_context
         + f"JOB DESCRIPTION:\n{job_description}\n\n"
-        f"BASE PROFILE (authoritative JSON):\n{profile.model_dump_json(indent=2)}"
+        f"BASE PROFILE (authoritative JSON):\n{profile_json}"
     )
 
 
