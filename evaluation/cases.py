@@ -42,6 +42,16 @@ class EvaluationCase:
     ``profile_fixture`` and ``posting_fixture`` name files under ``tests/fixtures/``.
     A case that named anything else would be a bug, so :func:`fixture_path` confines
     resolution to that directory.
+
+    ``company_name`` and ``role_title`` come from the **posting itself**, not from the
+    case name, and that distinction is a correctness fix rather than tidiness. The
+    letter prompt is told who the employer is and what the role is, and passing the case
+    identifier instead produced cover letters addressed to a company called
+    ``analyst_lumen`` for a position called ``Evaluation``. The document still passed
+    every gate -- word count, facts, page count -- because no check looks at the
+    salutation. Only a human reading the letter can see it, which is precisely the
+    judgement the owner is asked to make, so the harness must not hand them a document
+    whose heading is nonsense.
     """
 
     name: str
@@ -50,6 +60,10 @@ class EvaluationCase:
     #: What this case is here to exercise, in one line. Kept so a result table is
     #: readable without cross-referencing the fixtures.
     focus: str
+    #: The employer named in the posting, used as the letter's addressee.
+    company_name: str
+    #: The role named in the posting.
+    role_title: str
 
 
 #: The case set. Three cases, deliberately: enough to expose a model that only works
@@ -62,18 +76,24 @@ CASES: tuple[EvaluationCase, ...] = (
         profile_fixture="profiles/synthetic_analyst.yaml",
         posting_fixture="job_descriptions/nordwind_analytics_engineer.txt",
         focus="the baseline case; the recorded transcript the offline suite uses",
+        company_name="Nordwind Analytics GmbH",
+        role_title="Analytical Engineer",
     ),
     EvaluationCase(
         name="analyst_lumen",
         profile_fixture="profiles/synthetic_analyst.yaml",
         posting_fixture="job_descriptions/lumen_growth_analyst.txt",
         focus="a second posting for the same profile, to catch overfitting to one JD",
+        company_name="Lumen Consumer BV",
+        role_title="Growth Analyst",
     ),
     EvaluationCase(
         name="marketer_harbor",
         profile_fixture="profiles/synthetic_marketer.yaml",
         posting_fixture="job_descriptions/harbor_marketing_data_analyst.txt",
         focus="a different profile in a different field, against a marketing posting",
+        company_name="Harbor Retail Group",
+        role_title="Marketing Data Analyst",
     ),
 )
 

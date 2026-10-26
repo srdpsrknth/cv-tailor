@@ -156,7 +156,7 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     try:
         result = tailor_service.tailor_documents(
             posting, profile, config=config, service=service,
-            company_name=case.name, role_title="Evaluation",
+            company_name=case.company_name, role_title=case.role_title,
             # The cache is bypassed **on purpose**, and this is the only place in the
             # suite that has to say so. ``tailor_documents`` defaults to
             # ``use_cache=True`` and ``evaluation/live.py`` drives the *real* pipeline
