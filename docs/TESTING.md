@@ -1,8 +1,8 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **500 passed**, 1 warning, ~116 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **470 passed**, 30 deselected, ~13 s.
+**Current baseline:** **533 passed**, 1 warning, ~119 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **503 passed**, 30 deselected, ~17 s.
 
 | | |
 |---|---|
@@ -316,8 +316,47 @@ usage and would score as an accepted run costing $0.00), and **every curated id 
 price row on the OpenRouter route** (without one, `price_for` silently borrows the
 default route's rate and every model reports the same invented cost).
 
-**As of 2026-10-26 no live run has been made**, so the curated set's quality ranking is
-unmeasured and marked as such in `evaluation/curated_models.py`.
+**Per-candidate inputs (ADR 0016).** Three provider families demand mutually
+incompatible response schemas — OpenAI requires `additionalProperties: false`, Anthropic
+behind Vertex rejects a schema with more than 24 optional parameters, and Gemini rejects
+that keyword outright — so each candidate is asked in a dialect its providers accept, and
+`evaluation/candidate_inputs.py` records which and why. The **acceptance bar does not
+vary**: the same profiles, postings, validation rules and word-count gate for every
+candidate. `tests/test_evaluation_inputs.py` asserts both halves — each dialect's hard
+constraint structurally, and that no per-candidate success rule exists.
+
+### The study ran on 2026-10-26
+
+**$0.6637 was spent in total for the session**, from OpenRouter's own accounting, against
+the owner's $5 cap. All eight candidates ran three cases each. Ranked by cost per
+**accepted** result:
+
+| model | accepted | cost / accepted |
+|---|---|---|
+| **`openai/gpt-6-luna`** | **3/3** | **$0.00271** |
+| `deepseek/deepseek-v4-flash` | 2/3 | $0.00328 |
+| `anthropic/claude-haiku-5.5` | 3/3 | $0.00582 |
+| `google/gemini-3.8-flash` | 3/3 | $0.11384 |
+| `anthropic/claude-sonnet-5` | 3/3 | $0.15709 |
+| `qwen/qwen3.8-flash` | 0/3 | none accepted |
+| `z-ai/glm-5.3-flash` | 0/3 | none accepted |
+| `mistralai/mistral-small-2603` | 0/3 | none accepted |
+
+**The `measured` marker is deliberately NOT set.** The results are recorded, but the
+owner stated that writing, PDF and layout quality are theirs to judge before a ranking is
+final — and this suite measures none of those three. `tests/test_evaluation_suite.py`
+asserts precisely that: results are present, the marker is not, and a candidate that
+accepted nothing carries **no** cost per accepted result rather than a flattering zero.
+
+**To re-measure**, clear the sandbox first so no earlier run's artefacts are reused:
+
+```powershell
+Remove-Item -Recurse -Force .tmp\evaluation-store
+.venv\Scripts\python.exe -m evaluation --live --cap-usd 5
+```
+
+The accepted documents then land in `.tmp/evaluation-store/outputs/`, one job folder per
+accepted run, each with its PDFs and a `generation_result.json` manifest.
 
 Tests needing a TeX compiler carry the `requires_latex` marker and **skip automatically**
 when no `pdflatex` can be resolved, so the suite still runs green on a machine without TeX.

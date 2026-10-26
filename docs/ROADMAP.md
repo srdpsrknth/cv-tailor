@@ -2,10 +2,11 @@
 
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
 complete, Milestone 1.1 is complete, **Phase 1 is complete**, **Phase 2 is complete and closed
-out**, and **Phase 3 is in progress** — increments 4, 2, 1 and 3 are done, **item 6's offline
-groundwork is done** (provider interface, routing, budget caps, D-3/D-4, the evaluation suite and
-the curated set), and **item 5 is done**. **Item 6's budgeted live run has not been made**, so the
-curated set's quality ranking is unmeasured; **that live run is the only Phase 3 work still owed**.
+out**, and **Phase 3 is complete** — increments 4, 2, 1 and 3 are done, item 6's groundwork is
+done, item 5 is done, and **item 6's study has now run**: eight candidates were measured and
+`openai/gpt-6-luna` is the recommended model at **$0.00271 per accepted result**, 42× cheaper
+than the incumbent default. What remains is the owner's own quality judgement of the accepted
+documents, not further measurement.
 See [§Phase 3](#phase-3--llm-and-document-generation-improvements).
 Phases may be reordered, split or parallelised when dependencies justify it.
 
@@ -206,24 +207,74 @@ counts unchanged**, as intended.
 | 2 | Remove or merge the editorial-review pass | **DONE** (`refactor:`, 2026-10-26) — requirements folded into the draft prompt, second CV call removed; calls 3/4/6 → **2/3/5**, best-case input tokens −41% |
 | 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
 | 3 | Enable structured output (`response_schema`) | **DONE** (`feat:`, 2026-10-26) — JSON mode and a schema on the CV draft and the cover letter; the layout retry is deliberately left unconstrained because its response may be a delta. The schema requires the response *envelope* and leaves the document body open, which is what keeps D-1's truncation from returning. Calls unchanged at **2/3/5**; see [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
-| 6 | Provider interface, model routing, budget caps, and the curated model set | **OFFLINE GROUNDWORK DONE** (`feat:`/`fix:`, 2026-10-26) — see the close-out below. **The budgeted live run has not been made**, so the curated set's quality ranking is unmeasured |
+| 6 | Provider interface, model routing, budget caps, and the curated model set | **DONE** (`feat:`/`fix:`, 2026-10-26) — the interface, routing, caps and D-3/D-4 landed as increments A–C; the **study then ran** and named a winner. See the close-out below and [ADR 0016](DECISIONS/0016-per-candidate-inputs-and-one-winner.md) |
 | 5 | Cache validated results | **DONE** (`feat:`, 2026-10-26) — a validated generation is stored under `<store>/cache/<profile_id>/`, keyed by the bytes the model was shown; a repeat makes **0** LLM calls and produces byte-identical documents. Cold-cache call counts unchanged at **2/3/5**; see [ADR 0015](DECISIONS/0015-generation-cache.md) |
 
-### Item 6 close-out (2026-10-26)
+### Item 6 close-out — the study ran (2026-10-26)
 
-Three increments, each verified on its own against the frozen 2/3/5 baseline:
+**The study is complete.** Eight candidates, three cases each, **$0.6637 spent for the
+whole session** against the owner's $5 cap. Ranked by cost per **accepted** result:
+
+| model | accepted | cost / accepted | note |
+|---|---|---|---|
+| **`openai/gpt-6-luna`** | **3/3** | **$0.00271** | **winner** — no correction calls, 42× cheaper than the default |
+| `deepseek/deepseek-v4-flash` | 2/3 | $0.00328 | cheapest per attempt; one word-count failure |
+| `anthropic/claude-haiku-5.5` | 3/3 | $0.00582 | clean, at a fifth of its own family's flagship |
+| `google/gemini-3.8-flash` | 3/3 | $0.11384 | the incumbent default, kept as the control |
+| `anthropic/claude-sonnet-5` | 3/3 | $0.15709 | works; 58× the winner for no measured gain |
+| `qwen/qwen3.8-flash` | 0/3 | none | leaked schema text into `skills` |
+| `z-ai/glm-5.3-flash` | 0/3 | none | omitted `role`/dates from every experience entry |
+| `mistralai/mistral-small-2603` | 0/3 | none | **inconclusive** — every call rate-limited (429) |
+
+**The acceptance bar did not move, and the `measured` marker is not set.** Results are
+recorded; the final ranking awaits the owner's own reading of the accepted documents,
+because this suite measures no prose and no rendering. Packet:
+`.tmp/reading-packet/`.
+
+**What the study established beyond the ranking:**
+
+1. **Three provider families demand mutually incompatible schemas** — OpenAI requires
+   `additionalProperties: false`, Vertex rejects >24 optional parameters, Gemini rejects
+   that keyword outright. Ranking against one shared schema would have measured the
+   schema, not the models: `gpt-6-luna` and `claude-haiku-5.5` failed *every* call in two
+   earlier runs and became the winner and third place once asked properly.
+2. **The `structured_outputs` catalogue flag is advertising, not evidence.** Measured:
+   Cloudflare advertises it and silently returns an empty body rather than an error; two
+   other endpoints rejected the schema outright until the dialect was fixed.
+3. **No truncation at `max_tokens: 8000`** (largest constrained CV output 6,286 tokens),
+   but **reasoning tokens consume 53–58% of the output budget**, and one cover-letter call
+   emitted **21,463** output tokens against an assumed ~620.
+4. **Leaderboard position did not predict this task.** `qwen3.8-flash` (81.3% IFBench)
+   and `glm-5.3-flash` (27.6% hallucination rate) both accepted nothing; the winner was
+   chosen on price and reliability, not reputation.
+
+**Seven defects were found by making real calls, and each one would have been invisible
+offline** — the evaluation could not read `.env`, the SDK schema was not serializable, its
+type names were UPPERCASE, Gemini rejects `additionalProperties`, evaluation output was
+written into the repository under a *real* candidate's profile id, failed runs reported
+$0.00, `usage.cost` is 0 for Google-routed calls, and `require_parameters` made three
+models unroutable. Recorded here because it is the argument for keeping the paid suite.
+
+The three offline increments that preceded the study, each verified on its own against
+the frozen 2/3/5 baseline:
 
 | Increment | Commit | Outcome |
 |---|---|---|
 | A — provider interface, routing, budget caps | `feat:` `372a7bf` | `services/provider.py` implements `generate(prompt, *, schema, max_tokens, model)`; Gemini default (decision 6), OpenRouter second with its `response_format` envelope **translated** rather than passed through, plus `provider.require_parameters` on schema calls; `schema=None` reaches both providers as "send no constraint", preserving [ADR 0012](DECISIONS/0012-structured-output-scope.md); `Config.model_for(task)` and an optional `CVTAILOR_MAX_COST_USD` that fails closed. No silent fallback. [ADR 0013](DECISIONS/0013-provider-interface-and-routing.md) |
 | B — D-3 and D-4 | `fix:` `3cc8da5` | `services/pricing.py` is the one source of truth, keyed by `(provider, model)` and tier-aware. The long-context tier is applied to the tokens: for `gemini-2.5-pro` at 300k tokens the old flat figure was **$0.375 against a real $0.75**. The UI no longer carries a second table |
-| C — evaluation suite, curated set | `feat:` *(this increment)* | `evaluation/` implements ADR 0005's eight criteria, offline by default, refuses an over-budget plan before the first call, and is not collected by pytest. Five curated models across economy/balanced/frontier, every one **UNMEASURED**. [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md) |
+| C — evaluation suite, curated set | `feat:` `215ba08` | `evaluation/` implements ADR 0005's eight criteria, offline by default, refuses an over-budget plan before the first call, and is not collected by pytest. [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md) |
 
-**The budgeted live run is the one thing item 6 still owes.** The suite is ready: it projects the
-whole curated run at **$1.68** against the owner's **$5** budget, upper-bounded at 12 calls per
-case. Running it needs authorisation, not more code. It answers two open questions at once —
-which model is genuinely best per *accepted* result for this task, and whether structured output
-truncates on real documents (the question increment 3 could not settle offline).
+**The two questions item 6 set out to answer are now answered**, both by the study above:
+
+1. **Which model is genuinely best per accepted result** — `openai/gpt-6-luna`, at
+   $0.00271. The ranking is recorded; only the owner's quality judgement is outstanding.
+2. **Whether structured output truncates on real documents** — **it did not**, at
+   `max_tokens: 8000`; the largest constrained CV response was 6,286 output tokens and
+   every one finished with `finish_reason: stop`. The real risk turned out to be
+   different and is now quantified: reasoning tokens consume 53–58% of the output
+   budget, and one cover letter emitted 21,463 tokens against an assumed ~620. See
+   [ADR 0012](DECISIONS/0012-structured-output-scope.md), which also records that
+   compliance is a **per-endpoint** property and was measured as such.
 
 ### Item 5 — cache validated results *(DONE 2026-10-26)*
 

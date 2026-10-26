@@ -317,6 +317,27 @@ after increment 2**
 | Typical (3 calls) | 18,699 | 3,322 | **$0.026** | $0.038 |
 | Worst (5 calls) | 34,243 | 6,022 | **$0.048** | $0.060 |
 
+> **These are now confirmed against real billing, and the assumptions behind them were
+> too optimistic in two places (2026-10-26).** The evaluation suite ran for real, and
+> OpenRouter's own reported charge replaces the estimate for any run that goes through it
+> (`usage.cost`, with `cost_details.upstream_inference_cost` — Google-routed calls report
+> `cost: 0` and carry the real figure in the latter). Two measured findings change the
+> arithmetic above:
+>
+> 1. **Reasoning tokens are billed as output and consume the majority of the budget.**
+>    Measured at 53–58% of completion tokens (646 of 1,220 for `deepseek-v4-flash`; 483 of
+>    831 for `gemini-3.8-flash`). The output figures above assume roughly the document's
+>    own length, so a reasoning model's real output is materially higher.
+> 2. **A single cover-letter call emitted 21,463 output tokens** in one measured run,
+>    against the ~622 assumed here — a factor of ~35. The `≈622` figure describes a
+>    well-behaved letter, not the worst observed one, and cost per accepted result is what
+>    the ranking uses precisely because per-call figures like these mislead.
+>
+> The measured cost per **accepted** result, which is the figure that matters:
+> `openai/gpt-6-luna` **$0.00271**, `deepseek-v4-flash` **$0.00328**,
+> `claude-haiku-5.5` **$0.00582**, `gemini-3.8-flash` **$0.11384**, `claude-sonnet-5`
+> **$0.15709**. **The shipped default is 42× the cheapest model that does the job.**
+
 The per-call inputs are recomputed from the actual prompt bytes: the CV call grows from
 ≈6,150 to ≈6,438 tokens because the draft prompt now carries the editorial requirements
 (616 chars ≈ 288 tokens), and the ≈7,772-token review call disappears entirely. On the

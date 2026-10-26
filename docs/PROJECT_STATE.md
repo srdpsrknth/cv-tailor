@@ -1,10 +1,50 @@
 # Project state
 
-**Last updated:** 2026-10-26
+**Last updated:** 2026-10-26 (evening)
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `00fd229` — *feat: price OpenRouter runs from the provider's own charge*
+**Latest commit:** `968be28` — *fix: address the cover letter to the employer, not to the case id*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## The study has run, and the winner is `openai/gpt-6-luna`
+
+**$0.6637 total spend for the session** (OpenRouter's own accounting) against the owner's
+$5 cap. Eight candidates, three cases each, inputs retooled per candidate (ADR 0016).
+
+| model | accepted | cost / accepted |
+|---|---|---|
+| **`openai/gpt-6-luna`** | **3/3** | **$0.00271** |
+| `deepseek/deepseek-v4-flash` | 2/3 | $0.00328 |
+| `anthropic/claude-haiku-5.5` | 3/3 | $0.00582 |
+| `google/gemini-3.8-flash` | 3/3 | $0.11384 |
+| `anthropic/claude-sonnet-5` | 3/3 | $0.15709 |
+| `qwen/qwen3.8-flash` | 0/3 | none accepted |
+| `z-ai/glm-5.3-flash` | 0/3 | none accepted |
+| `mistralai/mistral-small-2603` | 0/3 | none accepted |
+
+**The winner is 42× cheaper per accepted result than the model this project ships**, and
+it accepted 3/3 with no correction calls. The owner's hypothesis — that this task does not
+need expensive models — is confirmed by measurement.
+
+**The next action is the owner's, not the agent's.** The `measured` marker is
+deliberately **not** set: the owner stated that writing, PDF and layout quality are theirs
+to judge before a ranking is final, and this suite measures **none** of those three. The
+reading packet is at `.tmp/reading-packet/` — 14 accepted runs with their PDFs and DOCX,
+grouped by synthetic profile, with a README explaining what to look at.
+
+**After that judgement**, in order: set `verified="measured"` and the final ranking in
+`evaluation/curated_models.py`; then decide whether to switch `DEFAULT_MODEL` (an ADR
+0005 decision that the benchmark now supports, unlike before); then build the curation
+skill the owner asked for.
+
+**Outstanding and known:**
+
+1. **`mistral-small-2603` is inconclusive, not failed** — every call was rate-limited
+   (429), so it produced no document to judge. Re-measure before judging it.
+2. **Seven provider/model defects were found and fixed** in this session (see below);
+   more may be latent, since each was only visible under a real call.
+3. **The curation skill is not built.** The owner asked for one that re-runs this study
+   when new models arrive; clarifying questions are owed first.
 
 ---
 

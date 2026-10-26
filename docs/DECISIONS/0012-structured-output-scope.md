@@ -100,8 +100,32 @@ the path it always was.
      several. Any tightening decision must name the provider **and** the endpoint it
      was measured on, or it is a guess wearing a measurement's clothes.
 
-  **This remains UNVERIFIED.** No paid call has been made, and the paragraph above is
-  documentation evidence about what *may* happen, not an observation of what did.
+  **This remained UNVERIFIED until 2026-10-26. It is now measured, and the answer is
+  that it did not truncate — but the risk was real for a different reason.**
+
+  A budgeted live study ran eight candidates over three cases each, with real
+  schema-constrained calls. **No constrained response truncated at `max_tokens: 8000`**:
+  the largest CV response was **6,286 output tokens** against the 8,000 ceiling, and every
+  accepted document finished with `finish_reason: stop` and parsed as valid JSON.
+
+  **The truncation concern was nevertheless well founded, and the mechanism turned out
+  not to be the schema's length.** Reasoning tokens are billed as output and are emitted
+  *before* the document, and they consumed **53–58% of the completion budget** in the
+  measured runs — 646 of 1,220 tokens for `deepseek-v4-flash`, 483 of 831 for
+  `gemini-3.8-flash`. A one-off reduction to a 700-token ceiling truncated both models
+  mid-document during verification, which is the failure this record was worried about,
+  reproduced on demand. So the property that protects the pipeline is the **ceiling**
+  (8,000) and not primarily the schema's optionality, and lowering `max_tokens` for cost
+  reasons would reintroduce D-1 immediately.
+
+  One further correction to this record's reasoning: **the count of 27 optional
+  parameters, which is the design this ADR chose, is itself rejected by one provider
+  family.** Anthropic's models behind Vertex refuse a schema with more than 24 optional
+  parameters outright. That does not invalidate the anti-truncation reasoning — it
+  invalidates the assumption that one schema can serve every provider. See
+  [ADR 0016](0016-per-candidate-inputs-and-one-winner.md), which supersedes the
+  "one schema for all" part of this decision while keeping this ADR's reasoning as the
+  reason one candidate's shape is what it is.
 - **`kind` is per call, not per service**, so the schema cannot drift from what is being
   asked for; `_call_gemini`'s signature grew two keyword arguments with defaults that
   preserve the previous behaviour for any caller that passes neither.
