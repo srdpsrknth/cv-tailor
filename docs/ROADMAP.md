@@ -202,8 +202,26 @@ counts unchanged**, as intended.
 | 2 | Remove or merge the editorial-review pass | **DONE** (`refactor:`, 2026-10-26) — requirements folded into the draft prompt, second CV call removed; calls 3/4/6 → **2/3/5**, best-case input tokens −41% |
 | 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
 | 3 | Enable structured output (`response_schema`) | **DONE** (`feat:`, 2026-10-26) — JSON mode and a schema on the CV draft and the cover letter; the layout retry is deliberately left unconstrained because its response may be a delta. The schema requires the response *envelope* and leaves the document body open, which is what keeps D-1's truncation from returning. Calls unchanged at **2/3/5**; see [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
-| 6 | Provider interface, model routing, budget caps | **Next in the agreed order** — new chat; the budgeted live evaluation that would confirm the truncation behaviour on real documents belongs here |
+| 6 | Provider interface, model routing, budget caps | **Next in the agreed order** — new chat; the budgeted live evaluation that would confirm the truncation behaviour on real documents belongs here, as does the model curation below |
 | 5 | Cache validated results | Not started — only after 1–4 have settled |
+
+**Item 6 scope, including an owner requirement recorded 2026-10-26.** Item 6 builds the thin
+provider interface, model-per-task routing and optional budget caps. It also owns **model
+curation**, and the owner's instruction is explicit:
+
+- OpenRouter provides access to a **very large** model catalogue. **Do not expose all of it**
+  — a wall of models is a decision the tool should have already made, not one to hand the
+  user.
+- **Research which model is genuinely best suited to CV and cover-letter generation**,
+  weighed on **price against content quality**. This is measured work, not a popularity
+  contest: it needs the evaluation method ADR 0005 already requires (accuracy, completeness,
+  relevance, writing quality, structured-output success, unnecessary claims, correction
+  attempts and total cost per *accepted* result).
+- **Offer users a small curated set spanning different performance and cost levels**, so the
+  trade-off is visible and the choice is theirs.
+
+Before any paid evaluation: agree the method and a spending budget with the owner (ADR 0005).
+Live evaluation stays out of CI — optional, budget-capped and reproducible.
 
 - **Objective:** cheaper, more reliable, provider-independent generation.
 - **User value:** lower cost, fewer failed runs, better documents.

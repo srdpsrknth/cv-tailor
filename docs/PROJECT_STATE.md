@@ -24,7 +24,7 @@ from a regression.
 | **2. Remove or merge the editorial-review pass** | **DONE** (`7c0d58a`) |
 | **1. Targeted layout retry instead of full regeneration** | **DONE** (`9a45811`) |
 | **3. Enable structured output (`response_schema`)** | **DONE** — this increment; see below |
-| 6. Provider interface, model routing, budget caps | **NEXT IN THE AGREED ORDER** — new chat |
+| 6. Provider interface, model routing, budget caps, **and the curated model set** | **NEXT IN THE AGREED ORDER** — new chat; briefing below |
 | 5. Cache validated results | Not started — only after 1–4 have settled |
 
 ### Phase 3, increment 3 — enable structured output, scoped (2026-10-26)
@@ -119,6 +119,86 @@ Every entry in its blast-radius list was addressed:
 - **Both fixture transcripts** — deliberately *not* regenerated, because the response shape
   did not change; the two remain in step with each other;
 - **`tests/test_editorial_instructions.py`** — still pins 2/3/5 and still passes unchanged.
+
+### Phase 3, item 6 — briefing for the next chat (provider interface, routing, budget caps)
+
+**Start state:** `refactor/architecture-v2` at `67de8b1`, in sync with origin. Working tree
+clean. **351 passed** (~108 s) offline; fast lane **321 passed** (~6 s). `master` untouched at
+`1416177`. Nothing is uncommitted and nothing is half-done. **Increments 4, 2, 1 and 3 of
+Phase 3 are done — do not re-open any of them.**
+
+**Baseline to verify, not re-derive:** call counts **2 / 3 / 5** (min / typical /
+max-successful) and 12 worst. Item 6 must not change them by accident; if it does, say so
+explicitly and explain why, exactly as increments 1 and 3 do.
+
+**What the item is.** [ADR 0005](DECISIONS/0005-llm-provider-interface.md) deferred a
+**thin provider interface** — a single `generate(prompt, *, schema, max_tokens, model)`
+contract — with Gemini as the default and OpenRouter as a second implementation;
+model-per-task routing; and optional budget caps. Re-confirm decisions 5, 6 and 7 when it
+begins.
+
+**Owner requirement recorded 2026-10-26 — model curation, and it is the heart of the item.**
+
+- OpenRouter exposes a **very large** catalogue. **Do not expose all of it.** A wall of
+  models hands the user a decision the tool should have made.
+- **Research which model is genuinely best for CV and cover-letter generation**, weighed on
+  **price against content quality**. Measured, not assumed.
+- **Offer a small curated set spanning different performance and cost levels**, so the
+  user sees the trade-off and chooses.
+
+Why this is research rather than lookup: a model that tops a general leaderboard is not
+thereby suited to producing a two-page CV that passes the factual gate, keeps every employer
+and date, respects the 290–310-word letter budget and returns **schema-valid JSON**. The
+selection criteria ADR 0005 already names are the right ones — accuracy, completeness,
+relevance, writing quality, structured-output success, unnecessary claims, correction
+attempts, and **total cost per *accepted* result** (a cheap model that fails validation and
+burns three correction calls is not cheap).
+
+**Gating prerequisites, do not skip:**
+
+1. **The evaluation suite does not exist yet.** It is the prerequisite for choosing the set.
+   It must run over the synthetic profiles and anonymised postings in `tests/fixtures/`, and
+   it stays **out of CI**: optional, budget-capped, reproducible.
+2. **Agree the method and a spending budget with the owner before any paid call** (ADR 0005).
+   The suite has never made a paid call and must not start by accident.
+3. **Verify OpenRouter prices from OpenRouter's own listing.** Do not carry a figure over
+   from a secondary source, and do not invent one. If the listing cannot be reached from the
+   session, say so and stop rather than guessing — the same rule D-5 followed for Gemini.
+
+**Also in scope, from the deferred list:** **D-3** (cost under-reported: `calculate_token_usage`
+prices the total with one flat rate while `PRICING` defines `input_long`/`output_long` tiers)
+and **D-4** (pricing duplicated in the UI). Both are cost-accounting defects that would make
+any price-versus-quality comparison untrustworthy, so they belong with this item rather than
+after it.
+
+**The item also owns the one question increment 3 could not settle offline:** whether
+structured output truncates on **real** documents. Increment 3 established offline that a
+truncated constrained response is rejected rather than parsed short, and scoped the schema to
+protect against it — but no paid call was made, so the behaviour against the provider is
+**unverified**. A budgeted live run answers it, and it is exactly the kind of measurement this
+item's evaluation suite is for.
+
+**Blast radius — read before editing:**
+
+| Area | Why it matters |
+|---|---|
+| `services/gemini_service.py` | `_call_gemini` is the only provider call site; `PRICING` and `_estimate_cost` are the single pricing source of truth (D-3, D-4) |
+| `_call_gemini`'s `kind` / `allow_delta` | Increment 3 added them to select the schema **per call**. A provider interface must preserve that contract, including the option of sending **no** schema on a call whose response is not a document |
+| `services/generation.py` `RESPONSE_SCHEMAS` | Provider-specific schema objects today. A second provider needs either a shared neutral schema or a translation layer — do not silently drop the constraint |
+| `config.py` | ADR 0010: no import-time reads, one `from_env()`, frozen `Config`, `DEFAULT_MODEL` must stay in `PRICING`. Model-per-task routing lands here |
+| `ui/app.py` | Duplicates the pricing table (D-4) — the single-source-of-truth fix is in scope |
+| `tests/test_tailoring_pipeline.py` | Pins the pricing-table invariants (D-5): `DEFAULT_MODEL in PRICING`, no retired rows, unknown model priced without crashing |
+| `tests/test_structured_output.py` | Pins the per-call schema scope. A provider swap must not silently disable structured output |
+| `tests/test_editorial_instructions.py` | Pins 2/3/5 — must keep passing |
+
+**House rules that bit previous increments** (worth repeating): do not verify against old code
+by stashing or `git checkout --` in the working tree — use a throwaway `git worktree` at the
+previous commit. Under this session's sandbox a new worktree may not be writable; point
+`TEMP`/`TMP` at a directory inside the main worktree and pass an absolute path to that
+worktree's pytest.
+
+**Also open, deliberately not in item 6's scope:** D-13, D-14, D-15, A-6 (date validation),
+A-7, and blocker 8. Item 5 (caching) waits until 1–4 have settled.
 
 ### Phase 3, increment 1 — targeted layout retry instead of full regeneration (2026-10-26)
 
@@ -478,7 +558,7 @@ Re-confirm each decision when its phase begins.
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
 | Decisions | **12 approved**; ADR 0009 amended 2026-10-26 (D-11 → Phase 5); **ADR 0012 new** (structured-output scope) |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4, 2, 1 and 3 of 6 done); next is Phase 3 increment 6 |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4, 2, 1 and 3 of 6 done); next is Phase 3 **item 6** — provider interface, routing, budget caps, and the curated model set |
 
 ### Verified baseline facts
 
@@ -636,6 +716,16 @@ Re-confirm each decision when its phase begins.
 ---
 
 ## Known-important findings (do not lose)
+
+- **The OpenRouter catalogue must not be exposed wholesale (owner requirement, 2026-10-26).**
+  OpenRouter fronts a very large number of models; the tool must carry a **small curated set
+  spanning different performance and cost levels**, chosen by researching what is genuinely
+  best for CV and cover-letter generation on **price against content quality**. A general
+  leaderboard ranking is not evidence of fitness for this task — the bar is a two-page CV that
+  passes the factual gate, keeps every employer and date, meets the 290–310-word letter
+  budget, and returns **schema-valid JSON**. Cost must be judged per *accepted* result, since
+  a cheap model that fails validation and burns three correction calls is not cheap. See
+  [ADR 0005](DECISIONS/0005-llm-provider-interface.md) §"Model curation".
 
 - **Structured output is scoped per call, and the scope is load-bearing — do not "simplify"
   it into a global JSON mode.** The CV draft and the cover letter send

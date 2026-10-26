@@ -59,6 +59,28 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > max-successful cases are **upper bounds**, as the note under that table says. Optimisation
 > **3 — structured output — is now the top opportunity and the next increment**; 5 stays
 > deferred until 1–4 have settled. The suite is **324 passed**.
+>
+> **Status note (2026-10-26, Phase 3 increment 3):** §5's optimisation **3 — "Enable
+> structured output" — is implemented, scoped per call**. JSON mode and a `response_schema`
+> now go on the CV draft and the cover letter; the **layout retry is deliberately left
+> unconstrained**, because since increment 1 its response may be a delta, which a schema
+> requiring `cv` cannot express. The schema constrains the response *envelope* and leaves the
+> document body open — no `required` inside it, no `additionalProperties: false` anywhere —
+> which is what keeps the premature truncation that D-1 records from returning. See
+> [ADR 0012](DECISIONS/0012-structured-output-scope.md). **Call counts are unchanged at
+> 2 / 3 / 5**; the schema is request metadata, not prompt content, so no prompt byte changed
+> and the §5 token and cost figures are unchanged. Truncation on **real** documents was not
+> observed either way — that needs a budgeted live run, and belongs to **item 6**. The suite
+> is **351 passed**.
+>
+> **Owner requirement recorded 2026-10-26 (scopes Phase 3 item 6).** OpenRouter exposes a very
+> large catalogue of models. **The tool must not surface all of them.** Phase 3 item 6 must
+> research and select a **small curated set** — the model(s) genuinely best suited to CV and
+> cover-letter generation on **price against content quality** — and offer users a **mix of
+> options spanning different performance and cost levels**, so the choice is theirs. This is a
+> selection-and-research deliverable, not a passthrough of the catalogue. See
+> [`ROADMAP.md`](ROADMAP.md) §Phase 3 and [`PROJECT_STATE.md`](PROJECT_STATE.md) §"Phase 3,
+> item 6".
 
 ---
 
