@@ -53,6 +53,12 @@ class CaseResult:
     letter_within_budget: Optional[bool] = None
     cv_page_count: Optional[int] = None
     error: Optional[str] = None
+    #: Which schema dialect this candidate was asked in (ADR 0016). Recorded so a
+    #: result is attributable to the model **or** to the inputs it was given: three
+    #: provider families demand incompatible schemas, so a candidate tuned to be
+    #: answerable must not be reported as though it answered unaided. Empty means the
+    #: default shape this project has always sent.
+    schema_dialect: str = ""
 
     @property
     def cost_per_call(self) -> float:

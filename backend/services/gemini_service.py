@@ -7,7 +7,7 @@ remains here is the pipeline's client of whichever provider ``config`` selects, 
 the run-level token and cost roll-up.
 """
 import os
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from config import DEFAULT_MODEL, Config
 from models.requests import TokenUsage
@@ -58,7 +58,8 @@ class GeminiService:
     no prompt byte.
     """
 
-    def __init__(self, config: Optional[Config] = None, api_key: Optional[str] = None):
+    def __init__(self, config: Optional[Config] = None, api_key: Optional[str] = None,
+                 render_schema: Optional[Callable] = None):
         """
         Initialize the service.
 
@@ -66,8 +67,15 @@ class GeminiService:
             config: resolved configuration. Built from the environment only when
                 omitted, so importing this module no longer fixes the model or key.
             api_key: explicit key, overriding the configured one.
+            render_schema: optional callable applied to each document schema before it
+                is sent, so a caller can ask a model in a dialect it accepts. Defaults
+                to ``None``, which sends exactly what this project has always sent.
+                Used by the evaluation (ADR 0016); production leaves it unset.
         """
         self.config = config or Config.from_env()
+        #: Optional per-call schema adaptation. ``None`` means "send the schema as-is",
+        #: which is the behaviour every existing caller already had.
+        self.render_schema = render_schema
         # The key is resolved by ``build_provider`` from the *selected* provider's
         # field, so a caller passing an explicit one does not need the configured key
         # to exist, and the Gemini key is never used for an OpenRouter call.
@@ -167,6 +175,19 @@ class GeminiService:
         # provider as "send no constraint", so a provider swap cannot quietly turn the
         # retry into a constrained call. tests/test_provider_interface.py pins it.
         schema = response_schema_for(kind, allow_delta=allow_delta)
+
+        # A caller may supply a **schema renderer**, and that exists purely so the
+        # evaluation can ask each candidate model in a dialect it accepts. The three
+        # provider families demand mutually incompatible schemas -- OpenAI requires
+        # ``additionalProperties: false``, Vertex rejects a schema with more than 24
+        # optional parameters, Gemini rejects the keyword outright -- so ranking models
+        # against one shared schema measures the schema, not the models. See ADR 0016.
+        #
+        # It is a callable rather than a dialect name so this module stays ignorant of
+        # provider families: the pipeline is handed "make this schema acceptable" and
+        # nothing else. Absent, the schema is exactly what the project always sent.
+        if schema is not None and self.render_schema is not None:
+            schema = self.render_schema(schema)
 
         # Model-per-task routing (ADR 0005). A layout retry is its own task, because
         # shortening an existing document is cheaper work than drafting one. A task

@@ -132,7 +132,26 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     # value. Constructed through the same factory the pipeline would use.
     from services.gemini_service import GeminiService
 
-    service = GeminiService(config=config)
+    # Each candidate is asked in a dialect its providers accept (ADR 0016). Without
+    # this, three of the eight failed *every* call for a reason that was ours, not the
+    # model's: OpenAI demands `additionalProperties: false`, Vertex rejects more than 24
+    # optional parameters, and Gemini rejects that keyword outright. The renderer is
+    # bound to this candidate so the dialect cannot leak between cases.
+    from evaluation.candidate_inputs import inputs_for, schema_for_candidate
+
+    # The candidate's own input profile, so a result can be attributed to the model or
+    # to the inputs it was given rather than being an unexplained aggregate (ADR 0016).
+    candidate = inputs_for(model.id)
+
+    def render_schema(schema):
+        # The pipeline builds a google `Schema`; the dialect work is on plain JSON, so
+        # it is converted first and returned as a dict -- which is what the provider
+        # layer sends anyway (see services.provider._plain_schema).
+        from services.provider import _plain_schema
+
+        return schema_for_candidate(model.id, _plain_schema(schema))
+
+    service = GeminiService(config=config, render_schema=render_schema)
 
     try:
         result = tailor_service.tailor_documents(
@@ -160,6 +179,7 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
             error=f"{type(error).__name__}: {error}",
             cost_usd=getattr(service, "spent_usd", 0.0) or 0.0,
             calls=getattr(service, "calls_made", 0) or 0,
+            schema_dialect=candidate.dialect,
         )
 
     usage = getattr(result, "token_usage", None)
@@ -175,6 +195,9 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
         # layout retry, which is the cost this metric exists to expose.
         correction_calls=max(0, calls - 2),
         cv_page_count=getattr(result, "cv_page_count", None),
+        # Recorded so a result is attributable to the model *or* to the inputs it was
+        # given. A tuned candidate must not be reported as though it passed unaided.
+        schema_dialect=candidate.dialect,
     )
 
 
