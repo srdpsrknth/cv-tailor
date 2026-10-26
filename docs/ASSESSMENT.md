@@ -48,6 +48,17 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > tables below are updated to the measured values. Call counts are **2 / 3 / 5**; the happy
 > path sends **41% fewer input tokens**. Optimisations 1, 3 and 5 remain open, and 1 is now
 > the largest remaining source of repeated input. The suite is **309 passed**.
+>
+> **Status note (2026-10-26, Phase 3 increment 1 of the agreed order):** §5's optimisation
+> **1 — "Targeted layout retry instead of full regeneration" — is implemented**. The retry
+> sends a targeted brief and the current CV instead of the whole context, and accepts a delta
+> merged onto the validated CV; retry input fell 3,488 → **740** tokens on the recorded
+> fixture and the whole typical run fell **33%**. Call counts are **unchanged at 2 / 3 / 5**
+> — this lowers tokens per retry, not the number of retries. Because the CV call's input is
+> now lower but the draft call is untouched, the §5 cost rows for the typical and
+> max-successful cases are **upper bounds**, as the note under that table says. Optimisation
+> **3 — structured output — is now the top opportunity and the next increment**; 5 stays
+> deferred until 1–4 have settled. The suite is **324 passed**.
 
 ---
 

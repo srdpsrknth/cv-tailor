@@ -316,8 +316,9 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | `python -m pytest -q` (**after Phase 2**) | **262 passed**, ~106 s |
 | `python -m pytest -q` (after the 2026-10-26 close-out) | 282 passed, ~114 s |
 | `python -m pytest -q` (after Phase 3 increment 1) | 298 passed, ~112 s |
-| `python -m pytest -q` (**after Phase 3 increment 2**) | **309 passed**, ~107 s |
-| Fast lane `-m "not requires_latex"` | **279 passed**, 30 deselected, ~6 s |
+| `python -m pytest -q` (after Phase 3 increment 2) | 309 passed, ~107 s |
+| `python -m pytest -q` (**after Phase 3 increment 1 of the agreed order**) | **324 passed**, ~107 s |
+| Fast lane `-m "not requires_latex"` | **294 passed**, 30 deselected, ~6 s |
 | `test_api.py` | 20 passed, ~2 s (no LaTeX, no network) |
 | `test_renderers_documents.py` | 34 passed, ~20 s |
 | `test_render_application_determinism.py` | 11 passed, ~73 s |
@@ -325,5 +326,5 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | Backend `import main` | ≈ 1.7–2.0 s |
 | `load_profile()` | 169 ms |
 | pdflatex per run | ≈ 2.9 s (run twice per compile) |
-| LLM calls: min / typical / max-successful / worst | **2 / 3 / 5 / 12** (was 3 / 4 / 6 / 18 before increment 2) |
+| LLM calls: min / typical / max-successful / worst | **2 / 3 / 5 / 12** (was 3 / 4 / 6 / 18 before increment 2; **unchanged** by the targeted layout retry) |
 | Cost per application (`gemini-3.8-flash`) | **$0.016 / $0.026 / $0.048** (was $0.027 / $0.038 / $0.060) |
