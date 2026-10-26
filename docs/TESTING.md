@@ -1,20 +1,22 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **262 passed**, 1 warning, ~106 s, fully offline — no paid API calls.
+**Current baseline:** **282 passed**, 1 warning, ~114 s, fully offline — no paid API calls.
 
 | | |
 |---|---|
 | Baseline before Milestone 1.1 | 12 passed, ~2.5 s |
 | Baseline after Milestone 1.1 | 141 passed, ~100 s |
 | Baseline after Phase 1 | 190 passed, ~110 s |
-| **Baseline after Phase 2** | **262 passed**, ~106 s |
+| Baseline after Phase 2 | 262 passed, ~106 s |
+| **Baseline after the Phase 2 close-out** | **282 passed**, ~114 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
 The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, and 190 → 262 in Phase 2. The
-runtime increase is almost entirely `pdflatex`: real rendering is exercised instead of mocked.
-Phase 2's 72 new tests are all offline and add ~1 s.
+2026-10-26 close-out added `test_api.py` (20 tests) and changed no existing test. The runtime
+increase is almost entirely `pdflatex`: real rendering is exercised instead of mocked. Phase 2's
+72 new tests are all offline and add ~1 s; the 20 API tests add ~2 s.
 
 **No test that existed at `325c4d1` has been modified in behaviour.** Two Phase 2 exceptions,
 both forced by the layout change the phase exists to make, and both **stricter** afterwards:
@@ -35,9 +37,11 @@ throwaway synthetic store once, for the whole suite.
 | `test_profile_store.py` | 46 | The store layout; fail-closed resolution for missing/blank/malformed/unknown ids; path-traversal rejection; verbatim import; refuse-to-overwrite; listing; `Config` integration |
 | `test_profile_isolation.py` | 13 | ADR 0003's five hazards, one test each: separate folders for one posting, A-untouched-when-B-runs, per-candidate snapshots, per-candidate validation, per-candidate mirror paths — plus no cross-contamination in prompts, fail-closed costing no API call, and documents being written into the **store** rather than the repository |
 | `test_privacy_boundary.py` | 13 | The real profile, applications and `outputs/` are **not tracked**; they are gitignored; a broad `git add -A` cannot stage them; fixtures stay tracked and contain no real identity; no hardcoded private path in committed code |
+| `test_api.py` | 20 | **New 2026-10-26.** `backend/main.py`: fail-closed resolution when no id is given, unknown and malformed ids, an explicit request id beating the configured one, a decoy `storage/profile/profile.yaml` proving the legacy default path is ignored, `job_id` containment, and download isolation between two profiles |
 
 `test_privacy_boundary.py` was verified to **fail** when the real profile is re-tracked, so it
-is a real guard rather than a passing formality.
+is a real guard rather than a passing formality. `test_api.py` was verified the same way:
+**16 of its 20 tests fail against the pre-close-out `main.py`** (checked by stashing the fix).
 
 ---
 
@@ -96,6 +100,9 @@ artifacts and may need an unconfined delete.
 # The public/private data boundary
 .venv\Scripts\python.exe -m pytest -q tests/test_privacy_boundary.py
 
+# The FastAPI adapter: fail-closed resolution and job_id containment (~2 s)
+.venv\Scripts\python.exe -m pytest -q tests/test_api.py
+
 # Only document output
 .venv\Scripts\python.exe -m pytest -q tests/test_renderers_documents.py tests/test_render_application_determinism.py
 
@@ -122,6 +129,7 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | `test_profile_store.py` | 46 | **New in Phase 2.** The store, and the fail-closed rule in ADR 0003 |
 | `test_profile_isolation.py` | 13 | **New in Phase 2.** Two candidates cannot contaminate each other; documents land in the store |
 | `test_privacy_boundary.py` | 13 | **New in Phase 2.** Real data stays out of the public repository |
+| `test_api.py` | 20 | **New 2026-10-26.** The FastAPI adapter resolves like the CLI and fails closed |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
 | `test_portability.py` | 2 | *(pre-existing)* pdflatex discovery and `LATEX_COMPILER` override |
@@ -157,6 +165,7 @@ behavioural test:
 | 19 | Profile resolution and the store (new in Phase 2) | `test_profile_store.py` |
 | 20 | Cross-profile isolation (new in Phase 2) | `test_profile_isolation.py` |
 | 21 | Public/private data boundary (new in Phase 2) | `test_privacy_boundary.py` |
+| 22 | HTTP API resolution and downloads (new 2026-10-26) | `test_api.py` |
 
 ### Isolation test caveat
 
@@ -195,9 +204,12 @@ validators before being written):
 
 ## What is NOT tested yet
 
-- **`backend/main.py` endpoints** — still zero API tests, including the `job_id` containment
-  question (§6). The `job_id` collision risk (A-9) is likewise unexercised. Phase 1 built the
-  service layer this needs, but deliberately left the API tests out to keep increments focused.
+- ~~**`backend/main.py` endpoints** — zero API tests, including the `job_id` containment
+  question (§6).~~ **Closed 2026-10-26** by `test_api.py`: `job_id` containment is now asserted
+  (traversal rejected with a 400 rather than resolved), and downloads are shown to be isolated
+  between two profiles. `/api/tailor`'s *success* path still needs a paid call, so — like
+  `cvtailor generate` — only its resolution and failure paths are covered; the pipeline beneath
+  it is covered offline by `test_tailoring_pipeline.py`.
 - **`DocxRenderer` in-place mutation** (A-7) — `docx_renderer.py:304-307` mutates
   `cl.paragraphs`. The bug is still real and unfixed; there is no test pinning it.
 - **Cost/token accounting correctness** (D-3) — `calculate_token_usage` totals are asserted
@@ -246,7 +258,9 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | `python -m pytest -q` (after M1.1) | 141 passed, ~100 s |
 | `python -m pytest -q` (**after Phase 1**) | **190 passed**, ~110 s |
 | `python -m pytest -q` (**after Phase 2**) | **262 passed**, ~106 s |
-| Fast lane `-m "not requires_latex"` | 232 passed, 30 deselected, ~6 s |
+| `python -m pytest -q` (**after the 2026-10-26 close-out**) | **282 passed**, ~114 s |
+| Fast lane `-m "not requires_latex"` | 252 passed, 30 deselected, ~7 s |
+| `test_api.py` | 20 passed, ~2 s (no LaTeX, no network) |
 | `test_renderers_documents.py` | 34 passed, ~20 s |
 | `test_render_application_determinism.py` | 11 passed, ~73 s |
 | `test_cli.py` | 22 passed (20 offline in ~2 s, 2 LaTeX-gated in ~14 s) |

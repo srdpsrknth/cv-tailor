@@ -30,6 +30,19 @@ folders in the meantime. They are the reference corpus for:
 
 Migrate them to the new schema in Phase 2, preserving reviewed content exactly.
 
+### Amendment (2026-10-26) — the migration moves to Phase 5
+
+Phase 2 is closed. It moved the archive out of the public repository into the private store at
+`<store>/applications/<job_id>/` ([0011](0011-private-store-location.md)), but it did **not**
+migrate the schemas. The owner has decided the migration is deferred to **Phase 5**, not
+abandoned: Phase 5 (Application management) is the phase that owns application schemas, and the
+archive is now private data that no longer sits in this repository at all.
+
+The instruction above that reads "migrate them to the new schema in Phase 2" is therefore
+**superseded**: read it as Phase 5. Nothing in the archive is deleted, rewritten or restructured
+before then, and the schema variation still has to be handled explicitly rather than assumed —
+the original reason for this decision is unchanged.
+
 ## Consequences
 
 - No interface work is thrown away, and users keep a working UI during the refactor.

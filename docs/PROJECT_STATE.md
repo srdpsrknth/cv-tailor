@@ -1,39 +1,53 @@
 # Project state
 
-**Last updated:** 2026-10-24
+**Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `86b1a0d` — *feat: move real candidate data to a private store*
+**Latest commit:** `a0b431c` — *feat: make the API multi-profile aware and fail closed*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 2 — multi-profile architecture. IMPLEMENTED (code + tests + migration + docs).**
+**Phase 2 — multi-profile architecture. COMPLETE and CLOSED OUT (code + tests + migration +
+docs + clean-up).**
 
 `ProfileStore` is in place, `profile_id` is threaded end to end and fails closed, the real
-profile has migrated into the private store, and the real data is no longer tracked in the
-public repository. `master` is untouched.
+profile has migrated into the private store, the real data is no longer tracked in the public
+repository, and the API adapter now resolves through the store like everything else. `master`
+is untouched.
 
-**Next action: decide what Phase 2 still owes before it is called complete.** The mechanism is
-done and proven; the remaining item is deliberate, not accidental:
+**Next action: start Phase 3 (LLM and document-generation improvements), or Phase 5's
+application-schema migration.** Phase 2 owes nothing further. The close-out on 2026-10-26
+closed the last functional gap (`backend/main.py`) and settled the remaining D-items:
 
-1. **`backend/main.py` is not multi-profile aware** (blocker 7 below). It still calls
-   `load_profile()` with no argument, so the FastAPI endpoint would fail closed and cannot
-   reach any profile in the store. This is the largest functional gap left, and it has no
-   tests at all.
-2. **Date validation (A-6)** — still unvalidated strings. A genuine multi-profile integrity
-   risk, left out of this increment to keep it reviewable.
-3. **The history question** — the data already published stays published until a rewrite is
-   approved. This is a decision for the owner, not an implementation task. See
-   [ADR 0011](DECISIONS/0011-private-store-location.md).
-4. **Adding a second real candidate** — now unblocked, since new data lands in the private
-   store from the start.
+1. **`backend/main.py` is multi-profile aware and tested** — closed in `a0b431c`; see
+   "Close-out" below. This was the largest functional gap left and had no tests at all.
+2. **D-9 re-verified as already resolved** — no `git rm --cached` was owed. The three untracked
+   leftovers on disk were deleted after SHA-256 confirmation against the private store.
+3. **D-10 decided by the owner — leave history as-is.** Recorded as an accepted limitation,
+   consistent with [ADR 0011](DECISIONS/0011-private-store-location.md).
+4. **D-11 deferred to Phase 5** by owner decision; [ADR 0009](DECISIONS/0009-interfaces-and-archive.md)
+   carries the amendment.
+5. **Date validation (A-6)** — still unvalidated strings. The remaining genuine integrity risk,
+   deliberately not bundled into a clean-up pass.
 
 **Do not re-read [`HANDOFF-PHASE-2.md`](HANDOFF-PHASE-2.md) as a to-do list**: its entry
 conditions and order of work are discharged. Its §4 privacy warning is resolved for *new* data
 and explicitly **not** resolved for already-published history.
+
+### Phase 2 close-out (2026-10-26)
+
+| Item | Outcome |
+|---|---|
+| `backend/main.py` (blocker 7) | **Fixed** — `/api/tailor` and all three download routes take an explicit `profile_id`, resolve through the store and fail closed; `job_id` validated against `^[A-Za-z0-9_-]+$`; first 20 API tests added, 16 of which fail against the old code |
+| D-8 | **Re-confirmed resolved** — `copilot-instructions.md` is a 37-line pointer to `AGENTS.md`; no second instruction file |
+| D-9 | **Re-verified as already resolved** — `git ls-files outputs` → `outputs/.gitkeep` only; the untracked pre-Phase-2 PDFs/DOCX were deleted after SHA-256 confirmation against the store |
+| D-10 | **Owner decision: leave history as-is** — untracked and gitignored; still in past commits, as ADR 0011 records |
+| D-11 | **Owner decision: defer to Phase 5** — ADR 0009 amended |
+| Dead code | **Removed** — `backend/validate_profile.py` (86 lines, unreferenced, hardcoded the dead single-profile path) and two self-referential `Config` aliases |
+| Tests | **262 → 282 passed** (~114 s), offline; fast lane 232 → 252 (~7 s). **No existing test was modified** |
 
 ### What Phase 2 delivered
 
@@ -53,7 +67,7 @@ and explicitly **not** resolved for already-published history.
 | The real profile is not in the public repo | **Yes, for new commits** — untracked and gitignored, asserted by `tests/test_privacy_boundary.py`. **Not** removed from existing history |
 | Generated documents land in the store, not the repo | **Yes** — `test_documents_are_written_into_the_store_not_the_repository` fails if `ApplicationStore` is rooted at `PROJECT_ROOT` again |
 | 190 existing tests still pass | **Yes** — all 190 still pass. Four *path assertions* across three tests in `test_tailoring_pipeline.py` and `test_tailor_service.py` were updated, because the output layout itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions about content and behaviour are unchanged |
-| `pytest -q` green and offline | **262 passed** in ~106 s, no paid API calls |
+| `pytest -q` green and offline | **282 passed** in ~114 s, no paid API calls (262 at the end of Phase 2 itself) |
 
 ### What Phase 1 delivered
 
@@ -101,28 +115,34 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 10 commits ahead of `master` — Phase 1 complete |
+| Dev branch | 17 commits ahead of `master` — Phases 1 and 2 complete, Phase 2 closed out |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **262 passed** (~106 s); fast lane `-m "not requires_latex"` → 232 passed (~6 s) |
+| Test baseline | **282 passed** (~114 s); fast lane `-m "not requires_latex"` → 252 passed (~7 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
+| HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
-| Private store | **`D:\coding\cv-tailor-data`** — its own Git repo, 70 tracked files (profile + 8 applications + outputs) |
+| Private store | **`D:\coding\cv-tailor-data`** — its own Git repo (profile + 8 applications + outputs) |
 | Generated documents | Written to `<store>/outputs/<profile_id>/<job_id>/`; the repo's own `outputs/` holds only `.gitkeep` |
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
-| Decisions | 11 approved; **ADR 0011** added for the private store and the history decision |
-| Roadmap | Phase 0, 1.1, **1 and 2 implemented**; Phase 2 tail (A-6, `main.py`) outstanding |
+| Decisions | 11 approved; ADR 0009 amended 2026-10-26 (D-11 → Phase 5) |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**; Phase 2 close-out done; next is Phase 3 or Phase 5's schema migration |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **262 passed**, 1 warning (~106 s), offline.
+- `.venv\Scripts\python.exe -m pytest -q` → **282 passed**, 1 warning (~114 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **252 passed**,
+  30 deselected (~7 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
-- **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1 and
-  190 → 262 in Phase 2. In Phase 2, four *path assertions* across three pre-existing tests were
-  updated because the output layout itself changed (`outputs/<job_id>/` →
-  `outputs/<profile_id>/<job_id>/`); their assertions about content are unchanged.
+- **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
+  190 → 262 in Phase 2, and 262 → 282 in the 2026-10-26 close-out (all new files). In Phase 2,
+  four *path assertions* across three pre-existing tests were updated because the output layout
+  itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
+  about content are unchanged.
 - `tests/test_renderers_documents.py` renders **real** LaTeX and DOCX.
 - `tests/test_cli.py` asserts the CLI's page count equals `render_application.py`'s.
+- `tests/test_api.py` (new) asserts the API resolves like the CLI: **16 of its 20 tests fail
+  against the pre-close-out `main.py`**, verified by stashing the fix.
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
@@ -147,7 +167,8 @@ Re-confirm each decision when its phase begins.
 3. **A-6: dates are still unvalidated strings.** Deferred out of the Phase 2 increment. Two
    existing tests deliberately pin the current wrong behaviour
    (`test_start_date_is_not_validated_yet`, `test_reversed_date_range_is_not_validated_yet`);
-   they are tripwires to be inverted when the validation lands, not endorsements.
+   they are tripwires to be inverted when the validation lands, not endorsements. **This is the
+   most important item still outstanding after the close-out.**
 4. **The private store is not backed up beyond its own Git history.** It is a local repository
    with no remote. Losing `D:\coding\cv-tailor-data` loses every profile.
 5. **Sandbox caveat:** under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
@@ -159,11 +180,17 @@ Re-confirm each decision when its phase begins.
 6. **`docx_renderer.py:304-307` mutates the caller's model** — verified real bug, still
    unfixed and **still untested** (deliberately: pinning it would bless it). Its practical
    impact is bounded by `test_docx_contains_every_body_paragraph`.
-7. **`backend/main.py` has no tests, and it now bypasses the store.** Its `/api/tailor`
-   endpoint calls `load_profile()` with no argument, which still reads the pre-Phase-2
-   default path. The API is therefore **not** multi-profile aware and will not find a profile
-   once one is not at `storage/profile/profile.yaml`. It was out of scope for this increment;
-   it is the most important piece of Phase 2 still outstanding.
+7. ~~**`backend/main.py` has no tests, and it bypasses the store.**~~ **RESOLVED 2026-10-26**
+   (`a0b431c`). It called `load_profile()` with no argument, which reads the pre-Phase-2 default
+   `storage/profile/profile.yaml`. On this machine that stale duplicate still existed and was
+   byte-identical to the store's copy, so `/api/tailor` *appeared* to work while silently
+   ignoring the store — the most dangerous shape of the bug. `/api/tailor` and the three
+   download routes now take an explicit `profile_id`, resolve through the store, and fail
+   closed; the download routes no longer use `config.outputs_dir` (that is the optional
+   *mirror*, and it omitted the candidate segment, so they could not find a document the
+   pipeline had just written). `tests/test_api.py` adds 20 tests. **Keep it this way**: the API
+   must resolve identity exactly as the CLI does, and `ProfileStoreError` must stay mapped to a
+   400 — it is deliberately not a `ValueError`, so an `except ValueError` clause will not catch it.
 8. **`render_application.py` and the CLI's `render` now duplicate render logic.** The CLI's
    `render` does not yet add the `\needspace` project-heading pagination tweak that the script
    applies, so a CV that depends on that tweak could paginate differently. Tracked below.
@@ -186,6 +213,20 @@ Re-confirm each decision when its phase begins.
   public repository's gitignored `outputs/`, contradicting ADR 0011. Now rooted at the store's
   per-candidate outputs directory, with a regression test that fails if it moves back.
 
+### Resolved in the Phase 2 close-out (2026-10-26)
+
+- ~~The API resolves a profile by default and bypasses the store~~ — `/api/tailor` called
+  `load_profile()` with no argument. Now takes an explicit `profile_id`, resolves through the
+  store, fails closed, and is tested (blocker 7).
+- ~~The download routes cannot find a generated document~~ — they used `config.outputs_dir`
+  (the optional mirror) and omitted the candidate segment. Now
+  `<store>/outputs/<profile_id>/<job_id>/`, with `job_id` validated against
+  `^[A-Za-z0-9_-]+$`.
+- ~~`backend/validate_profile.py`~~ — 86 lines, unreferenced, hardcoding the dead
+  single-profile path. Removed.
+- ~~`Config.LEGACY_PROFILE_PATH` / `DEFAULT_PROFILE_PATH`~~ — self-referential aliases nothing
+  read. Removed.
+
 ### Resolved in Phase 1
 
 - ~~Dead code: `response_schema`, `validate_api_key`, `create_gemini_service`, `ErrorResponse`,
@@ -204,15 +245,24 @@ Re-confirm each decision when its phase begins.
 
 - ~~`.github/copilot-instructions.md` describes a **different system** (Tectonic,
   `gemini-1.5-flash`, a non-existent `/api/preview` endpoint)~~ — resolved in `c3839da`: it is
-  now a 31-line pointer to `AGENTS.md` (D-8). **Keep it that way**: one set of project
-  instructions, tool-independent. Do not let a second instruction file grow back.
+  now a short pointer to `AGENTS.md` (D-8). **Keep it that way**: one set of project
+  instructions, tool-independent. Do not let a second instruction file grow back. Re-confirmed
+  unchanged on 2026-10-26.
 - ~~Generated PDFs/DOCX are **tracked** in `outputs/` despite `.gitignore` (D-9)~~ — resolved in
   Phase 2 by untracking `outputs/` (ADR 0011). The three PDFs/DOCX and the `.gitkeep` are gone
   from the index. Generated documents are written into the private store's
   `outputs/<profile_id>/<job_id>/`; the repository's own `outputs/` now holds only `.gitkeep`.
+  **Re-verified 2026-10-26:** `git ls-files outputs` → `outputs/.gitkeep` only, so no further
+  untracking was owed. Three untracked pre-Phase-2 PDFs/DOCX were still sitting on disk in
+  `outputs/`; they were deleted after each was confirmed byte-identical (SHA-256) to its copy
+  in the private store.
 - `initial_generation_result.json:4-6` leaks absolute local paths incl. a third-party name
-  (D-10). **Now untracked** with the rest of `applications/`, but still present in public
-  history.
+  (D-10). **Untracked** with the rest of `applications/`, so it cannot be re-committed, but
+  still present in public history. **Owner decision 2026-10-26: leave history as-is.** This is
+  the accepted limitation ADR 0011 records; no rewrite or force-push is approved.
+- **D-11 (inconsistent saved-application schemas) moved from Phase 2 to Phase 5** by owner
+  decision on 2026-10-26; [ADR 0009](DECISIONS/0009-interfaces-and-archive.md) carries the
+  amendment. The archive is private data now, and Phase 5 owns application schemas.
 - **`profile_id` is resolved before any paid work, on purpose.** A missing or unknown id must
   cost nothing and leave no folder behind. If you reorder `tailor_documents`, keep the
   resolution first — a test asserts no API call happens when it fails.

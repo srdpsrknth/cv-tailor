@@ -148,6 +148,37 @@ without waiting for discovery or tracking.
 - **Deferred to a later increment, deliberately:** date validation (A-6), the `outputs/`
   artifact-filename convention, and the `\needspace` parity gap.
 
+### Close-out (2026-10-26) — suite **262 → 282**
+
+An audit-and-clean-up pass, not a refactor, to remove the last descriptions of the
+single-profile system. It closed the largest outstanding functional gap and settled the two
+open D-items the owner still had to decide.
+
+- **`backend/main.py` is multi-profile aware and tested** (`a0b431c`) — the API resolved a
+  profile with `load_profile()` and no argument, reading the pre-Phase-2 path
+  `storage/profile/profile.yaml` and bypassing the store entirely (ADR 0003). On this machine
+  that stale duplicate still existed and was byte-identical to the store's copy, so
+  `/api/tailor` appeared to work while silently ignoring the store; on a fresh clone it raised.
+  `/api/tailor` and all three download routes now take an explicit `profile_id`, resolve through
+  the store, and fail closed. `job_id` is validated against `^[A-Za-z0-9_-]+$` before use
+  (ASSESSMENT.md §6). `tests/test_api.py` adds the module's first 20 tests; **16 of them fail
+  against the previous `main.py`**, verified by stashing the fix.
+- **D-9 re-verified as already resolved** — `git ls-files outputs` returns only
+  `outputs/.gitkeep`, so no further untracking was owed. The three untracked pre-Phase-2
+  PDFs/DOCX still on disk were deleted after each was confirmed byte-identical (SHA-256) to its
+  copy in the private store.
+- **D-10 decided: leave history as-is.** The file is untracked and gitignored; it remains in
+  past commits, which is the limitation [ADR 0011](DECISIONS/0011-private-store-location.md)
+  already records. No rewrite or force-push is approved.
+- **D-11 deferred to Phase 5**, not Phase 2 — see the Phase 5 entry below.
+- **Dead code removed** — `backend/validate_profile.py` (86 lines, unreferenced, hardcoding the
+  dead single-profile path) and two self-referential `Config` aliases (`LEGACY_PROFILE_PATH`,
+  `DEFAULT_PROFILE_PATH`). No existing test was changed.
+
+**Still open after the close-out:** A-6 (dates), A-7 (renderer mutation), A-8 (custom render
+scripts), A-10 (`--mirror-configured`), D-3, D-4, D-13, D-14, D-15, and blocker 8
+(`\needspace` parity).
+
 **Not undone:** the data already published in the public repository's history stays published.
 Untracking is not un-disclosure; purging it needs a history rewrite and a force-push, which
 [ADR 0011](DECISIONS/0011-private-store-location.md) records as a separate unapproved decision.
@@ -194,6 +225,12 @@ Untracking is not un-disclosure; purging it needs a history rewrite and a force-
 - **Scope:** statuses (saved → shortlisted → preparing → submitted → interview → offer /
   rejected / withdrawn), deadlines, follow-ups, notes, saved document versions, search and
   filtering. **No LLM required** to record or update an application. **No automatic submission.**
+- **Inherited from Phase 2 (owner decision 2026-10-26):** migrate the saved-application archive
+  to one schema (**D-11**). [ADR 0009](DECISIONS/0009-interfaces-and-archive.md) originally named
+  Phase 2, but the archive left the public repository in Phase 2 and now lives in the private
+  store at `<store>/applications/<job_id>/`, so the migration belongs with the phase that owns
+  application schemas. The archive stays readable as-is until then; nothing is deleted or
+  rewritten in the meantime.
 - **Dependencies:** Phase 2.
 - **Acceptance:** full lifecycle manageable from the CLI with zero LLM calls.
 - **Testing:** store round-trips, migration from existing `applications/`.

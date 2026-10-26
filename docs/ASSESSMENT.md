@@ -24,6 +24,15 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > **A-10** (`--mirror-configured`), **D-4**, **D-8**, **D-10**, **D-11**, **D-13**, **D-14**.
 > **§6's recommendation is implemented but its history warning is not resolved**: the data
 > already committed remains in the public repository's history.
+>
+> **Status note (2026-10-26, Phase 2 close-out):** a clean-up pass over the stale/new-system
+> inconsistencies. **`backend/main.py` is now multi-profile aware and tested** — it no longer
+> resolves a profile by default, which was the last single-profile path in the codebase (see
+> blocker 7 in [`PROJECT_STATE.md`](PROJECT_STATE.md), now closed). Newly resolved: **D-8**
+> re-confirmed, **D-9** re-verified as already done, **D-10** and **D-11** decided by the owner
+> (both recorded in §3). Removed as dead code: `backend/validate_profile.py` and two
+> self-referential `Config` path aliases. The suite is **282 passed**. Still open: **A-6**,
+> **A-7**, **A-8**, **A-10**, **D-3**, **D-4**, **D-13**, **D-14**, **D-15**.
 
 ---
 
@@ -33,6 +42,13 @@ A local, single-user tool that turns a pasted job description into a tailored CV
 cover letter (DOCX + PDF), grounded in one authoritative YAML profile.
 
 **Verified end-to-end workflow**
+
+> **Superseded by Phase 2 (2026-10-24) and Phase 2 close-out (2026-10-26).** The diagram below is
+> the *pre-Phase-2* flow, kept as the Phase 0 record. The profile is no longer read from
+> `storage/profile/profile.yaml`: it is resolved by `profile_id` through `ProfileStore`
+> (ADR 0003, ADR 0011), and outputs are written to `<store>/outputs/<profile_id>/<job_id>/`.
+> As of 2026-10-26 the FastAPI adapter resolves the same way — it no longer calls
+> `load_profile()` with no argument.
 
 ```
 storage/profile/profile.yaml
@@ -63,7 +79,9 @@ tailor_documents()                             backend/services/tailor_service.p
 ```
 
 **Interfaces**
-- `backend/main.py` — FastAPI, 4 endpoints (`/health`, `/api/tailor`, 3 downloads).
+- `backend/main.py` — FastAPI, 4 endpoints (`/health`, `/api/tailor`, 3 downloads). **As of
+  2026-10-26** `/api/tailor` and the download routes take an explicit `profile_id` and resolve
+  through the store, failing closed (ADR 0003). Tested by `tests/test_api.py`.
 - `ui/app.py` — Streamlit, single-page form; calls the API over HTTP.
 - `scripts/render_application.py` — re-renders saved `content.json` **without** an LLM call.
 - `.agents/skills/cv-tailor-application/SKILL.md` — agent workflow for manual applications.
@@ -81,7 +99,7 @@ tailor_documents()                             backend/services/tailor_service.p
 | Token/cost accounting | **Works, partly wrong** | `calculate_token_usage` — see §3 D-3 |
 | Saved application archive | **Works, ad-hoc** | 8 dirs in `applications/`, inconsistent schemas |
 | Streamlit UI | **Works, thin** | `ui/app.py` — one form, no history/browse |
-| Multi-profile | **Absent** | hardcoded single path `profile_loader.py:27` |
+| Multi-profile | **Works** *(Phase 2)* | `ProfileStore` keyed by `profile_id`, fail-closed (ADR 0003); CLI and API both resolve through it |
 | Job discovery / matching | **Absent** | — |
 | Application tracking | **Absent** | — |
 | CLI | **Works** *(Phase 1)* | `cvtailor` — `doctor`, `profile show`, `generate`, `render` |
@@ -132,10 +150,10 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 | **D-5** | ~~Legacy model pricing retained~~ **RESOLVED in Phase 1** | `gemini_service.py:47-70` | **Pruned** after verifying names and prices against ai.google.dev (2026-10-23): `gemini-1.5-*` are delisted and `gemini-3-pro-preview` is shut down; the 2.5-series and `gemini-3.8-flash` prices were confirmed accurate. This exposed a latent `KeyError`: the fallback resolved through the deleted row. It now targets `DEFAULT_MODEL`, asserted by a test. |
 | **D-6** | Unused dependencies | grep: no imports in `backend/` | **Pruned:** `pydantic-settings`, `python-multipart`, `tiktoken`, `httpx`, `pytest-asyncio`, `black`, `ruff`. Kept `tzdata` (needed by `ZoneInfo` on Windows), `pytest`, `streamlit` and `requests` (used indirectly). **Correction:** `pandas` is *not* in `requirements.txt` and *is* used at `ui/app.py:231-232`; it arrives transitively via streamlit. |
 | **D-7** | ~~`ErrorResponse`, `TailoredOutput` defined and exported, never used~~ **RESOLVED in Phase 1** | `requests.py:44`, `tailored_output.py:71`, `models/__init__.py:19,25` | **Deleted**, including the exports. `TailoringExplanation` was kept — it is still used. |
-| **D-8** | ~~`.github/copilot-instructions.md` (646 lines) describes a **different system**~~ **RESOLVED in `c3839da`** | was `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Rewritten as a 31-line pointer** to `AGENTS.md`, which is the single tool-independent instruction set. The old text (Tectonic, `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/`, `/api/preview`) is gone. |
-| **D-9** | ~~Three generated binaries tracked in `outputs/` despite `.gitignore:45`~~ **RESOLVED in Phase 2** | `git ls-files` showed adjoe CV PDF + CL DOCX + PDF | **Untracked** via `git rm --cached` and gitignored; the repository's `outputs/` now holds only `.gitkeep`. `tests/test_privacy_boundary.py` fails if real data is re-tracked. Still present in already-published history — not rewritten ([ADR 0011](DECISIONS/0011-private-store-location.md)). |
-| **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | **Still open.** |
-| **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | Define one schema; migrate. **Phase 2.** |
+| **D-8** | ~~`.github/copilot-instructions.md` (646 lines) describes a **different system**~~ **RESOLVED in `c3839da`** | was `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Rewritten as a short pointer** to `AGENTS.md`, which is the single tool-independent instruction set. The old text (Tectonic, `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/`, `/api/preview`) is gone. Re-confirmed 2026-10-26: nothing regressed, and no second instruction file has grown back. |
+| **D-9** | ~~Three generated binaries tracked in `outputs/` despite `.gitignore:45`~~ **RESOLVED in Phase 2** | `git ls-files` showed adjoe CV PDF + CL DOCX + PDF | **Untracked** via `git rm --cached` and gitignored; the repository's `outputs/` now holds only `.gitkeep`. `tests/test_privacy_boundary.py` fails if real data is re-tracked. Still present in already-published history — not rewritten ([ADR 0011](DECISIONS/0011-private-store-location.md)). **Re-verified 2026-10-26:** `git ls-files outputs` → `outputs/.gitkeep` only; no further untracking is owed. The three untracked files left on disk by the pre-Phase-2 layout were deleted after confirming each was byte-identical (SHA-256) to its copy in the private store. |
+| **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | **Owner decision 2026-10-26: leave history as-is.** The file is untracked and gitignored with the rest of `applications/`, so it cannot be re-committed; it remains retrievable from past commits of the public remote. This is the same accepted limitation [ADR 0011](DECISIONS/0011-private-store-location.md) records, and no rewrite or force-push is approved. |
+| **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | **Owner decision 2026-10-26: deferred to Phase 5**, not done in Phase 2. [ADR 0009](DECISIONS/0009-interfaces-and-archive.md) named Phase 2, but the archive left the public repository in Phase 2 and now lives in the private store, so the migration is a Phase 5 concern (Application management owns application schemas). The old archive stays readable as-is until then. |
 | **D-12** | ~~Two near-identical `_escape_latex` and three `_slugify` implementations~~ **RESOLVED in Phase 1** | `latex_renderer.py:349,357`, `docx_renderer.py:130,143`, `tailor_service.py:29` | **Consolidated** into `utils/text.py`. Behaviour was verified identical to both originals across the escaping edge cases — including the pre-existing quirk where the braces in `\textbackslash{}` are themselves escaped — and that is now pinned by a test. |
 | **D-13** | `outputs/<job_id>/latex_work/` scratch dir created inside the deliverable folder | `docx_renderer.py:264` | **Still open.** Use a temp dir. |
 | **D-14** | Failed generations leave a partial `outputs/<job_id>/` with no `generation_result.json` | verified in master worktree: adjoe dir lacks the manifest | **Partially addressed:** failures write an explicit `status: failed` manifest through `ApplicationStore.save_failure`. Pinning this in a test was deferred — `docx_renderer.py:264` can still leave residue. |
@@ -169,7 +187,7 @@ Plus `test_docx_renderer.py` (XML-sensitive text) and `test_portability.py` (com
 | `profile_loader` validation & migration | No test for malformed/legacy profiles; multi-profile depends on it |
 | Real renderer output (LaTeX & DOCX) | Both renderers are **mocked** in the only integration test; page-count logic is tested against blank PDFs |
 | Factual-accuracy regressions on real content | The `_validate_cv` rules are only spot-checked |
-| `main.py` endpoints | Zero API tests (incl. the `job_id` containment question) |
+| ~~`main.py` endpoints~~ **CLOSED 2026-10-26** | `tests/test_api.py` (20 tests): fail-closed resolution, the legacy-path decoy, `job_id` containment, download isolation between two profiles. 16 of the 20 fail against the previous `main.py`. |
 | `render_application.py` | The deterministic re-render path — the most-used revision route — is untested |
 | Cross-profile contamination | No second profile exists to test against |
 | Cost/token accounting | `calculate_token_usage` untested; D-3 would not be caught |

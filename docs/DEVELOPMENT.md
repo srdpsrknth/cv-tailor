@@ -111,7 +111,7 @@ while pip was stuck.
 
 Runnable: `.venv` with all locked dependencies, `.env` created from `.env.example`, ports set
 to 8001/8502. `scripts/check_setup.py` reports profile/timezone/LaTeX/templates OK, and
-`python -m pytest -q` → **262 passed** (see [`TESTING.md`](TESTING.md) for the current baseline).
+`python -m pytest -q` → **282 passed** (see [`TESTING.md`](TESTING.md) for the current baseline).
 
 The only outstanding item is `GEMINI_API_KEY`, which the owner must enter into `.env` directly
 — never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too; without them

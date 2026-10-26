@@ -20,9 +20,9 @@ This file exists so a **new chat** can begin Phase 2 without the Phase 1 convers
 1. `git -C D:\coding\cv-tailor-next status --short` → clean.
 2. `git rev-parse --abbrev-ref HEAD` → `refactor/architecture-v2`.
 3. `.venv\Scripts\python.exe -m pytest -q` → **190 passed** in ~110 s when this was written
-   (**262 passed** now, after Phase 2).
+   (**282 passed** after the Phase 2 close-out).
 4. Fast lane while iterating: `-m "not requires_latex"` → 160 passed in ~5 s when this was
-   written (**232 passed** now).
+   written (**252 passed** after the Phase 2 close-out).
 5. `git log --oneline -1` → `3e779f5` or later.
 
 If the suite is not 190 green, **stop and find out why** before changing anything. The whole
