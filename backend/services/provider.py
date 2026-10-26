@@ -316,7 +316,19 @@ class OpenRouterProvider(Provider):
                     # per *request* and depends on which upstream provider served it.
                     # Absent or unparseable, it stays None and the caller estimates --
                     # an absent figure must never be read as "free".
-                    reported_cost_usd=_positive_float(usage.get("cost")),
+                    #
+                    # **``cost_details.upstream_inference_cost`` is consulted, because
+                    # ``cost`` is not always the charge.** Measured 2026-10-26: a
+                    # request routed to **Google AI Studio** returns ``cost: 0`` while
+                    # ``upstream_inference_cost`` holds the real figure (0.004284 for a
+                    # 1,206-token prompt), and every other route examined returns the two
+                    # equal. Reading only ``cost`` recorded every Google-routed call --
+                    # including this project's own default model -- as **free**, which
+                    # is the one error that flatters a model and the exact quantity the
+                    # ranking is built on. The larger of the two is taken rather than a
+                    # fixed preference, so a route reporting only one still yields the
+                    # real charge.
+                    reported_cost_usd=_reported_cost(usage),
                 )
             except Exception as error:  # noqa: BLE001 -- re-raised as ProviderError
                 last_error = error
@@ -472,6 +484,37 @@ def schema_is_sent(schema: Optional[dict]) -> bool:
     schema case without duplicating the ``is not None`` rule in three places.
     """
     return schema is not None
+
+
+def _reported_cost(usage: dict) -> Optional[float]:
+    """The USD this call was charged, from an OpenRouter ``usage`` object.
+
+    **Two fields, because ``cost`` alone is sometimes zero.** A request routed to
+    **Google AI Studio** returns ``cost: 0`` with the real figure in
+    ``cost_details.upstream_inference_cost`` -- measured on 2026-10-26 at 0.004284 for
+    a 1,206-token prompt -- while every other route examined (DeepInfra, Alibaba,
+    OpenInference) returns the two values identical. Since Google AI Studio serves this
+    project's default model, reading only ``cost`` recorded those calls as free.
+
+    The **larger** usable figure wins rather than a fixed preference, so a route that
+    populates only one of the two still yields the real charge, and a route that
+    populates both cannot be under-reported by the field that happens to be zero.
+    ``None`` means "no usable figure, estimate it" and stays distinct from a genuine
+    ``0.0``.
+    """
+    if not isinstance(usage, dict):
+        return None
+    details = usage.get("cost_details")
+    candidates = [
+        _positive_float(usage.get("cost")),
+        _positive_float(details.get("upstream_inference_cost"))
+        if isinstance(details, dict)
+        else None,
+    ]
+    usable = [value for value in candidates if value is not None]
+    if not usable:
+        return None
+    return max(usable)
 
 
 def _positive_float(value: Any) -> Optional[float]:

@@ -819,6 +819,66 @@ def test_a_genuinely_free_model_reports_zero_not_none(monkeypatch):
     assert provider.generate('prompt', model='m').reported_cost_usd == 0.0
 
 
+def test_a_zero_cost_with_a_real_upstream_charge_is_not_read_as_free(monkeypatch):
+    """``cost`` is not always the charge, and this is the case that proves it.
+
+    Measured 2026-10-26: a request OpenRouter routes to **Google AI Studio** returns
+    ``cost: 0`` while ``cost_details.upstream_inference_cost`` holds the real figure --
+    0.004284 for a 1,206-token prompt. Every other route examined (DeepInfra, Alibaba,
+    OpenInference) returns the two equal.
+
+    Since Google AI Studio serves this project's own default model, reading only
+    ``cost`` recorded those calls as **free**. That is the one error that flatters a
+    model, and cost per accepted result is the ranking metric, so the default model
+    would have appeared to cost nothing at all.
+    """
+    _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {
+            'prompt_tokens': 1206,
+            'completion_tokens': 330,
+            'cost': 0,
+            'cost_details': {'upstream_inference_cost': 0.004284},
+        },
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='google/gemini-3.8-flash')
+
+    reported = provider.generate('prompt', model='google/gemini-3.8-flash').reported_cost_usd
+
+    assert reported == pytest.approx(0.004284), (
+        'a Google-routed call reports cost=0 with the real charge in cost_details; '
+        'reading only `cost` makes the default model look free'
+    )
+
+
+def test_the_two_cost_fields_are_reconciled_not_preferred(monkeypatch):
+    """Whichever field carries the real charge wins, so neither can understate it.
+
+    A fixed preference for one field breaks whichever route populates only the other,
+    so the larger usable figure is taken instead.
+    """
+    _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 1, 'completion_tokens': 1, 'cost': 0.002,
+                  'cost_details': {'upstream_inference_cost': 0.005}},
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='m')
+
+    assert provider.generate('prompt', model='m').reported_cost_usd == pytest.approx(0.005)
+
+
+def test_an_upstream_charge_alone_is_used(monkeypatch):
+    """A response carrying only ``cost_details`` still yields a real figure."""
+    _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 1, 'completion_tokens': 1,
+                  'cost_details': {'upstream_inference_cost': 0.003}},
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='m')
+
+    assert provider.generate('prompt', model='m').reported_cost_usd == pytest.approx(0.003)
+
+
 def test_gemini_reports_no_cost_because_the_api_has_none():
     """``usage_metadata`` carries token counts only -- verified against ai.google.dev.
 
