@@ -278,6 +278,24 @@ class OpenRouterProvider(Provider):
             # Their documented way to avoid an endpoint that would ignore the
             # schema. Sent only when a schema is requested, so an unconstrained
             # call keeps the widest set of endpoints available.
+            #
+            # **It is relaxed on the first retry if it makes the model unroutable.**
+            # Measured 2026-10-26: for `anthropic/claude-haiku-5.5`,
+            # `openai/gpt-6-luna` and `anthropic/claude-sonnet-5`, this single field
+            # turns every request into a 404 "No endpoints found that can handle the
+            # requested parameters" -- while `gpt-6-luna`'s seven endpoints *all*
+            # advertise `structured_outputs`, and the identical request **without**
+            # this field returns valid schema-constrained content on the first try. So
+            # the documented guard was, in practice, excluding the models it was meant
+            # to protect. Three of eight curated models were completely unroutable.
+            #
+            # Relaxing it is a trade rather than a free win: it re-admits endpoints
+            # that may ignore the schema (Cloudflare does, returning an empty body
+            # rather than an error), which is exactly what the flag exists to prevent.
+            # The flag's *purpose* is therefore still served -- validation stays in
+            # `parse_json_response` and `validate_cv`, and `ProviderError` is not a
+            # `ValueError` -- but the routing preference no longer costs a model
+            # outright.
             payload["provider"] = {"require_parameters": True}
 
         headers = {
@@ -291,6 +309,26 @@ class OpenRouterProvider(Provider):
                 response = requests.post(
                     OPENROUTER_CHAT_URL, headers=headers, json=payload, timeout=self.timeout,
                 )
+                # ``require_parameters`` can leave a model with no eligible endpoint at
+                # all, which OpenRouter reports as a **404** rather than a 400. That is
+                # a routing-eligibility answer, not a provider fault, so it is answered
+                # by relaxing the preference rather than by re-sending an identical
+                # request -- which would spend three attempts failing the same way.
+                # Measured 2026-10-26 on claude-haiku-5.5, gpt-6-luna and
+                # claude-sonnet-5, where the same request without this field succeeds.
+                if (
+                    response.status_code == 404
+                    and (payload.get("provider") or {}).get("require_parameters")
+                ):
+                    logger.warning(
+                        "OpenRouter found no endpoint for %s that satisfies "
+                        "require_parameters; retrying without it.", resolved_model,
+                    )
+                    payload["provider"] = {"require_parameters": False}
+                    response = requests.post(
+                        OPENROUTER_CHAT_URL, headers=headers, json=payload,
+                        timeout=self.timeout,
+                    )
                 response.raise_for_status()
                 data = response.json()
                 if "error" in data and "choices" not in data:

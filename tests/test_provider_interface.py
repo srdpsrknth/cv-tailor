@@ -296,6 +296,96 @@ def test_openrouter_requires_an_endpoint_that_supports_the_schema(monkeypatch):
     assert sent[-1]['json']['provider'] == {'require_parameters': True}
 
 
+def test_a_404_from_require_parameters_is_retried_without_it(monkeypatch):
+    """The guard must not make a model unroutable -- measured, and it did.
+
+    OpenRouter answers a request whose ``require_parameters`` no endpoint satisfies
+    with a **404**, not a 400. Measured 2026-10-26: for ``anthropic/claude-haiku-5.5``,
+    ``openai/gpt-6-luna`` and ``anthropic/claude-sonnet-5`` that single field turned
+    *every* request into "No endpoints found that can handle the requested parameters",
+    while the identical request without it returned valid schema-constrained content
+    first time. Three of eight curated models were completely unroutable, and each one
+    burned all three attempts failing identically.
+
+    So a 404 is answered by relaxing the preference once, not by re-sending.
+    """
+    sent: list = []
+
+    class _Response:
+        def __init__(self, status, payload):
+            self.status_code = status
+            self._payload = payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(f'HTTP {self.status_code}')
+
+        def json(self):
+            return self._payload
+
+    # ``requests.post`` calls this with ``json=`` as a keyword, so the parameter must
+    # keep that name -- and the module of the same name is therefore reached through
+    # ``_json`` inside this function.
+    import json as _json
+
+    def post(url, headers=None, json=None, timeout=None):  # noqa: A002
+        # Deep-copied, because the provider mutates its payload dict in place to relax
+        # ``require_parameters``. Storing the reference would make both recorded
+        # requests show the final state and the assertions below vacuous.
+        sent.append(_json.loads(_json.dumps(json)))
+        if len(sent) == 1:
+            return _Response(404, {'error': {'message': 'No endpoints found'}})
+        return _Response(200, {
+            'choices': [{'message': {'content': '{"cv": {"title": "Recorded"}}'}}],
+            'usage': {'prompt_tokens': 10, 'completion_tokens': 5, 'cost': 0.001},
+        })
+
+    import requests
+
+    monkeypatch.setattr(requests, 'post', post)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    response = provider.generate('prompt', schema={'type': 'object'})
+
+    assert len(sent) == 2, 'the request must be retried once, not three times'
+    assert sent[0]['provider'] == {'require_parameters': True}
+    assert sent[1]['provider'] == {'require_parameters': False}
+    assert response.text == '{"cv": {"title": "Recorded"}}'
+
+
+def test_a_404_without_require_parameters_is_not_special_cased(monkeypatch):
+    """A genuine 404 for a model that does not exist must still raise.
+
+    The relaxation is conditional on the flag having been sent, so it cannot mask a
+    real "this model is not available" answer.
+    """
+    sent: list = []
+
+    class _Response:
+        status_code = 404
+
+        def raise_for_status(self):
+            raise RuntimeError('HTTP 404')
+
+        def json(self):
+            return {'error': {'message': 'No endpoints found'}}
+
+    def post(url, headers=None, json=None, timeout=None):  # noqa: A002
+        sent.append(json)
+        return _Response()
+
+    import requests
+
+    monkeypatch.setattr(requests, 'post', post)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    with pytest.raises(ProviderError):
+        provider.generate('prompt')  # no schema, so no require_parameters
+
+    assert len(sent) == 3, 'a plain 404 keeps the ordinary three attempts'
+    assert 'provider' not in sent[0]
+
+
 # --- the schema must be in the *standard* dialect, not the SDK's --------------------------
 
 def test_the_converted_schema_uses_lowercase_type_names(monkeypatch):
