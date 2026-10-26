@@ -57,6 +57,19 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
         result = tailor_service.tailor_documents(
             posting, profile, config=config,
             company_name=case.name, role_title="Evaluation",
+            # The cache is bypassed **on purpose**, and this is the only place in the
+            # suite that has to say so. ``tailor_documents`` defaults to
+            # ``use_cache=True`` and ``evaluation/live.py`` drives the *real* pipeline
+            # with a loose ``profile_path``, so without this the paid run would read and
+            # write the same ``<store>/cache/<profile_id>/`` the user's own runs use.
+            #
+            # A benchmark answer served from cache measures the cache, not the model:
+            # a hit makes no API call, reports **zero** usage, and comes back as an
+            # accepted case costing $0.00 with 0 calls -- a fabricated "cheapest,
+            # perfect" result that would land at the top of the ranking. Only the first
+            # run of a pair is at risk, and that is precisely the run whose numbers the
+            # owner is paying for, so the bypass is not optional here.
+            use_cache=False,
         )
     except Exception as error:  # noqa: BLE001 -- a failure is data for the metrics
         return CaseResult(

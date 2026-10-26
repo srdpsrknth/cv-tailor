@@ -192,6 +192,82 @@ def test_the_suite_never_reads_the_private_store():
         assert 'cv-tailor-data' not in text, f'{path.name} names this machine\'s store'
 
 
+# --- a measurement must not be served from the cache -------------------------------------------
+
+def test_the_evaluation_bypasses_the_generation_cache():
+    """A benchmark answer from a cache measures the cache, not the model.
+
+    ``tailor_documents`` defaults to ``use_cache=True`` and this suite drives the **real**
+    pipeline with a loose ``profile_path``, so it shares ``<store>/cache/<profile_id>/``
+    with the user's own runs. A hit makes no API call, reports zero usage, and therefore
+    scores as an **accepted case costing $0.00 with 0 calls** -- a fabricated best result.
+
+    The whole 15-pair grid has a distinct key, so the exposure is a *repeat* of a pair --
+    which is exactly the run whose numbers are being paid for. The bypass is therefore
+    asserted on the call rather than left to a default.
+    """
+    from evaluation import live
+
+    captured: dict = {}
+
+    def fake_tailor_documents(posting, profile, **kwargs):
+        captured.update(kwargs)
+
+        class _Result:
+            status = 'success'
+            cv_page_count = 2
+
+        return _Result()
+
+    import services.tailor_service as tailor_service
+
+    original = tailor_service.tailor_documents
+    tailor_service.tailor_documents = fake_tailor_documents
+    try:
+        from evaluation.cases import CASES
+        from evaluation.curated_models import CURATED_MODELS
+
+        live.run_one_case(CASES[0], CURATED_MODELS[0])
+    finally:
+        tailor_service.tailor_documents = original
+
+    assert captured.get('use_cache') is False, (
+        'the evaluation must not read or write the generation cache: a cached answer is '
+        'reported as an accepted run costing $0.00, which would top the ranking'
+    )
+
+
+def test_the_evaluation_still_names_a_provider_and_a_model():
+    """The bypass must not have been bought by dropping the routing the run measures."""
+    from evaluation import live
+    from evaluation.cases import CASES
+    from evaluation.curated_models import CURATED_MODELS
+
+    captured: dict = {}
+
+    def fake_tailor_documents(posting, profile, **kwargs):
+        captured.update(kwargs)
+
+        class _Result:
+            status = 'success'
+            cv_page_count = 2
+
+        return _Result()
+
+    import services.tailor_service as tailor_service
+
+    original = tailor_service.tailor_documents
+    tailor_service.tailor_documents = fake_tailor_documents
+    try:
+        live.run_one_case(CASES[0], CURATED_MODELS[0])
+    finally:
+        tailor_service.tailor_documents = original
+
+    config = captured['config']
+    assert config.provider_name == 'openrouter'
+    assert config.model == CURATED_MODELS[0].id
+
+
 # --- the curated set --------------------------------------------------------------------------
 
 def test_the_set_is_small():
