@@ -1,7 +1,8 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **282 passed**, 1 warning, ~114 s, fully offline — no paid API calls.
+**Current baseline:** **309 passed**, 1 warning, ~107 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **279 passed**, 30 deselected, ~6 s.
 
 | | |
 |---|---|
@@ -9,26 +10,61 @@
 | Baseline after Milestone 1.1 | 141 passed, ~100 s |
 | Baseline after Phase 1 | 190 passed, ~110 s |
 | Baseline after Phase 2 | 262 passed, ~106 s |
-| **Baseline after the Phase 2 close-out** | **282 passed**, ~114 s |
+| Baseline after the Phase 2 close-out | 282 passed, ~114 s |
+| Baseline after Phase 3 increment 1 | 298 passed, ~112 s |
+| **Baseline after Phase 3 increment 2** | **309 passed**, ~107 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
-The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, and 190 → 262 in Phase 2. The
-2026-10-26 close-out added `test_api.py` (20 tests) and changed no existing test. The runtime
-increase is almost entirely `pdflatex`: real rendering is exercised instead of mocked. Phase 2's
-72 new tests are all offline and add ~1 s; the 20 API tests add ~2 s.
+The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, 190 → 262 in Phase 2,
+262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3 increment 1 (all new files), and
+298 → **309** in increment 2. The runtime increase is almost entirely `pdflatex`: real rendering
+is exercised instead of mocked.
 
-**No test that existed at `325c4d1` has been modified in behaviour.** Two Phase 2 exceptions,
-both forced by the layout change the phase exists to make, and both **stricter** afterwards:
+> **Sandbox caveat.** Under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
+> on ACL operations ("No usable temporary directory" is the same environment artifact), and
+> `tools/build_fixtures.py` is denied writes under `tests/` even though ACLs allow them. Run
+> pytest unconfined; build fixtures into a staging root and copy them in (that is what the
+> script's `argv[1]` is for).
+
+**No test that existed at `325c4d1` has been modified in behaviour** except where a change of
+behaviour was the point of the increment. Every such change is listed below with its reason.
+
+Phase 2's two exceptions, both forced by the layout change that phase exists to make, and both
+**stricter** afterwards:
 
 | Test | Change | Why |
 |---|---|---|
 | `test_tailoring_pipeline.py::test_artifacts_are_persisted_under_the_job_folder` | asserted `outputs/<job_id>/`; now `outputs/<profile_id>/<job_id>/` and additionally asserts the id | The path *is* the feature (ADR 0003); the new claim is stronger, not weaker |
 | `test_tailor_service.py` + `test_tailoring_pipeline.py` glob patterns | `outputs/*/source/...` → `outputs/*/*/source/...` | Same reason: one more path segment now exists |
 
+Phase 3 increment 2's exceptions — the first time existing tests were edited **intentionally**,
+because removing the editorial-review call is precisely what they pinned:
+
+| Test | Change | Why |
+|---|---|---|
+| `test_tailoring_pipeline.py:47` | `call_count` 3 → **2** | The review call is gone; this count *is* the increment's headline result |
+| `test_tailoring_pipeline.py` saved-content | asserted the **reviewed** summary, now the **draft** one | The draft is the accepted CV; there is no reviewed revision any more |
+| 4 explanation tests (`:145-225`) | read `cv_draft` instead of `cv_editorial_review`; fake transcripts reordered | The explanation's source moved with the removed call |
+| `:597`, `:765`, `test_tailor_service.py:105` | `cv_attempts` 3 → **2**; token totals 3000/300 → 2000/200 | Same run, one fewer CV call |
+| `test_short_letter…`, `test_length_retry…` | dropped the now-nonexistent review response from the fake transcript | The transcript must match the calls the pipeline actually makes |
+| `test_profile_serialization.py:101`, `:121` | `call_count` 3 → 2, 4 → 3 | Same removal; the serialization invariant itself is untouched |
+
 Everything else passes unchanged. Rather than edit 32 call sites to thread a `profile_id` they
 are not about, `tests/conftest.py` sets `CVTAILOR_PROFILE_ID` and points `CVTAILOR_STORE` at a
 throwaway synthetic store once, for the whole suite.
+
+### Phase 3 additions
+
+| File | Tests | Covers |
+|---|---|---|
+| `test_profile_serialization.py` | 16 | **New in increment 1.** The profile is serialized once per application; the rendered context is **byte-identical** with and without `profile_json` on every country-header branch; the `rules`-excluded facts memo returns the same text without re-serializing, never becomes a profile field, and does not un-ban a banned tool |
+| `test_editorial_instructions.py` | 11 | **New in increment 2.** The merged editorial requirements reach the **CV call only** (not the letter), are injected exactly once, and are carried by a layout retry too; the validation gate is unchanged (an invalid draft still fails the run and no letter is drafted from it); the call counts are **2/3/5** on the happy, typical and max-successful paths |
+
+`test_profile_serialization.py` was verified to be a real guard: **11 of its 16 tests fail
+against the pre-increment-1 code**. `test_editorial_instructions.py` likewise: **9 of its 11
+tests fail against the pre-increment-2 code** (checked by stashing `generation.py` and
+`tailor_service.py`).
 
 ### Phase 2 additions
 
@@ -130,6 +166,8 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | `test_profile_isolation.py` | 13 | **New in Phase 2.** Two candidates cannot contaminate each other; documents land in the store |
 | `test_privacy_boundary.py` | 13 | **New in Phase 2.** Real data stays out of the public repository |
 | `test_api.py` | 20 | **New 2026-10-26.** The FastAPI adapter resolves like the CLI and fails closed |
+| `test_profile_serialization.py` | 16 | **New in Phase 3 increment 1.** One serialization per application; byte-identical prompts; the rules-excluded facts memo |
+| `test_editorial_instructions.py` | 11 | **New in Phase 3 increment 2.** The merged editorial requirements reach the CV call only; the gate is unchanged; call counts are 2/3/5 |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
 | `test_portability.py` | 2 | *(pre-existing)* pdflatex discovery and `LATEX_COMPILER` override |
@@ -258,8 +296,10 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | `python -m pytest -q` (after M1.1) | 141 passed, ~100 s |
 | `python -m pytest -q` (**after Phase 1**) | **190 passed**, ~110 s |
 | `python -m pytest -q` (**after Phase 2**) | **262 passed**, ~106 s |
-| `python -m pytest -q` (**after the 2026-10-26 close-out**) | **282 passed**, ~114 s |
-| Fast lane `-m "not requires_latex"` | 252 passed, 30 deselected, ~7 s |
+| `python -m pytest -q` (after the 2026-10-26 close-out) | 282 passed, ~114 s |
+| `python -m pytest -q` (after Phase 3 increment 1) | 298 passed, ~112 s |
+| `python -m pytest -q` (**after Phase 3 increment 2**) | **309 passed**, ~107 s |
+| Fast lane `-m "not requires_latex"` | **279 passed**, 30 deselected, ~6 s |
 | `test_api.py` | 20 passed, ~2 s (no LaTeX, no network) |
 | `test_renderers_documents.py` | 34 passed, ~20 s |
 | `test_render_application_determinism.py` | 11 passed, ~73 s |
@@ -267,5 +307,5 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | Backend `import main` | ≈ 1.7–2.0 s |
 | `load_profile()` | 169 ms |
 | pdflatex per run | ≈ 2.9 s (run twice per compile) |
-| LLM calls: min / typical / max / worst | 3 / 4 / 6 / 18 |
-| Cost per application (`gemini-3.8-flash`) | $0.027 / $0.049 / $0.092 |
+| LLM calls: min / typical / max-successful / worst | **2 / 3 / 5 / 12** (was 3 / 4 / 6 / 18 before increment 2) |
+| Cost per application (`gemini-3.8-flash`) | **$0.016 / $0.026 / $0.048** (was $0.027 / $0.038 / $0.060) |
