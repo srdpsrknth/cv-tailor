@@ -41,6 +41,13 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > them. Optimisations 1, 2, 3 and 5 remain open and are deliberately kept separate, because
 > each changes the call-count baseline the others are verified against. The suite is
 > **298 passed**.
+>
+> **Status note (2026-10-26, Phase 3 increment 2):** §5's optimisation **2 — "Remove or merge
+> the editorial-review pass" — is implemented**. The requirements were folded into the draft
+> prompt and the second CV call was deleted, so the *prompt* did change this time and the §5
+> tables below are updated to the measured values. Call counts are **2 / 3 / 5**; the happy
+> path sends **41% fewer input tokens**. Optimisations 1, 3 and 5 remain open, and 1 is now
+> the largest remaining source of repeated input. The suite is **309 passed**.
 
 ---
 
@@ -66,10 +73,9 @@ storage/profile/profile.yaml
         │  + job_description + company/role/work_country
         ▼
 tailor_documents()                             backend/services/tailor_service.py:109
-   ├─ CV draft            LLM call 1 ─┐
-   ├─ CV editorial review LLM call 2  ├─ GeminiService._call_gemini()
-   ├─ Cover letter        LLM call 3  │  backend/services/gemini_service.py:124
-   └─ Layout retry loop (≤4) ─────────┘
+   ├─ CV draft (editorial requirements folded in)  LLM call 1 ─┐
+   ├─ Cover letter                                 LLM call 2  ├─ GeminiService._call_gemini()
+   └─ Layout retry loop (≤4) ──────────────────────────────────┘  backend/services/gemini_service.py:124
         │  validate: _validate_cv / _validate_cover_letter
         ▼
    Render: LaTeXRenderer.render_cv()  → CV PDF   backend/renderers/latex_renderer.py:67
@@ -239,60 +245,85 @@ budget-capped suite.
 | pdflatex per run | ≈ 2.9 s (run twice per compile) |
 | CV re-renders, worst case | 4 layout attempts × 2 runs = 8 |
 
-**LLM calls per application** (VERIFIED from control flow)
+**LLM calls per application** (VERIFIED from control flow; **updated in Phase 3 increment 2**)
+
+The editorial-review pass was removed in increment 2, so every count drops by one CV call.
+The *arithmetic* is the same; the second CV call is simply gone. The new figures were
+verified by driving the real pipeline with recorded transcripts, not by subtracting.
 
 | Case | Arithmetic | Logical calls |
 |---|---|---|
-| Minimum | 1 draft + 1 review + 1 letter | **3** |
-| Typical (1 layout retry) | 3 + 1 | **4** |
-| Max successful (fits on 4th render) | 3 + 3 | **6** |
-| Worst (validation retries exhausted) | 6 `generate` × 3 | **18** |
-| HTTP ceiling (`_call_gemini` retries ×3) | 18 × 3 | **54** |
+| Minimum | 1 draft + 1 letter | **2** |
+| Typical (1 layout retry) | 2 + 1 | **3** |
+| Max successful (fits on 4th render) | 2 + 3 | **5** |
+| Worst (validation retries exhausted) | 6 `generate` × 2 | **12** |
+| HTTP ceiling (`_call_gemini` retries ×3) | 12 × 3 | **36** |
 
-**Estimated cost per application** (`gemini-3.8-flash`, $0.75 / $3.75 per 1M):
+**Estimated cost per application** (`gemini-3.8-flash`, $0.75 / $3.75 per 1M) — **measured
+after increment 2**
 
-| Case | Input tok | Output tok | Cost |
-|---|---|---|---|
-| Best (3 calls) | 19,145 | 3,322 | **$0.027** |
-| Typical (4 calls) | 34,601 | 6,022 | **$0.049** |
-| Worst (6 calls) | 65,513 | 11,422 | **$0.092** |
+| Case | Input tok | Output tok | Cost | Was |
+|---|---|---|---|---|
+| Best (2 calls) | 10,927 | 1,972 | **$0.016** | $0.027 |
+| Typical (3 calls) | 18,699 | 3,322 | **$0.026** | $0.038 |
+| Worst (5 calls) | 34,243 | 6,022 | **$0.048** | $0.060 |
 
-**Dominant inefficiency:** every CV call re-sends ~6,150 tokens of identical
-prompt+profile+JD context. The editorial-review pass alone is ~25% of total input tokens,
-and each layout retry re-sends the entire context *plus* the full previous CV JSON
-(≈7,730 tokens) to produce a shorter variant.
+The per-call inputs are recomputed from the actual prompt bytes: the CV call grows from
+≈6,150 to ≈6,438 tokens because the draft prompt now carries the editorial requirements
+(616 chars ≈ 288 tokens), and the ≈7,772-token review call disappears entirely. On the
+happy path that is a **41% reduction in input tokens** and **one fewer call**.
+
+> **Correction carried from the pre-increment table.** The old "Typical (4 calls)" row
+> stated 34,601 input tokens, which is the arithmetic of *five* calls (draft + review +
+> two retries + letter), not four. The call count and the token total disagreed. The rows
+> above are derived consistently from the per-call inputs, so a count and its tokens now
+> describe the same run. The old `Worst` row was also mislabelled: at 65,513 tokens it
+> described 6 calls @ ~10,919, i.e. the max-successful case, not the retry-exhausted one.
+
+**Dominant inefficiency (still open):** each layout retry re-sends the entire context
+*plus* the full previous CV JSON (≈7,772 tokens) to produce a shorter variant. With the
+review pass gone this is now the largest single source of repeated input.
 
 **Optimization opportunities (evidence-based, in priority order)**
 
 1. **Targeted layout retry instead of full regeneration** — send only the sections to shorten
-   as a delta. Est. **25–45%** of typical-case input cost.
-2. **Remove or merge the editorial-review pass** — fold its instructions into the draft
-   prompt. Est. **~25%** of input tokens and one call.
+   as a delta. Est. **25–45%** of typical-case input cost. **Now the top opportunity.**
+2. ~~**Remove or merge the editorial-review pass**~~ — **DONE — Phase 3, increment 2
+   (2026-10-26).** The requirements were folded into the draft prompt
+   (`generation.EDITORIAL_REQUIREMENTS`, injected by `build_cv_prompt`) and the second CV
+   call was deleted. See the measured effect below.
 3. **Enable structured output** (`response_schema`) — removes the parse-failure retry loop,
    the dominant tail risk.
 4. ~~**Serialize the profile once** per application rather than per call.~~
    **DONE — Phase 3, increment 1 (2026-10-26).** The context block is now built once per
    application and reused by the CV prompt, the letter prompt and every layout retry
    (`tailor_service.tailor_documents` → `generation.build_context(..., profile_json=...)`).
-   The *token* figures above are unchanged, because the bytes sent to the model are
-   byte-identical — this removes repeated work, not content. Measured on this machine:
+   The *token* figures were unchanged by that increment, because the bytes sent to the model
+   are byte-identical — it removes repeated work, not content. Measured on this machine:
    `model_dump_json(indent=2)` ≈ 0.044 ms and the banned-tool facts block ≈ 0.23 ms per
    call, against a typical run that rebuilt them 3–4 times and up to 8 times at the
    worst (7 banned tools × one scan each). That is single-digit milliseconds per
-   application — real, but **not** a cost saving; the saving is that the work is no
-   longer repeated. Do not mistake this increment for a cost reduction.
+   application — real, but **not** a cost saving.
 5. **Cache validated results** — re-rendering already costs 0 LLM calls; extend that
    principle to "same profile + same JD → reuse".
 
 *Do not add async, concurrency or caching infrastructure before 1–5 are exhausted.*
 
-**Measured effect of optimisation 4 (2026-10-26).** The prompt sent to the model is
+**Measured effect of optimisation 4 (2026-10-26).** The prompt sent to the model was
 unchanged: `tests/test_profile_serialization.py` asserts the rendered context is
 byte-identical with and without the new `profile_json` argument, and asserts the pipeline
-serializes the profile exactly once per application. The call count is unchanged and is
-still pinned at 3 min / 4 typical / 6 max by `test_tailoring_pipeline.py`. The remaining
-optimisations 1, 2, 3 and 5 are each being done in their own increment precisely so that
-this baseline stays attributable.
+serializes the profile exactly once per application.
+
+**Measured effect of optimisation 2 (2026-10-26).** Call counts 3/4/6 → **2/3/5**, the
+numbers now pinned by `tests/test_editorial_instructions.py` against the real pipeline
+rather than derived on paper. Both recorded transcripts lost their
+`02_cv_editorial_review.json` step (`tools/build_fixtures.py` regenerates them) and
+`tailoring_explanation` is read from the **draft** response, which is now the only CV
+response. Validation is unchanged: the draft was always the document `validate_cv` gated,
+and the review's output was re-validated from scratch anyway — so the pass bought a second
+draft, not a stronger gate. Two tests assert that an invalid draft still fails the run and
+that no letter is drafted from it.
+
 
 ---
 

@@ -105,18 +105,19 @@ def analyst_sessions():
     profile = load_profile(str(SOURCE_FIXTURES / "profiles/synthetic_analyst.yaml"))
     out = FIXTURES / "llm_responses/analyst_nordwind"
 
+    # Since Phase 3 increment 2 there is no editorial-review step: the draft response
+    # is the accepted CV and the only carrier of `tailoring_explanation`. The recorded
+    # draft therefore IS the previously-reviewed payload -- same shape
+    # `{"cv": ..., "tailoring_explanation": ...}`, same summary wording -- so the
+    # transcripts still describe a realistic accepted document, just produced in one
+    # call instead of two.
     draft = cv_payload(
         profile,
         "Analytical Engineer",
         ["Analytical engineer with experience across warehouse modelling, pipeline reliability "
-         "and self-service reporting in synthetic fixture organisations."],
+         "and stakeholder-facing reporting in synthetic fixture organisations."],
         ANALYST_SKILLS,
     )
-    reviewed = json.loads(json.dumps(draft))
-    reviewed["summary"] = [
-        "Analytical engineer with experience across warehouse modelling, pipeline reliability "
-        "and stakeholder-facing reporting in synthetic fixture organisations."
-    ]
     explanation = {
         "summary_changes": "Aligned the approved summary with the posting's measurement focus.",
         "bullet_modifications": "Kept pipeline and data-quality bullets; shortened tooling detail.",
@@ -126,8 +127,8 @@ def analyst_sessions():
     }
     # `tailor_documents` reads `data.get("tailoring_explanation")` from the TOP level of
     # the parsed response, not from inside `cv`. Recorded the way production expects it.
-    review_payload = {"cv": reviewed, "tailoring_explanation": explanation}
-    shortened = json.loads(json.dumps(reviewed))
+    draft_payload = {"cv": draft, "tailoring_explanation": explanation}
+    shortened = json.loads(json.dumps(draft))
     shortened["summary"] = [
         "Analytical engineer with experience across warehouse modelling and pipeline reliability."
     ]
@@ -153,16 +154,15 @@ def analyst_sessions():
     )
 
     # Validate against the real production validators before writing.
-    for payload in (draft, reviewed, shortened):
+    for payload in (draft, shortened):
         _validate_cv(TailoredCV.model_validate(payload), profile)
     _validate_cover_letter(TailoredCoverLetter.model_validate(letter_payload), profile)
 
-    write_json(out / "01_cv_draft.json", {"cv": draft})
-    write_json(out / "02_cv_editorial_review.json", review_payload)
-    write_json(out / "03_cover_letter.json", {"cover_letter": letter_payload})
-    # 04 is delivered inside a Markdown fence to exercise the tolerant parser.
+    write_json(out / "01_cv_draft.json", draft_payload)
+    write_json(out / "02_cover_letter.json", {"cover_letter": letter_payload})
+    # 03 is delivered inside a Markdown fence to exercise the tolerant parser.
     fenced = "```json\n" + json.dumps({"cv": shortened}, indent=2, ensure_ascii=False) + "\n```"
-    write_text(out / "04_cv_layout_retry.json", fenced + "\n")
+    write_text(out / "03_cv_layout_retry.json", fenced + "\n")
 
     write_json(out / "responses.json", {
         "session": "analyst_nordwind",
@@ -170,9 +170,8 @@ def analyst_sessions():
         "job_description": "job_descriptions/nordwind_analytics_engineer.txt",
         "steps": [
             {"attempt": "cv_draft", "file": "01_cv_draft.json", "format": "json"},
-            {"attempt": "cv_editorial_review", "file": "02_cv_editorial_review.json", "format": "json"},
-            {"attempt": "cover_letter", "file": "03_cover_letter.json", "format": "json"},
-            {"attempt": "cv_layout_retry", "file": "04_cv_layout_retry.json", "format": "fenced"},
+            {"attempt": "cover_letter", "file": "02_cover_letter.json", "format": "json"},
+            {"attempt": "cv_layout_retry", "file": "03_cv_layout_retry.json", "format": "fenced"},
         ],
     })
 
@@ -181,18 +180,14 @@ def marketer_sessions():
     profile = load_profile(str(SOURCE_FIXTURES / "profiles/synthetic_marketer.yaml"))
     out = FIXTURES / "llm_responses/marketer_lumen"
 
+    # One call, as above: the draft carries the accepted CV and the explanation.
     draft = cv_payload(
         profile,
         "Growth Analyst",
-        ["Growth marketing analyst with experience across paid acquisition reporting, "
-         "retention analysis and lifecycle experimentation in synthetic fixture organisations."],
+        ["Growth marketing analyst with experience across paid acquisition reporting and "
+         "lifecycle experimentation in synthetic fixture organisations."],
         MARKETER_SKILLS,
     )
-    reviewed = json.loads(json.dumps(draft))
-    reviewed["summary"] = [
-        "Growth marketing analyst with experience across paid acquisition reporting and "
-        "lifecycle experimentation in synthetic fixture organisations."
-    ]
     explanation = {
         "summary_changes": "Emphasised acquisition reporting and experimentation.",
         "bullet_modifications": "Kept campaign and lifecycle bullets, shortened tooling lists.",
@@ -200,7 +195,7 @@ def marketer_sessions():
         "project_selection": "No selected projects in this profile; none were added.",
         "overall_strategy": "Matched the posting's acquisition and retention emphasis.",
     }
-    review_payload = {"cv": reviewed, "tailoring_explanation": explanation}
+    draft_payload = {"cv": draft, "tailoring_explanation": explanation}
 
     letter_payload = letter(
         "Lumen Consumer BV",
@@ -222,21 +217,18 @@ def marketer_sessions():
         ],
     )
 
-    for payload in (draft, reviewed):
-        _validate_cv(TailoredCV.model_validate(payload), profile)
+    _validate_cv(TailoredCV.model_validate(draft), profile)
     _validate_cover_letter(TailoredCoverLetter.model_validate(letter_payload), profile)
 
-    write_json(out / "01_cv_draft.json", {"cv": draft})
-    write_json(out / "02_cv_editorial_review.json", review_payload)
-    write_json(out / "03_cover_letter.json", {"cover_letter": letter_payload})
+    write_json(out / "01_cv_draft.json", draft_payload)
+    write_json(out / "02_cover_letter.json", {"cover_letter": letter_payload})
     write_json(out / "responses.json", {
         "session": "marketer_lumen",
         "profile": "profiles/synthetic_marketer.yaml",
         "job_description": "job_descriptions/lumen_growth_analyst.txt",
         "steps": [
             {"attempt": "cv_draft", "file": "01_cv_draft.json", "format": "json"},
-            {"attempt": "cv_editorial_review", "file": "02_cv_editorial_review.json", "format": "json"},
-            {"attempt": "cover_letter", "file": "03_cover_letter.json", "format": "json"},
+            {"attempt": "cover_letter", "file": "02_cover_letter.json", "format": "json"},
         ],
     })
 
@@ -251,7 +243,7 @@ def content_documents():
         ANALYST_SKILLS,
     )
     letter_payload = json.loads(
-        (FIXTURES / "llm_responses/analyst_nordwind/03_cover_letter.json").read_text(encoding="utf-8")
+        (FIXTURES / "llm_responses/analyst_nordwind/02_cover_letter.json").read_text(encoding="utf-8")
     )["cover_letter"]
     _validate_cv(TailoredCV.model_validate(cv), profile)
     _validate_cover_letter(TailoredCoverLetter.model_validate(letter_payload), profile)

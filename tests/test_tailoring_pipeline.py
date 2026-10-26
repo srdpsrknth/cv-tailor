@@ -43,8 +43,10 @@ def test_pipeline_produces_a_two_page_cv_and_one_page_letter(
     assert result.cv_page_count == 2
     assert result.cover_letter_page_count == 1
     assert not offline.exhausted, 'pipeline asked for more responses than were recorded'
-    # draft + editorial review + letter = 3 logical calls on the happy path.
-    assert offline.call_count == 3
+    # draft + letter = 2 logical calls on the happy path. The editorial-review call was
+    # removed in Phase 3 increment 2: its requirements are folded into the draft prompt,
+    # so the draft is the accepted CV rather than a first draft awaiting revision.
+    assert offline.call_count == 2
 
 
 def test_saved_content_matches_the_accepted_documents(
@@ -61,8 +63,9 @@ def test_saved_content_matches_the_accepted_documents(
 
     assert saved['company_name'] == 'Nordwind Analytics GmbH'
     assert saved['role_title'] == 'Analytical Engineer'
-    # The letter passes through an editorial-reviewed CV, not the raw draft.
-    assert saved['cv']['summary'] == analyst_session.step_payload('cv_editorial_review')['cv']['summary']
+    # The saved CV is the *accepted* CV. There is no longer a reviewed revision: the
+    # single draft call is what validation gates and what the letter is built from.
+    assert saved['cv']['summary'] == analyst_session.step_payload('cv_draft')['cv']['summary']
     assert saved['cover_letter']['paragraphs'] == \
         analyst_session.step_payload('cover_letter')['cover_letter']['paragraphs']
 
@@ -145,7 +148,14 @@ def test_message_reports_pages_and_letter_words(
 def test_tailoring_explanation_is_carried_through(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
-    """The editorial-review response is the source of the explanation."""
+    """The draft response is now the source of the explanation.
+
+    It used to come from the editorial-review response, because that was the last CV
+    call. With the review pass removed (Phase 3 increment 2) the draft is the final CV
+    response, so the explanation must be read from it -- otherwise it would silently
+    become ``None``, which is exactly the failure mode ``extract_explanation`` exists
+    to prevent.
+    """
     offline_service(analyst_session.texts())
     stub_renderers([2])
 
@@ -154,7 +164,7 @@ def test_tailoring_explanation_is_carried_through(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
     assert result.tailoring_explanation is not None
-    expected = analyst_session.step_payload('cv_editorial_review')['tailoring_explanation']
+    expected = analyst_session.step_payload('cv_draft')['tailoring_explanation']
     assert result.tailoring_explanation['overall_strategy'] == expected['overall_strategy']
 
 
@@ -167,12 +177,11 @@ def test_nested_tailoring_explanation_is_read_from_inside_cv(
     nest it inside ``cv``. Before the fix this produced
     ``tailoring_explanation is None`` with no error at all.
     """
-    review = json.loads(analyst_session.step_text('cv_editorial_review'))
-    nested = review.pop('tailoring_explanation')
-    review['cv']['tailoring_explanation'] = nested
+    draft = json.loads(analyst_session.step_text('cv_draft'))
+    nested = draft.pop('tailoring_explanation')
+    draft['cv']['tailoring_explanation'] = nested
     offline_service([
-        analyst_session.step_text('cv_draft'), json.dumps(review),
-        analyst_session.step_text('cover_letter'),
+        json.dumps(draft), analyst_session.step_text('cover_letter'),
     ])
     stub_renderers([2])
 
@@ -188,11 +197,10 @@ def test_top_level_explanation_still_wins_over_a_nested_one(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
     """Precedence is unchanged: the documented top-level key is authoritative."""
-    review = json.loads(analyst_session.step_text('cv_editorial_review'))
-    review['cv']['tailoring_explanation'] = {'overall_strategy': 'nested decoy'}
+    draft = json.loads(analyst_session.step_text('cv_draft'))
+    draft['cv']['tailoring_explanation'] = {'overall_strategy': 'nested decoy'}
     offline_service([
-        analyst_session.step_text('cv_draft'), json.dumps(review),
-        analyst_session.step_text('cover_letter'),
+        json.dumps(draft), analyst_session.step_text('cover_letter'),
     ])
     stub_renderers([2])
 
@@ -202,19 +210,18 @@ def test_top_level_explanation_still_wins_over_a_nested_one(
     )
     assert result.tailoring_explanation['overall_strategy'] != 'nested decoy'
     assert result.tailoring_explanation['overall_strategy'] == \
-        review['tailoring_explanation']['overall_strategy']
+        draft['tailoring_explanation']['overall_strategy']
 
 
 def test_layout_retry_explanation_takes_precedence_when_supplied(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
-    """A layout retry that returns its own explanation must supersede the review's one."""
+    """A layout retry that returns its own explanation must supersede the draft's one."""
     draft = analyst_session.step_text('cv_draft')
-    review = analyst_session.step_text('cv_editorial_review')
     retry = service._parse_json_response(analyst_session.step_text('cv_layout_retry'))
     retry['tailoring_explanation'] = {'overall_strategy': 'from the layout retry'}
     offline_service([
-        draft, review, analyst_session.step_text('cover_letter'), json.dumps(retry),
+        draft, analyst_session.step_text('cover_letter'), json.dumps(retry),
     ])
     stub_renderers([3, 2])
 
@@ -593,8 +600,9 @@ def test_layout_retry_shortens_the_cv_until_it_fits(
     )
 
     assert result.cv_page_count == 2
-    # draft + editorial review + one layout revision
-    assert result.token_usage.cv_attempts == 3
+    # draft + one layout revision. The editorial review was removed in increment 2, so
+    # the same run now costs one fewer CV call for the same accepted document.
+    assert result.token_usage.cv_attempts == 2
     manifest = read_json(Path(result.source_path).with_name('generation_result.json'))
     assert manifest['cv_page_history'] == [3, 2]
     # The retry must be sent the current candidate, not the original prompt alone.
@@ -637,13 +645,12 @@ def test_short_letter_is_corrected_rather_than_silently_accepted(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
     draft = analyst_session.step_payload('cv_draft')
-    review = analyst_session.step_payload('cv_editorial_review')
     good_letter = analyst_session.step_text('cover_letter')
 
     bad = json.loads(good_letter)
     bad['cover_letter']['paragraphs'] = ['short paragraph'] * 4
     offline = offline_service([
-        json.dumps(draft), json.dumps(review), json.dumps(bad), good_letter,
+        json.dumps(draft), json.dumps(bad), good_letter,
     ])
     stub_renderers([2])
 
@@ -761,11 +768,11 @@ def test_token_usage_is_attributed_per_component(
     )
     usage = result.token_usage
 
-    # 3 CV calls (draft, review, one layout retry), 1 letter call.
-    assert usage.cv_attempts == 3 and usage.cl_attempts == 1
-    assert usage.cv_input_tokens == 3000 and usage.cl_input_tokens == 1000
-    assert usage.cv_output_tokens == 300 and usage.cl_output_tokens == 100
-    assert usage.total_tokens == 4400
+    # 2 CV calls (draft, one layout retry), 1 letter call.
+    assert usage.cv_attempts == 2 and usage.cl_attempts == 1
+    assert usage.cv_input_tokens == 2000 and usage.cl_input_tokens == 1000
+    assert usage.cv_output_tokens == 200 and usage.cl_output_tokens == 100
+    assert usage.total_tokens == 3300
 
 
 # --- shared text helpers (D-12) ------------------------------------------------------

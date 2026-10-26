@@ -3,7 +3,7 @@
 Extracted from ``tailor_service.tailor_documents`` (A-3). This module knows how to
 turn a job description plus a profile into a validated CV and cover letter: it
 builds the prompts, calls the model, validates each response, corrects failures,
-runs the editorial review, and drives the layout-retry loop.
+and drives the layout-retry loop.
 
 It deliberately knows **nothing** about the filesystem. ``tailor_service`` owns
 persistence and calls into here, which is what makes the flow testable in parts.
@@ -352,15 +352,48 @@ def build_context(
     )
 
 
-EDITORIAL_REVIEW_INSTRUCTION = (
-    "\nEDITORIAL AND FACTUAL REVIEW: Review the following draft against the profile. "
-    "Remove invented outcomes, tools, claims of sole ownership, and claims that developing projects are complete. "
-    "Improve plain-language writing and remove repeated responsibilities/project bullets. "
-    "Check alignment with the supplied role and job description: preserve natural supported keywords, "
-    "prioritize relevant examples, and retain profile-backed foundational skills expected for the role. "
-    "Treat the approved summary as a style reference, not mandatory identical wording. "
-    "Preserve work history and factual metrics. Return a complete revised CV JSON.\nDRAFT:\n"
+#: The editorial requirements that used to be a second, whole-CV pass.
+#:
+#: Phase 3, increment 2 removed that pass and folded its requirements into the draft
+#: prompt instead. The pass re-sent the entire context *plus* the finished draft
+#: (~7,730 tokens) to ask for a complete revision -- one whole call and ~25% of total
+#: input tokens (ASSESSMENT.md §5) for instructions that were already implicit in the
+#: draft prompt's WRITING AND FACTUAL RULES. The revision it returned was also
+#: re-validated from scratch, so the pass bought a second draft, not a stronger gate.
+#:
+#: The text below is tested against the real validators before it is shipped
+#: (``tests/test_editorial_instructions.py``): every clause here is one the pipeline
+#: already enforces downstream, so stating it up front is what makes a single draft
+#: sufficient. It is injected by :func:`build_cv_prompt`, never as a suffix to the
+#: finished document.
+EDITORIAL_REQUIREMENTS = (
+    "\nEDITORIAL AND FACTUAL REQUIREMENTS (check the draft against these before returning it)\n"
+    "- Remove invented outcomes, tools, claims of sole ownership, and any implication that "
+    "developing work is complete.\n"
+    "- Use plain language and remove repeated responsibilities or project bullets.\n"
+    "- Check alignment with the supplied role and job description: preserve natural supported "
+    "keywords, prioritize relevant examples, and retain profile-backed foundational skills "
+    "expected for the role.\n"
+    "- Treat the approved summary as a style reference, not mandatory identical wording.\n"
+    "- Preserve work history and factual metrics exactly.\n"
 )
+
+
+def build_cv_prompt(prompt_text: str, context: str) -> str:
+    """The CV prompt: the prompt file, the editorial requirements, then the context.
+
+    The requirements sit **before** the job description and profile so the model reads
+    them as part of the brief it is drafting against, rather than as an afterthought
+    appended to a document it has already written. That ordering is the whole point of
+    merging the pass: the model is asked to satisfy these checks while drafting, not to
+    re-read its own output afterwards and revise it.
+
+    They are deliberately *not* part of ``tailor_cv_prompt.md``: that file is the
+    candidate-facing writing brief, and these are checks the pipeline enforces anyway.
+    Keeping them in code lets a test assert they are injected exactly once, and lets the
+    layout-retry path (which reuses the same prompt) inherit them unchanged.
+    """
+    return prompt_text + EDITORIAL_REQUIREMENTS + context
 
 
 def layout_correction_instruction(page_count: int, budget: int, rules: ProfileRules) -> str:
@@ -542,14 +575,17 @@ class DocumentGenerator:
         company_name: Optional[str] = None,
         role_title: Optional[str] = None,
     ):
-        """Draft, review, and generate the letter. Returns (cv, cl, explanation)."""
+        """Draft the CV, then generate the letter. Returns (cv, cl, explanation).
+
+        The CV is produced by **one** call. Until Phase 3 increment 2 the draft was
+        followed by a second, whole-CV editorial pass; its requirements now ship inside
+        the draft prompt (:data:`EDITORIAL_REQUIREMENTS`), which removes a call and
+        ~25% of input tokens without lowering the bar -- the returned draft is still the
+        only document that reaches validation, and the ``tailoring_explanation`` now
+        comes from the draft response rather than the review's.
+        """
         self._status("Drafting CV...")
-        cv, _ = self.generate(cv_prompt, "cv", work_country, company_name, role_title)
-        # The Booking workflow included editorial review. Apply it to UI generation too.
-        cv, data = self.generate(
-            cv_prompt + EDITORIAL_REVIEW_INSTRUCTION + cv.model_dump_json(indent=2),
-            "cv", work_country, company_name, role_title,
-        )
+        cv, data = self.generate(cv_prompt, "cv", work_country, company_name, role_title)
         explanation = extract_explanation(data)
 
         # Generate the letter only once the CV's wording has passed validation.

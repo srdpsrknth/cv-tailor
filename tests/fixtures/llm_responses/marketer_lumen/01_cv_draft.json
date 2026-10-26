@@ -3,7 +3,7 @@
     "title": "Growth Analyst",
     "work_authorization": null,
     "summary": [
-      "Growth marketing analyst with experience across paid acquisition reporting, retention analysis and lifecycle experimentation in synthetic fixture organisations."
+      "Growth marketing analyst with experience across paid acquisition reporting and lifecycle experimentation in synthetic fixture organisations."
     ],
     "skills": {
       "Marketing Analytics": [
@@ -46,5 +46,12 @@
     ],
     "include_education": true,
     "include_certifications": true
+  },
+  "tailoring_explanation": {
+    "summary_changes": "Emphasised acquisition reporting and experimentation.",
+    "bullet_modifications": "Kept campaign and lifecycle bullets, shortened tooling lists.",
+    "skill_reordering": "Led with marketing analytics skills named in the posting.",
+    "project_selection": "No selected projects in this profile; none were added.",
+    "overall_strategy": "Matched the posting's acquisition and retention emphasis."
   }
 }

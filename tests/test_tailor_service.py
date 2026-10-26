@@ -97,13 +97,15 @@ def test_length_retry_accepts_fenced_json_and_saves_final_content(monkeypatch, t
     cv = cv_data(profile)
     shorter = {**cv, 'summary': ['Analytics professional with broad reporting experience.']}
     fake = configure(monkeypatch, tmp_path, profile, [3, 2], [
-        json.dumps({'cv': cv}), json.dumps({'cv': cv}), json.dumps({'cover_letter': cl_data()}),
+        json.dumps({'cv': cv}), json.dumps({'cover_letter': cl_data()}),
         '```json\n' + json.dumps({'cv': shorter}) + '\n```',
     ])
     result = service.tailor_documents('A sufficiently detailed job description.', profile)
     assert result.status == 'success' and result.cv_page_count == 2
-    assert result.token_usage.cv_attempts == 3 and result.token_usage.cl_attempts == 1
-    assert result.token_usage.cv_input_tokens == 300 and result.token_usage.cl_input_tokens == 100
+    # One draft call and one layout retry: the editorial review was removed in Phase 3
+    # increment 2, so the CV side is now 2 calls where it used to be 3.
+    assert result.token_usage.cv_attempts == 2 and result.token_usage.cl_attempts == 1
+    assert result.token_usage.cv_input_tokens == 200 and result.token_usage.cl_input_tokens == 100
     saved = json.loads(Path(result.source_path).read_text())
     assert saved['cv']['summary'] == shorter['summary']
     assert Path(result.cv_path).read_bytes() == (Path(result.source_path).parent.parent / 'CV.pdf').read_bytes()
@@ -115,7 +117,7 @@ def test_length_retry_accepts_fenced_json_and_saves_final_content(monkeypatch, t
 def test_three_page_cv_is_never_reported_as_success(monkeypatch, tmp_path, profile):
     cv = json.dumps({'cv': cv_data(profile)})
     configure(monkeypatch, tmp_path, profile, [3, 3, 3, 3],
-              [cv, cv, json.dumps({'cover_letter': cl_data()}), cv, cv, cv])
+              [cv, json.dumps({'cover_letter': cl_data()}), cv, cv, cv])
     with pytest.raises(ValueError, match='not marked successful'):
         service.tailor_documents('A sufficiently detailed job description.', profile)
     # Phase 2 layout: outputs/<profile_id>/<job_id>/source/... (ADR 0003).
@@ -128,7 +130,7 @@ def test_short_letter_is_corrected_instead_of_silently_accepted(monkeypatch, tmp
     cv = json.dumps({'cv': cv_data(profile)})
     short = {**cl_data(), 'paragraphs': ['short paragraph'] * 4}
     fake = configure(monkeypatch, tmp_path, profile, [2],
-                     [cv, cv, json.dumps({'cover_letter': short}), json.dumps({'cover_letter': cl_data()})])
+                     [cv, json.dumps({'cover_letter': short}), json.dumps({'cover_letter': cl_data()})])
     result = service.tailor_documents('A sufficiently detailed job description.', profile)
     assert result.token_usage.cl_attempts == 2
     assert '8 words' in fake._call_gemini.call_args_list[-1].args[0]

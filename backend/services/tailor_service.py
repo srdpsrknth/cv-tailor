@@ -38,6 +38,7 @@ from services.generation import (
     DocumentGenerator,
     ProfileRules,
     build_context,
+    build_cv_prompt,
 )
 from utils.text import slugify
 
@@ -184,7 +185,7 @@ def tailor_documents(
         job_description, profile, company_name, role_title, work_country,
         profile_json=profile.model_dump_json(indent=2),
     )
-    cv_prompt = PROMPT_CV_PATH.read_text(encoding="utf-8") + context
+    cv_prompt = build_cv_prompt(PROMPT_CV_PATH.read_text(encoding="utf-8"), context)
     cl_prompt = PROMPT_CL_PATH.read_text(encoding="utf-8") + context
 
     generator = DocumentGenerator(

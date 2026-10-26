@@ -3,7 +3,7 @@
     "title": "Analytical Engineer",
     "work_authorization": null,
     "summary": [
-      "Analytical engineer with experience across warehouse modelling, pipeline reliability and self-service reporting in synthetic fixture organisations."
+      "Analytical engineer with experience across warehouse modelling, pipeline reliability and stakeholder-facing reporting in synthetic fixture organisations."
     ],
     "skills": {
       "Core Analytics": [
@@ -70,5 +70,12 @@
     ],
     "include_education": true,
     "include_certifications": true
+  },
+  "tailoring_explanation": {
+    "summary_changes": "Aligned the approved summary with the posting's measurement focus.",
+    "bullet_modifications": "Kept pipeline and data-quality bullets; shortened tooling detail.",
+    "skill_reordering": "Led with SQL and warehouse modelling skills.",
+    "project_selection": "Retained the attribution rebuild as the single attribution project.",
+    "overall_strategy": "Emphasised the transformation layer the posting asks for."
   }
 }

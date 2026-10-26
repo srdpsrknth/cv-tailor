@@ -9,18 +9,13 @@
       "format": "json"
     },
     {
-      "attempt": "cv_editorial_review",
-      "file": "02_cv_editorial_review.json",
-      "format": "json"
-    },
-    {
       "attempt": "cover_letter",
-      "file": "03_cover_letter.json",
+      "file": "02_cover_letter.json",
       "format": "json"
     },
     {
       "attempt": "cv_layout_retry",
-      "file": "04_cv_layout_retry.json",
+      "file": "03_cv_layout_retry.json",
       "format": "fenced"
     }
   ]

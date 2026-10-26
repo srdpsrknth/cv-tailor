@@ -88,7 +88,7 @@ def test_the_header_is_unaffected_by_the_new_parameter(analyst_profile, country)
 def test_every_prompt_carries_the_serialized_profile(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
-    """Draft, editorial review and letter all carry the identical profile block."""
+    """Draft and letter carry the identical profile block; the editorial review is gone."""
     offline = offline_service(analyst_session.texts())
     stub_renderers([2])
 
@@ -98,7 +98,7 @@ def test_every_prompt_carries_the_serialized_profile(
     )
 
     block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2)
-    assert offline.call_count == 3
+    assert offline.call_count == 2
     assert all(block in prompt for prompt in offline.prompts), \
         'a prompt did not carry the exact serialized profile'
 
@@ -115,10 +115,10 @@ def test_a_layout_retry_reuses_the_serialized_profile(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
 
-    # draft + review + one shorten + letter. The letter is drafted last, so the
-    # shortening prompt is the third -- assert on the prompt that carries the marker
-    # rather than on an index that ordering could change.
-    assert offline.call_count == 4
+    # draft + one shorten + letter. The letter is drafted last, so the shortening prompt
+    # is the second -- assert on the prompt that carries the marker rather than on an
+    # index that ordering could change.
+    assert offline.call_count == 3
     block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2)
     assert all(block in prompt for prompt in offline.prompts)
     shortening = [p for p in offline.prompts if 'LAYOUT CORRECTION' in p]

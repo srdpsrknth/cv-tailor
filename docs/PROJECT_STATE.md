@@ -3,14 +3,14 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `2943b45` — *refactor: serialise the profile once per application* (Phase 3, increment 4)
+**Latest commit:** `013bfe0` — *docs: brief Phase 3 increment 2 …* (increment 2's own commit follows)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increment 1 of 4 done.**
+**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increments 4 and 2 done.**
 
 Phase 3's scope is deliberately split across several chats. The agreed order is
 **4 → 2 → 1 → 3**, then a new chat for **6**, and **5** only once 1–4 have settled. Do not
@@ -20,12 +20,96 @@ from a regression.
 
 | Item | State |
 |---|---|
-| **4. Serialise the profile once per application** | **DONE** — this increment; see below |
-| **2. Remove or merge the editorial-review pass** | **NEXT IN THE AGREED ORDER** |
-| 1. Targeted layout retry instead of full regeneration | Not started |
+| **4. Serialise the profile once per application** | **DONE** (`2943b45`) |
+| **2. Remove or merge the editorial-review pass** | **DONE** — this increment; see below |
+| **1. Targeted layout retry instead of full regeneration** | **NEXT IN THE AGREED ORDER** |
 | 3. Enable structured output (`response_schema`) | Not started |
 | 6. Provider interface, model routing, budget caps | Not started — new chat |
 | 5. Cache validated results | Not started — only after 1–4 have settled |
+
+### Phase 3, increment 2 — remove or merge the editorial-review pass (2026-10-26)
+
+**What changed.** `DocumentGenerator.generate_pair` used to make a **second** CV call: it
+re-sent the whole context *plus* the full draft CV with `EDITORIAL_REVIEW_INSTRUCTION`
+appended, and expected a complete revised CV back. That call is gone.
+
+**Decision: MERGE, then drop the call.** The instruction text was folded into the draft
+prompt rather than deleted, because dropping the requirements outright would have removed
+real editorial constraints (no invented outcomes, no claims that developing work is
+complete, no repeated bullets, no sole-ownership claims) that nothing else in the prompt
+states. The pass itself was removed because it was **redundant, not protective**:
+
+- every clause in it was already covered by the draft prompt's `WRITING AND FACTUAL RULES`,
+  so the second call mostly re-asked for what the first call had been told;
+- the revision it returned was **re-validated from scratch** by `validate_cv`, exactly like
+  the draft — so the pass bought a second draft, not a stronger gate;
+- it cost one whole call and ~25% of total input tokens (ASSESSMENT §5), because the draft
+  CV JSON (≈7,730 tokens) was sent on top of the ≈6,150-token context that was sent again.
+
+**Where the merged text lives.** `generation.EDITORIAL_REQUIREMENTS` (replacing
+`EDITORIAL_REVIEW_INSTRUCTION`), injected by the new `generation.build_cv_prompt()`, which
+`tailor_service.tailor_documents` now calls. The requirements are placed **before** the job
+description and profile, so the model drafts against them instead of being handed them after
+writing. They are deliberately **not** in `tailor_cv_prompt.md` — that file is the
+candidate-facing writing brief — and they are **not** added to `build_context`, so the
+cover-letter prompt does not pay for CV rules it does not use. Both properties are tested.
+
+**`tailoring_explanation` now comes from the draft.** It used to be read from the review
+response, which was the last CV call. It is now read from the draft response via the
+unchanged `extract_explanation`, which still prefers the top-level key and still accepts the
+nested `cv.tailoring_explanation` shape. A layout retry's explanation still supersedes it.
+
+**Validation did not weaken.** The draft was *already* the only document `validate_cv`
+gated; the review's output was validated too, but by the same function against the same
+rules. No silent fallback was introduced: an invalid draft is retried only through the
+documented 3-attempt correction loop and then raises, and no cover letter is drafted from an
+invalid CV. Two tests in `tests/test_editorial_instructions.py` assert exactly that.
+
+**Verified new call counts** (driven through the real pipeline with recorded transcripts,
+not derived on paper):
+
+| Case | Was | Now |
+|---|---|---|
+| Happy path | 3 | **2** |
+| Typical (1 layout retry) | 4 | **3** |
+| Max successful (fits on 4th render) | 6 | **5** |
+| Worst (validation retries exhausted) | 18 | **12** |
+
+**Measured cost effect** (`gemini-3.8-flash`, $0.75/$3.75 per 1M): best $0.027 → **$0.016**,
+typical $0.038 → **$0.026**, max-successful $0.060 → **$0.048**. The CV call grows from
+≈6,150 to ≈6,438 tokens (the requirements are 616 chars ≈ 288 tokens); the ≈7,772-token
+review call disappears. **Happy path: −41% input tokens and one fewer call.**
+
+**A pre-existing error in the old §5 table was found and corrected.** The old
+"Typical (4 calls)" row stated 34,601 input tokens — the arithmetic of *five* calls, not
+four — and the old "Worst (6 calls)" row at 65,513 tokens actually described the
+max-successful case. The new rows are derived consistently, so a count and its tokens now
+describe the same run.
+
+**Fixtures regenerated.** Both recorded transcripts lost their `02_cv_editorial_review.json`
+step (`tools/build_fixtures.py`; the step files were renamed so the numbering has no gap),
+and each `01_cv_draft.json` now **is** the previously-reviewed payload — same
+`{"cv": …, "tailoring_explanation": …}` shape, same summary wording. They still describe a
+realistic accepted document; they just get there in one call.
+
+**Tests: 298 → 309 passed** (~107 s), fully offline, no paid calls. Fast lane 268 → **279
+passed** (~6 s). New file `tests/test_editorial_instructions.py` (11 tests, **9 of which fail
+against the pre-increment code**, verified by stashing the change).
+
+**Tests that legitimately changed this time** (each pins behaviour this increment intends to
+change — none was "fixed" to make a broken change pass):
+
+| Test | Change | Why it is correct |
+|---|---|---|
+| `test_tailoring_pipeline.py:47` | `call_count` 3 → **2** | The review call is gone; the count is the increment's headline result |
+| `test_tailoring_pipeline.py` saved-content | asserted the **reviewed** summary, now the **draft** one | The draft is the accepted CV; there is no reviewed revision any more |
+| 4 explanation tests (`:145-225`) | read `cv_draft` instead of `cv_editorial_review`; injected transcripts reordered | The explanation's source moved with the removed call |
+| `:597`, `:765` + tailor_service `:105` | `cv_attempts` 3 → **2**, token totals 3000/300 → 2000/200 | Same run, one fewer CV call |
+| `test_short_letter…` (`:640`) | dropped the now-nonexistent review response from the fake transcript | The transcript must match the calls the pipeline actually makes |
+| `test_profile_serialization.py:101`, `:121` | `call_count` 3 → 2, 4 → 3 | Same removal; the serialization invariant itself is untouched |
+
+**Do not re-open increment 1.** It stayed a pure de-duplication and its byte-identical-prompt
+guarantee still holds; this increment is what changed the prompt and the call count.
 
 ### Phase 3, increment 1 — serialise the profile once per application (2026-10-26)
 
@@ -68,41 +152,22 @@ fallback, so caching is never a requirement.
 (~7 s). **No existing test was modified**, and the new file is `tests/test_profile_serialization.py`
 (16 tests, 11 of which fail against the pre-increment code).
 
-### Phase 3, increment 2 — briefing for the next chat (NOT STARTED)
+### Phase 3, increment 2 — briefing for the next chat (DISCHARGED 2026-10-26)
 
-**Goal:** remove or merge the editorial-review pass — the second CV call in
-`DocumentGenerator.generate_pair` (`generation.py:545-557`), which today re-sends the whole
-context *plus* the full draft CV and returns a complete revised CV.
+The briefing that stood here has been **fully discharged** by the increment 2 section above.
+Every item in its blast-radius list was addressed:
 
-**Why it is worth doing:** ASSESSMENT.md §5 measures it at **~25% of total input tokens and
-one whole call**, because the draft CV JSON is ~7,730 tokens on top of the ~6,150-token
-context that is sent again.
+- the happy-path `call_count` is now **2**, and `cv_attempts` **2** — asserted, not assumed;
+- the saved CV is the **draft**, and the draft is what the letter is built from;
+- the four explanation tests now read `cv_draft`; the nested and top-level precedence cases
+  and the layout-retry precedence case all still hold;
+- **both** transcripts dropped their `02_cv_editorial_review.json` step and were regenerated
+  with `tools/build_fixtures.py` in step with each other;
+- `EDITORIAL_REVIEW_INSTRUCTION` was replaced by `EDITORIAL_REQUIREMENTS`, as item 2 owned.
 
-**What will change for the next chat's baseline** (this is exactly why increment 1 froze its
-own baseline first): the happy-path call count drops **3 → 2**, the typical case **4 → 3**,
-and the max-successful **6 → 5**. The per-application cost estimates in §5 move as a result.
-Verify the *new* counts rather than assuming the arithmetic.
-
-**Known blast radius — read these before editing, they pin the current behaviour on purpose:**
-
-- `tests/test_tailoring_pipeline.py:47` — `offline.call_count == 3` on the happy path.
-- `tests/test_tailoring_pipeline.py:597` and `:765` — `cv_attempts` is 3 (draft + review + retry).
-- `tests/test_tailoring_pipeline.py:65` — the saved CV must equal the **reviewed** CV, not the
-  raw draft. Merging the passes must keep the letter built from the accepted CV.
-- `tests/test_tailoring_pipeline.py:148-230` — four tests take `tailoring_explanation` from the
-  **review** response (`cv_editorial_review`, including the nested and top-level variants, and
-  the layout-retry precedence case). If the review call goes away, the explanation must come
-  from the draft instead, and those fixtures/expectations change with it.
-- `tests/fixtures/llm_responses/analyst_nordwind/` and `marketer_lumen/` — both recorded
-  transcripts contain a `02_cv_editorial_review.json` step, so `responses.json` and the replay
-  order change. Regenerate with `tools/build_fixtures.py`, and keep both transcripts in step.
-- `EDITORIAL_REVIEW_INSTRUCTION` (`generation.py:355`) is item 2's to change; **it is
-  deliberately untouched in increment 1**, as is `parse_json_response`, `shorten_cv` /
-  `layout_correction_instruction`, and `_call_gemini`'s config (items 1 and 3).
-
-**Constraint carried over:** the suite must stay fully offline with no paid calls, and the
-"no silent fallback that bypasses validation" acceptance criterion still holds — folding the
-review into the draft must not weaken `validate_cv`.
+**Item 1's baseline is now frozen at 2/3/5.** Do not touch `shorten_cv` or
+`layout_correction_instruction` outside item 1, and do not touch `_call_gemini`'s config,
+`response_mime_type` or `parse_json_response` outside item 3.
 
 **Phase 2 — multi-profile architecture. COMPLETE and CLOSED OUT (code + tests + migration +
 docs + clean-up).**
@@ -211,9 +276,9 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 18 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increment 4 done |
+| Dev branch | 19 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increments 4 and 2 done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **298 passed** (~112 s); fast lane `-m "not requires_latex"` → 268 passed (~7 s) |
+| Test baseline | **309 passed** (~107 s); fast lane `-m "not requires_latex"` → 279 passed (~6 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
 | HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
@@ -222,17 +287,19 @@ Re-confirm each decision when its phase begins.
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
 | Decisions | 11 approved; ADR 0009 amended 2026-10-26 (D-11 → Phase 5) |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increment 4 of 6); next is Phase 3 increment 2 |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4 and 2 of 6 done); next is Phase 3 increment 1 |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **298 passed**, 1 warning (~112 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **268 passed**,
-  30 deselected (~7 s).
+- `.venv\Scripts\python.exe -m pytest -q` → **309 passed**, 1 warning (~107 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **279 passed**,
+  30 deselected (~6 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
 - **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
-  190 → 262 in Phase 2, 262 → 282 in the 2026-10-26 close-out, and 282 → 298 in Phase 3
-  increment 1 (all new files). In Phase 2,
+  190 → 262 in Phase 2, 262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3
+  increment 1 (all new files), and 298 → **309** in increment 2 (one new file, plus the
+  legitimate edits listed in that increment's section — the first time edits to existing
+  tests were intended rather than incidental). In Phase 2,
   four *path assertions* across three pre-existing tests were updated because the output layout
   itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
   about content are unchanged.
@@ -245,12 +312,19 @@ Re-confirm each decision when its phase begins.
   tests fail against the pre-increment code**, verified by stashing the change. The memo test
   was additionally verified to fail when the cache lookup is neutered, so it measures work
   rather than passing vacuously.
+- `tests/test_editorial_instructions.py` (new, Phase 3 increment 2) asserts the merged
+  requirements reach the CV call only, that the gate is unchanged, and that the call counts
+  are 2/3/5: **9 of its 11 tests fail against the pre-increment code**, verified by stashing
+  `generation.py` and `tailor_service.py`.
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
-- LLM calls per application: **3 min / 4 typical / 6 max-successful / 18 worst**.
-- Estimated cost per application (`gemini-3.8-flash`): **$0.027 / $0.049 / $0.092**.
-- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below).
+- LLM calls per application: **2 min / 3 typical / 5 max-successful / 12 worst** (was 3/4/6/18
+  before increment 2).
+- Estimated cost per application (`gemini-3.8-flash`): **$0.016 / $0.026 / $0.048** (was
+  $0.027 / $0.038 / $0.060).
+- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below); the
+  increment did **not** change provider or model, so no re-verification was owed (decision 7).
 
 ---
 
