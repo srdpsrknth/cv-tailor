@@ -34,10 +34,14 @@ git worktree add -b refactor/architecture-v2 ../cv-tailor-next master
 
 ## Environment isolation
 
-Each worktree needs **its own** `.venv`, `.env`, logs, outputs and ports. The two worktrees
-already have separate `outputs/` directories, so generated documents never collide.
+Each worktree needs **its own** `.venv`, `.env`, logs and ports.
 
-**The development worktree currently has no `.venv` and no `.env` and cannot run.** Set it up:
+Generated documents do **not** live in either worktree: since ADR 0011 they are written to the
+private store, `<store>/outputs/<profile_id>/<job_id>/`, so the two worktrees cannot collide
+regardless of `OUTPUTS_DIR`.
+
+`refactor/architecture-v2` is already set up and runnable. To create this setup from scratch on
+another machine:
 
 ```powershell
 # Windows
@@ -105,10 +109,13 @@ while pip was stuck.
 
 ### Current state of this worktree
 
-Set up and verified 2026-10-23: `.venv` with all locked dependencies, `.env` created from
-`.env.example`, ports set to 8001/8502, `pytest` → **12 passed**, `scripts/check_setup.py`
-reports profile/timezone/LaTeX/templates OK. The only outstanding item is `GEMINI_API_KEY`,
-which the owner must enter into `.env` directly — never paste it into a chat.
+Runnable: `.venv` with all locked dependencies, `.env` created from `.env.example`, ports set
+to 8001/8502. `scripts/check_setup.py` reports profile/timezone/LaTeX/templates OK, and
+`python -m pytest -q` → **262 passed** (see [`TESTING.md`](TESTING.md) for the current baseline).
+
+The only outstanding item is `GEMINI_API_KEY`, which the owner must enter into `.env` directly
+— never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too; without them
+every command that touches candidate data fails closed by design (ADR 0003).
 
 ### Running both versions at once
 

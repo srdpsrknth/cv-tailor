@@ -132,7 +132,7 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 | **D-5** | ~~Legacy model pricing retained~~ **RESOLVED in Phase 1** | `gemini_service.py:47-70` | **Pruned** after verifying names and prices against ai.google.dev (2026-10-23): `gemini-1.5-*` are delisted and `gemini-3-pro-preview` is shut down; the 2.5-series and `gemini-3.8-flash` prices were confirmed accurate. This exposed a latent `KeyError`: the fallback resolved through the deleted row. It now targets `DEFAULT_MODEL`, asserted by a test. |
 | **D-6** | Unused dependencies | grep: no imports in `backend/` | **Pruned:** `pydantic-settings`, `python-multipart`, `tiktoken`, `httpx`, `pytest-asyncio`, `black`, `ruff`. Kept `tzdata` (needed by `ZoneInfo` on Windows), `pytest`, `streamlit` and `requests` (used indirectly). **Correction:** `pandas` is *not* in `requirements.txt` and *is* used at `ui/app.py:231-232`; it arrives transitively via streamlit. |
 | **D-7** | ~~`ErrorResponse`, `TailoredOutput` defined and exported, never used~~ **RESOLVED in Phase 1** | `requests.py:44`, `tailored_output.py:71`, `models/__init__.py:19,25` | **Deleted**, including the exports. `TailoringExplanation` was kept — it is still used. |
-| **D-8** | `.github/copilot-instructions.md` (646 lines) describes a **different system**: Tectonic (not pdflatex), `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/` (87 files, absent), "Python 3.14+", `/api/preview` endpoint that does not exist | `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Still open.** Rewrite as a pointer to `AGENTS.md`. Highest-value remaining doc fix. |
+| **D-8** | ~~`.github/copilot-instructions.md` (646 lines) describes a **different system**~~ **RESOLVED in `c3839da`** | was `.github/copilot-instructions.md:22,42,45,163,381,604,644` | **Rewritten as a 31-line pointer** to `AGENTS.md`, which is the single tool-independent instruction set. The old text (Tectonic, `gemini-1.5-flash`, `BaseProfile`, `cover_letter_examples/`, `/api/preview`) is gone. |
 | **D-9** | ~~Three generated binaries tracked in `outputs/` despite `.gitignore:45`~~ **RESOLVED in Phase 2** | `git ls-files` showed adjoe CV PDF + CL DOCX + PDF | **Untracked** via `git rm --cached` and gitignored; the repository's `outputs/` now holds only `.gitkeep`. `tests/test_privacy_boundary.py` fails if real data is re-tracked. Still present in already-published history — not rewritten ([ADR 0011](DECISIONS/0011-private-store-location.md)). |
 | **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | **Still open.** |
 | **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | Define one schema; migrate. **Phase 2.** |
@@ -309,14 +309,16 @@ public repository before 2026-10-24 still has the profile and the 64 application
 
 | Document | State |
 |---|---|
-| `AGENTS.md` (13 lines) | Accurate and concise. **Keep as the single entry point.** |
+| `AGENTS.md` | Accurate and concise. **Keep as the single entry point.** |
 | `README.md` | Accurate; correctly documents the render path. |
 | `docs/MAC_SETUP.md` | Accurate and genuinely portable. |
 | `.agents/skills/cv-tailor-application/SKILL.md` | Accurate and detailed. |
-| `.github/copilot-instructions.md` | **Largely obsolete/contradictory** (D-8) — describes Tectonic, `gemini-1.5-flash`, a non-existent endpoint and directory. |
+| `.github/copilot-instructions.md` | **Fixed** (`c3839da`) — now a short pointer to `AGENTS.md` (D-8). |
 
-There is no `docs/ARCHITECTURE.md`, `ROADMAP.md`, `PROJECT_STATE.md`, or decisions log —
-which is why project knowledge currently lives in conversation history.
+When this assessment was written there was no `ROADMAP.md`, `PROJECT_STATE.md` or decisions log,
+which is why project knowledge lived in conversation history. All three now exist, and
+`docs/DECISIONS/` holds the settled choices. **Keep one instruction set**: `AGENTS.md` is
+authoritative for every agent, and `.github/copilot-instructions.md` only points at it.
 
 ---
 

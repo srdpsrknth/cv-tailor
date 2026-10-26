@@ -202,9 +202,10 @@ Re-confirm each decision when its phase begins.
 
 ## Known-important findings (do not lose)
 
-- `.github/copilot-instructions.md` describes a **different system** (Tectonic, `gemini-1.5-flash`,
-  a non-existent `/api/preview` endpoint). It is the most misleading document in the repo (D-8).
-  **Still unfixed.**
+- ~~`.github/copilot-instructions.md` describes a **different system** (Tectonic,
+  `gemini-1.5-flash`, a non-existent `/api/preview` endpoint)~~ — resolved in `c3839da`: it is
+  now a 31-line pointer to `AGENTS.md` (D-8). **Keep it that way**: one set of project
+  instructions, tool-independent. Do not let a second instruction file grow back.
 - ~~Generated PDFs/DOCX are **tracked** in `outputs/` despite `.gitignore` (D-9)~~ — resolved in
   Phase 2 by untracking `outputs/` (ADR 0011). The three PDFs/DOCX and the `.gitkeep` are gone
   from the index. Generated documents are written into the private store's
