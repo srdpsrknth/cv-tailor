@@ -241,6 +241,7 @@ def tailor_documents(
     rules: Optional[ProfileRules] = None,
     profile_id: Optional[str] = None,
     use_cache: bool = True,
+    service: Optional["GeminiService"] = None,
 ) -> TailorResponse:
     """Produce a two-page CV and a one-page cover letter, and persist them.
 
@@ -262,12 +263,20 @@ def tailor_documents(
 
     # Resolved at call time (never at import), so the model, key and output path can
     # differ per invocation -- and one test can override another's environment.
-    if config is None:
-        config = Config.from_env(load_env_file=False, overrides={"project_root": PROJECT_ROOT})
-        # Constructed with no arguments so an injected double can stand in for it.
-        service = GeminiService()
-    else:
-        service = GeminiService(config=config)
+    #
+    # ``service`` may be supplied by the caller, and that is what makes **failed** runs
+    # auditable. The service accumulates the money actually spent, so a caller that
+    # owns the object can still read it after this function raises; without that, a run
+    # that made several paid calls and then failed the gate reports a cost of zero, and
+    # a model that never succeeds looks free. Only the object is injected -- the
+    # provider, routing and key are still resolved from ``config`` here.
+    if service is None:
+        if config is None:
+            config = Config.from_env(load_env_file=False, overrides={"project_root": PROJECT_ROOT})
+            # Constructed with no arguments so an injected double can stand in for it.
+            service = GeminiService()
+        else:
+            service = GeminiService(config=config)
 
     # Fail closed, and fail *early*: an unresolvable candidate must cost nothing and
     # must not leave a half-written folder behind.
@@ -336,6 +345,14 @@ def tailor_documents(
     # ``ApplicationStore`` appends the candidate segment itself, so it takes the
     # parent of ``ProfileStore.outputs_dir()`` -- passing the per-profile directory
     # would nest the id twice.
+    #
+    # **``config.outputs_dir`` is NOT consulted here, and that is deliberate.** It is
+    # the *mirror* destination -- ``ApplicationStore.mirror`` copies documents there --
+    # not the primary output root. Using it as the root would move where a normal run
+    # writes whenever a user configured mirroring, which is a behaviour change dressed
+    # as a fix. A caller that wants output somewhere else roots the **store** there
+    # (``profile_store_dir``), which is the supported way to relocate generated
+    # documents and is what the evaluation suite does.
     outputs_root = (
         config.store.outputs_dir(resolved_profile_id).parent
         if config.profile_path is None

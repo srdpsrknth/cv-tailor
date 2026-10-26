@@ -23,6 +23,22 @@ from evaluation.metrics import CaseResult
 from evaluation.runner import live_run, plan
 
 
+def _install_fixture_profile(store_root, profile_id: str, fixture: str) -> None:
+    """Copy a synthetic fixture into the sandbox store under ``profile_id``.
+
+    The profile is loaded from the **store** rather than named as a loose file, which is
+    what makes ``tailor_documents`` root its output inside the sandbox instead of the
+    repository. Only ``tests/fixtures/`` data is copied -- never a real profile, and the
+    private store is never read -- so the suite still sends nothing but synthetic
+    documents to a third party.
+    """
+    import shutil
+
+    destination = Path(store_root) / "profiles" / profile_id
+    destination.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(fixture_path(fixture), destination / "profile.yaml")
+
+
 def _read(path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -80,14 +96,24 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     # id is derived from the fixture so two cases cannot collide, and it is deliberately
     # not a store id, so nothing here can be mistaken for a real candidate.
     synthetic_id = f"eval_{case.name}"
+    sandbox = _sandbox_store()
+    _install_fixture_profile(sandbox, synthetic_id, case.profile_fixture)
     config = Config.from_env(
         load_env_file=True,
         overrides={
             "provider": "openrouter",
             "model": model.id,
-            "profile_path": fixture_path(case.profile_fixture),
+            # No ``profile_path``: the profile is read from the sandbox **store**
+            # instead, and that distinction is what keeps generated documents out of
+            # the repository. ``tailor_documents`` roots its output at
+            # ``PROJECT_ROOT/outputs`` whenever a loose profile path is named (the
+            # branch a person running ``--profile path`` takes), and only uses the
+            # store's output tree when the store is authoritative. Naming a fixture
+            # file here therefore wrote evaluation documents into the public working
+            # tree -- it surfaced as a bare ``PermissionError`` on this read-only
+            # checkout, and on a writable one it would have succeeded silently.
             "profile_id": synthetic_id,
-            "profile_store_dir": _sandbox_store(),
+            "profile_store_dir": sandbox,
         },
     )
 
@@ -97,9 +123,20 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     # misconfiguration that reads as a result. Cheap, and it costs nothing to be sure.
     config.require_provider_key()
 
+    # The service is built here and handed in, so the money it spends stays readable
+    # **after a failure**. Without this a run that made several paid calls and then
+    # failed the word-count gate reported ``cost_usd=0.0``: the accumulated spend lives
+    # on the service, and ``tailor_documents`` normally creates and discards it. That
+    # would have made every *failing* model look free -- and cost per accepted result
+    # is the ranking metric, so the worst performers would have looked like the best
+    # value. Constructed through the same factory the pipeline would use.
+    from services.gemini_service import GeminiService
+
+    service = GeminiService(config=config)
+
     try:
         result = tailor_service.tailor_documents(
-            posting, profile, config=config,
+            posting, profile, config=config, service=service,
             company_name=case.name, role_title="Evaluation",
             # The cache is bypassed **on purpose**, and this is the only place in the
             # suite that has to say so. ``tailor_documents`` defaults to
@@ -116,9 +153,13 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
             use_cache=False,
         )
     except Exception as error:  # noqa: BLE001 -- a failure is data for the metrics
+        # A failure is measured, not discarded: the calls it made were paid for, so the
+        # spend and the call count are recorded from the service rather than zeroed.
         return CaseResult(
             model_id=model.id, case_name=case.name, accepted=False,
             error=f"{type(error).__name__}: {error}",
+            cost_usd=getattr(service, "spent_usd", 0.0) or 0.0,
+            calls=getattr(service, "calls_made", 0) or 0,
         )
 
     usage = getattr(result, "token_usage", None)

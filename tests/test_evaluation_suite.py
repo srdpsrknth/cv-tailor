@@ -268,6 +268,90 @@ def test_the_evaluation_still_names_a_provider_and_a_model():
     assert config.model == CURATED_MODELS[0].id
 
 
+def test_the_evaluation_uses_a_synthetic_profile_identity():
+    """It must never file output under whatever id the developer's `.env` names.
+
+    ``tailor_documents`` writes the job folder under the resolved ``profile_id``, and a
+    real ``.env`` carries the developer's own (this machine's says ``sreedeep``). Left
+    alone, an evaluation over *synthetic* fixtures files job folders -- accepted
+    documents included -- under a real candidate's profile. It surfaced as a
+    ``PermissionError`` on a read-only path, but on a writable one it would have
+    silently mixed evaluation output into real candidate data.
+    """
+    from evaluation import live
+    from evaluation.cases import CASES
+    from evaluation.curated_models import CURATED_MODELS
+
+    captured: dict = {}
+
+    def fake_tailor_documents(posting, profile, **kwargs):
+        captured.update(kwargs)
+
+        class _Result:
+            status = 'success'
+            cv_page_count = 2
+
+        return _Result()
+
+    import services.tailor_service as tailor_service
+
+    original = tailor_service.tailor_documents
+    tailor_service.tailor_documents = fake_tailor_documents
+    try:
+        live.run_one_case(CASES[0], CURATED_MODELS[0])
+    finally:
+        tailor_service.tailor_documents = original
+
+    config = captured['config']
+    assert config.profile_id, 'the evaluation must name a profile id'
+    assert config.profile_id.startswith('eval_'), (
+        f'the evaluation resolved {config.profile_id!r}, which is not a synthetic id; '
+        f'it would file synthetic output under a real candidate'
+    )
+    assert config.profile_id != 'sreedeep'
+
+
+def test_a_failed_case_still_reports_what_it_spent():
+    """A failure is measured, not written off as free.
+
+    This is the mirror of the cache bug. ``run_one_case`` used to return a failure
+    ``CaseResult`` with the default ``cost_usd=0.0``, discarding every call the case had
+    actually paid for -- the spend accumulates on the service, and ``tailor_documents``
+    normally creates and discards it. Since the ranking metric is cost per **accepted**
+    result, a model that spent money and accepted nothing would have reported $0.00 and
+    looked like the cheapest option in the table.
+    """
+    from evaluation import live
+    from evaluation.cases import CASES
+    from evaluation.curated_models import CURATED_MODELS
+
+    import services.tailor_service as tailor_service
+
+    def failing_tailor_documents(posting, profile, **kwargs):
+        # Simulate a run that made real, paid calls and then failed the gate.
+        service = kwargs.get('service')
+        assert service is not None, (
+            'the evaluation must pass its own service so spend survives a failure'
+        )
+        service.spent_usd = 0.0123
+        service.calls_made = 3
+        raise ValueError('Could not produce a valid cover_letter document')
+
+    original = tailor_service.tailor_documents
+    tailor_service.tailor_documents = failing_tailor_documents
+    try:
+        result = live.run_one_case(CASES[0], CURATED_MODELS[0])
+    finally:
+        tailor_service.tailor_documents = original
+    assert result.accepted is False
+    assert result.error
+    assert result.cost_usd == pytest.approx(0.0123), (
+        'a failed case must report the money it actually spent, or failing models '
+        'appear free'
+    )
+    assert result.calls == 3
+
+
 # --- the curated set --------------------------------------------------------------------------
 
 def test_the_set_is_small():
