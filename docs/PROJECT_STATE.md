@@ -3,17 +3,17 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `2e528e1` — *feat: enable structured output, scoped to the calls where it is safe* (Phase 3 increment 3)
+**Latest commit:** `215ba08` — *feat: add the evaluation suite and a curated OpenRouter shortlist* (Phase 3 item 6, increment C)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increments 4, 2, 1 and 3 done.**
+**Phase 3 — LLM and document-generation improvements. Items 4, 2, 1, 3 and 6's OFFLINE GROUNDWORK are done.**
 
 Phase 3's scope is deliberately split across several chats. The agreed order is
-**4 → 2 → 1 → 3**, then a new chat for **6**, and **5** only once 1–4 have settled. Do not
+**4 → 2 → 1 → 3**, then **6**, and **5** only once 1–4 have settled. Do not
 combine two of these items in one commit: each changes the LLM call-count baseline the
 others are verified against, so mixing them makes an intended change indistinguishable
 from a regression.
@@ -23,9 +23,151 @@ from a regression.
 | **4. Serialise the profile once per application** | **DONE** (`2943b45`) |
 | **2. Remove or merge the editorial-review pass** | **DONE** (`7c0d58a`) |
 | **1. Targeted layout retry instead of full regeneration** | **DONE** (`9a45811`) |
-| **3. Enable structured output (`response_schema`)** | **DONE** — this increment; see below |
-| 6. Provider interface, model routing, budget caps, **and the curated model set** | **NEXT IN THE AGREED ORDER** — new chat; briefing below |
-| 5. Cache validated results | Not started — only after 1–4 have settled |
+| **3. Enable structured output (`response_schema`)** | **DONE** (`2e528e1` → `85879b5`); see ADR 0012 |
+| **6. Provider interface, model routing, budget caps, and the curated model set** | **OFFLINE GROUNDWORK DONE** (`372a7bf`, `3cc8da5`, `215ba08`) — **the budgeted live run has NOT been made**; see below |
+| **5. Cache validated results** | **NEXT IN THE AGREED ORDER** — items 1–4 have now settled, so this is unblocked |
+
+### Phase 3, item 6 — what was built, and the one thing still owed (2026-10-26)
+
+**Three increments, each verified on its own against the frozen 2/3/5 baseline.**
+
+| Increment | Commit | What it did |
+|---|---|---|
+| **A — provider interface, routing, budget caps** | `372a7bf` | `services/provider.py`: `generate(prompt, *, schema, max_tokens, model)` with Gemini as default (decision 6) and OpenRouter as the second implementation. Model-per-task routing (`Config.model_for`) and an optional `CVTAILOR_MAX_COST_USD` that fails closed. [ADR 0013](DECISIONS/0013-provider-interface-and-routing.md) |
+| **B — D-3 and D-4** | `3cc8da5` | `services/pricing.py` is the one pricing source of truth, keyed by `(provider, model)` and tier-aware. The UI stops duplicating the table |
+| **C — evaluation suite and curated set** | `215ba08` | `evaluation/` implements ADR 0005's eight criteria, offline by default, budget-capped, out of CI. Five curated OpenRouter models, every one **UNMEASURED**. [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md) |
+
+**Decisions 5, 6 and 7 were re-confirmed at the start of the item.** Decision 5 (thin adapters)
+and decision 7 (job sources) were untouched. **Decision 6 was honoured, not merely noted**: Gemini
+stays the default provider and `gemini-3.8-flash` stays `DEFAULT_MODEL`; OpenRouter is opt-in; and
+**no provider or model was switched**, because ADR 0005 requires benchmarking before switching and
+the benchmark has not run.
+
+**The per-call response contract survived the indirection — this was the main risk.** ADR 0012
+scopes structured output *per call*, and one call (the layout retry) must send **no** schema
+because its response may be a delta of unit ids with no document key. The provider layer receives
+`schema=None` on that call and passes it through as "send no constraint" on **both** providers, so
+a provider swap cannot quietly turn the retry into a constrained call. `response_schema_for`
+remains the single decision point; `_call_gemini` is still the single call site.
+
+**OpenRouter's schema envelope is not Gemini's, so it is translated rather than passed through.**
+Their contract is `response_format={"type": "json_schema", "json_schema": {"name", "strict",
+"schema"}}` (verified from openrouter.ai/docs/features/structured-outputs, 2026-10-26). Their docs
+also state that `strict` enforcement "varies by provider" and exact compliance "is not guaranteed
+on every endpoint", so a schema-constrained call additionally sends
+`provider.require_parameters: true` — their documented way to avoid an endpoint that would ignore
+the schema. `strict` is **not** relied upon: validation stays in `parse_json_response` and
+`validate_cv`, exactly where it was.
+
+**No silent fallback, and `ProviderError` is deliberately not a `ValueError`.** The pipeline's
+3-attempt correction loop catches `ValueError`, so a provider outage misclassified as one would
+burn three paid calls re-asking a question the provider never answered. An unknown provider name,
+a missing key for the *selected* provider, and a provider failure all raise.
+
+**D-3 and D-4 are fixed, and no published figure moved.** The long-context tier is now applied to
+the tokens (for `gemini-2.5-pro` at 300k tokens the old flat estimate was **$0.375 against a real
+$0.75 — half**), and price is keyed by route because a bare model name does not identify one:
+OpenRouter lists `google/gemini-3.8-flash` at **$0.825/$4.125** per 1M while Google charges
+**$0.75/$3.75** direct. The §5 rows in ASSESSMENT are **identical** under the new accounting
+($0.01559 / $0.026482 / $0.048265), because `gemini-3.8-flash` has no long tier and its prompts are
+~6.4k tokens — far below the 200k threshold.
+
+**The model curation, and what it honestly claims.** Owner requirement, recorded 2026-10-26:
+OpenRouter must not be exposed wholesale. Five models are offered, spanning
+economy/balanced/frontier, each filtered on two **verified** properties rather than reputation:
+`structured_outputs` is advertised for it in OpenRouter's own listing, and its endpoint can emit a
+document. That filter is what excludes the Amazon Nova family — `nova-micro` at $0.035/$0.140 would
+otherwise be the cheapest entry in the set.
+
+**No quality ranking is claimed, because none was measured.** Every entry reads
+`verified="price+capability"`, and a test asserts that none says `measured`. Ordering these by
+reputation and presenting it as research would fabricate exactly the evidence ADR 0005 says must
+precede a model switch. The set is a **shortlist awaiting measurement**, and that claim is a value
+the code reports rather than a sentence in this document.
+
+**The evaluation suite exists and has never run.** It is offline by default (`plan()` and
+`dry_run()` make no network call; the CLI defaults to `--dry-run`), spending requires `--live`
+**and** a cap the projection fits, an over-budget **projection** is refused before the provider is
+built, a missing cap is a refusal rather than "unlimited", the cap is re-checked before every
+call, and nothing under `evaluation/` is named `test_*` so pytest and CI cannot reach the paid
+path. Cases read only `tests/fixtures/` and refuse a path that escapes it, so a live run cannot
+send a real candidate's profile to a third party.
+
+**The one thing item 6 still owes.** The projected cost of the whole curated run is **$1.68**
+against the owner's agreed **$5** budget (upper-bounded at 12 calls per case). Running it needs
+authorisation, not more code. It answers two open questions at once:
+
+1. **Which model is genuinely best per *accepted* result** for this task — the curation's
+   headline requirement.
+2. **Whether structured output truncates on real documents** — the question increment 3 could not
+   settle offline. Increment 3 proved a truncated constrained response is *rejected* rather than
+   parsed short, and designed the schema to protect against it, but made no paid call, so provider
+   behaviour is still **unverified**.
+
+**Call counts are UNCHANGED at 2/3/5** (min/typical/max-successful), 12 worst. No increment added
+a call: the interface adds routing, the pricing change adds no request, and the evaluation suite
+is not part of the pipeline. `tests/test_editorial_instructions.py` still pins 2/3/5 and still
+passes unchanged.
+
+**Tests: 351 → 436 passed** (~115 s), fully offline, no paid calls. Fast lane 321 → **406 passed**
+(~12 s). New files: `tests/test_provider_interface.py` (39), `tests/test_pricing.py` (17),
+`tests/test_evaluation_suite.py` (29). Diagnosed against a throwaway `git worktree` at `23156b1`
+(not by stashing): **39 of 39** provider tests and **17 of 17** pricing tests fail there. The
+evaluation file's 29 tests **also pass there**, stated plainly rather than hidden — that suite and
+the curated set are new code with no predecessor, so there is no old behaviour to fail against,
+and the file guards the new code's properties instead.
+
+**No existing test was modified in behaviour.** One seam moved:
+`tests/test_structured_output.py` patched `gemini_service.genai.Client` and now patches
+`provider.genai.Client`, which is where the request is built. **No assertion changed** — those
+tests still inspect the real `GenerateContentConfig`, so they remain a check of what is *sent*.
+
+**Do not re-open increments 4, 2, 1 or 3.** None was touched.
+
+### Phase 3, item 6 — briefing retained for the follow-up chat
+
+**Start state for the follow-up:** `refactor/architecture-v2` at `215ba08`. Working tree clean,
+nothing half-done. **436 passed** (~115 s) offline; fast lane **406**. `master` untouched at
+`1416177`.
+
+**What to do next, in order:**
+
+1. **Ask the owner to authorise the budgeted live run** and re-confirm the $5 cap. Method and
+   budget must be agreed before any paid call (ADR 0005); the projection is **$1.68**.
+   ```powershell
+   .venv\Scripts\python.exe -m evaluation              # dry run, free, shows the plan
+   .venv\Scripts\python.exe -m evaluation --live --cap-usd 5
+   ```
+2. **Then, and only then, fill in the curated set's ranking** in
+   `evaluation/curated_models.py`: set `verified="measured"` and record `measured_notes` from the
+   real results. `tests/test_evaluation_suite.py` deliberately fails until the marker is updated,
+   so the claim cannot drift ahead of the evidence.
+3. **Answer the truncation question** from the same run — whether a schema-constrained draft
+   truncated on a real document. If it did not, ADR 0012 records that the body constraints *can*
+   be tightened, as a measured decision rather than a guess.
+
+**Blast radius for the follow-up:**
+
+| Area | Why it matters |
+|---|---|
+| `services/provider.py` | The one place a request is built. `schema=None` must stay meaning "send no constraint" |
+| `services/gemini_service.py` | `_call_gemini` is still the only pipeline call site; `PRICING` here is a **derived view**, not a table |
+| `services/pricing.py` | The single pricing source (D-4). A new row needs a dated entry in `PRICE_SOURCES` |
+| `evaluation/curated_models.py` | The curated set and the UNMEASURED markers |
+| `evaluation/live.py` | The **only** place a paid call can originate; imported lazily, only after the cap check |
+| `tests/test_editorial_instructions.py` | Pins 2/3/5 — must keep passing |
+| `tests/test_provider_interface.py` | Pins the per-call schema contract across the indirection |
+| `tests/test_pricing.py` | Pins D-3/D-4, including that no second pricing table exists |
+
+**House rules that bit previous increments** (worth repeating): do not verify against old code by
+stashing or `git checkout --` in the working tree — use a throwaway `git worktree`. Under this
+session's sandbox a new worktree may not be writable; point `TEMP`/`TMP` at a directory inside the
+main worktree and pass an absolute path to that worktree's pytest. A test file that imports a
+brand-new module should import it defensively and **fail** (not skip) when absent, so a broken
+import in the real tree cannot hide behind a skip.
+
+**Also open, deliberately not in item 6's scope:** D-13, D-14, D-15, A-6 (date validation), A-7,
+and blocker 8. **Item 5 (caching) is next in the agreed order** and is now unblocked.
 
 ### Phase 3, increment 3 — enable structured output, scoped (2026-10-26)
 
@@ -547,80 +689,83 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 22 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increments 4, 2, 1 and 3 done |
+| Dev branch | 33 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 items 4, 2, 1, 3 and item 6's offline groundwork done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **351 passed** (~108 s); fast lane `-m "not requires_latex"` → 321 passed (~6 s) |
+| Test baseline | **436 passed** (~115 s); fast lane `-m "not requires_latex"` → 406 passed (~12 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
+| Providers | **Gemini (default) and OpenRouter**, behind one `generate(...)` contract; model-per-task routing; optional `CVTAILOR_MAX_COST_USD` cap |
+| Pricing | **One source of truth** — `services/pricing.py`, route- and tier-aware (D-3, D-4 resolved) |
+| Evaluation suite | **Exists, offline by default, never in CI; has NOT been run.** Whole curated run projected at **$1.68** against a **$5** cap |
+| Curated models | **5 offered** (economy/balanced/frontier), all **UNMEASURED** — quality ranking awaits the live run |
 | HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
 | Private store | **`D:\coding\cv-tailor-data`** — its own Git repo (profile + 8 applications + outputs) |
 | Generated documents | Written to `<store>/outputs/<profile_id>/<job_id>/`; the repo's own `outputs/` holds only `.gitkeep` |
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
-| Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
-| Decisions | **12 approved**; ADR 0009 amended 2026-10-26 (D-11 → Phase 5); **ADR 0012 new** (structured-output scope) |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4, 2, 1 and 3 of 6 done); next is Phase 3 **item 6** — provider interface, routing, budget caps, and the curated model set |
+| Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md); D-3 and D-4 now resolved |
+| Decisions | **14 approved**; **ADR 0013** (provider interface, routing, caps) and **ADR 0014** (evaluation suite, curation) are new |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (items 4, 2, 1, 3 and 6's offline groundwork done); next is Phase 3 **item 5** — cache validated results |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **351 passed**, 1 warning (~108 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **321 passed**,
-  30 deselected (~6 s).
-- Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
+- `.venv\Scripts\python.exe -m pytest -q` → **436 passed**, 1 warning (~115 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **406 passed**,
+  30 deselected (~12 s).
+- Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite. **No paid
+  call has ever been made in this repository.**
 - **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
   190 → 262 in Phase 2, 262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3
   increment 1 (all new files), 298 → 309 in increment 2 (one new file, plus the legitimate
   edits listed in that increment's section — the first time edits to existing tests were
   intended rather than incidental), 309 → **324** in increment 1 of the agreed order
   (one new file, plus four existing tests that pinned the retry contract that increment
-  deliberately replaced), and 324 → **351** in increment 3 of the agreed order (one new
-  file, **no existing test modified**). In Phase 2,
+  deliberately replaced), 324 → **351** in increment 3 of the agreed order (one new
+  file, **no existing test modified**), 351 → **390** in item 6 increment A (one new file,
+  plus one monkeypatch-seam update in `test_structured_output.py` with no assertion changed),
+  390 → **407** in increment B (one new file), and 407 → **436** in increment C (one new file).
+  In Phase 2,
   four *path assertions* across three pre-existing tests were updated because the output layout
   itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
   about content are unchanged.
 - `tests/test_renderers_documents.py` renders **real** LaTeX and DOCX.
 - `tests/test_cli.py` asserts the CLI's page count equals `render_application.py`'s.
-- `tests/test_api.py` (new) asserts the API resolves like the CLI: **16 of its 20 tests fail
+- `tests/test_api.py` asserts the API resolves like the CLI: **16 of its 20 tests fail
   against the pre-close-out `main.py`**, verified by stashing the fix.
-- `tests/test_profile_serialization.py` (new, Phase 3 increment 1) asserts the profile is
+- `tests/test_profile_serialization.py` (Phase 3 increment 1) asserts the profile is
   serialized once per application and that the prompt bytes are unchanged: **11 of its 16
-  tests fail against the pre-increment code**, verified by stashing the change. The memo test
-  was additionally verified to fail when the cache lookup is neutered, so it measures work
-  rather than passing vacuously.
-- `tests/test_editorial_instructions.py` (new, Phase 3 increment 2) asserts the merged
+  tests fail against the pre-increment code**, verified by stashing the change.
+- `tests/test_editorial_instructions.py` (Phase 3 increment 2) asserts the merged
   requirements reach the CV call only, that the gate is unchanged, and that the call counts
-  are 2/3/5: **9 of its 11 tests fail against the pre-increment code**, verified by stashing
-  `generation.py` and `tailor_service.py`.
-- `tests/test_layout_retry.py` (new, Phase 3 increment 1 of the agreed order) asserts the
-  retry sends a targeted brief and the current CV rather than the whole context, that a
-  delta is merged onto the validated CV and re-gated, that a delta cannot address an
-  employer/date/education field, and that an unappliable delta fails the run instead of
-  silently keeping the long CV: **13 of its 15 tests fail against `2a7632d`**, verified by
-  running them in a throwaway worktree of that commit (not by stashing).
-- `tests/test_structured_output.py` (new, Phase 3 increment 3) asserts structured output is
-  **scoped per call**: the draft and the letter send JSON mode plus a per-kind
-  `response_schema`; the layout retry (`allow_delta=True`) and any unknown document kind
-  send **neither**. It walks the emitted schema to prove the body stays open (no `required`
-  inside it, no `additionalProperties: false` anywhere) and that the nested
-  `tailoring_explanation` remains legal, drives a truncated constrained response through the
-  parser to prove it is rejected rather than parsed short, and asserts the gate and the call
-  counts are unchanged: **13 of its 27 tests fail against `85879b5`**, verified by running
-  them in a throwaway worktree of that commit (not by stashing).
+  are 2/3/5: **9 of its 11 tests fail against the pre-increment code**.
+- `tests/test_layout_retry.py` (Phase 3 increment 1 of the agreed order): **13 of its 15 tests
+  fail against `2a7632d`**, verified in a throwaway worktree of that commit (not by stashing).
+- `tests/test_structured_output.py` (Phase 3 increment 3): **13 of its 27 tests fail against
+  `85879b5`**, verified in a throwaway worktree.
+- `tests/test_provider_interface.py` (item 6, increment A): **39 of 39 fail against `23156b1`** —
+  the whole interface is new. Imports the new module defensively and **fails** rather than skips
+  when it is absent, so a broken import in the real tree cannot hide behind a skip.
+- `tests/test_pricing.py` (increment B): **17 of 17 fail against `23156b1`**. Same defensive
+  import, same reasoning.
+- `tests/test_evaluation_suite.py` (increment C): **29 tests, 0 skips in the real tree.** They
+  also pass against `23156b1` with 2 skipped — stated plainly: the evaluation suite and the
+  curated set are new code with no predecessor, so there is no old behaviour to fail against.
+  The file guards the new code's *properties* (offline by default, cap fails closed, out of CI,
+  unmeasured markers, rates match the listing) rather than diffing behaviour.
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
 - LLM calls per application: **2 min / 3 typical / 5 max-successful / 12 worst** (was 3/4/6/18
-  before increment 2). **Unchanged by increment 1 of the agreed order** — that increment
-  lowers tokens per retry, not the number of retries — and **unchanged by increment 3**,
-  which adds no call: the schema is request metadata, not prompt content, so no prompt byte
-  changed.
-- Estimated cost per application (`gemini-3.8-flash`): **$0.016 / $0.026 / $0.048** (was
-  $0.027 / $0.038 / $0.060 before increment 2). Increment 1 of the agreed order lowers the
-  typical case further (retry input 3,488 → 740 tokens on the recorded fixture) but the
-  figures in ASSESSMENT §5 are quoted against the fixture transcript, **not** the 6,438-token
-  production CV call, so they are not restated here as a production saving. Increment 3
-  changes no figure: it adds request metadata, not prompt content.
-- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below); none of
-  increments 2, 1 or 3 changed provider or model, so no re-verification was owed (decision 7).
+  before increment 2). **Unchanged by increments 1 and 3 of the agreed order**, and **unchanged
+  by all three of item 6's increments** — the provider interface adds routing, the pricing fix
+  adds no request, and the evaluation suite is not in the pipeline.
+- Estimated cost per application (`gemini-3.8-flash`): **$0.016 / $0.026 / $0.048**. Re-derived
+  on 2026-10-26 under the new tiered, route-aware accounting: $0.01559 / $0.026482 / $0.048265 —
+  **identical**, because `gemini-3.8-flash` has no long-context tier and its prompts are ~6.4k
+  tokens, far below the 200k threshold. D-3 changes the models where it mattered.
+- Pricing verified against ai.google.dev on 2026-10-23 and against **OpenRouter's own listing on
+  2026-10-26** (467 models, SHA-256 `64B4A173A08F7027DD2F04778A85C5B5EFC4097331CF1529B502CBE249092BC7`).
+  Each route's date and source are recorded in `pricing.PRICE_SOURCES` and asserted by a test.
+  **Item 6 changed no provider and no default model** — decision 6 stands.
 
 ---
 
@@ -629,6 +774,9 @@ Re-confirm each decision when its phase begins.
 1. **`GEMINI_API_KEY` is not set in this worktree's `.env`.** `cvtailor doctor` reports it as
    the only real blocker. The owner must enter it directly — never paste it into a chat. Live
    generation in this worktree is blocked until then; rendering, the CLI and all tests are not.
+   **Item 6 adds a second, related gate:** the evaluation suite's paid path needs
+   `OPENROUTER_API_KEY` (for an OpenRouter run) and explicit owner authorisation of the method
+   and budget. It is refused before the first call without both.
 2. **The already-published personal data is still public.** Untracking stopped *future*
    exposure; it did not un-publish anything. `storage/profile/profile.yaml` — name, email,
    mobile, city, immigration status, employment history — and the 64 application files remain
@@ -718,14 +866,49 @@ Re-confirm each decision when its phase begins.
 ## Known-important findings (do not lose)
 
 - **The OpenRouter catalogue must not be exposed wholesale (owner requirement, 2026-10-26).**
-  OpenRouter fronts a very large number of models; the tool must carry a **small curated set
-  spanning different performance and cost levels**, chosen by researching what is genuinely
-  best for CV and cover-letter generation on **price against content quality**. A general
-  leaderboard ranking is not evidence of fitness for this task — the bar is a two-page CV that
-  passes the factual gate, keeps every employer and date, meets the 290–310-word letter
-  budget, and returns **schema-valid JSON**. Cost must be judged per *accepted* result, since
-  a cheap model that fails validation and burns three correction calls is not cheap. See
-  [ADR 0005](DECISIONS/0005-llm-provider-interface.md) §"Model curation".
+  OpenRouter fronts a very large number of models (467 when verified on 2026-10-26); the tool
+  carries a **small curated set spanning different performance and cost levels**. See
+  [ADR 0005](DECISIONS/0005-llm-provider-interface.md) §"Model curation" and
+  [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md). **Implemented in item 6, with the
+  quality ranking explicitly NOT claimed**: five models, each marked `verified="price+capability"`,
+  none `measured`. A test fails if any entry claims a measured ranking, so the marker cannot drift
+  ahead of the evidence.
+
+- **The curated set's ranking is unmeasured, on purpose, and this is the honest state.** A model
+  that tops a general leaderboard is not thereby fit for this task — the bar is a two-page CV that
+  passes the factual gate, keeps every employer and date, meets the 290–310-word letter budget and
+  returns schema-valid JSON. Cost must be judged per **accepted** result, because a cheap model
+  that fails validation and burns three correction calls is not cheap. The suite that measures
+  this exists and is offline by default; running it needs authorisation, not code.
+
+- **Structured output's behaviour on real documents is still unverified.** Increment 3 proved
+  offline that a truncated constrained response is *rejected* rather than parsed short, and
+  designed the schema to protect against truncation — but made no paid call. **Item 6 did not
+  change that**: it preserved the contract (including `schema=None` reaching both providers) and
+  built the suite that would answer it. The budgeted live run is the remaining step.
+
+- **A price without a named route is ambiguous.** OpenRouter lists `google/gemini-3.8-flash` at
+  **$0.825/$4.125** per 1M while Google charges **$0.75/$3.75** direct (both verified from the
+  providers' own listings). The pricing table is therefore keyed by `(provider, model)`, and each
+  route records the date and document its prices came from. Do not add a row without one — a test
+  requires it.
+
+- **`schema=None` must keep meaning "send no constraint".** The layout retry's response may be a
+  delta of unit ids with no document key, which a schema requiring `cv` cannot express. The
+  provider layer receives `None` and passes it through on both providers; a provider that decided
+  for itself would be a second, weaker gate on the same question.
+
+- **`ProviderError` must not become a `ValueError`.** The pipeline's correction loop catches
+  `ValueError`; a provider outage classified as one would burn three paid calls re-asking a
+  question the provider never answered.
+
+- **The budget cap fails closed, and a missing cap is a refusal — not "unlimited".** A malformed
+  `CVTAILOR_MAX_COST_USD` is a `ConfigError`. An evaluation plan whose *projection* exceeds the cap
+  is refused **before** the provider is built, and the cap is re-checked before every call rather
+  than once at the start.
+
+- **Nothing under `evaluation/` may be named `test_*`.** That is what keeps the paid path out of
+  CI; a test asserts it and asserts that the CI workflow does not invoke the suite.
 
 - **Structured output is scoped per call, and the scope is load-bearing — do not "simplify"
   it into a global JSON mode.** The CV draft and the cover letter send

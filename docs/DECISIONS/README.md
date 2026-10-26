@@ -17,6 +17,8 @@ Only the owner can move a decision to **Approved**.
 | [0010](0010-config-object.md) | One explicit `Config` object; no import-time environment reads | **Approved** — implemented |
 | [0011](0011-private-store-location.md) | Private store is a sibling repo; untrack real data, do not rewrite history | **Approved** — Phase 2 |
 | [0012](0012-structured-output-scope.md) | Structured output scoped per call; schema constrains the envelope, not the document body | **Approved** — Phase 3 increment 3 |
+| [0013](0013-provider-interface-and-routing.md) | Thin provider interface; Gemini default, OpenRouter second; model-per-task routing; optional budget cap | **Approved** — Phase 3 item 6 |
+| [0014](0014-evaluation-suite-and-curation.md) | The live evaluation suite stays opt-in and budget-capped; curation is a shortlist until measured | **Approved** — Phase 3 item 6 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1
@@ -34,6 +36,18 @@ Phase 3 increment 3, because it decides *where* structured output applies and *h
 schema is. Both are expensive to change once a live evaluation depends on them, and the strictness
 choice is the one that separates this increment from the change D-1 removed for causing
 truncation.
+
+**Decisions recorded 2026-10-26 (Phase 3 item 6).** [0013](0013-provider-interface-and-routing.md)
+discharges the interface [0005](0005-llm-provider-interface.md) deferred, and records three choices
+that are expensive to reverse: that `schema=None` means "send no constraint" and reaches the
+provider as such; that there is **no** fallback between providers or models; and that a provider
+failure is not a `ValueError`, because the correction loop catches `ValueError`.
+[0014](0014-evaluation-suite-and-curation.md) records that the live evaluation stays opt-in,
+budget-capped and out of CI, and — the part that matters most — that **the curated set's quality
+ranking is unmeasured and is marked as such**, rather than inferred from price, reputation or a
+general leaderboard. Both were written during implementation because the alternatives are either
+unsafe (a silent provider fallback) or dishonest (a ranking presented as researched when it was
+assumed).
 
 ## Owner's stated preferences (recorded verbatim in intent)
 

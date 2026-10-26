@@ -1,7 +1,8 @@
 # 0005 — Thin LLM provider interface; benchmark before switching
 
-**Status:** Approved (2026-10-23)
-**Date:** 2026-10-23
+**Status:** Approved (2026-10-23) — **implemented in Phase 3 item 6 (2026-10-26)**; see
+[0013](0013-provider-interface-and-routing.md) for the interface as built and
+[0014](0014-evaluation-suite-and-curation.md) for the evaluation suite and curation.
 **Related:** [ASSESSMENT.md](../ASSESSMENT.md) §3 D-1, D-3, §5
 
 ## Context
@@ -49,6 +50,17 @@ tops a general leaderboard is not thereby suited to producing a two-page CV that
 factual gate, keeps every employer and date, and returns schema-valid JSON. Curation is
 therefore part of item 6's deliverable, not a follow-up: the interface is only useful once
 the options it exposes are chosen deliberately.
+
+**Discharged in Phase 3 item 6 (2026-10-26), with the research half explicitly still open.**
+The set exists: five models spanning economy/balanced/frontier, each filtered on two
+properties **verified from OpenRouter's own listing** — that `structured_outputs` is
+advertised for it, and that its endpoint can emit a document. That filter is what excludes
+the Amazon Nova family, whose cheapest member would otherwise head the table. **What is not
+claimed is the quality ranking**: every entry reads `verified="price+capability"`, none reads
+`measured`, and a test fails if any entry claims a measured ranking. The evaluation suite that
+would settle it is built and has **not run** — doing so needs the owner's authorisation and a
+budget, which is exactly what this ADR requires. See
+[0014](0014-evaluation-suite-and-curation.md).
 
 ## Consequences
 
