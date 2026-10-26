@@ -3,14 +3,14 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `14e19e8` — *docs: carry the increment 1 baseline into the assessment status notes and testing table* (code at `9a45811`)
+**Latest commit:** `85879b5` — *docs: brief Phase 3 increment 3 and record the latest-commit header* (code at `9a45811`)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increments 4, 2 and 1 done.**
+**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increments 4, 2, 1 and 3 done.**
 
 Phase 3's scope is deliberately split across several chats. The agreed order is
 **4 → 2 → 1 → 3**, then a new chat for **6**, and **5** only once 1–4 have settled. Do not
@@ -22,10 +22,103 @@ from a regression.
 |---|---|
 | **4. Serialise the profile once per application** | **DONE** (`2943b45`) |
 | **2. Remove or merge the editorial-review pass** | **DONE** (`7c0d58a`) |
-| **1. Targeted layout retry instead of full regeneration** | **DONE** — this increment; see below |
-| 3. Enable structured output (`response_schema`) | **NEXT IN THE AGREED ORDER** — new chat |
-| 6. Provider interface, model routing, budget caps | Not started — new chat, after 3 |
+| **1. Targeted layout retry instead of full regeneration** | **DONE** (`9a45811`) |
+| **3. Enable structured output (`response_schema`)** | **DONE** — this increment; see below |
+| 6. Provider interface, model routing, budget caps | **NEXT IN THE AGREED ORDER** — new chat |
 | 5. Cache validated results | Not started — only after 1–4 have settled |
+
+### Phase 3, increment 3 — enable structured output, scoped (2026-10-26)
+
+**What changed.** `_call_gemini` now sends
+`response_mime_type="application/json"` together with a `response_schema`, **but only on
+the calls whose response is always one complete document**: the CV draft and the cover
+letter. The layout retry is deliberately left unconstrained, because since item 1 its
+response may be a **delta** — an object of unit ids such as
+`{"experience[0].bullets[1]": "..."}` with no document key — which a schema requiring `cv`
+cannot express. Recorded in [ADR 0012](DECISIONS/0012-structured-output-scope.md).
+
+**Why scoping is the answer to the truncation question, not a dodge.** The comment at the
+old `gemini_service.py:135-137` recorded that JSON mode *caused premature truncation of
+long document responses*, and that comment is why the original `response_schema` code was
+deleted as dead (D-1). The anti-truncation property is therefore **designed into the
+schema** rather than hoped for:
+
+- the schema requires the **envelope** key (`cv` / `cover_letter`) and *nothing else* —
+  so the real gain is that `parse_json_response`'s brace-scan stops being the failure path;
+- there is **no `required` inside the document body** and **no `additionalProperties:
+  false` anywhere** — enumerating and requiring every field of a ~1,350-token document is
+  what makes a constrained response long and cut-off-prone, and a cut-off response is
+  invalid JSON. The body's properties are described so the contract is meaningful, and
+  left optional so the response stays short enough to finish;
+- `tailoring_explanation` is permitted at the top level **and** nested inside `cv`, and
+  required in neither, so the schema does not silently decide which of the two shapes
+  `extract_explanation` receives, nor turn a harmless omission into a failed run and a
+  wasted paid call;
+- a kind absent from `generation.RESPONSE_SCHEMAS` gets **no** schema, so a future document
+  type cannot inherit the CV's constraints by accident.
+
+**What this increment does NOT claim.** It does **not** claim truncation was *observed* not
+to return on real documents. No paid call was made — the suite is offline by constraint,
+and the worktree's `.env` still has no `GEMINI_API_KEY` (blocker 1). What is established
+offline is that the schema is well-formed and serialized by the SDK, that a truncated
+constrained response is **rejected** rather than parsed into a short document, and that the
+scope excludes the one call whose response is not a document. Confirming the truncation
+behaviour against the provider needs a budgeted live run, which belongs to **item 6**.
+
+**No silent fallback, and `validate_cv` is not bypassed.** A schema-constrained response
+goes through the same `parse_json_response` and the same gate as before. JSON mode is a
+*request* to the provider, never a substitute for validation: two tests drive a
+schema-violating draft and a malformed one through the real pipeline and assert the run
+still fails after exactly three attempts.
+
+**Both explanation shapes still work.** `extract_explanation` reads the top level then
+`cv.`; both are exercised through the real pipeline and both reach `TailoringExplanation`.
+A response that omits the explanation entirely still succeeds with
+`tailoring_explanation == None`, which is why it is not required in the schema.
+
+**Call counts are UNCHANGED at 2/3/5** (min/typical/max-successful), 12 worst — verified by
+driving the real pipeline rather than derived on paper. `tests/test_editorial_instructions.py`
+still pins them and `tests/test_structured_output.py` re-asserts the happy and typical ends
+of the range. The schema is request metadata, not prompt content, so **no prompt byte
+changed** and the token and cost figures in ASSESSMENT §5 are unchanged. A schema that
+failed often enough to trigger the correction loop would show up as a *rise* on the happy
+path, which is why that path is asserted rather than left unmeasured.
+
+**Tests: 324 → 351 passed** (~108 s), fully offline, no paid calls. Fast lane 294 → **321
+passed** (~6 s). New file `tests/test_structured_output.py` (27 tests); **13 of the 27 fail
+against `85879b5`**, verified by running them in a throwaway `git worktree` of that commit
+(not by stashing).
+
+**No existing test was modified.** The one supporting change is that
+`tests/support.py`'s `OfflineGemini` gained a `calls` list recording each call's keyword
+arguments: the schema is chosen **per call**, so "was a schema sent here?" is a property of
+the call and the existing `prompts` list cannot express it. That is an addition to the
+double, not a change to an existing assertion.
+
+**Fixtures were NOT regenerated.** The response *shape* the model returns is unchanged — the
+schema constrains the envelope, and both recorded transcripts already carry the document
+key the schema requires. `tools/build_fixtures.py` was not run, so its two transcripts
+remain in step with each other as increment 2 left them.
+
+**Do not re-open increments 4, 2 or 1.** None was touched by this increment.
+
+### Phase 3, increment 3 — briefing for the next chat (DISCHARGED 2026-10-26)
+
+The briefing that stood here was **fully discharged** by the increment 3 section above.
+Every entry in its blast-radius list was addressed:
+
+- **`parse_json_response`** — unchanged; its `accept_delta=False` default and the retry-only
+  switch-on are untouched, and a schema that does not satisfy the parser still fails loudly;
+- **`looks_like_cv_delta` / `apply_cv_delta`** — the whole-document/delta collision was
+  checked deliberately and resolved by **not sending a schema on the call that may return a
+  delta**, which is asserted by `test_a_layout_retry_sends_no_schema`;
+- **`extract_explanation`** — both shapes still work; the schema permits the top-level and
+  the nested explanation and requires neither, and both are exercised end to end;
+- **`_call_gemini`** — config, `max_output_tokens` and the retry loop are otherwise
+  unchanged, and **neither the provider nor the model was changed** (decision 7);
+- **Both fixture transcripts** — deliberately *not* regenerated, because the response shape
+  did not change; the two remain in step with each other;
+- **`tests/test_editorial_instructions.py`** — still pins 2/3/5 and still passes unchanged.
 
 ### Phase 3, increment 1 — targeted layout retry instead of full regeneration (2026-10-26)
 
@@ -113,48 +206,17 @@ is exactly what this increment replaces — none was "fixed" to make a broken ch
 **Next action: Phase 3, item 3 — enable structured output (`response_schema`)**, in a new
 chat. `_call_gemini`'s config and `response_mime_type` and `parse_json_response` are item
 3's to change; item 1 touched only the retry path and the parser's default-off flag.
+**DISCHARGED 2026-10-26** — see the increment 3 section at the top of this file.
 
 **Do not re-open increments 4 or 2.** Neither was touched by this increment.
 
-### Phase 3, increment 3 — briefing for the next chat (structured output)
+### Phase 3, increment 3 — briefing for the next chat (DISCHARGED 2026-10-26)
 
-**Start state:** `refactor/architecture-v2` at `14e19e8`, in sync with origin. Working tree
-clean. **324 passed** (~107 s) offline; fast lane **294 passed** (~6 s). `master` untouched
-at `1416177`. Nothing is uncommitted and nothing is half-done.
-
-**The item.** ASSESSMENT §5 optimisation 3: enable Gemini's structured output so the
-`parse_json_response` brace-scan is no longer the failure path. Today `_call_gemini`
-**deliberately does not** set `response_mime_type="application/json"` — see the comment at
-`gemini_service.py:135-137`, which records that it *caused premature truncation of long
-document responses*. That comment is the whole reason the old `response_schema` code was
-deleted as dead (D-1). Treat it as the central design question: the increment must show
-that structured output does not reintroduce truncation, or must scope it to the calls where
-it is safe.
-
-**Baseline to verify, not re-derive:** call counts **2 / 3 / 5** (min / typical /
-max-successful) and 12 worst. Item 3 must not change them; if it does, say so explicitly and
-explain why, exactly as item 1's docs do.
-
-**Blast radius — read before editing:**
-
-| Area | Why it matters |
-|---|---|
-| `parse_json_response` | Item 1 added `accept_delta=False`, switched on for retries only. A schema change must not break the delta shape or make a malformed draft look valid |
-| `looks_like_cv_delta` / `apply_cv_delta` | The delta path is new; a `response_schema` that constrains the *document* shape will conflict with a delta response unless the schema allows both |
-| `extract_explanation` | Reads top level then nested `cv.`; a strict schema changes which shape the model returns |
-| `_call_gemini` | Config, `max_output_tokens`, retry loop. Do not change the model or provider (decision 7) |
-| Both fixture transcripts | If the response shape changes, `tools/build_fixtures.py` must regenerate them in step with each other (staging-root caveat in TESTING.md) |
-| `tests/test_editorial_instructions.py` | Pins 2/3/5 — must keep passing |
-
-**House rules that bit this increment** (worth repeating): do not verify against the old
-code by stashing or `git checkout --` in the working tree — use a throwaway `git worktree`
-at the previous commit. Item 1 lost its uncommitted implementation that way and had to
-rebuild it.
-
-**Also open, deliberately not in item 3's scope:** D-3 (cost uses one flat rate while
-`PRICING` defines long-context tiers), D-4, D-13, D-14, D-15, A-6 (date validation), A-7,
-and blocker 8. Item 6 (provider interface, model routing, budget caps) is a **separate new
-chat after item 3**; item 5 (caching) waits until 1–4 have settled.
+The briefing that stood here has been **fully discharged** by the increment 3 section at
+the top of this file. Its start state was `14e19e8` with 324 passed, and its central design
+question — *show truncation does not come back, or scope structured output to the calls
+where it is safe* — was answered by **scoping**, with the anti-truncation property designed
+into the schema rather than assumed. See [ADR 0012](DECISIONS/0012-structured-output-scope.md).
 
 ### Phase 3, increment 2 — remove or merge the editorial-review pass (2026-10-26)
 
@@ -405,9 +467,9 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 20 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increments 4, 2 and 1 done |
+| Dev branch | 22 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increments 4, 2, 1 and 3 done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **324 passed** (~108 s); fast lane `-m "not requires_latex"` → 294 passed (~6 s) |
+| Test baseline | **351 passed** (~108 s); fast lane `-m "not requires_latex"` → 321 passed (~6 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
 | HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
@@ -415,22 +477,23 @@ Re-confirm each decision when its phase begins.
 | Generated documents | Written to `<store>/outputs/<profile_id>/<job_id>/`; the repo's own `outputs/` holds only `.gitkeep` |
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
-| Decisions | 11 approved; ADR 0009 amended 2026-10-26 (D-11 → Phase 5) |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4, 2 and 1 of 6 done); next is Phase 3 increment 3 |
+| Decisions | **12 approved**; ADR 0009 amended 2026-10-26 (D-11 → Phase 5); **ADR 0012 new** (structured-output scope) |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4, 2, 1 and 3 of 6 done); next is Phase 3 increment 6 |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **324 passed**, 1 warning (~108 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **294 passed**,
+- `.venv\Scripts\python.exe -m pytest -q` → **351 passed**, 1 warning (~108 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **321 passed**,
   30 deselected (~6 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
 - **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
   190 → 262 in Phase 2, 262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3
   increment 1 (all new files), 298 → 309 in increment 2 (one new file, plus the legitimate
   edits listed in that increment's section — the first time edits to existing tests were
-  intended rather than incidental), and 309 → **324** in increment 1 of the agreed order
-  (one new file, plus four existing tests that pinned the retry contract this increment
-  deliberately replaced). In Phase 2,
+  intended rather than incidental), 309 → **324** in increment 1 of the agreed order
+  (one new file, plus four existing tests that pinned the retry contract that increment
+  deliberately replaced), and 324 → **351** in increment 3 of the agreed order (one new
+  file, **no existing test modified**). In Phase 2,
   four *path assertions* across three pre-existing tests were updated because the output layout
   itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
   about content are unchanged.
@@ -453,20 +516,31 @@ Re-confirm each decision when its phase begins.
   employer/date/education field, and that an unappliable delta fails the run instead of
   silently keeping the long CV: **13 of its 15 tests fail against `2a7632d`**, verified by
   running them in a throwaway worktree of that commit (not by stashing).
+- `tests/test_structured_output.py` (new, Phase 3 increment 3) asserts structured output is
+  **scoped per call**: the draft and the letter send JSON mode plus a per-kind
+  `response_schema`; the layout retry (`allow_delta=True`) and any unknown document kind
+  send **neither**. It walks the emitted schema to prove the body stays open (no `required`
+  inside it, no `additionalProperties: false` anywhere) and that the nested
+  `tailoring_explanation` remains legal, drives a truncated constrained response through the
+  parser to prove it is rejected rather than parsed short, and asserts the gate and the call
+  counts are unchanged: **13 of its 27 tests fail against `85879b5`**, verified by running
+  them in a throwaway worktree of that commit (not by stashing).
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
 - LLM calls per application: **2 min / 3 typical / 5 max-successful / 12 worst** (was 3/4/6/18
   before increment 2). **Unchanged by increment 1 of the agreed order** — that increment
-  lowers tokens per retry, not the number of retries.
+  lowers tokens per retry, not the number of retries — and **unchanged by increment 3**,
+  which adds no call: the schema is request metadata, not prompt content, so no prompt byte
+  changed.
 - Estimated cost per application (`gemini-3.8-flash`): **$0.016 / $0.026 / $0.048** (was
   $0.027 / $0.038 / $0.060 before increment 2). Increment 1 of the agreed order lowers the
   typical case further (retry input 3,488 → 740 tokens on the recorded fixture) but the
   figures in ASSESSMENT §5 are quoted against the fixture transcript, **not** the 6,438-token
-  production CV call, so they are not restated here as a production saving.
-- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below); neither
-  increment 2 nor increment 1 changed provider or model, so no re-verification was owed
-  (decision 7).
+  production CV call, so they are not restated here as a production saving. Increment 3
+  changes no figure: it adds request metadata, not prompt content.
+- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below); none of
+  increments 2, 1 or 3 changed provider or model, so no re-verification was owed (decision 7).
 
 ---
 
@@ -547,8 +621,10 @@ Re-confirm each decision when its phase begins.
 
 ### Resolved in Phase 1
 
-- ~~Dead code: `response_schema`, `validate_api_key`, `create_gemini_service`, `ErrorResponse`,
-  `TailoredOutput`~~ — removed (D-1, D-2, D-7).
+- ~~Dead code: `validate_api_key`, `create_gemini_service`, `ErrorResponse`, `TailoredOutput`~~
+  — removed (D-2, D-7). `response_schema` was removed here too, as dead code (D-1), and was
+  **made live again** in Phase 3 increment 3, scoped per call — see
+  [ADR 0012](DECISIONS/0012-structured-output-scope.md).
 - ~~Import-time env reads~~ — `Config` object, guarded by a test (A-5).
 - ~~296-line `tailor_documents`~~ — split into `generation` + `application_store` (A-3).
 - ~~Candidate-specific rules hardcoded in the validator~~ — now profile-scoped (A-1).
@@ -560,6 +636,16 @@ Re-confirm each decision when its phase begins.
 ---
 
 ## Known-important findings (do not lose)
+
+- **Structured output is scoped per call, and the scope is load-bearing — do not "simplify"
+  it into a global JSON mode.** The CV draft and the cover letter send
+  `response_mime_type="application/json"` plus a `response_schema`; the layout retry and any
+  unknown document kind send **neither**. The retry is excluded because its response may be a
+  **delta** of unit ids, which a schema requiring `cv` cannot express. The schema requires the
+  **envelope** key and leaves the document body open (no `required` inside it, no
+  `additionalProperties: false` anywhere) because a strict body is what truncated long
+  responses and got the first implementation deleted (D-1). See
+  [ADR 0012](DECISIONS/0012-structured-output-scope.md) and `tests/test_structured_output.py`.
 
 - ~~`.github/copilot-instructions.md` describes a **different system** (Tectonic,
   `gemini-1.5-flash`, a non-existent `/api/preview` endpoint)~~ — resolved in `c3839da`: it is

@@ -1,8 +1,8 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **324 passed**, 1 warning, ~108 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **294 passed**, 30 deselected, ~6 s.
+**Current baseline:** **351 passed**, 1 warning, ~108 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **321 passed**, 30 deselected, ~6 s.
 
 | | |
 |---|---|
@@ -13,15 +13,16 @@
 | Baseline after the Phase 2 close-out | 282 passed, ~114 s |
 | Baseline after Phase 3 increment 1 | 298 passed, ~112 s |
 | Baseline after Phase 3 increment 2 | 309 passed, ~107 s |
-| **Baseline after Phase 3 increment 1 of the agreed order (targeted layout retry)** | **324 passed**, ~108 s |
+| Baseline after Phase 3 increment 1 of the agreed order (targeted layout retry) | 324 passed, ~108 s |
+| **Baseline after Phase 3 increment 3 (structured output)** | **351 passed**, ~108 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
 The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, 190 → 262 in Phase 2,
 262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3 increment 1 (all new files),
-298 → 309 in increment 2, and 309 → **324** in Phase 3 increment 1 of the agreed order
-(targeted layout retry). The runtime increase is almost entirely `pdflatex`: real rendering
-is exercised instead of mocked.
+298 → 309 in increment 2, 309 → 324 in Phase 3 increment 1 of the agreed order
+(targeted layout retry), and 324 → **351** in increment 3 (structured output). The runtime
+increase is almost entirely `pdflatex`: real rendering is exercised instead of mocked.
 
 > **Sandbox caveat.** Under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
 > on ACL operations ("No usable temporary directory" is the same environment artifact), and
@@ -65,6 +66,13 @@ that pinned the *old* retry contract, which is precisely what the increment repl
 `test_tailor_service.py:114` was not changed: its second clause (`'CURRENT CV:' in ...`) still
 holds on the targeted retry.
 
+**Phase 3 increment 3 (structured output) modified no existing test at all.** Every new
+assertion lives in `test_structured_output.py`. `tests/support.py`'s `OfflineGemini` gained a
+`calls` list recording each call's keyword arguments, because the schema is chosen **per call**
+— "was a schema sent here?" is a property of the call, not of the service — and the existing
+`prompts` list cannot express it. That is an addition to the double, not a change to any
+existing assertion.
+
 Everything else passes unchanged. Rather than edit 32 call sites to thread a `profile_id` they
 are not about, `tests/conftest.py` sets `CVTAILOR_PROFILE_ID` and points `CVTAILOR_STORE` at a
 throwaway synthetic store once, for the whole suite.
@@ -76,13 +84,15 @@ throwaway synthetic store once, for the whole suite.
 | `test_profile_serialization.py` | 16 | **New in increment 1.** The profile is serialized once per application; the rendered context is **byte-identical** with and without `profile_json` on every country-header branch; the `rules`-excluded facts memo returns the same text without re-serializing, never becomes a profile field, and does not un-ban a banned tool |
 | `test_editorial_instructions.py` | 11 | **New in increment 2.** The merged editorial requirements reach the **CV call only** (not the letter), are injected exactly once, and are carried by a layout retry too; the validation gate is unchanged (an invalid draft still fails the run and no letter is drafted from it); the call counts are **2/3/5** on the happy, typical and max-successful paths |
 | `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The retry sends the targeted brief and the current CV, with **no** profile, job description or prompt file; the brief reports the document's real body length; a delta response is merged onto the validated CV and **re-gated**, a full-CV response still works, an unknown/unaddressable key raises, a delta cannot write an employer/date/education field or complete an ongoing role, and an unappliable delta fails the run rather than silently keeping the long CV |
+| `test_structured_output.py` | 27 | **New in Phase 3 increment 3.** Structured output is **scoped, not global**: the CV draft and the cover letter send `response_mime_type="application/json"` with a per-kind `response_schema`; the layout retry (`allow_delta=True`) and any unknown document kind send **neither**. The schema requires the envelope key and leaves the document body open — asserted by walking the emitted schema for `required` inside the body and for `additionalProperties: false` — which is what keeps D-1's truncation from returning. Both `tailoring_explanation` shapes (top level and nested) still reach `TailoringExplanation`, an omitted explanation is still accepted, a truncated constrained response is **rejected** rather than parsed short, `validate_cv` is still the only gate, and the happy/typical paths stay at 2 and 3 calls |
 
 `test_profile_serialization.py` was verified to be a real guard: **11 of its 16 tests fail
 against the pre-increment-1 code**. `test_editorial_instructions.py` likewise: **9 of its 11
 tests fail against the pre-increment-2 code** (checked by stashing `generation.py` and
 `tailor_service.py`). `test_layout_retry.py`: **13 of its 15 tests fail against `2a7632d`**,
 checked by adding a throwaway `git worktree` at that commit and running the new file there —
-no stashing in the working tree.
+no stashing in the working tree. `test_structured_output.py`: **13 of its 27 tests fail against
+`85879b5`**, checked the same way, with a throwaway worktree rather than a stash.
 
 ### Phase 2 additions
 
@@ -186,6 +196,8 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | `test_api.py` | 20 | **New 2026-10-26.** The FastAPI adapter resolves like the CLI and fails closed |
 | `test_profile_serialization.py` | 16 | **New in Phase 3 increment 1.** One serialization per application; byte-identical prompts; the rules-excluded facts memo |
 | `test_editorial_instructions.py` | 11 | **New in Phase 3 increment 2.** The merged editorial requirements reach the CV call only; the gate is unchanged; call counts are 2/3/5 |
+| `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The targeted retry, the delta merge, and the fact that a delta cannot bypass the gate |
+| `test_structured_output.py` | 27 | **New in Phase 3 increment 3.** Structured output is scoped per call; the schema constrains the envelope, not the document body; a truncated response is rejected; the gate and the call counts are unchanged |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
 | `test_portability.py` | 2 | *(pre-existing)* pdflatex discovery and `LATEX_COMPILER` override |
@@ -317,8 +329,9 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | `python -m pytest -q` (after the 2026-10-26 close-out) | 282 passed, ~114 s |
 | `python -m pytest -q` (after Phase 3 increment 1) | 298 passed, ~112 s |
 | `python -m pytest -q` (after Phase 3 increment 2) | 309 passed, ~107 s |
-| `python -m pytest -q` (**after Phase 3 increment 1 of the agreed order**) | **324 passed**, ~107 s |
-| Fast lane `-m "not requires_latex"` | **294 passed**, 30 deselected, ~6 s |
+| `python -m pytest -q` (after Phase 3 increment 1 of the agreed order) | 324 passed, ~107 s |
+| `python -m pytest -q` (**after Phase 3 increment 3** — structured output) | **351 passed**, ~108 s |
+| Fast lane `-m "not requires_latex"` | **321 passed**, 30 deselected, ~6 s |
 | `test_api.py` | 20 passed, ~2 s (no LaTeX, no network) |
 | `test_renderers_documents.py` | 34 passed, ~20 s |
 | `test_render_application_determinism.py` | 11 passed, ~73 s |

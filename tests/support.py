@@ -109,9 +109,12 @@ class OfflineGemini:
 
     Replays recorded responses in order. Every call is recorded so tests can assert on
     the prompt that was actually sent — which is how profile/JD/country context
-    propagation is checked. If the caller exhausts the transcript, the last response is
-    replayed and :attr:`exhausted` becomes true, so an unexpected extra call shows up as
-    an assertion failure rather than a hang or a real request.
+    propagation is checked. The keyword arguments are recorded too, so a test can assert
+    which *response contract* a call asked for (the structured-output schema is
+    per-call, so "was a schema sent here?" is a property of the call, not the service).
+    If the caller exhausts the transcript, the last response is replayed and
+    :attr:`exhausted` becomes true, so an unexpected extra call shows up as an
+    assertion failure rather than a hang or a real request.
     """
 
     def __init__(self, texts, inputs_per_call: int = 100, outputs_per_call: int = 20):
@@ -119,10 +122,17 @@ class OfflineGemini:
         self.inputs_per_call = inputs_per_call
         self.outputs_per_call = outputs_per_call
         self.prompts: list[str] = []
+        #: One ``{"kind": ..., "allow_delta": ...}`` per call, in order.
+        self.calls: list[dict] = []
         self.exhausted = False
 
     def _call_gemini(self, prompt, *args, **kwargs):
         self.prompts.append(prompt)
+        self.calls.append({
+            'kind': kwargs.get('kind'),
+            'allow_delta': bool(kwargs.get('allow_delta', False)),
+            'max_output_tokens': kwargs.get('max_output_tokens'),
+        })
         index = len(self.prompts) - 1
         if index >= len(self.texts):
             self.exhausted = True

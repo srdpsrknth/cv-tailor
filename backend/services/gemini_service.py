@@ -11,6 +11,7 @@ from google.genai import types
 
 from config import DEFAULT_MODEL, Config
 from models.requests import TokenUsage
+from services.generation import response_schema_for
 
 # Re-exported for callers that only need the model name.
 __all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL"]
@@ -103,7 +104,9 @@ class GeminiService:
         self,
         prompt: str,
         max_retries: int = 3,
-        max_output_tokens: Optional[int] = None
+        max_output_tokens: Optional[int] = None,
+        kind: Optional[str] = None,
+        allow_delta: bool = False,
     ) -> Tuple[str, int, int]:
         """
         Call Gemini API with retry logic.
@@ -112,6 +115,11 @@ class GeminiService:
             prompt: The prompt to send
             max_retries: Maximum number of retry attempts
             max_output_tokens: Override max_output_tokens for this call (uses self.max_output_tokens if None)
+            kind: The document being asked for (``cv``, ``cover_letter``). Selects the
+                structured-output schema; an unknown or missing kind gets no schema.
+            allow_delta: True for a layout retry, whose response may be a *delta* of
+                replacement values rather than a document. Such a call is deliberately
+                left unconstrained -- see ``generation.RESPONSE_SCHEMAS``.
 
         Returns:
             Tuple of (response_text, input_tokens, output_tokens)
@@ -121,6 +129,14 @@ class GeminiService:
         """
         # Use provided max_output_tokens or fall back to instance default
         tokens_limit = max_output_tokens if max_output_tokens is not None else self.max_output_tokens
+
+        # The schema is per *call*, not per service: the draft and the letter always
+        # return one complete document, so they are constrained; a layout retry may
+        # return a delta and is therefore not. See generation.RESPONSE_SCHEMAS for why
+        # structured output is scoped rather than enabled everywhere -- an earlier
+        # blanket application of response_mime_type caused premature truncation of long
+        # document responses (D-1).
+        schema = response_schema_for(kind, allow_delta=allow_delta)
 
         for attempt in range(max_retries):
             try:
@@ -132,14 +148,19 @@ class GeminiService:
                 if self.model == "gemini-3.8-flash":
                     config.thinking_config = types.ThinkingConfig(thinking_level="low")
 
-                # Do not set response_mime_type="application/json": it causes premature
-                # truncation of long document responses. Parsing is handled by
-                # tailor_service._parse_json_response, which tolerates wrappers.
+                # Mime type and schema travel together: JSON mode without a schema still
+                # changes the envelope, so a call that is not schema-constrained keeps
+                # both unset and the tolerant parser stays the path it always was.
+                if schema is not None:
+                    config.response_mime_type = "application/json"
+                    config.response_schema = schema
+
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,
                     config=config
                 )
+
 
                 # Check finish reason for debugging truncation issues
                 if response.candidates and len(response.candidates) > 0:

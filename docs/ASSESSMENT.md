@@ -129,7 +129,7 @@ tailor_documents()                             backend/services/tailor_service.p
 | Application tracking | **Absent** | — |
 | CLI | **Works** *(Phase 1)* | `cvtailor` — `doctor`, `profile show`, `generate`, `render` |
 | Provider abstraction | **Absent** | Gemini hardwired `tailor_service.py:119` |
-| Structured output (JSON mode) | **Dead code, removed** | `response_schema` never passed — see §3 D-1 |
+| Structured output (JSON mode) | **Live, scoped per call** | `generation.RESPONSE_SCHEMAS` selects the schema; the draft and the letter are constrained, the layout retry is not (its response may be a delta) — [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
 | `validate_api_key()` | **Removed** *(Phase 1)* | Superseded by `cvtailor doctor --verify-key` |
 | Candidate-scoped rules | **Works** *(Phase 1)* | `rules:` block in the profile; see §2 A-1 |
 
@@ -168,7 +168,7 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 
 | ID | Finding | Evidence | Action |
 |---|---|---|---|
-| **D-1** | ~~`response_schema` / JSON mode is **dead code**~~ **RESOLVED in Phase 1** | Dead branches `gemini_service.py:162-164,187-198,204` | **Deleted**, along with the unused `response_schema` parameter. The comment explaining why `response_mime_type` is not set was kept — that reasoning is still load-bearing. |
+| **D-1** | ~~`response_schema` / JSON mode is **dead code**~~ **RESOLVED in Phase 1; made live in Phase 3 increment 3** | Dead branches `gemini_service.py:162-164,187-198,204` | **Deleted** in Phase 1, along with the unused `response_schema` parameter; the comment explaining why `response_mime_type` was not set was kept, because that reasoning was load-bearing. **Phase 3 increment 3 made structured output live, on the terms that comment demanded**: scoped per call (draft and letter only — the layout retry may return a delta), and constraining the response *envelope* rather than the document body. See [ADR 0012](DECISIONS/0012-structured-output-scope.md). |
 | **D-2** | ~~`validate_api_key()` and `create_gemini_service()` never called~~ **RESOLVED in Phase 1** | `gemini_service.py:265,285` | **Deleted.** Key checking now lives in `cvtailor doctor`, which asserts presence only and verifies against Google just with `--verify-key`. |
 | **D-3** | **Cost under-reported**: `calculate_token_usage` prices the *total* with one flat rate, ignoring `input_long`/`output_long` tiers it defines | `gemini_service.py:100-122` vs `PRICING` `:35-40` | **Still open.** Fix before trusting cost data. |
 | **D-4** | Pricing table duplicated and stale in UI | `ui/app.py:239-246` vs `gemini_service.py:28-71` | **Still open** — single source of truth still needed. |
@@ -315,8 +315,13 @@ repeated input. See the measured effect below.
    (2026-10-26).** The requirements were folded into the draft prompt
    (`generation.EDITORIAL_REQUIREMENTS`, injected by `build_cv_prompt`) and the second CV
    call was deleted. See the measured effect below.
-3. **Enable structured output** (`response_schema`) — removes the parse-failure retry loop,
-   the dominant tail risk. **Now the top opportunity, and the next increment.**
+3. ~~**Enable structured output** (`response_schema`) — removes the parse-failure retry
+   loop, the dominant tail risk.~~ **DONE — Phase 3, increment 3 (2026-10-26), scoped.**
+   JSON mode and a `response_schema` are now sent on the CV draft and the cover letter;
+   the layout retry is deliberately left unconstrained because its response may be a
+   delta. The schema constrains the **envelope** (`cv` / `cover_letter` required) and not
+   the document body, which is what keeps the truncation D-1 records from returning. See
+   [ADR 0012](DECISIONS/0012-structured-output-scope.md) and the measured effect below.
 4. ~~**Serialize the profile once** per application rather than per call.~~
    **DONE — Phase 3, increment 1 (2026-10-26).** The context block is now built once per
    application and reused by the CV prompt, the letter prompt and every layout retry
@@ -372,6 +377,48 @@ and existing skills categories, so employers, titles, dates, education, certific
 `work_authorization` are structurally unreachable and ongoing work cannot be completed by a
 retry. An unknown key raises, the retry goes through the unchanged 3-attempt correction
 loop, and the run then fails — there is no silent fallback that keeps the unshortened CV.
+
+**Measured effect of optimisation 3 (2026-10-26).** Structured output is **scoped**, not
+enabled globally, and the scope is the decision this increment turns on
+([ADR 0012](DECISIONS/0012-structured-output-scope.md)):
+
+| Call | Response contract | JSON mode + `response_schema` |
+|---|---|---|
+| CV draft | one complete document, always | **sent** |
+| Cover letter | one complete document, always | **sent** |
+| Layout retry | complete CV **or** a delta of unit ids | **not sent** |
+| Any unknown/future document kind | unspecified | **not sent** |
+
+The schema requires the envelope key (``cv`` / ``cover_letter``) and **nothing else**.
+There is no ``required`` inside the document and no ``additionalProperties: false``
+anywhere: enumerating and requiring every field of a ~1,350-token document is what makes a
+constrained response long and cut-off-prone, and a cut-off response is invalid JSON. That
+is the failure D-1 records, so the body's properties are described — keeping the contract
+meaningful — and left optional, keeping the response short enough to finish. The
+guarantee actually bought is that the response is an object carrying the expected document
+key, so **`parse_json_response`'s brace-scan stops being the failure path**.
+
+**What this increment does NOT claim.** It does not claim truncation has been *observed*
+not to return on real documents, because no paid call was made — the suite is offline by
+constraint. What is established offline is (a) the schema is well-formed and the SDK
+serializes it (asserted), (b) a truncated constrained response is *rejected* rather than
+parsed into a short document (asserted), and (c) the scope excludes the one call whose
+response is not a document (asserted). Confirming the truncation behaviour against the
+provider needs a budgeted live run, which belongs to item 6 with the rest of the
+benchmarking.
+
+**No silent fallback, and `validate_cv` is not bypassed.** A schema-constrained response
+goes through the same `parse_json_response` and the same gate as before; JSON mode is a
+request to the provider, never a substitute for validation. Two tests drive a
+schema-violating draft and a malformed one through the real pipeline and assert the run
+still fails after exactly three attempts.
+
+**Call counts are UNCHANGED at 2/3/5** (12 worst), verified by driving the real pipeline
+with recorded transcripts rather than derived on paper. The schema is request metadata,
+not prompt content, so no prompt byte changed and the token and cost figures above are
+unchanged too. A schema that failed often enough to trigger the correction loop would show
+up here as a *rise* on the happy path, which is why the happy path is asserted to stay at
+two calls rather than merely left unmeasured.
 
 > **Caveat on extrapolating to production.** The fixture documents are ~80–100 body words,
 > so on them the 650/550-word budget is not the binding constraint and a model using the

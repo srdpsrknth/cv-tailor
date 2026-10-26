@@ -1,0 +1,95 @@
+# 0012 — Structured output is scoped per call, not enabled globally
+
+**Status:** Approved (2026-10-26) — implemented in Phase 3, increment 3
+**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §5 optimisation 3, §3 D-1;
+[ADR 0005](0005-llm-provider-interface.md)
+
+## Context
+
+`_call_gemini` did **not** set `response_mime_type="application/json"`, and the comment
+there recorded the reason: it *caused premature truncation of long document responses*.
+That single fact is why the original `response_schema` code was deleted as dead code in
+Phase 1 (**D-1**). ASSESSMENT §5 lists "enable structured output" as the top remaining
+optimisation, described as removing "the parse-failure retry loop, the dominant tail
+risk" — so the item cannot be discharged by simply setting the flag that was removed for
+cause.
+
+Three properties of the pipeline constrain the shape of any answer:
+
+1. **The document response is long.** A draft CV is ≈1,350 output tokens and a cover
+   letter ≈620. The truncation that killed the first attempt was a *length* effect.
+2. **One call's response is not a document at all.** Since Phase 3 item 1 the layout
+   retry may return a **delta** — an object of unit ids such as
+   `{"experience[0].bullets[1]": "..."}` with no document key, merged by
+   `apply_cv_delta`. A schema requiring `cv` cannot express that shape.
+3. **`extract_explanation` accepts two envelopes.** It reads `tailoring_explanation` at
+   the top level *and* nested inside `cv`. A strict schema decides, silently, which one
+   the model may return.
+
+## Decision
+
+**Enable structured output, scoped by call, with the anti-truncation property designed
+into the schema rather than hoped for.**
+
+| Call | Contract | Schema |
+|---|---|---|
+| CV draft | one complete document, always | **required** |
+| Cover letter | one complete document, always | **required** |
+| Layout retry | complete CV **or** delta | **not sent** |
+
+The schema constrains the **envelope**, not the document body:
+
+- `required: ["cv"]` (or `["cover_letter"]`) and nothing else — the response is a JSON
+  object carrying the expected document key, so the brace-scan in `parse_json_response`
+  stops being the failure path. That is the guarantee this increment actually buys.
+- **No `required` inside the document, and no `additionalProperties: false` anywhere.**
+  Enumerating and requiring every field of a ~1,350-token document is what makes a
+  constrained response long and cut-off-prone — the failure D-1 records. The body's
+  properties are *described* so the contract is not vacuous, and left optional so the
+  response stays short enough to finish.
+- `tailoring_explanation` is permitted at the top level **and** inside `cv`, and is
+  required in neither, so tightening the envelope does not decide which of the two
+  shapes `extract_explanation` receives, nor turn a harmless omission into a failed run
+  and a wasted paid call.
+
+`generation.RESPONSE_SCHEMAS` maps document kind to schema and
+`generation.response_schema_for(kind, allow_delta=...)` selects it. A kind absent from the
+mapping gets **no** schema: a future document type must not inherit the CV's constraints
+by accident. `_call_gemini` sets `response_mime_type` and `response_schema` **together**,
+so a call that is not schema-constrained keeps both unset and the tolerant parser remains
+the path it always was.
+
+## Consequences
+
+- **No silent fallback, and none was introduced.** A schema-constrained response is still
+  parsed by `parse_json_response` and still gated by `validate_cv`; JSON mode is a
+  *request* to the provider, never a substitute for validation. A response that does not
+  parse is retried only through the unchanged 3-attempt correction loop and then raises.
+  A truncated response is invalid JSON and `parse_json_response` never repairs truncated
+  document data — so if truncation ever returns, the suite fails at the parser instead of
+  shipping a half-length CV.
+- **The delta path is untouched.** `apply_cv_delta`, `looks_like_cv_delta` and
+  `parse_json_response(accept_delta=True)` keep working because the one call that may
+  return a delta is the one call sent no schema.
+- **Call counts are unchanged at 2/3/5** (12 worst): the schema adds no call. A schema
+  that failed often would show up as a *rise* in count on the happy path, which is
+  asserted, so the increment cannot hide a new retry loop.
+- **Token and cost figures are unchanged.** The schema is request metadata, not prompt
+  content, so no prompt byte changes.
+- **Scope, not permanence.** If a budgeted live evaluation (Phase 3 item 6) shows the
+  provider handles a strict body schema without truncation on real documents, the body
+  constraints can be tightened then. That is a measured decision, not a guess, and it
+  belongs with benchmarking.
+- **`kind` is per call, not per service**, so the schema cannot drift from what is being
+  asked for; `_call_gemini`'s signature grew two keyword arguments with defaults that
+  preserve the previous behaviour for any caller that passes neither.
+
+## Alternatives considered
+
+| Option | Why not |
+|---|---|
+| Enable JSON mode everywhere, as the deleted code did | That is the change D-1 records as the cause of truncation; re-deriving it without addressing length would repeat a known failure |
+| Strict schema over the whole document (`required` every field, `additionalProperties: false`) | Maximises constrained output length on the longest responses — precisely the truncation risk. Also forbids the delta shape and the nested explanation |
+| Schema on the retry too, allowing either document or delta | A delta has arbitrary keys (`experience[0].bullets[1]`), which a schema cannot enumerate; admitting both shapes in one schema is effectively unconstrained for the delta case while still forcing the provider down a slower constrained-decode path |
+| No schema; keep relying on the brace-scan | Leaves the parse-failure tail risk that ASSESSMENT §5 optimisation 3 exists to remove |
+| Validate the response against the schema client-side and reject on mismatch | Duplicates `validate_cv` and creates a second, weaker gate — exactly the "silent fallback" the roadmap's acceptance criteria forbid |

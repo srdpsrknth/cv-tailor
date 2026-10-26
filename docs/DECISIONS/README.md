@@ -16,6 +16,7 @@ Only the owner can move a decision to **Approved**.
 | [0009](0009-interfaces-and-archive.md) | Keep FastAPI + Streamlit; `applications/` read-only until Phase 2 | **Approved** |
 | [0010](0010-config-object.md) | One explicit `Config` object; no import-time environment reads | **Approved** — implemented |
 | [0011](0011-private-store-location.md) | Private store is a sibling repo; untrack real data, do not rewrite history | **Approved** — Phase 2 |
+| [0012](0012-structured-output-scope.md) | Structured output scoped per call; schema constrains the envelope, not the document body | **Approved** — Phase 3 increment 3 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1
@@ -27,6 +28,12 @@ owner at the start of Phase 2, before any code was written. It records three sep
 private store's location, migrating the real profile/applications/outputs out of the public repo,
 and the explicit decision **not** to rewrite history — so the data already published remains
 published until a history rewrite is separately approved.
+
+**Decision recorded 2026-10-26.** [0012](0012-structured-output-scope.md) was recorded during
+Phase 3 increment 3, because it decides *where* structured output applies and *how strict* the
+schema is. Both are expensive to change once a live evaluation depends on them, and the strictness
+choice is the one that separates this increment from the change D-1 removed for causing
+truncation.
 
 ## Owner's stated preferences (recorded verbatim in intent)
 

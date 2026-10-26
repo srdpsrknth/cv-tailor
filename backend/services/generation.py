@@ -657,6 +657,191 @@ def _merge_experience_unit(cv: TailoredCV, key: str, value) -> None:
 
 
 
+# --- structured output ------------------------------------------------------------------
+#
+# Where a schema is sent, and where it deliberately is not.
+#
+# Gemini's structured output constrains a response to a declared shape. It is a real gain --
+# the brace-scan in :func:`parse_json_response` stops being the failure path -- but the
+# original implementation was **deleted as dead code in Phase 1 (D-1)**, because
+# ``response_mime_type="application/json"`` *caused premature truncation of long document
+# responses*. That reason is still load-bearing, so this increment scopes structured output
+# instead of enabling it everywhere:
+#
+# * the **CV draft** and the **cover letter** always return one complete document, so they
+#   get a schema, and the schema is required;
+# * the **layout retry** is the one call whose response may be a *delta* -- an object of unit
+#   ids such as ``{"experience[0].bullets[1]": "..."}`` with no document key. A schema that
+#   requires ``cv`` cannot express that shape, so sending one there would break
+#   :func:`apply_cv_delta` or make the provider silently substitute a whole-document answer
+#   for the cheaper delta. That call therefore sends **no** schema.
+#
+# Why this is not merely a compromise: the anti-truncation property is designed into the
+# schema, not hoped for. Descriptions are deliberate -- they are what the provider shows the
+# model -- but ``additionalProperties`` is left unset and no field inside a document is
+# ``required``. Enumerating and requiring a ~1,350-token document's every field is what makes
+# a constrained response long and cut-off-prone, and a cut-off response is invalid JSON.
+# Constraining the *envelope* buys the parse guarantee this increment wants (the response is
+# an object carrying ``cv``/``cover_letter``, never prose or a bare array) while leaving the
+# document's own length and shape to the model.
+
+
+def _tailoring_explanation_schema():
+    """The explanation object, accepted in either position by :func:`extract_explanation`."""
+    from google.genai import types
+
+    return types.Schema(
+        type="OBJECT",
+        description="How the document was tailored. Optional; omit it if there is nothing to say.",
+        properties={
+            key: types.Schema(type="STRING")
+            for key in (
+                "summary_changes",
+                "bullet_modifications",
+                "skill_reordering",
+                "project_selection",
+                "overall_strategy",
+            )
+        },
+    )
+
+
+def _cv_document_schema():
+    """The CV body: properties described, nothing required.
+
+    ``summary`` is an array of strings, ``skills`` a map of category to skills, and
+    ``experience`` a list of roles with their own bullets and projects -- the shape
+    ``TailoredCV`` validates. Listing them keeps the contract meaningful; *not*
+    requiring them keeps the response short enough to finish.
+    """
+    from google.genai import types
+
+    return types.Schema(
+        type="OBJECT",
+        description="The tailored CV. Keep every employer, title and date from the profile.",
+        properties={
+            "title": types.Schema(type="STRING"),
+            "work_authorization": types.Schema(type="STRING", nullable=True),
+            "summary": types.Schema(type="ARRAY", items=types.Schema(type="STRING")),
+            "skills": types.Schema(
+                type="OBJECT",
+                additional_properties=types.Schema(
+                    type="ARRAY", items=types.Schema(type="STRING")
+                ),
+            ),
+            "experience": types.Schema(
+                type="ARRAY",
+                items=types.Schema(
+                    type="OBJECT",
+                    properties={
+                        "company": types.Schema(type="STRING"),
+                        "role": types.Schema(type="STRING"),
+                        "start_date": types.Schema(type="STRING"),
+                        "end_date": types.Schema(type="STRING"),
+                        "bullets": types.Schema(
+                            type="ARRAY", items=types.Schema(type="STRING")
+                        ),
+                        "projects": types.Schema(
+                            type="ARRAY",
+                            items=types.Schema(
+                                type="OBJECT",
+                                properties={
+                                    "name": types.Schema(type="STRING"),
+                                    "bullets": types.Schema(
+                                        type="ARRAY", items=types.Schema(type="STRING")
+                                    ),
+                                },
+                            ),
+                        ),
+                    },
+                ),
+            ),
+            "include_education": types.Schema(type="BOOLEAN"),
+            "include_certifications": types.Schema(type="BOOLEAN"),
+            # extract_explanation reads a nested explanation too, so it must stay legal
+            # here. Forbidding it would decide, on the model's behalf, which of the two
+            # shapes it may return -- the thing `extract_explanation` exists not to do.
+            "tailoring_explanation": _tailoring_explanation_schema(),
+        },
+    )
+
+
+def _cover_letter_document_schema():
+    from google.genai import types
+
+    return types.Schema(
+        type="OBJECT",
+        description="The tailored cover letter: four paragraphs, 290-310 body words.",
+        properties={
+            "role_title": types.Schema(type="STRING"),
+            "company_name": types.Schema(type="STRING"),
+            "paragraphs": types.Schema(type="ARRAY", items=types.Schema(type="STRING")),
+            "closing_line": types.Schema(type="STRING"),
+            "signature_name": types.Schema(type="STRING"),
+        },
+    )
+
+
+def _document_response_schema(envelope_key: str, document):
+    """Wrap one document in its envelope, requiring exactly that envelope key.
+
+    ``cv``/``cover_letter`` is the only required property. The prompt asks for
+    ``tailoring_explanation`` beside it, but the recorded fixtures show it is genuinely
+    optional in practice and :func:`extract_explanation` reads it defensively -- so
+    requiring it would turn a harmless omission into a failed run and a wasted call.
+    """
+    from google.genai import types
+
+    properties = {envelope_key: document}
+    if envelope_key == "cv":
+        properties["tailoring_explanation"] = _tailoring_explanation_schema()
+    return types.Schema(
+        type="OBJECT",
+        description=(
+            "A JSON object carrying the tailored document under "
+            f"{envelope_key!r}. No markdown, commentary or LaTeX."
+        ),
+        properties=properties,
+        required=[envelope_key],
+    )
+
+
+def _build_response_schemas() -> dict:
+    """Build the per-document schemas once, at import.
+
+    Building them here rather than per call keeps the cost off the generation path.
+    They are plain data describing a contract, not per-run state, so a module-level
+    mapping is correct -- this is deliberately *not* an environment read (ADR 0010).
+    """
+    return {
+        "cv": _document_response_schema("cv", _cv_document_schema()),
+        "cover_letter": _document_response_schema(
+            "cover_letter", _cover_letter_document_schema()
+        ),
+    }
+
+
+#: Response contract per document kind. A kind absent from this mapping is sent **no**
+#: schema: an unknown document type must not inherit the CV's constraints by accident.
+RESPONSE_SCHEMAS = _build_response_schemas()
+
+
+def response_schema_for(kind: Optional[str], allow_delta: bool = False):
+    """The schema for one call, or ``None`` to leave the response unconstrained.
+
+    ``allow_delta`` marks the layout retry, whose response may be a delta rather than a
+    document. That path is deliberately schema-free: see the module comment above
+    :data:`RESPONSE_SCHEMAS`.
+
+    Returning ``None`` means "no schema", and the caller must then also leave
+    ``response_mime_type`` unset -- JSON mode without a schema still changes the
+    response envelope, and this function's contract is about the whole config.
+    """
+    if allow_delta:
+        return None
+    return RESPONSE_SCHEMAS.get(kind or "")
+
+
 # --- the generation pipeline ----------------------------------------------------------
 
 @dataclass
@@ -721,6 +906,11 @@ class DocumentGenerator:
         exactly as it gates a draft. There is no branch that returns a document the gate
         has not seen, and no branch that quietly keeps ``base_cv`` when the model fails:
         a retry that cannot be applied is retried and then raises.
+
+        ``kind`` is also forwarded to the provider as the *response contract*: it selects
+        the structured-output schema. ``base_cv`` is what marks the one call that may
+        return a delta, and that call is sent no schema -- see
+        :func:`response_schema_for`.
         """
         last_error = ""
         previous = ""
@@ -731,7 +921,9 @@ class DocumentGenerator:
                 if last_error
                 else ""
             )
-            response, inputs, outputs = self.service._call_gemini(prompt + feedback)
+            response, inputs, outputs = self.service._call_gemini(
+                prompt + feedback, kind=kind, allow_delta=base_cv is not None,
+            )
             self.counts[kind].add(inputs, outputs)
             self.drafts.append({"component": kind, "response": response})
             try:
