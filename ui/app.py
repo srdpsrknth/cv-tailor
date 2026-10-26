@@ -234,29 +234,45 @@ if "generated" in st.session_state and st.session_state.generated:
 
         st.markdown("### Cost Calculation")
 
-        # Get pricing info (this should match backend PRICING dict)
-        model_name = token_usage.get('model_name', 'gemini-2.5-flash')
-        pricing_info = {
-            'gemini-3.8-flash': {'input': 0.75, 'output': 3.75},
-            'gemini-2.5-flash': {'input': 0.30, 'output': 2.50},
-            'gemini-2.5-flash-lite': {'input': 0.10, 'output': 0.40},
-            'gemini-1.5-flash': {'input': 0.075, 'output': 0.30},
-        }
+        # Pricing comes from the single source of truth (D-4). This block used to hold
+        # its own copy of the table, which had drifted: it still priced a model that
+        # Phase 1 retired, and showed the user a figure the backend would not agree
+        # with. It now reads the same module the backend prices with, so the breakdown
+        # below and `estimated_cost_usd` cannot disagree.
+        from services import pricing
 
-        pricing = pricing_info.get(model_name, {'input': 0.30, 'output': 2.50})
+        model_name = token_usage.get('model_name', 'gemini-2.5-flash')
+        provider = token_usage.get('provider') or pricing.DEFAULT_PROVIDER
 
         total_input = token_usage['cv_input_tokens'] + token_usage['cl_input_tokens']
         total_output = token_usage['cv_output_tokens'] + token_usage['cl_output_tokens']
 
-        input_cost = (total_input / 1_000_000) * pricing['input']
-        output_cost = (total_output / 1_000_000) * pricing['output']
+        # The per-call lines reuse the same function the backend charges with, so the
+        # long-context tier (D-3) is reflected here rather than assumed away.
+        input_cost = pricing.estimate_cost(total_input, 0, model_name, provider=provider)
+        output_cost = pricing.estimate_cost(0, total_output, model_name, provider=provider)
+        price = pricing.price_for(model_name, provider)
+        tier = pricing.describe_tier(total_input, model_name, provider=provider)
+        input_rate = price.input_long if tier == 'long-context' else price.input
+        output_rate = price.output_long if tier == 'long-context' else price.output
+
+        unpriced_note = (
+            ''
+            if pricing.is_priced(model_name, provider)
+            else (
+                f"\n\n⚠️ *{model_name} is not in the verified price table, so these "
+                f"figures fall back to {pricing.DEFAULT_MODEL}'s rates. Treat them as "
+                "an approximation.*"
+            )
+        )
 
         st.markdown(f"""
-        - **Input tokens:** {total_input:,} × ${pricing['input']}/1M = **${input_cost:.6f}**
-        - **Output tokens:** {total_output:,} × ${pricing['output']}/1M = **${output_cost:.6f}**
+        - **Input tokens:** {total_input:,} × ${input_rate}/1M = **${input_cost:.6f}**
+        - **Output tokens:** {total_output:,} × ${output_rate}/1M = **${output_cost:.6f}**
         - **Total cost:** **${token_usage['estimated_cost_usd']:.6f}**
 
-        💡 *All costs are in USD. Pricing is for {model_name} model.*
+        💡 *All costs are in USD. Pricing is for {model_name} via {provider} ({tier} tier).*
+        {unpriced_note}
         """)
 
     st.divider()

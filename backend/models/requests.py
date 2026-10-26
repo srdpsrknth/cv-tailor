@@ -32,6 +32,10 @@ class TokenUsage(BaseModel):
     cv_attempts: int = 1
     cl_attempts: int = 1
     model_name: str = "gemini-2.5-flash"
+    #: Which route the run was billed on. Part of the record because the same model
+    #: costs different amounts direct and through a gateway, so a model name alone
+    #: does not identify a price (D-3/D-4).
+    provider: Optional[str] = None
 
 
 class TailorResponse(BaseModel):

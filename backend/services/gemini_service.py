@@ -1,48 +1,39 @@
-"""
-Google Gemini API service for CV and cover letter tailoring.
-Handles API calls, token tracking, cost estimation, and error handling.
+"""Provider client for CV and cover letter tailoring.
+
+Historically this module was the Gemini integration *and* the pricing table. Since
+Phase 3 item 6 it is neither: the provider lives in :mod:`services.provider` and the
+prices live in :mod:`services.pricing`, which is the one source of truth (D-4). What
+remains here is the pipeline's client of whichever provider ``config`` selects, plus
+the run-level token and cost roll-up.
 """
 import os
 from typing import Optional, Tuple
 
 from config import DEFAULT_MODEL, Config
 from models.requests import TokenUsage
+from services import pricing
 from services.generation import response_schema_for
 from services.provider import ProviderError, build_provider
 
-# Re-exported for callers that only need the model name.
+# Re-exported for callers that only need the model name or the table.
 __all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL", "ProviderError"]
 
-# Pricing (per 1M tokens in USD), verified against ai.google.dev on 2026-10-23.
-# Free tier: 15 requests/min, 1.5M tokens/day
+#: Re-exported **view** of the single pricing table, for callers that still import it
+#: from here. It is a derived mapping, not a second table: it exposes the Gemini-route
+#: rows under their bare model names, which is the shape this module used to publish.
+#: ``ui/app.py`` no longer reads it (that duplication was D-4); this exists so the
+#: load-bearing invariants in ``tests/test_tailoring_pipeline.py`` -- that
+#: ``DEFAULT_MODEL`` is priced, and that no retired row is -- keep being asserted
+#: against something real.
 PRICING = {
-    # Introductory pricing through December 31, 2026; then $1.50 / $7.50.
-    "gemini-3.8-flash": {
-        "input": 0.75,
-        "output": 3.75,
-    },
-    # --- GEMINI 3 SERIES ---
-    # gemini-3-pro-preview was shut down and has been removed rather than mispriced.
-    "gemini-3-flash-preview": {
-        "input": 0.50,       # $0.50 / 1M
-        "output": 3.00,      # $3.00 / 1M
-    },
-
-    # --- GEMINI 2.5 SERIES: Stable production models ---
-    "gemini-2.5-pro": {
-        "input": 1.25,       # $1.25 / 1M (<= 200k context)
-        "input_long": 2.50,  # $2.50 / 1M (> 200k context)
-        "output": 10.00,     # $10.00 / 1M
-        "output_long": 15.00 # $15.00 / 1M
-    },
-    "gemini-2.5-flash": {
-        "input": 0.30,       # $0.30 / 1M
-        "output": 2.50,      # $2.50 / 1M
-    },
-    "gemini-2.5-flash-lite": {
-        "input": 0.10,       # $0.10 / 1M
-        "output": 0.40,      # $0.40 / 1M
-    },
+    model: {
+        "input": price.input,
+        "output": price.output,
+        **({"input_long": price.input_long} if price.input_long is not None else {}),
+        **({"output_long": price.output_long} if price.output_long is not None else {}),
+    }
+    for (provider, model), price in pricing.PRICING.items()
+    if provider == pricing.DEFAULT_PROVIDER
 }
 
 
@@ -119,16 +110,18 @@ class GeminiService:
         Returns:
             Cost in USD
         """
-        # An unlisted model must still be priced without crashing. Fall back to the
-        # configured default's rates rather than to a removed legacy model.
-        pricing = PRICING.get(model or self.model, PRICING[DEFAULT_MODEL])
-
-        # Calculate cost per million tokens
-        input_cost = (input_tokens / 1_000_000) * pricing["input"]
-        output_cost = (output_tokens / 1_000_000) * pricing["output"]
-        total_usd = input_cost + output_cost
-
-        return total_usd
+        # Long-context tiers are applied to the tokens rather than to a flat total
+        # (D-3), and the route is part of the price because the same model costs
+        # different amounts direct and through OpenRouter. See services.pricing.
+        #
+        # ``getattr`` for the route: a service constructed without a config (the
+        # "unlisted model must still be priced" invariant a test pins) has no route,
+        # and the default route is the correct reading of "not specified".
+        config = getattr(self, "config", None)
+        provider = getattr(config, "provider", None) or pricing.DEFAULT_PROVIDER
+        return pricing.estimate_cost(
+            input_tokens, output_tokens, model or self.model, provider=provider,
+        )
 
     def _call_gemini(
         self,
@@ -258,5 +251,9 @@ class GeminiService:
             estimated_cost_usd=round(cost_usd, 6),
             cv_attempts=cv_attempts,
             cl_attempts=cl_attempts,
-            model_name=self.model
+            model_name=self.model,
+            provider=(
+                getattr(getattr(self, "config", None), "provider", None)
+                or pricing.DEFAULT_PROVIDER
+            ),
         )
