@@ -11,6 +11,14 @@ class TailorRequest(BaseModel):
     company_name: Optional[str] = Field(None, description="Company name (optional)")
     role_title: Optional[str] = Field(None, description="Role title (optional)")
     work_country: Optional[str] = Field(None, max_length=100, description="Actual country of employment, not company headquarters")
+    profile_id: Optional[str] = Field(
+        None,
+        description=(
+            "Which candidate to tailor for. Optional here only because it may come "
+            "from CVTAILOR_PROFILE_ID instead; there is no default profile and the "
+            "request fails closed when neither is set (ADR 0003)."
+        ),
+    )
 
 
 class TokenUsage(BaseModel):

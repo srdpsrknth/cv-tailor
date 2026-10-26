@@ -11,13 +11,21 @@ from models.profile import Profile
 def load_profile(profile_path: Optional[str] = None) -> Profile:
     """
     Load and validate profile from YAML file.
-    
+
+    This loads a file the caller named. It is *not* how a profile is chosen:
+    candidate identity is resolved through :class:`~services.profile_store.ProfileStore`
+    with an explicit ``profile_id``, which fails closed (ADR 0003). The no-argument
+    form below exists only for the pre-store layout and is retained so a migration
+    can still read the old location; new callers must pass a path or go through the
+    store. Prefer ``Config.load_profile()``.
+
     Args:
-        profile_path: Path to profile.yaml (defaults to storage/profile/profile.yaml)
-        
+        profile_path: Path to a profile.yaml. When omitted, the pre-Phase-2 default
+            ``storage/profile/profile.yaml`` is assumed.
+
     Returns:
         Validated Profile object
-        
+
     Raises:
         FileNotFoundError: If profile file doesn't exist
         ValueError: If profile validation fails

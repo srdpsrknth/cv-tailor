@@ -28,14 +28,6 @@ DEFAULT_MODEL = "gemini-3.8-flash"
 #: sibling directory outside the repository; this keeps a bare checkout working).
 DEFAULT_STORE_DIRNAME = "storage"
 
-#: Retained for the single-profile layout of Phase 1: the pre-store location of the
-#: authoritative profile. Only used to *find* a profile to migrate, never to load one
-#: implicitly -- ``profile_id`` is required (ADR 0003).
-LEGACY_PROFILE_PATH = PROJECT_ROOT / "storage" / "profile" / "profile.yaml"
-
-#: Alias kept so Phase 1 callers and tests that referenced the old name still resolve.
-DEFAULT_PROFILE_PATH = LEGACY_PROFILE_PATH
-
 
 @dataclass(frozen=True)
 class Config:
