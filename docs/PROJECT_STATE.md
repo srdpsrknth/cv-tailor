@@ -3,20 +3,16 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `8310e91` — *fix: keep the generation cache out of the repository* (Phase 3 item 5)
+**Latest commit:** `00fd229` — *feat: price OpenRouter runs from the provider's own charge*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 3 — LLM and document-generation improvements. Items 4, 2, 1, 3, 6's OFFLINE GROUNDWORK and now 5 are done.**
-
-Phase 3's scope is deliberately split across several chats. The agreed order is
-**4 → 2 → 1 → 3**, then **6**, and **5** only once 1–4 have settled. Do not
-combine two of these items in one commit: each changes the LLM call-count baseline the
-others are verified against, so mixing them makes an intended change indistinguishable
-from a regression.
+**Phase 3 — the budgeted live evaluation run.** Items 4, 2, 1, 3 and 5 are done; item 6's
+offline groundwork is done, and its **slate and cost accounting were reworked on
+2026-10-26 at the owner's instruction**. The live run is still the only outstanding work.
 
 | Item | State |
 |---|---|
@@ -24,11 +20,108 @@ from a regression.
 | **2. Remove or merge the editorial-review pass** | **DONE** (`7c0d58a`) |
 | **1. Targeted layout retry instead of full regeneration** | **DONE** (`9a45811`) |
 | **3. Enable structured output (`response_schema`)** | **DONE** (`2e528e1` → `85879b5`); see ADR 0012 |
-| **6. Provider interface, model routing, budget caps, and the curated model set** | **OFFLINE GROUNDWORK DONE** (`372a7bf`, `3cc8da5`, `215ba08`) — **the budgeted live run has NOT been made**; see below |
-| **5. Cache validated results** | **DONE** (2026-10-26); see [ADR 0015](DECISIONS/0015-generation-cache.md) |
+| **6. Provider interface, model routing, budget caps, and the curated model set** | Groundwork **DONE**; slate + cost accounting **reworked 2026-10-26** (`00fd229`). **The budgeted live run has NOT been made** |
+| **5. Cache validated results** | **DONE** (`2230c86` → `8310e91`); see ADR 0015 |
 
-**Phase 3 has one piece of work left, and it is not code: item 6's budgeted live evaluation
-run.** Everything else in the agreed order is committed and green.
+### 2026-10-26 (latest) — the slate, the cost source, and the cache (two commits)
+
+**`6d5fa58` — the evaluation no longer reads or writes the generation cache.** `live.py`
+drives the real pipeline with a loose `profile_path` and did not pass `use_cache`, so a
+paid run shared `<store>/cache/<profile_id>/` with the user's own runs. A cache **hit**
+makes no call and reports **zero** usage, so it scored as an *accepted* case costing
+**$0.00** — which `metrics.rank` sorts to the **top**. The corruption would have looked
+like the best finding in the table. Two tests guard it; the first asserts `use_cache is
+False` on the call the suite actually makes and was verified to **fail** against the
+unfixed code. The store held no `cache/` directory, so no stale entry was lurking — the
+fix is structural, not a cleanup.
+
+**`00fd229` — the cost figure is the provider's own, and the slate was replaced.**
+
+1. **OpenRouter's `usage.cost` is now authoritative.** It is returned automatically with
+   every response and needs **no** request parameter (their docs: the old `usage.include`
+   opt-in is deprecated and "has no effect"), so nothing about the request changed. This
+   is not merely more accurate: the table prices a **route**, while OpenRouter bills per
+   **request** depending on which upstream provider served it. `_record_spend` prefers
+   it; `calculate_token_usage` no longer re-prices the run's totals from the table.
+   `None` means "estimate it" and is deliberately distinct from `0.0`, which means "this
+   cost nothing".
+2. **Gemini's thinking tokens are now counted.** They are billed as output but excluded
+   from `candidates_token_count`. `GeminiProvider` turns thinking on for
+   `gemini-3.8-flash` — the model this project ships — so its output tokens and cost were
+   under-reported. **A separate defect, found while answering the owner's question about
+   Gemini pricing, and fixed on its own merits.**
+3. **The curated set is 8 models across 7 families, nothing older than 2025-10.** The
+   owner rejected the first draft — *"three google models, one claude and one deepseek -
+   which is fine but not much variety"* — and added a rule: *"i dont want to use VERY old
+   models either. i want models from oct 2025 onwards only."* Both rules are enforced by
+   tests, not documented as intentions.
+
+**The static table is retained for exactly two jobs and no third:** pricing the
+**projection** (ADR 0014 requires an over-budget plan be refused *before* any call, when
+nothing has been reported yet), and pricing **Gemini**, which reports no cost at all —
+verified: `usage_metadata` carries token counts only, and Google's own response to a
+long-standing SDK request for cost was to link the pricing page. `PRICE_MAX_AGE_DAYS`
+(62) encodes the owner's "re-verify if older than 2 months" rule; the dry run — the screen
+a spend is approved from — now warns when the table is stale, and the guard **fails
+towards stale**.
+
+**Two candidates were rejected on measured evidence**, and both would have looked like
+good value on a capability ranking. `minimax-m3.1-flash` scores 42.7 on the AA
+Intelligence Index but reports a **93% hallucination rate** — when it does not know, it
+answers anyway — which is disqualifying for a tool whose hardest rule is "do not invent
+an achievement". `gemini-2.5-flash-lite` is the cheapest thing clearing the capability
+screen and is simply too old to keep.
+
+**What the research could and could not support**, recorded because the set is presented
+as curated. Prices, ids, creation dates and the `structured_outputs` flag came from
+OpenRouter's live listing (467 models; 189 met every structural requirement). The flag is
+**weaker than it looks and this was verified**: the payload carries **no per-endpoint
+field**, while OpenRouter's docs say strict enforcement "is not guaranteed on every
+endpoint". **No benchmark measures CV prose**, so IFBench (constraint-following) and
+AA-Omniscience's hallucination rate were used only to narrow the field — which is all
+they can support, and the leaderboards consulted warn their rank predicts deployment only
+weakly.
+
+**Tests: 480 → 500 passed** (~116 s), fully offline, no paid calls; fast lane 450 → 470.
+**Seven of the new provider tests were verified to fail** against the pre-change code in
+a throwaway worktree at `6d5fa58`. Call counts unchanged at 2/3/5.
+
+### The live run, and what it still owes (updated 2026-10-26)
+
+**8 models, 3 cases, projected at $1.6467 against the owner's $5 cap.**
+
+```
+deepseek/deepseek-v4-flash    $0.0299      z-ai/glm-5.3-flash          $0.0591
+anthropic/claude-haiku-5.5    $0.0475      mistralai/mistral-small-2603 $0.0639
+openai/gpt-6-luna             $0.0475      google/gemini-3.8-flash     $0.3917
+qwen/qwen3.8-flash            $0.0576      anthropic/claude-sonnet-5   $0.9495
+```
+
+`google/gemini-3.8-flash` is kept deliberately as the **control**: it is the model this
+project actually ships, so every other entry is measured against something real rather
+than against a leaderboard.
+
+**Blockers and open items before the run can happen:**
+
+1. **No OpenRouter key in this worktree's `.env`.** Verified 2026-10-26:
+   `OPENROUTER_API_KEY` is absent (`GEMINI_API_KEY` is present as the documented
+   placeholder). A real key must be added to `D:\coding\cv-tailor-next\.env` **by the
+   owner** — it is gitignored, and must never be pasted into a chat, echoed, logged or
+   committed. The key *is* present in the DSH credential store, which is a different
+   store and is not read by `Config.from_env()`.
+2. **The owner has not yet authorised the paid run.** The $5 cap is agreed; the spend is
+   not. Do not run `--live` without an explicit, in-conversation yes.
+3. **The owner will judge writing quality, PDF quality and layout quality themselves**
+   before any ranking is marked final. The run must therefore leave readable artefacts.
+   **`evaluation/` measures none of those three** — it records `cv_page_count` and
+   nothing else about rendering, so no layout verdict may be inferred from it.
+4. **The owner wants a skill that re-runs this curation when new models arrive**, so the
+   set can be refreshed without repeating this session's manual research. Not started;
+   clarifying questions are owed first.
+
+**Commit `00fd229` is local only.** The owner asked for local commits to review, with a
+separate approval before any push. Nothing has been pushed.
+
 
 ### Phase 3, item 5 — cache validated results (2026-10-26)
 

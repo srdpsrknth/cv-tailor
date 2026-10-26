@@ -124,9 +124,24 @@ profile block that was sent.
 - **Half the item's value is only realised when the profile and posting are truly
   identical.** A user who edits the profile, changes the country, or switches model
   gets a fresh draft by design — that is the invalidation contract, not a cache miss.
-- **The evaluation suite and this cache do not interact.** `evaluation/` builds its
-  own provider path and does not go through `tailor_documents`, so a live run cannot
-  be served from the cache and cannot populate it.
+- **The evaluation suite bypasses this cache, and that is asserted rather than
+  assumed.** `evaluation/live.py` drives the *real* pipeline
+  (`tailor_service.tailor_documents`) with a loose `profile_path`, and that function
+  defaults to `use_cache=True`, so a paid run would read and write the same
+  `<store>/cache/<profile_id>/` the user's own runs use. A hit makes no call, reports
+  **zero** usage, and therefore scores as an accepted case costing **$0.00** — which
+  `metrics.rank` sorts to the top, so the corruption would look like a finding rather
+  than an error. `evaluation/live.py` now passes `use_cache=False` explicitly, and two
+  tests guard it (2026-10-26). The 3×8 grid's pairs all have distinct keys, so only a
+  *repeat* of a pair is exposed — which is exactly the run being paid for.
+
+  > **Correction.** An earlier revision of this record stated that "the evaluation
+  > suite and this cache do not interact" and that a live run "cannot be served from
+  > the cache and cannot populate it". **That was wrong** when it was written and is
+  > wrong now: the suite drives the real pipeline, so it does both unless it opts out.
+  > The error came from reading `evaluation/` in isolation rather than following the
+  > call into `tailor_service`. It is recorded here rather than silently edited
+  > because the same misreading would otherwise be made again.
 
 ## Alternatives considered
 

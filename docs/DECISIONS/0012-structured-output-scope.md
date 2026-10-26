@@ -80,6 +80,28 @@ the path it always was.
   provider handles a strict body schema without truncation on real documents, the body
   constraints can be tightened then. That is a measured decision, not a guess, and it
   belongs with benchmarking.
+- **What the second provider adds to this question, recorded 2026-10-26.** OpenRouter's
+  own documentation states that `strict: true` enforcement "varies by provider: some
+  guarantee schema-conforming output, while others translate your schema into their own
+  structured-output format or **treat it as a strong hint**, so exact compliance is not
+  guaranteed on every endpoint", and that support is "determined per endpoint, not just
+  per model". The catalogue payload carries **no per-endpoint field** — this was
+  verified directly — so a model-level `structured_outputs` flag cannot distinguish
+  native enforcement from translation. Two consequences for this record:
+  1. **The scoping decision stands and is more clearly right than before.** Because
+     compliance cannot be assumed, the schema must never be the only thing standing
+     between the model and a malformed document. It is not: `parse_json_response` and
+     `validate_cv` are unchanged, and `require_parameters: true` is sent on
+     schema-bearing calls so the request is not routed to an endpoint that would ignore
+     the parameter entirely.
+  2. **"Did it truncate?" is a per-provider question, not one question.** A clean
+     result through OpenRouter does not license tightening the body constraints for
+     every endpoint behind it, because the endpoint that served the request is one of
+     several. Any tightening decision must name the provider **and** the endpoint it
+     was measured on, or it is a guess wearing a measurement's clothes.
+
+  **This remains UNVERIFIED.** No paid call has been made, and the paragraph above is
+  documentation evidence about what *may* happen, not an observation of what did.
 - **`kind` is per call, not per service**, so the schema cannot drift from what is being
   asked for; `_call_gemini`'s signature grew two keyword arguments with defaults that
   preserve the previous behaviour for any caller that passes neither.
