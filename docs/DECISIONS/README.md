@@ -19,6 +19,7 @@ Only the owner can move a decision to **Approved**.
 | [0012](0012-structured-output-scope.md) | Structured output scoped per call; schema constrains the envelope, not the document body | **Approved** — Phase 3 increment 3 |
 | [0013](0013-provider-interface-and-routing.md) | Thin provider interface; Gemini default, OpenRouter second; model-per-task routing; optional budget cap | **Approved** — Phase 3 item 6 |
 | [0014](0014-evaluation-suite-and-curation.md) | The live evaluation suite stays opt-in and budget-capped; curation is a shortlist until measured | **Approved** — Phase 3 item 6 |
+| [0015](0015-generation-cache.md) | Cache validated generations, keyed by the bytes the model was shown; only a validated result is stored, and the store is always safe to delete | **Approved** — Phase 3 item 5 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1
@@ -44,10 +45,22 @@ provider as such; that there is **no** fallback between providers or models; and
 failure is not a `ValueError`, because the correction loop catches `ValueError`.
 [0014](0014-evaluation-suite-and-curation.md) records that the live evaluation stays opt-in,
 budget-capped and out of CI, and — the part that matters most — that **the curated set's quality
+regardless of reputation — and that **the curated set's quality
 ranking is unmeasured and is marked as such**, rather than inferred from price, reputation or a
 general leaderboard. Both were written during implementation because the alternatives are either
 unsafe (a silent provider fallback) or dishonest (a ranking presented as researched when it was
 assumed).
+
+**Decision recorded 2026-10-26 (Phase 3 item 5).** [0015](0015-generation-cache.md) records that
+the generation cache is keyed by **the bytes the model was shown** — the serialized profile, the
+posting plus company/role/country, both prompt files, the schema, the provider and both routed
+models — and not by a `job_id` or a timestamp. Three parts are hard to reverse: that only a
+**validated** result is ever stored (an entry written before the gate would make a retry loop's
+failure into a permanent answer); that the key includes the **prompt files themselves**, read and
+hashed per call, so a prompt edit cannot serve a stale document even if nobody bumps a constant;
+and that the store is **derived data whose deletion is always safe**, so every read failure is a
+miss rather than an error. `model` is two ingredients rather than one because item 6's
+per-task routing lets two models serve one posting.
 
 ## Owner's stated preferences (recorded verbatim in intent)
 

@@ -91,6 +91,7 @@ def tailor(req: TailorRequest):
             work_country=req.work_country,
             config=config,
             profile_id=profile_id,
+            use_cache=req.use_cache,
         )
         return result
 

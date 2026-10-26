@@ -98,6 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--company", help="Company name (otherwise inferred).")
     generate.add_argument("--role", help="Role title (otherwise inferred).")
     generate.add_argument("--country", help="Actual country of employment.")
+    generate.add_argument("--no-cache", action="store_true",
+                          help="Re-draft even if an identical validated generation is stored.")
     generate.add_argument("--yes", action="store_true", help="Skip confirmations.")
 
     # --- render -----------------------------------------------------------------------

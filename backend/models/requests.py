@@ -19,6 +19,14 @@ class TailorRequest(BaseModel):
             "request fails closed when neither is set (ADR 0003)."
         ),
     )
+    use_cache: bool = Field(
+        True,
+        description=(
+            "Reuse a stored validated generation for the identical profile, posting, "
+            "prompts, schema and model (Phase 3 item 5). Set false to force a fresh "
+            "draft; the fresh result is still stored."
+        ),
+    )
 
 
 class TokenUsage(BaseModel):

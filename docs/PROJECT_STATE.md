@@ -3,14 +3,14 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `215ba08` — *feat: add the evaluation suite and a curated OpenRouter shortlist* (Phase 3 item 6, increment C)
+**Latest commit:** `def7fe0` — *docs: define item 5 and retire the discharged item 6 briefing* (item 5's code follows in this increment)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 3 — LLM and document-generation improvements. Items 4, 2, 1, 3 and 6's OFFLINE GROUNDWORK are done.**
+**Phase 3 — LLM and document-generation improvements. Items 4, 2, 1, 3, 6's OFFLINE GROUNDWORK and now 5 are done.**
 
 Phase 3's scope is deliberately split across several chats. The agreed order is
 **4 → 2 → 1 → 3**, then **6**, and **5** only once 1–4 have settled. Do not
@@ -25,7 +25,109 @@ from a regression.
 | **1. Targeted layout retry instead of full regeneration** | **DONE** (`9a45811`) |
 | **3. Enable structured output (`response_schema`)** | **DONE** (`2e528e1` → `85879b5`); see ADR 0012 |
 | **6. Provider interface, model routing, budget caps, and the curated model set** | **OFFLINE GROUNDWORK DONE** (`372a7bf`, `3cc8da5`, `215ba08`) — **the budgeted live run has NOT been made**; see below |
-| **5. Cache validated results** | **NEXT IN THE AGREED ORDER** — items 1–4 have now settled, so this is unblocked |
+| **5. Cache validated results** | **DONE** (2026-10-26); see [ADR 0015](DECISIONS/0015-generation-cache.md) |
+
+**Phase 3 has one piece of work left, and it is not code: item 6's budgeted live evaluation
+run.** Everything else in the agreed order is committed and green.
+
+### Phase 3, item 5 — cache validated results (2026-10-26)
+
+**What changed.** One profile against one posting re-drafted both documents from scratch and paid
+for them again. It now stores a **validated** generation under
+`<store>/cache/<profile_id>/generations/<key>.json` and serves an identical request from disk.
+
+| Commit | What it did |
+|---|---|
+| *(this increment)* | `services/cache_store.py`: the key, the entry and the store; the pipeline reads before its first call and writes after the page-count gate; `--no-cache` and the API's `use_cache` bypass. [ADR 0015](DECISIONS/0015-generation-cache.md) |
+
+**The key is the bytes the model was shown, and that is enforced structurally rather than by
+convention.** `cache_store.serialize_profile_bytes(profile)` produces one string, and that same
+string is both emitted into the prompt context *and* hashed into the key. Two derivations could
+drift, and a drift would mean hashing something the model was never shown. The full ingredient
+list is: `format_version`, the profile bytes, the job description, company/role/country, **both
+prompt files byte-for-byte**, a `PROMPT_VERSION` digest of the CV prompt file, the
+response-schema digest, the provider, the CV model, the cover-letter model, and a digest of the
+resolved `rules`.
+
+**The prompt files are read and hashed per call, not tracked by a version constant.** That is
+deliberate and it is the whole risk the roadmap names: a hand-maintained constant is one more
+thing a prompt edit can forget to bump, and the failure is silent — the user gets a document
+drafted under rules that no longer exist. Reading the file makes "a prompt change must not serve
+a stale document" true by construction. `model` is **two** ingredients (`model_cv`, `model_cl`)
+rather than one, because item 6 added per-task routing and two models can serve one posting.
+
+**`job_id` and timestamps are deliberately absent from the key.** `make_job_id` embeds
+`time.time_ns() // 1_000_000`, so keying on it would miss every single time by construction —
+the cache would be write-only. A test asserts this behaviourally: the same inputs, evaluated with
+the clock advanced, produce the same key.
+
+**Only a validated result may be cached, and the write happens in exactly one place.** The entry
+is written after the page-count gate has passed, so a draft that failed the gate cannot become a
+permanent answer. Asserted by counting entries **during** rendering — a renderer that inspects the
+cache records zero entries — so a write moved earlier in the function would be caught rather than
+merely absent.
+
+**A stored document is re-validated on read, through the same gate.** The cache is a plain JSON
+file a person can edit or truncate, so "it was validated when it was stored" is a claim about the
+past, not about these bytes. `DocumentGenerator.restore` runs the stored documents through the
+same `_build_model` a fresh draft goes through — at **no API cost** — and a stored document that
+no longer validates (because the profile changed, or the file was hand-edited) is treated as a
+miss and regenerated. The read path never writes: a bad entry is not deleted, it is simply not
+used, and the next generation overwrites it.
+
+**Every read failure is a miss, never an error.** Missing, empty, malformed, truncated,
+wrong-format-version, no-longer-validating and wrong-shape entries all degrade to "generate it
+again", because a cache that can break a run that would otherwise have succeeded is worse than no
+cache. Deleting `<store>/cache/` costs a regeneration and nothing else — there is no document that
+exists only in the cache, because every entry was written from an application that was already
+persisted.
+
+**A hit reports zero usage, and that is the honest number.** Replaying the original run's token
+totals would put a cost on a run that made no call, on the one path where the saving is the entire
+point. The original figures are not lost: they are preserved in the same file as `original_usage`.
+A hit still writes a **complete job folder**, including the restored raw responses as
+`drafts.json`, because the cache replaces the generation and not the persistence — the user asked
+for an application and gets one, with the same audit trail.
+
+**Call counts are UNCHANGED at 2/3/5 on a cold cache** (min/typical/max-successful), 12 worst.
+This is stated explicitly because the item's scope required it: item 5 adds a lookup **before** the
+first call and a write **after** the last one, and adds no request. On a **hit** the count is
+**0**, which is the item's whole point. `tests/test_editorial_instructions.py` still pins 2/3/5 and
+still passes unchanged.
+
+**The cache is derived data in the private store** (ADR 0011), at `<store>/cache/<profile_id>/` —
+a sibling of `outputs/`, never inside it, because anything listing a candidate's applications must
+not start returning cache entries. `ProfileStore.cache_dir` mirrors `outputs_dir` and validates
+the id, so two candidates cannot read each other's entries (ADR 0003).
+
+**What is deliberately NOT built, and is a real open follow-up: there is no eviction policy.**
+Nothing prunes entries, so the directory grows by one small JSON file per distinct generation. For
+a single-user tool where the whole directory is documented as safe to delete, that is acceptable —
+but it is a follow-up rather than a solved problem, and [ADR 0015](DECISIONS/0015-generation-cache.md)
+records it as such.
+
+**Half the saving only appears when the inputs are truly identical, and that is by design.** A
+user who edits the profile, changes the country, switches model or edits a prompt gets a fresh
+draft. That is the invalidation contract the item asked for, not a miss to be optimised away.
+
+**Tests: 436 → 478 passed** (~116 s), fully offline, no paid calls. Fast lane 406 → **448 passed**
+(~13 s). New file `tests/test_generation_cache.py` (42 tests). Verified against a throwaway
+`git worktree` at `def7fe0` (not by stashing): the file's defensive import **fails** there
+(`services.cache_store could not be imported`), which is the correct outcome for a brand-new
+module; with that one guard neutralised and nothing else changed, **37 of the 42 fail**. The 5 that
+pass there are named rather than glossed over — two assert *that a fresh call happens*, which is
+also what code with no cache does, and three assert that a second ordinary run reproduces the
+first's documents, which is trivially true when there is no cache to differ from.
+
+**One existing test was modified, and the reason is worth recording.**
+`test_layout_retry.py::test_a_delta_that_breaks_a_profile_rule_is_rejected` runs the same profile
+against the same posting twice — once with an accepted delta and once with a forbidden one. Those
+two runs share a cache key, so the second was being served from the first's entry and the rejection
+it asserts never executed. It now passes `use_cache=False` on the second run. **No assertion
+changed.** That is a genuine finding: it is the first case in the suite where two runs are
+deliberately identical, and item 5 is precisely about identical runs no longer being independent.
+
+**Do not re-open increments 4, 2, 1 or 3, and do not re-open item 6's groundwork.** None was touched.
 
 ### Phase 3, item 6 — what was built, and the one thing still owed (2026-10-26)
 
@@ -167,7 +269,8 @@ brand-new module should import it defensively and **fail** (not skip) when absen
 import in the real tree cannot hide behind a skip.
 
 **Also open, deliberately not in item 6's scope:** D-13, D-14, D-15, A-6 (date validation), A-7,
-and blocker 8. **Item 5 (caching) is next in the agreed order** and is now unblocked.
+and blocker 8. ~~**Item 5 (caching) is next in the agreed order**~~ — **DONE 2026-10-26**; see the
+item 5 section at the top of this file.
 
 ### Phase 3, increment 3 — enable structured output, scoped (2026-10-26)
 
@@ -360,7 +463,7 @@ pytest. A test file importing a brand-new module should import it defensively an
 skip) when it is absent, so a broken import in the real tree cannot hide behind a skip.
 
 **Also open, deliberately not in item 6's scope:** D-13, D-14, D-15, A-6 (date validation),
-A-7, and blocker 8. **Item 5 (caching) is next** — items 1–4 have settled, so it is unblocked.
+A-7, and blocker 8. ~~**Item 5 (caching) is next**~~ — **DONE 2026-10-26**.
 
 ### Phase 3, increment 1 — targeted layout retry instead of full regeneration (2026-10-26)
 
@@ -709,12 +812,13 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 33 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 items 4, 2, 1, 3 and item 6's offline groundwork done |
+| Dev branch | 34 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 items 4, 2, 1, 3, 5 and item 6's offline groundwork done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **436 passed** (~115 s); fast lane `-m "not requires_latex"` → 406 passed (~12 s) |
-| CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
+| Test baseline | **478 passed** (~116 s); fast lane `-m "not requires_latex"` → 448 passed (~13 s) |
+| CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate` (with `--no-cache`), `render`, `doctor` |
 | Providers | **Gemini (default) and OpenRouter**, behind one `generate(...)` contract; model-per-task routing; optional `CVTAILOR_MAX_COST_USD` cap |
 | Pricing | **One source of truth** — `services/pricing.py`, route- and tier-aware (D-3, D-4 resolved) |
+| Generation cache | **Live** — a validated generation is stored under `<store>/cache/<profile_id>/`; an identical repeat costs **0** LLM calls. Derived data, safe to delete, **no eviction policy** |
 | Evaluation suite | **Exists, offline by default, never in CI; has NOT been run.** Whole curated run projected at **$1.68** against a **$5** cap |
 | Curated models | **5 offered** (economy/balanced/frontier), all **UNMEASURED** — quality ranking awaits the live run |
 | HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
@@ -724,13 +828,13 @@ Re-confirm each decision when its phase begins.
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md); D-3 and D-4 now resolved |
 | Decisions | **14 approved**; **ADR 0013** (provider interface, routing, caps) and **ADR 0014** (evaluation suite, curation) are new |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (items 4, 2, 1, 3 and 6's offline groundwork done); next is Phase 3 **item 5** — cache validated results |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 items 4, 2, 1, 3, 5 and 6's offline groundwork done**. The **only** Phase 3 work left is item 6's budgeted live evaluation run, which needs owner authorisation rather than code |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **436 passed**, 1 warning (~115 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **406 passed**,
-  30 deselected (~12 s).
+- `.venv\Scripts\python.exe -m pytest -q` → **478 passed**, 1 warning (~116 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **448 passed**,
+  30 deselected (~13 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite. **No paid
   call has ever been made in this repository.**
 - **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
@@ -742,7 +846,10 @@ Re-confirm each decision when its phase begins.
   deliberately replaced), 324 → **351** in increment 3 of the agreed order (one new
   file, **no existing test modified**), 351 → **390** in item 6 increment A (one new file,
   plus one monkeypatch-seam update in `test_structured_output.py` with no assertion changed),
-  390 → **407** in increment B (one new file), and 407 → **436** in increment C (one new file).
+  390 → **407** in increment B (one new file), and 407 → **436** in increment C (one new file),
+  and 436 → **478** in Phase 3 item 5 (one new file, plus the one existing test recorded in
+  that item's section — the first time an existing test was edited *because the cache made two
+  identical runs non-independent*, not because behaviour was being pinned).
   In Phase 2,
   four *path assertions* across three pre-existing tests were updated because the output layout
   itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
@@ -771,13 +878,21 @@ Re-confirm each decision when its phase begins.
   curated set are new code with no predecessor, so there is no old behaviour to fail against.
   The file guards the new code's *properties* (offline by default, cap fails closed, out of CI,
   unmeasured markers, rates match the listing) rather than diffing behaviour.
+- `tests/test_generation_cache.py` (Phase 3 item 5): **37 of its 42 tests fail against `def7fe0`**
+  once its own defensive import guard is neutralised, verified in a throwaway worktree. The file
+  imports `services.cache_store` defensively and **fails** (not skips) when it is absent, so
+  against `def7fe0` it errors at collection — the correct outcome for a new module, stated rather
+  than hidden.
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
 - LLM calls per application: **2 min / 3 typical / 5 max-successful / 12 worst** (was 3/4/6/18
-  before increment 2). **Unchanged by increments 1 and 3 of the agreed order**, and **unchanged
-  by all three of item 6's increments** — the provider interface adds routing, the pricing fix
-  adds no request, and the evaluation suite is not in the pipeline.
+  before increment 2). **Unchanged by increments 1 and 3 of the agreed order**, **unchanged
+  by all three of item 6's increments**, and **unchanged by item 5 on a cold cache** — the
+  provider interface adds routing, the pricing fix adds no request, the evaluation suite is not
+  in the pipeline, and the cache adds a lookup and a write rather than a request.
+- LLM calls on a **cache hit**: **0** (item 5). A hit also reports **zero** tokens and $0.00,
+  rather than replaying the original run's totals; the originals are kept as `original_usage`.
 - Estimated cost per application (`gemini-3.8-flash`): **$0.016 / $0.026 / $0.048**. Re-derived
   on 2026-10-26 under the new tiered, route-aware accounting: $0.01559 / $0.026482 / $0.048265 —
   **identical**, because `gemini-3.8-flash` has no long-context tier and its prompts are ~6.4k
@@ -980,8 +1095,39 @@ Re-confirm each decision when its phase begins.
 - **A tool named in `rules.banned_tools` must not count as evidence the candidate used it.**
   The check serializes the profile with the `rules` block excluded; without that, declaring a
   tool banned would silently un-ban it.
-- `outputs/2026_adjoe_senior_data_analyst_1769343142/` has **no `source/content.json`** — the
-  D-14 partial-folder case. Do not assume `outputs/*/source/` exists.
+- **The generation cache's key is the bytes the model was shown, and it is derived from one
+  string.** `cache_store.serialize_profile_bytes(profile)` produces the profile bytes; that same
+  string is emitted into the prompt context **and** hashed into the key. Do not "simplify" this
+  into two derivations — if the hashed bytes and the sent bytes can differ, a prompt change can be
+  served from cache and nobody would see it. `job_id` and timestamps must stay out of the key:
+  `make_job_id` embeds a millisecond timestamp, so keying on it would miss every time.
+- **The prompt files are hashed per call on purpose.** `prompt_version=_source_digest(PROMPT_CV_PATH)`
+  reads and hashes the file rather than trusting a `PROMPT_VERSION` constant, because the failure a
+  constant produces is silent: the user is served a document drafted under rules that no longer
+  exist. Do not replace it with a hand-bumped constant.
+- **Only a validated result may be cached, and the write site is load-bearing.** The entry is
+  written after the page-count gate and nowhere else. Moving that write earlier would turn a failed
+  layout loop into a permanent answer; a test counts entries *during* rendering so the move cannot
+  happen unnoticed.
+- **A cache read never raises and never writes.** Missing, malformed, truncated,
+  wrong-format-version, no-longer-validating and wrong-shape entries are all **misses**. A stored
+  document is re-validated through `DocumentGenerator.restore` — the same `_build_model` a fresh
+  draft uses — because the cache is an editable file on disk, not a guarantee. Do not add an
+  `except`-free path here or a delete-on-read.
+- **A cache hit reports zero usage, not the original run's totals.** Pricing a run that made no
+  call is the dishonesty this item exists to remove; the originals live in `original_usage`.
+- **`model` is two key ingredients, not one** (`model_cv`, `model_cl`), because item 6's per-task
+  routing lets two models serve one posting.
+
+- **The generation cache has no eviction policy — this is a real open follow-up, not an oversight.**
+  Nothing prunes `<store>/cache/`; it grows by one small JSON file per distinct generation. Deleting
+  the directory is documented as always safe (it is derived data and every entry came from an
+  application that was already persisted), and clearing it by hand is the documented mechanism. An
+  eviction or size policy is unbuilt; see [ADR 0015](DECISIONS/0015-generation-cache.md).
+
+- **A stored-application folder has no `source/content.json` in one case.**
+  `outputs/2026_adjoe_senior_data_analyst_1769343142/` is the D-14 partial-folder case. Do not
+  assume `outputs/*/source/` exists.
 - `docx_renderer.py:264` writes a `latex_work/` scratch dir inside the deliverable folder (D-13).
 
 ---

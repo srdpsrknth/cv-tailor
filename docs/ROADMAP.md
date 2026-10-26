@@ -2,11 +2,11 @@
 
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
 complete, Milestone 1.1 is complete, **Phase 1 is complete**, **Phase 2 is complete and closed
-out**, and **Phase 3 is in progress** — increments 4, 2, 1 and 3 are done, and **item 6's offline
+out**, and **Phase 3 is in progress** — increments 4, 2, 1 and 3 are done, **item 6's offline
 groundwork is done** (provider interface, routing, budget caps, D-3/D-4, the evaluation suite and
-the curated set). **Item 6's budgeted live run has not been made**, so the curated set's quality
-ranking is unmeasured. **Item 5 is next** — see
-[§Phase 3](#phase-3--llm-and-document-generation-improvements).
+the curated set), and **item 5 is done**. **Item 6's budgeted live run has not been made**, so the
+curated set's quality ranking is unmeasured; **that live run is the only Phase 3 work still owed**.
+See [§Phase 3](#phase-3--llm-and-document-generation-improvements).
 Phases may be reordered, split or parallelised when dependencies justify it.
 
 Approved direction: **Option B — modular redesign, executed incrementally.** Keep the
@@ -207,7 +207,7 @@ counts unchanged**, as intended.
 | 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
 | 3 | Enable structured output (`response_schema`) | **DONE** (`feat:`, 2026-10-26) — JSON mode and a schema on the CV draft and the cover letter; the layout retry is deliberately left unconstrained because its response may be a delta. The schema requires the response *envelope* and leaves the document body open, which is what keeps D-1's truncation from returning. Calls unchanged at **2/3/5**; see [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
 | 6 | Provider interface, model routing, budget caps, and the curated model set | **OFFLINE GROUNDWORK DONE** (`feat:`/`fix:`, 2026-10-26) — see the close-out below. **The budgeted live run has not been made**, so the curated set's quality ranking is unmeasured |
-| 5 | Cache validated results | **NEXT IN THE AGREED ORDER** — items 1–4 have now settled |
+| 5 | Cache validated results | **DONE** (`feat:`, 2026-10-26) — a validated generation is stored under `<store>/cache/<profile_id>/`, keyed by the bytes the model was shown; a repeat makes **0** LLM calls and produces byte-identical documents. Cold-cache call counts unchanged at **2/3/5**; see [ADR 0015](DECISIONS/0015-generation-cache.md) |
 
 ### Item 6 close-out (2026-10-26)
 
@@ -225,38 +225,44 @@ case. Running it needs authorisation, not more code. It answers two open questio
 which model is genuinely best per *accepted* result for this task, and whether structured output
 truncates on real documents (the question increment 3 could not settle offline).
 
-### Item 5 — cache validated results *(NEXT)*
+### Item 5 — cache validated results *(DONE 2026-10-26)*
 
 **Objective:** stop paying twice for work already done.
 
-**What is already true, and shapes the item.** Re-rendering an existing `content.json` costs
+**What was already true, and shaped the item.** Re-rendering an existing `content.json` costs
 **zero** LLM calls today — the render path is already free, and `render_application.py` is the
-route real revisions use. So the item is not "make rendering cheap"; it is about the *generation*
-path: the same profile against the same posting currently re-drafts from scratch every time.
+route real revisions use. So the item was never "make rendering cheap"; it is about the
+*generation* path, where the same profile against the same posting re-drafted from scratch.
 
-**Scope to decide and implement:**
+**What was built.** `services/cache_store.py`. A validated generation is stored under
+`<store>/cache/<profile_id>/generations/<key>.json`, and an identical request is served from
+disk. See [ADR 0015](DECISIONS/0015-generation-cache.md) for the full reasoning.
 
-- **What the key is.** The obvious key is a hash of exactly what the model was shown — the
-  serialized profile bytes *plus* the job description *plus* the prompt and schema version — not
-  a `job_id` or a timestamp. Two runs that differ in any prompt byte must not share an entry, or
-  a prompt change would silently serve stale documents. Item 4 made the profile bytes a single,
-  stable, byte-identical block, which is what makes this keyed reliably.
-- **What is cached.** A **validated** result only. Caching a draft that failed the gate would
-  turn a retry loop's failures into a permanent answer.
-- **When it is invalidated.** Any change to the prompt files, the editorial requirements, the
-  schema, the model, or the profile. `model` is part of the key because item 6 added
-  per-task routing: two models can now serve the same posting.
-- **Where it lives.** Alongside the existing store layout, and **never** in the repository.
-  It is derived data, so it must be safe to delete.
+| The four decisions | How each is met |
+|---|---|
+| **What the key is** | A SHA-256 digest over named fields: the serialized profile bytes, the job description, company/role/country, **both prompt files byte-for-byte**, the schema digest, the provider, both routed models, and the resolved `rules`. `job_id` and any timestamp are deliberately absent — `job_id` embeds a millisecond, so keying on it would miss by construction |
+| **What is cached** | A **validated** result only. The entry is written after the page-count gate passes and nowhere else, so a draft that failed the gate can never become a permanent answer |
+| **When it is invalidated** | Any change to the prompt files, the editorial requirements, the schema, the model, the provider, the country, or the profile. The prompt files are **read and hashed per call** rather than tracked by a version constant, so an edit cannot be served from cache even if nobody bumps anything |
+| **Where it lives** | `<store>/cache/<profile_id>/` (ADR 0011), a sibling of `outputs/`, never in the repository. It is derived data, so deleting it is always safe: every read failure — missing, malformed, truncated, wrong format version — is a **miss**, never an error |
 
-**Acceptance:** a repeat of an identical generation makes **0** LLM calls and produces a
-byte-identical accepted document; a changed prompt byte, model or profile makes a fresh call;
-and the existing call-count baseline (2/3/5, worst 12) is unchanged on a cold cache.
+**Two guards worth naming.** A stored document is **re-validated** on read through the same
+`_build_model` a fresh draft goes through, because the cache is a plain JSON file a person can
+edit and "it was validated when it was stored" is a claim about the past; re-validating is free.
+And a hit reports **zero** usage rather than replaying the original run's token totals, because
+pricing a run that made no call is exactly the dishonesty this item exists to remove. The
+original figures are kept in the same file as `original_usage`.
 
-**Testing:** recorded-response determinism, plus a test that fails if a prompt change is served
-from cache. **This item changes no call count on a cold cache** — if it does, say so explicitly.
+**Acceptance — verified.** A repeat of an identical generation makes **0** LLM calls and produces
+byte-identical accepted documents; a changed prompt byte, model, provider, country or profile
+makes a fresh call; and the cold-cache call-count baseline is **unchanged at 2/3/5, worst 12** —
+item 5 adds a lookup before the first call and a write after the last one, and adds no request.
 
-**Effort:** Medium.
+**Deliberately not built, and recorded as an open follow-up:** there is **no eviction policy**.
+One small JSON file per distinct generation, for a single-user tool, is acceptable, and deletion is
+documented as always safe — but an eviction or size policy is a real follow-up rather than a solved
+problem.
+
+**Effort:** Medium (as estimated).
 
 **Item 6 scope, including an owner requirement recorded 2026-10-26.** Item 6 builds the thin
 provider interface, model-per-task routing and optional budget caps. It also owns **model

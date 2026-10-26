@@ -75,6 +75,19 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > per-call contract that makes the answer meaningful, but **the live run has still not been
 > made**. The suite is **436 passed** (351 after increment 3 alone).
 >
+> **Status note (2026-10-26, Phase 3 item 5):** §5's optimisation **5 — "Cache validated
+> results" — is implemented, and that closes the list.** The generation cache stores a
+> **validated** result under `<store>/cache/<profile_id>/` and serves an identical request from
+> disk: **0 LLM calls** and byte-identical accepted documents. Its key is a digest of the bytes
+> the model was shown — the serialized profile, the posting plus company/role/country, both
+> prompt files read and hashed per call, the schema, the provider and both routed models — so a
+> prompt, model, provider, country or profile change is a **miss** rather than a stale document.
+> Only a validated result is ever stored, the store is derived data whose deletion is always
+> safe, and a stored document is re-validated on read because the cache is an editable file on
+> disk. See [ADR 0015](DECISIONS/0015-generation-cache.md). **Call counts on a cold cache are
+> unchanged at 2 / 3 / 5, worst 12** — the item adds a lookup and a write, not a request. The
+> suite is **478 passed**.
+>
 > **Owner requirement recorded 2026-10-26 (scopes Phase 3 item 6).** OpenRouter exposes a very
 > large catalogue of models. **The tool must not surface all of them.** Phase 3 item 6 must
 > research and select a **small curated set** — the model(s) genuinely best suited to CV and
@@ -154,6 +167,7 @@ tailor_documents()                             backend/services/tailor_service.p
 | CLI | **Works** *(Phase 1)* | `cvtailor` — `doctor`, `profile show`, `generate`, `render` |
 | Provider abstraction | **Absent** | Gemini hardwired `tailor_service.py:119` |
 | Structured output (JSON mode) | **Live, scoped per call** | `generation.RESPONSE_SCHEMAS` selects the schema; the draft and the letter are constrained, the layout retry is not (its response may be a delta) — [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
+| Generation cache | **Live** *(Phase 3 item 5)* | `services/cache_store.py` — a validated generation is stored under `<store>/cache/<profile_id>/` and an identical request costs **0** LLM calls; keyed by the bytes the model was shown, so a prompt, model, provider or profile change is a miss ([ADR 0015](DECISIONS/0015-generation-cache.md)) |
 | `validate_api_key()` | **Removed** *(Phase 1)* | Superseded by `cvtailor doctor --verify-key` |
 | Candidate-scoped rules | **Works** *(Phase 1)* | `rules:` block in the profile; see §2 A-1 |
 
@@ -356,9 +370,15 @@ repeated input. See the measured effect below.
    call, against a typical run that rebuilt them 3–4 times and up to 8 times at the
    worst (7 banned tools × one scan each). That is single-digit milliseconds per
    application — real, but **not** a cost saving.
-5. **Cache validated results** — re-rendering already costs 0 LLM calls; extend that
-   principle to "same profile + same JD → reuse". **This is Phase 3 item 5**, the last
-   item in the agreed order.
+5. ~~**Cache validated results** — re-rendering already costs 0 LLM calls; extend that
+   principle to "same profile + same JD → reuse".~~ **DONE — Phase 3, item 5 (2026-10-26).**
+   A **validated** generation is stored under `<store>/cache/<profile_id>/` and an identical
+   request is served from disk: **0 LLM calls** and byte-identical accepted documents. The key
+   is a digest of the bytes the model was shown — the serialized profile, the posting plus
+   company/role/country, both prompt files read and hashed per call, the schema, the provider
+   and **both routed models** — so a prompt, model, provider or profile change is a miss rather
+   than a stale document. See [ADR 0015](DECISIONS/0015-generation-cache.md) and the measured
+   effect below.
 
 **Pricing is now route- and tier-aware (Phase 3, item 6).** `services/pricing.py` is the one
 source of truth (D-4) and applies the long-context tier to the tokens (D-3). Price is keyed by
@@ -375,6 +395,27 @@ first call, and is not collected by pytest so CI cannot spend. It projects the w
 run at **$1.68** against a **$5** budget. Until it runs, no model-quality ranking is claimed.
 
 *Do not add async, concurrency or caching infrastructure before 1–5 are exhausted.*
+
+**Item 5 closes that list, and it did not add infrastructure — it removed work.** All five
+optimisations are now implemented, so the "do not add caching infrastructure" line above is spent:
+the cache exists because one of the five asked for it, not as a general-purpose layer.
+
+**Measured effect of optimisation 5 (2026-10-26).** The item was verified by driving the real
+pipeline over the recorded Nordwind transcript, not by inspection:
+
+| Case | Calls | Tokens reported | Cost |
+|---|---|---|---|
+| First run (cold cache) | **2** | 200 | ~$0.0002 |
+| Identical repeat (hit) | **0** | **0** | **$0.00** |
+| Cold cache, one layout retry | **3** | — | unchanged |
+| Cold cache, max successful | **5** | — | unchanged |
+
+**Call counts on a cold cache are unchanged at 2/3/5, worst 12.** This is stated explicitly
+because the item was required to say so if it were not: item 5 adds a lookup **before** the first
+call and a write **after** the last one, and adds no request. A test asserts that nothing is
+written before the page-count gate, so the cold path is read-free and write-free on the way in.
+The saving is exact and total on a repeat — the whole generation is free — and zero on anything
+that differs in a single ingredient.
 
 **Measured effect of optimisation 4 (2026-10-26).** The prompt sent to the model was
 unchanged: `tests/test_profile_serialization.py` asserts the rendered context is

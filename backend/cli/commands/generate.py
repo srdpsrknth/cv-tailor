@@ -123,6 +123,10 @@ def run(args, console: Console, config) -> int:
             # Explicit, so the output folder is keyed to the candidate even when the
             # config carries no id because a loose --profile file was used.
             profile_id=profile_id,
+            # A repeat of one profile against one posting is served from the store's
+            # cache, so it costs nothing. --no-cache forces a fresh draft (and still
+            # stores it), which is the escape hatch when the stored one is unwanted.
+            use_cache=not getattr(args, "no_cache", False),
         )
     except ValueError as error:
         raise CliError(f"Generation failed: {error}")

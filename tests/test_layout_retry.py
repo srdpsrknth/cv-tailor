@@ -217,6 +217,9 @@ def test_a_delta_that_breaks_a_profile_rule_is_rejected(
     assert result.cv_page_count == 2
 
     # The same run, but the delta also rewrites the summary against the profile's rule.
+    # ``use_cache=False`` is required here: Phase 3 item 5 stores the accepted run above
+    # under a key that this box shares, so without it the second call would be served
+    # from the cache and would never make the call this test is about.
     offline_service([
         analyst_session.step_text('cv_draft'),
         analyst_session.step_text('cover_letter'),
@@ -227,6 +230,7 @@ def test_a_delta_that_breaks_a_profile_rule_is_rejected(
         service.tailor_documents(
             analyst_session.job_description_text, analyst_profile,
             company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
+            use_cache=False,
         )
 
 

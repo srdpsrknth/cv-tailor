@@ -333,21 +333,31 @@ def build_context(
     role_title: Optional[str] = None,
     work_country: Optional[str] = None,
     profile_json: Optional[str] = None,
+    profile_bytes: Optional[str] = None,
 ) -> str:
     """The shared COMPANY/ROLE/country/posting/profile block both prompts append.
 
-    ``profile_json`` lets a caller that already serialized the profile reuse those
-    exact bytes: the pipeline serializes once per application and every prompt --
-    CV, cover letter and each layout retry -- appends this same block. Serializing
-    the profile is pure cost, so it is done once rather than once per call.
+    ``profile_bytes`` (equivalently its older spelling ``profile_json``) lets a caller
+    that already serialized the profile reuse those exact bytes: the pipeline
+    serializes once per application and every prompt -- CV, cover letter and each
+    layout retry -- appends this same block. Serializing the profile is pure cost, so
+    it is done once rather than once per call.
+
+    Since Phase 3 item 5 the **same string** is also the profile half of the cache
+    key, which is why the parameter is named for what it is: the bytes the model was
+    shown. Hashing anything else -- a re-serialization, a digest of the profile model
+    -- would let the key and the prompt drift apart, and a prompt change would be
+    served from cache without anyone noticing.
 
     The default reproduces the previous behaviour byte for byte, so a caller that
     passes nothing gets exactly what it got before. This parameter carries **no**
     prompt-wording change: it selects between two identical strings.
     """
     work_country = (work_country or "").strip() or None
-    if profile_json is None:
-        profile_json = profile.model_dump_json(indent=2)
+    if profile_bytes is None:
+        profile_bytes = profile_json
+    if profile_bytes is None:
+        profile_bytes = profile.model_dump_json(indent=2)
     country_context = (
         f"\nWORK COUNTRY (explicit user selection; overrides country inference): {work_country}. "
         "Apply the work-authorization rules for this country. Company headquarters and past job locations are irrelevant.\n"
@@ -359,7 +369,7 @@ def build_context(
         f"ROLE: {role_title or 'Infer from job description'}\n"
         + country_context
         + f"JOB DESCRIPTION:\n{job_description}\n\n"
-        f"BASE PROFILE (authoritative JSON):\n{profile_json}"
+        f"BASE PROFILE (authoritative JSON):\n{profile_bytes}"
     )
 
 
@@ -948,6 +958,40 @@ class DocumentGenerator:
         raise ValueError(
             f"Could not produce a valid {kind} document after three attempts: {last_error}"
         )
+
+    def restore(
+        self,
+        cv_data: dict,
+        cl_data: dict,
+        work_country: Optional[str] = None,
+        company_name: Optional[str] = None,
+        role_title: Optional[str] = None,
+    ):
+        """Re-admit a **stored** CV and cover letter through the same gate.
+
+        Phase 3 item 5 serves an identical generation from the cache instead of
+        paying for it twice. The one thing that must not happen is a stored document
+        reaching the renderer without being validated again: the cache is a file on
+        disk that a person can edit, truncate or hand-craft, so "it was validated
+        when it was stored" is a claim about the past, not about these bytes.
+
+        Re-validating is free -- no API call -- so a cache hit runs exactly the same
+        gate a fresh generation runs, through exactly the same method. A stored
+        document that no longer validates (because the profile changed, or the file
+        was edited) raises here, and the caller turns that into a miss and generates
+        the document instead.
+
+        The question this answers honestly: a cache entry that *fails* the gate
+        cannot be served. It is not deleted -- the read path never writes -- and the
+        next identical request re-generates, overwriting the entry.
+        """
+        cv = self._build_model(
+            {"cv": cv_data}, "cv", work_country, company_name, role_title
+        )
+        cl = self._build_model(
+            {"cover_letter": cl_data}, "cover_letter", work_country, company_name, role_title
+        )
+        return cv, cl
 
     def _build_model(
         self,

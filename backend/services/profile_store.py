@@ -15,6 +15,7 @@ Layout (ADR 0004), with ``<store>`` outside the public repository (ADR 0011)::
 
     <store>/profiles/<profile_id>/profile.yaml
     <store>/outputs/<profile_id>/<job_id>/...
+    <store>/cache/<profile_id>/generations/<key>.json    (derived; safe to delete)
 
 ``profile_id`` becomes a directory name and is therefore validated against
 ``^[a-z0-9][a-z0-9_-]*$``. Path traversal is rejected structurally rather than
@@ -146,6 +147,20 @@ class ProfileStore:
         exists, so adding a second can never collide with the first (ADR 0003).
         """
         return self.root / "outputs" / validate_profile_id(profile_id)
+
+    def cache_dir(self, profile_id) -> Path:
+        """``<store>/cache/<profile_id>`` -- derived data for one candidate.
+
+        Phase 3 item 5 stores validated generations here. It is deliberately a
+        sibling of ``outputs/`` rather than a subdirectory of it: an entry is an
+        optimisation, not an application, and nothing that lists a candidate's
+        applications should start returning cache entries.
+
+        Like ``outputs_dir``, the candidate segment is always present. Because the
+        cache is derived, deleting this directory is always safe -- it costs a
+        regeneration, never a document.
+        """
+        return self.root / "cache" / validate_profile_id(profile_id)
 
     # --- reading ----------------------------------------------------------------------
 
