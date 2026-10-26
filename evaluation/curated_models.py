@@ -103,6 +103,16 @@ class CuratedModel:
     verified: str = VERIFIED_PRICE_AND_CAPABILITY
     #: Populated only by a completed evaluation run, never by hand.
     measured_notes: Optional[str] = None
+    #: The study's outcome for this candidate (ADR 0016), written from the run of
+    #: 2026-10-26 and verifiable against the job folders that run left behind. An
+    #: unmeasured candidate carries no values here and is not ranked at all -- nothing
+    #: is inferred in their place.
+    accepted: Optional[int] = None
+    attempted: Optional[int] = None
+    #: Cost per **accepted** result in USD -- the ranking metric. ``None`` for a
+    #: candidate that accepted nothing: such a model has no meaningful cost per accepted
+    #: result, and reporting ``0.0`` would make the worst performer look cheapest.
+    cost_per_accepted: Optional[float] = None
 
     @property
     def is_measured(self) -> bool:
@@ -179,6 +189,14 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.091,
         output_per_1m=0.182,
         created="2026-04-24",
+        accepted=2,
+        attempted=3,
+        cost_per_accepted=0.00328,
+        measured_notes=(
+            'Second. Cheapest per attempt, but 2/3 accepted with 3 correction calls: one'
+            'case failed the word-count gate. The cheapest per attempt and not per'
+            'accepted result is exactly the gap this metric exists to expose.'
+        ),
     ),
     CuratedModel(
         id="anthropic/claude-haiku-5.5",
@@ -192,6 +210,14 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.100,
         output_per_1m=0.500,
         created="2026-10-07",
+        accepted=3,
+        attempted=3,
+        cost_per_accepted=0.00582,
+        measured_notes=(
+            '3/3 accepted, no correction calls, at a fifth of Claude Sonnet 5 per'
+            'accepted result -- so the expensive end of its own family is not needed for'
+            'this task. Asked in the anthropic-vertex dialect.'
+        ),
     ),
     CuratedModel(
         id="openai/gpt-6-luna",
@@ -205,6 +231,14 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.100,
         output_per_1m=0.500,
         created="2026-09-22",
+        accepted=3,
+        attempted=3,
+        cost_per_accepted=0.00271,
+        measured_notes=(
+            'WINNER. Best cost per accepted result in the study: 3/3 accepted with no'
+            'correction calls, at $0.00271 -- 42x cheaper than the incumbent default.'
+            'Asked in the strict dialect.'
+        ),
     ),
     # --- balanced ----------------------------------------------------------------
     CuratedModel(
@@ -218,6 +252,15 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.150,
         output_per_1m=0.470,
         created="2026-08-26",
+        accepted=0,
+        attempted=3,
+        cost_per_accepted=None,
+        measured_notes=(
+            '0/3 accepted, and the failure is specific: it leaked schema text into the'
+            'output, returning a fragment such as a completionState object as the value'
+            'of skills instead of a list of skills. Its 81.3% IFBench score did not'
+            'predict this task.'
+        ),
     ),
     CuratedModel(
         id="z-ai/glm-5.3-flash",
@@ -231,6 +274,14 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.150,
         output_per_1m=0.500,
         created="2026-08-26",
+        accepted=0,
+        attempted=3,
+        cost_per_accepted=None,
+        measured_notes=(
+            '0/3 accepted. It omitted role, start_date and end_date from every work'
+            'experience entry -- precisely the fields the factual gate exists to'
+            'protect. Its low measured hallucination rate did not predict this either.'
+        ),
     ),
     CuratedModel(
         id="mistralai/mistral-small-2603",
@@ -244,6 +295,15 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.150,
         output_per_1m=0.600,
         created="2026-03-16",
+        accepted=0,
+        attempted=3,
+        cost_per_accepted=None,
+        measured_notes=(
+            '0/3 accepted, but inconclusive rather than damning: every call was'
+            'rate-limited (HTTP 429) by its provider, so it never produced a document to'
+            'judge. The one candidate whose result should be re-measured before it is'
+            'judged.'
+        ),
     ),
     # --- frontier ----------------------------------------------------------------
     CuratedModel(
@@ -259,6 +319,13 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.825,
         output_per_1m=4.125,
         created="2026-09-02",
+        accepted=3,
+        attempted=3,
+        cost_per_accepted=0.11384,
+        measured_notes=(
+            'The incumbent default, kept as the control. 3/3 accepted but with 2'
+            "correction calls and 42x the winner's cost per accepted result."
+        ),
     ),
     CuratedModel(
         id="anthropic/claude-sonnet-5",
@@ -272,6 +339,14 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=2.00,
         output_per_1m=10.00,
         created="2026-06-30",
+        accepted=3,
+        attempted=3,
+        cost_per_accepted=0.15709,
+        measured_notes=(
+            'The most expensive candidate and the worst value: 3/3 accepted at 1'
+            "correction call, for 58x the winner's cost per accepted result. It works,"
+            'and it is not worth it here.'
+        ),
     ),
 )
 

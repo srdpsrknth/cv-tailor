@@ -436,24 +436,56 @@ def test_the_set_is_ordered_cheapest_first():
     assert tiers == sorted(tiers, key=NATURAL_COST_ORDER.index)
 
 
-def test_every_entry_declares_an_unmeasured_ranking():
-    """The honest claim, made machine-checkable rather than a sentence in a document.
+def test_the_ranking_is_not_marked_measured_until_the_owner_has_read_the_documents():
+    """Measurement happened; the *verdict* is still withheld, and that is deliberate.
 
-    No quality run has happened, so no entry may claim a measured ranking. When the
-    budgeted run does happen, this test is what forces the marker to be updated
-    rather than the claim being quietly made in prose.
+    This test replaces one that asserted every entry was UNMEASURED, which was the
+    honest claim before 2026-10-26 and is not any more: the study ran, and all eight
+    candidates now carry accepted/attempted/cost-per-accepted from it.
+
+    What has **not** happened is the owner's own quality judgement. They stated the
+    requirement directly: writing, PDF and layout quality are theirs to assess before
+    the ranking is marked final. The suite measures acceptance, cost and correction
+    calls; it measures **no** prose and **no** rendering, so a `measured` marker set on
+    this evidence alone would claim a quality verdict nobody has made.
+
+    So the assertion is not "nothing is measured" but "measurement does not by itself
+    promote an entry": results are present, the marker is still `price+capability`, and
+    flipping it is a deliberate act that must come with the owner's reading.
     """
-    from evaluation.curated_models import CURATED_MODELS, unmeasured_entries
+    from evaluation.curated_models import CURATED_MODELS, VERIFIED_MEASURED, unmeasured_entries
 
-    assert len(unmeasured_entries()) == len(CURATED_MODELS)
+    with_results = [m for m in CURATED_MODELS if m.accepted is not None]
+    assert with_results, (
+        'no entry carries study results; if the results were removed, this guard needs '
+        'rewriting rather than relaxing'
+    )
+    for model in with_results:
+        assert model.attempted is not None, f'{model.id} has accepted but not attempted'
+        assert model.accepted <= model.attempted, f'{model.id} accepted more than attempted'
+        assert model.measured_notes, (
+            f'{model.id} has results but no note saying what happened'
+        )
+        # A candidate that accepted nothing must not report a cost per accepted result.
+        if model.accepted == 0:
+            assert model.cost_per_accepted is None, (
+                f'{model.id} accepted nothing, so it has no cost per accepted result; '
+                f'reporting one makes the worst performer look cheap'
+            )
+        else:
+            assert model.cost_per_accepted and model.cost_per_accepted > 0
+
+    # The marker itself is still withheld pending the owner's judgement.
+    assert len(unmeasured_entries()) == len(CURATED_MODELS), (
+        'an entry was marked `measured` without the owner having judged writing and '
+        'layout quality, which this suite does not measure'
+    )
     for model in CURATED_MODELS:
-        assert model.is_measured is False
-        assert model.verified == 'price+capability'
-        assert model.measured_notes is None, 'no run has populated notes'
+        assert model.verified != VERIFIED_MEASURED
 
 
 def test_no_entry_carries_an_invented_quality_claim():
-    """Guidance may describe what a model is for; it may not rank it on quality."""
+    """``guidance`` may describe what a model is *for*; it may not rank it on quality."""
     from evaluation.curated_models import CURATED_MODELS
 
     forbidden = ('best', 'highest quality', 'state of the art', 'outperforms', 'top ')
