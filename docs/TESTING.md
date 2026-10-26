@@ -1,8 +1,8 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **351 passed**, 1 warning, ~108 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **321 passed**, 30 deselected, ~6 s.
+**Current baseline:** **436 passed**, 1 warning, ~115 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **406 passed**, 30 deselected, ~11 s.
 
 | | |
 |---|---|
@@ -14,15 +14,20 @@
 | Baseline after Phase 3 increment 1 | 298 passed, ~112 s |
 | Baseline after Phase 3 increment 2 | 309 passed, ~107 s |
 | Baseline after Phase 3 increment 1 of the agreed order (targeted layout retry) | 324 passed, ~108 s |
-| **Baseline after Phase 3 increment 3 (structured output)** | **351 passed**, ~108 s |
+| Baseline after Phase 3 increment 3 (structured output) | 351 passed, ~108 s |
+| Baseline after Phase 3 item 6, increment A (provider interface, routing, budget caps) | 390 passed, ~113 s |
+| Baseline after Phase 3 item 6, increment B (D-3, D-4 — route- and tier-aware pricing) | 407 passed, ~112 s |
+| **Baseline after Phase 3 item 6, increment C (evaluation suite, curated set)** | **436 passed**, ~115 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
 The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, 190 → 262 in Phase 2,
 262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3 increment 1 (all new files),
 298 → 309 in increment 2, 309 → 324 in Phase 3 increment 1 of the agreed order
-(targeted layout retry), and 324 → **351** in increment 3 (structured output). The runtime
-increase is almost entirely `pdflatex`: real rendering is exercised instead of mocked.
+(targeted layout retry), 324 → **351** in increment 3 (structured output), 351 → **390**
+in item 6 increment A, 390 → **407** in increment B, and 407 → **436** in increment C.
+The runtime increase is almost entirely `pdflatex`: real rendering is exercised instead of
+mocked.
 
 > **Sandbox caveat.** Under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
 > on ACL operations ("No usable temporary directory" is the same environment artifact), and
@@ -85,6 +90,9 @@ throwaway synthetic store once, for the whole suite.
 | `test_editorial_instructions.py` | 11 | **New in increment 2.** The merged editorial requirements reach the **CV call only** (not the letter), are injected exactly once, and are carried by a layout retry too; the validation gate is unchanged (an invalid draft still fails the run and no letter is drafted from it); the call counts are **2/3/5** on the happy, typical and max-successful paths |
 | `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The retry sends the targeted brief and the current CV, with **no** profile, job description or prompt file; the brief reports the document's real body length; a delta response is merged onto the validated CV and **re-gated**, a full-CV response still works, an unknown/unaddressable key raises, a delta cannot write an employer/date/education field or complete an ongoing role, and an unappliable delta fails the run rather than silently keeping the long CV |
 | `test_structured_output.py` | 27 | **New in Phase 3 increment 3.** Structured output is **scoped, not global**: the CV draft and the cover letter send `response_mime_type="application/json"` with a per-kind `response_schema`; the layout retry (`allow_delta=True`) and any unknown document kind send **neither**. The schema requires the envelope key and leaves the document body open — asserted by walking the emitted schema for `required` inside the body and for `additionalProperties: false` — which is what keeps D-1's truncation from returning. Both `tailoring_explanation` shapes (top level and nested) still reach `TailoringExplanation`, an omitted explanation is still accepted, a truncated constrained response is **rejected** rather than parsed short, `validate_cv` is still the only gate, and the happy/typical paths stay at 2 and 3 calls |
+| `test_provider_interface.py` | 39 | **New in Phase 3 item 6, increment A.** The single `generate(prompt, *, schema, max_tokens, model)` contract; `schema=None` reaches **both** providers as "send no constraint", so the layout retry and an unknown kind stay unconstrained while the draft and letter keep theirs; OpenRouter's `response_format` envelope is **translated**, not passed through, and a schema call also sends `provider.require_parameters`; no silent fallback (unknown provider, missing key for the *selected* provider, and provider failure all raise); `ProviderError` is deliberately **not** a `ValueError`, because the correction loop catches `ValueError`; model-per-task routing including the `layout_retry` task; the budget cap refuses a malformed value, stops further calls, and prices a routed model as itself; the 2-call happy path driven through the real pipeline |
+| `test_pricing.py` | 17 | **New in item 6, increment B (D-3, D-4).** The long-context tier is applied to the tokens and selected on the input count; the old flat rate would have **halved** the estimate for `gemini-2.5-pro` at 300k tokens; a half-defined long pair is not a tier; the route is part of the price key (Gemini direct $0.75/$3.75 vs OpenRouter $0.825/$4.125); an unpriced route is distinguishable from a priced one and the fallback target always exists; every route records a dated source; the UI carries **no** model-keyed table and prices through `services.pricing`; only `pricing.py` defines the table (parsed with `ast`, not string-matched); the compatibility view in `gemini_service` is derived, not a second table |
+| `test_evaluation_suite.py` | 29 | **New in item 6, increment C.** The suite is offline by default and the default cap is the agreed $5; the whole curated run is projected **under** budget; a plan is refused **before** the first call, a missing cap is a refusal rather than "unlimited", and the cap is re-checked before every call rather than only at the start; a live run needs explicit authorisation and an over-budget one spends **nothing**; nothing under `evaluation/` is collected by pytest and CI does not invoke it; cases resolve only inside `tests/fixtures/`, a path that escapes is refused, and the suite never names the private store; the curated set is small, spans three cost tiers cheapest-first, and every entry is **UNMEASURED** with no invented quality claim; recorded rates and structured-output support **match the listing**; cost per **accepted** result is the headline metric and a model that accepts nothing reports `None`, never `0.0` |
 
 `test_profile_serialization.py` was verified to be a real guard: **11 of its 16 tests fail
 against the pre-increment-1 code**. `test_editorial_instructions.py` likewise: **9 of its 11
@@ -93,6 +101,25 @@ tests fail against the pre-increment-2 code** (checked by stashing `generation.p
 checked by adding a throwaway `git worktree` at that commit and running the new file there —
 no stashing in the working tree. `test_structured_output.py`: **13 of its 27 tests fail against
 `85879b5`**, checked the same way, with a throwaway worktree rather than a stash.
+
+**Item 6, checked the same way — a throwaway `git worktree` at `23156b1`, never a stash:**
+
+| File | Result against `23156b1` |
+|---|---|
+| `test_provider_interface.py` | **39 of 39 fail** — `services.provider` does not exist, so the whole interface is new |
+| `test_pricing.py` | **17 of 17 fail** — `services.pricing` does not exist, so there is no single source (D-3/D-4) |
+| `test_evaluation_suite.py` | **29 pass, 0 fail — expected, and stated plainly.** The suite and the curated set are new code with no predecessor, so there is no old behaviour to fail against. This file is a guard on the new code's properties (offline by default, cap fails closed, out of CI, unmeasured markers), not a before/after diff |
+
+Both `test_provider_interface.py` and `test_pricing.py` import the new module defensively and
+**fail** rather than skip when it is absent, so a broken import in the real tree — the one thing
+those files exist to catch — cannot be hidden by a skip. In the real tree both run with **zero
+skips**.
+
+`tests/test_structured_output.py` needed one seam update in increment A: its monkeypatch target
+moved from `gemini_service.genai.Client` to `provider.genai.Client`, which is where the request
+is now built. **No assertion changed** — the tests still inspect the real
+`GenerateContentConfig`, so they remain a check of what is *sent* rather than of how the service
+is wired.
 
 ### Phase 2 additions
 
@@ -172,7 +199,39 @@ artifacts and may need an unconfined delete.
 
 # One workflow, verbosely
 .venv\Scripts\python.exe -m pytest tests/test_tailoring_pipeline.py -q -k "retry or letter"
+
+# Item 6: the provider interface, routing and budget caps
+.venv\Scripts\python.exe -m pytest -q tests/test_provider_interface.py
+
+# Item 6: route- and tier-aware pricing (D-3, D-4)
+.venv\Scripts\python.exe -m pytest -q tests/test_pricing.py
+
+# Item 6: the evaluation suite and the curated model set (offline)
+.venv\Scripts\python.exe -m pytest -q tests/test_evaluation_suite.py
 ```
+
+### The live evaluation suite — opt-in, budget-capped, **never in CI**
+
+`tests/test_evaluation_suite.py` tests the suite *offline*. The suite itself lives in
+`evaluation/` and is **not collected by pytest** — nothing there is named `test_*` — so CI
+cannot make a paid call through it, which a test asserts.
+
+```powershell
+# Default: prices the run and stops. Makes no API call.
+.venv\Scripts\python.exe -m evaluation
+
+# Show the curated set, its tiers and its verification status
+.venv\Scripts\python.exe -m evaluation --list-models
+
+# A live run. Paid, requires an agreed budget (ADR 0005).
+.venv\Scripts\python.exe -m evaluation --live --cap-usd 5
+```
+
+The whole curated run is projected at **$1.68** against the owner's **$5** budget, upper-bounded
+at 12 calls per case. A plan whose projection exceeds `--cap-usd` is refused **before** the
+first call, and the cap is re-checked before every call. **As of 2026-10-26 no live run has been
+made**, so the curated set's quality ranking is unmeasured and marked as such in
+`evaluation/curated_models.py`.
 
 Tests needing a TeX compiler carry the `requires_latex` marker and **skip automatically**
 when no `pdflatex` can be resolved, so the suite still runs green on a machine without TeX.

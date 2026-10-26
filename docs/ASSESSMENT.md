@@ -192,8 +192,8 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 |---|---|---|---|
 | **D-1** | ~~`response_schema` / JSON mode is **dead code**~~ **RESOLVED in Phase 1; made live in Phase 3 increment 3** | Dead branches `gemini_service.py:162-164,187-198,204` | **Deleted** in Phase 1, along with the unused `response_schema` parameter; the comment explaining why `response_mime_type` was not set was kept, because that reasoning was load-bearing. **Phase 3 increment 3 made structured output live, on the terms that comment demanded**: scoped per call (draft and letter only — the layout retry may return a delta), and constraining the response *envelope* rather than the document body. See [ADR 0012](DECISIONS/0012-structured-output-scope.md). |
 | **D-2** | ~~`validate_api_key()` and `create_gemini_service()` never called~~ **RESOLVED in Phase 1** | `gemini_service.py:265,285` | **Deleted.** Key checking now lives in `cvtailor doctor`, which asserts presence only and verifies against Google just with `--verify-key`. |
-| **D-3** | **Cost under-reported**: `calculate_token_usage` prices the *total* with one flat rate, ignoring `input_long`/`output_long` tiers it defines | `gemini_service.py:100-122` vs `PRICING` `:35-40` | **Still open.** Fix before trusting cost data. |
-| **D-4** | Pricing table duplicated and stale in UI | `ui/app.py:239-246` vs `gemini_service.py:28-71` | **Still open** — single source of truth still needed. |
+| **D-3** | ~~**Cost under-reported**: `calculate_token_usage` prices the *total* with one flat rate, ignoring `input_long`/`output_long` tiers it defines~~ **RESOLVED in Phase 3 item 6** | was `gemini_service.py:100-122` vs `PRICING` `:35-40` | **Fixed.** Pricing moved to `services/pricing.py`, which applies the long-context tier to the *tokens*, selected on the input count alone — how the providers bill. For `gemini-2.5-pro` at 300k input tokens the old flat figure was **$0.375 against a real $0.75: half**. The tier rates were confirmed from OpenRouter's own listing, whose `overrides` entry for `google/gemini-2.5-pro` states `min_prompt_tokens: 200000` with prompt $2.50 / completion $15.00 — exactly the values this repository had defined and never applied. **No published figure moves**: `gemini-3.8-flash` has no long tier and its prompts are ~6.4k tokens, so the §5 rows are unchanged. |
+| **D-4** | ~~Pricing table duplicated and stale in UI~~ **RESOLVED in Phase 3 item 6** | was `ui/app.py:239-246` vs `gemini_service.py:28-71` | **Fixed.** `services/pricing.py` is the one source; the UI reads it. The duplication had drifted — the UI's copy still priced `gemini-1.5-flash`, retired in Phase 1 — so the user could be shown a rate the backend disagreed with. `gemini_service.PRICING` remains as a **derived view** of that one table, not a second copy. Two tests fail if a model-keyed table grows back in the UI, and one parses every `PRICING = {...}` dict literal in `backend/` and `ui/` to prove only `pricing.py` defines one. |
 | **D-5** | ~~Legacy model pricing retained~~ **RESOLVED in Phase 1** | `gemini_service.py:47-70` | **Pruned** after verifying names and prices against ai.google.dev (2026-10-23): `gemini-1.5-*` are delisted and `gemini-3-pro-preview` is shut down; the 2.5-series and `gemini-3.8-flash` prices were confirmed accurate. This exposed a latent `KeyError`: the fallback resolved through the deleted row. It now targets `DEFAULT_MODEL`, asserted by a test. |
 | **D-6** | Unused dependencies | grep: no imports in `backend/` | **Pruned:** `pydantic-settings`, `python-multipart`, `tiktoken`, `httpx`, `pytest-asyncio`, `black`, `ruff`. Kept `tzdata` (needed by `ZoneInfo` on Windows), `pytest`, `streamlit` and `requests` (used indirectly). **Correction:** `pandas` is *not* in `requirements.txt` and *is* used at `ui/app.py:231-232`; it arrives transitively via streamlit. |
 | **D-7** | ~~`ErrorResponse`, `TailoredOutput` defined and exported, never used~~ **RESOLVED in Phase 1** | `requests.py:44`, `tailored_output.py:71`, `models/__init__.py:19,25` | **Deleted**, including the exports. `TailoringExplanation` was kept — it is still used. |
@@ -355,7 +355,22 @@ repeated input. See the measured effect below.
    worst (7 banned tools × one scan each). That is single-digit milliseconds per
    application — real, but **not** a cost saving.
 5. **Cache validated results** — re-rendering already costs 0 LLM calls; extend that
-   principle to "same profile + same JD → reuse".
+   principle to "same profile + same JD → reuse". **This is Phase 3 item 5**, the last
+   item in the agreed order.
+
+**Pricing is now route- and tier-aware (Phase 3, item 6).** `services/pricing.py` is the one
+source of truth (D-4) and applies the long-context tier to the tokens (D-3). Price is keyed by
+`(provider, model)` because a bare model name does not identify a price — OpenRouter lists
+`google/gemini-3.8-flash` at **$0.825/$4.125** per 1M while Google charges **$0.75/$3.75**
+direct, both verified from the provider's own listing. The **§5 cost rows above do not move**:
+`gemini-3.8-flash` has no long-context tier and its prompts are ~6.4k tokens, well under the
+200k threshold, so the figures are identical under the new accounting. Re-derived on
+2026-10-26: $0.01559 / $0.026482 / $0.048265 for best / typical / worst.
+
+**The evaluation suite exists and has not run (Phase 3, item 6).** `evaluation/` implements the
+eight criteria ADR 0005 names, is offline by default, refuses an over-budget plan before the
+first call, and is not collected by pytest so CI cannot spend. It projects the whole curated
+run at **$1.68** against a **$5** budget. Until it runs, no model-quality ranking is claimed.
 
 *Do not add async, concurrency or caching infrastructure before 1–5 are exhausted.*
 

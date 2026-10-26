@@ -2,7 +2,11 @@
 
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
 complete, Milestone 1.1 is complete, **Phase 1 is complete**, **Phase 2 is complete and closed
-out**, and **Phase 3 is in progress** (increments 4, 2, 1 and 3 of 6 done — see [§Phase 3](#phase-3--llm-and-document-generation-improvements)).
+out**, and **Phase 3 is in progress** — increments 4, 2, 1 and 3 are done, and **item 6's offline
+groundwork is done** (provider interface, routing, budget caps, D-3/D-4, the evaluation suite and
+the curated set). **Item 6's budgeted live run has not been made**, so the curated set's quality
+ranking is unmeasured. **Item 5 is next** — see
+[§Phase 3](#phase-3--llm-and-document-generation-improvements).
 Phases may be reordered, split or parallelised when dependencies justify it.
 
 Approved direction: **Option B — modular redesign, executed incrementally.** Keep the
@@ -202,8 +206,24 @@ counts unchanged**, as intended.
 | 2 | Remove or merge the editorial-review pass | **DONE** (`refactor:`, 2026-10-26) — requirements folded into the draft prompt, second CV call removed; calls 3/4/6 → **2/3/5**, best-case input tokens −41% |
 | 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
 | 3 | Enable structured output (`response_schema`) | **DONE** (`feat:`, 2026-10-26) — JSON mode and a schema on the CV draft and the cover letter; the layout retry is deliberately left unconstrained because its response may be a delta. The schema requires the response *envelope* and leaves the document body open, which is what keeps D-1's truncation from returning. Calls unchanged at **2/3/5**; see [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
-| 6 | Provider interface, model routing, budget caps | **Next in the agreed order** — new chat; the budgeted live evaluation that would confirm the truncation behaviour on real documents belongs here, as does the model curation below |
-| 5 | Cache validated results | Not started — only after 1–4 have settled |
+| 6 | Provider interface, model routing, budget caps, and the curated model set | **OFFLINE GROUNDWORK DONE** (`feat:`/`fix:`, 2026-10-26) — see the close-out below. **The budgeted live run has not been made**, so the curated set's quality ranking is unmeasured |
+| 5 | Cache validated results | **NEXT IN THE AGREED ORDER** — items 1–4 have now settled |
+
+### Item 6 close-out (2026-10-26)
+
+Three increments, each verified on its own against the frozen 2/3/5 baseline:
+
+| Increment | Commit | Outcome |
+|---|---|---|
+| A — provider interface, routing, budget caps | `feat:` `372a7bf` | `services/provider.py` implements `generate(prompt, *, schema, max_tokens, model)`; Gemini default (decision 6), OpenRouter second with its `response_format` envelope **translated** rather than passed through, plus `provider.require_parameters` on schema calls; `schema=None` reaches both providers as "send no constraint", preserving [ADR 0012](DECISIONS/0012-structured-output-scope.md); `Config.model_for(task)` and an optional `CVTAILOR_MAX_COST_USD` that fails closed. No silent fallback. [ADR 0013](DECISIONS/0013-provider-interface-and-routing.md) |
+| B — D-3 and D-4 | `fix:` `3cc8da5` | `services/pricing.py` is the one source of truth, keyed by `(provider, model)` and tier-aware. The long-context tier is applied to the tokens: for `gemini-2.5-pro` at 300k tokens the old flat figure was **$0.375 against a real $0.75**. The UI no longer carries a second table |
+| C — evaluation suite, curated set | `feat:` *(this increment)* | `evaluation/` implements ADR 0005's eight criteria, offline by default, refuses an over-budget plan before the first call, and is not collected by pytest. Five curated models across economy/balanced/frontier, every one **UNMEASURED**. [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md) |
+
+**The budgeted live run is the one thing item 6 still owes.** The suite is ready: it projects the
+whole curated run at **$1.68** against the owner's **$5** budget, upper-bounded at 12 calls per
+case. Running it needs authorisation, not more code. It answers two open questions at once —
+which model is genuinely best per *accepted* result for this task, and whether structured output
+truncates on real documents (the question increment 3 could not settle offline).
 
 **Item 6 scope, including an owner requirement recorded 2026-10-26.** Item 6 builds the thin
 provider interface, model-per-task routing and optional budget caps. It also owns **model

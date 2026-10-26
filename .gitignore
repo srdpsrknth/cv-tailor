@@ -99,3 +99,10 @@ pytest-cache-files-*/
 # Misc
 *.bak
 *.tmp
+
+# Scratch space used for throwaway worktrees, recorded provider listings and
+# staging roots. Explicitly ignored by name so a tracked directory named "tmp"
+# elsewhere is unaffected. Also holds the recorded OpenRouter listing the curated
+# model ids were read from: it is a 467-model blob, quoted and hashed in
+# evaluation/curated_models.py rather than committed.
+.tmp/
