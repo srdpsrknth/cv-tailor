@@ -3,14 +3,14 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `7c0d58a` — *refactor: merge the editorial-review pass into the draft prompt* (Phase 3, increment 2)
+**Latest commit:** *(Phase 3, increment 1 — `refactor: send a targeted layout retry instead of a full regeneration`; sha recorded in the next commit's header)*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
 
 ## Active task
 
-**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increments 4 and 2 done.**
+**Phase 3 — LLM and document-generation improvements. IN PROGRESS: increments 4, 2 and 1 done.**
 
 Phase 3's scope is deliberately split across several chats. The agreed order is
 **4 → 2 → 1 → 3**, then a new chat for **6**, and **5** only once 1–4 have settled. Do not
@@ -21,11 +21,100 @@ from a regression.
 | Item | State |
 |---|---|
 | **4. Serialise the profile once per application** | **DONE** (`2943b45`) |
-| **2. Remove or merge the editorial-review pass** | **DONE** — this increment; see below |
-| **1. Targeted layout retry instead of full regeneration** | **NEXT IN THE AGREED ORDER** |
-| 3. Enable structured output (`response_schema`) | Not started |
-| 6. Provider interface, model routing, budget caps | Not started — new chat |
+| **2. Remove or merge the editorial-review pass** | **DONE** (`7c0d58a`) |
+| **1. Targeted layout retry instead of full regeneration** | **DONE** — this increment; see below |
+| 3. Enable structured output (`response_schema`) | **NEXT IN THE AGREED ORDER** — new chat |
+| 6. Provider interface, model routing, budget caps | Not started — new chat, after 3 |
 | 5. Cache validated results | Not started — only after 1–4 have settled |
+
+### Phase 3, increment 1 — targeted layout retry instead of full regeneration (2026-10-26)
+
+**What changed.** `DocumentGenerator.shorten_cv` used to re-send the whole CV prompt —
+prompt file, editorial requirements, job description and the entire serialized profile —
+plus the complete previous CV, and asked for a complete shorter CV back. That was the
+largest remaining source of repeated input (ASSESSMENT §5 estimated 25–45% of
+typical-case input cost). The retry now sends a **targeted brief plus the current CV**,
+and accepts **either** a complete CV (the old contract, still supported) **or a delta** of
+replacement values that is merged onto the CV that was just rendered.
+
+**Measured effect** (real pipeline, recorded transcript, `tiktoken` `cl100k_base` as a
+local proxy for Gemini's tokenizer — absolute numbers are not billed counts, but every
+old/new comparison is on the same basis):
+
+| Retry input | Before | After |
+|---|---|---|
+| Retry prompt | 3,488 tokens (16,508 chars) | **740 tokens (3,301 chars)** |
+| of which context (profile + JD) | 1,408 | **0** |
+| Whole 3-call run | 8,365 | **5,617** (−33%) |
+| Retry response, if a delta | ~386–481 tokens (full JSON copy) | **~91–267** |
+
+The retry now sends **fewer input tokens than the draft call** (740 vs 2,886) instead of
+more. Measured against the **baseline** retry the increment is **−79% input**; measured
+against the whole typical run it is **−33%**. The old estimate of 25–45% is therefore met
+on the per-retry basis and slightly under it on the per-run basis — the run also pays for
+the draft and the letter, which this increment does not touch.
+
+**Call counts are UNCHANGED at 2/3/5** (min/typical/max-successful), verified by driving
+the real pipeline rather than derived on paper; `tests/test_editorial_instructions.py`
+still pins them and `tests/test_layout_retry.py` re-asserts the counts it exercises. This
+increment lowers tokens **per retry**, not the number of retries. Worst case stays 12.
+
+**Why a delta cannot weaken the gate.** `validate_cv` is not bypassed — it is called on
+the *merged* document, and a delta has no path around it:
+
+- the delta is merged onto the previous CV, which **already passed** `validate_cv`;
+- `generation.apply_cv_delta` accepts only unit ids for the **summary, bullets, project
+  names/bullets and existing skills categories**. Employers, titles, dates, education,
+  certifications and `work_authorization` are **not addressable**, so no delta can invent
+  an employer, alter a date, or turn ongoing work (`end_date: present`) into completed
+  work — structurally, not by convention;
+- an unknown or malformed key raises `ValueError`; it is **never ignored**. A delta that
+  cannot be applied goes through the unchanged 3-attempt correction loop and then raises
+  the run. There is **no** path that silently keeps the unshortened CV and reports
+  success;
+- a complete-CV response still goes through `_build_model` exactly as before.
+
+**`parse_json_response` gained `accept_delta=False`.** A delta has no document key, so the
+parser would have rejected it. The flag is off by default and is switched on only when a
+retry has a base CV, so a *draft* that returns a stray object still fails loudly. The
+parser is otherwise unchanged, and this is not item 3's `response_mime_type` work.
+
+**`tailoring_explanation` precedence survives.** `shorten_cv` still returns
+`extract_explanation(data) or explanation`, so a retry that returns its own explanation
+supersedes the draft's — including on the delta path, where the explanation is read from
+the delta object. The existing precedence test still passes unchanged.
+
+**Load-bearing prompt constraints kept.** The retry brief still states every rule the old
+instruction carried (keep all employers and exact dates, education and core skills, do not
+shrink the font, do not complete ongoing work, do not remove an achievement or metric), and
+the profile-derived project clause is unchanged. The old "approximately 650/550 words"
+budget is unchanged too, but the brief now **also** reports the document's real length —
+the recorded fixtures are ~80–100 real body words, so the bare 650-word target described a
+document 3–8× the size of the one being shortened.
+
+**Tests: 309 → 324 passed** (~108 s), fully offline, no paid calls. Fast lane 279 → **294
+passed** (~6 s). New file `tests/test_layout_retry.py` (15 tests); **13 of the 15 fail
+against the pre-increment code**, verified by running them against a throwaway worktree of
+`2a7632d` (not by stashing).
+
+**Tests that legitimately changed this time** (each pinned the *old* retry contract, which
+is exactly what this increment replaces — none was "fixed" to make a broken change pass):
+
+| Test | Change | Why it is correct |
+|---|---|---|
+| `test_tailoring_pipeline.py::test_layout_retry_shortens_the_cv_until_it_fits` | asserted the retry was `offline.last_prompt`; now selects the retry by its marker | The letter is drafted last, so the old assertion was checking the *letter*; it passed only because the whole context was re-sent. It now pins the retry itself |
+| `test_tailoring_pipeline.py::test_layout_retry_budget_shrinks_with_each_attempt` | selects retries by `LAYOUT RETRY` instead of `LAYOUT CORRECTION` | The 650/550 budget assertions are unchanged; only the marker moved |
+| `test_editorial_instructions.py::test_a_layout_retry_also_carries_the_requirements` | inverted: the retry no longer re-sends them; the draft still carries them exactly once | The retry stopped re-sending the context. The requirement that matters — the checks reach the model, once — is asserted more precisely than before |
+| `test_profile_serialization.py::test_a_layout_retry_reuses_the_serialized_profile` | inverted: the profile block is now on the draft and letter **only** | Increment 1's invariant was "the same bytes every time" because the retry re-sent the context. Item 1 goes further: re-sending it is now the regression |
+
+`test_tailor_service.py:114` was **not** changed: it asserts
+`shorter['summary'][0] in ... or 'CURRENT CV:' in ...`, and the second clause still holds.
+
+**Next action: Phase 3, item 3 — enable structured output (`response_schema`)**, in a new
+chat. `_call_gemini`'s config and `response_mime_type` and `parse_json_response` are item
+3's to change; item 1 touched only the retry path and the parser's default-off flag.
+
+**Do not re-open increments 4 or 2.** Neither was touched by this increment.
 
 ### Phase 3, increment 2 — remove or merge the editorial-review pass (2026-10-26)
 
@@ -276,9 +365,9 @@ Re-confirm each decision when its phase begins.
 | Area | State |
 |---|---|
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
-| Dev branch | 19 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increments 4 and 2 done |
+| Dev branch | 20 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 increments 4, 2 and 1 done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **309 passed** (~107 s); fast lane `-m "not requires_latex"` → 279 passed (~6 s) |
+| Test baseline | **324 passed** (~108 s); fast lane `-m "not requires_latex"` → 294 passed (~6 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate`, `render`, `doctor` |
 | HTTP API | **Multi-profile aware** — `/api/tailor` and the download routes resolve `profile_id` through the store and fail closed (`test_api.py`, 20 tests) |
 | Fixtures | Synthetic only — `tests/fixtures/`; a test asserts no real identity appears in them |
@@ -287,19 +376,21 @@ Re-confirm each decision when its phase begins.
 | Real data in public repo | **Untracked since Phase 2**; still present in history (see blocker 2) |
 | Assessment | Complete and committed — [`ASSESSMENT.md`](ASSESSMENT.md) |
 | Decisions | 11 approved; ADR 0009 amended 2026-10-26 (D-11 → Phase 5) |
-| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4 and 2 of 6 done); next is Phase 3 increment 1 |
+| Roadmap | Phase 0, 1.1, **1 and 2 complete**, **Phase 3 in progress** (increments 4, 2 and 1 of 6 done); next is Phase 3 increment 3 |
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **309 passed**, 1 warning (~107 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **279 passed**,
+- `.venv\Scripts\python.exe -m pytest -q` → **324 passed**, 1 warning (~108 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **294 passed**,
   30 deselected (~6 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite.
 - **No existing test was modified before Phase 2.** The suite grew 141 → 190 in Phase 1,
   190 → 262 in Phase 2, 262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3
-  increment 1 (all new files), and 298 → **309** in increment 2 (one new file, plus the
-  legitimate edits listed in that increment's section — the first time edits to existing
-  tests were intended rather than incidental). In Phase 2,
+  increment 1 (all new files), 298 → 309 in increment 2 (one new file, plus the legitimate
+  edits listed in that increment's section — the first time edits to existing tests were
+  intended rather than incidental), and 309 → **324** in increment 1 of the agreed order
+  (one new file, plus four existing tests that pinned the retry contract this increment
+  deliberately replaced). In Phase 2,
   four *path assertions* across three pre-existing tests were updated because the output layout
   itself changed (`outputs/<job_id>/` → `outputs/<profile_id>/<job_id>/`); their assertions
   about content are unchanged.
@@ -316,15 +407,26 @@ Re-confirm each decision when its phase begins.
   requirements reach the CV call only, that the gate is unchanged, and that the call counts
   are 2/3/5: **9 of its 11 tests fail against the pre-increment code**, verified by stashing
   `generation.py` and `tailor_service.py`.
+- `tests/test_layout_retry.py` (new, Phase 3 increment 1 of the agreed order) asserts the
+  retry sends a targeted brief and the current CV rather than the whole context, that a
+  delta is merged onto the validated CV and re-gated, that a delta cannot address an
+  employer/date/education field, and that an unappliable delta fails the run instead of
+  silently keeping the long CV: **13 of its 15 tests fail against `2a7632d`**, verified by
+  running them in a throwaway worktree of that commit (not by stashing).
 - `cvtailor render` needs no API key; `cvtailor doctor` checks the key for *presence* only
   unless `--verify-key` is passed.
 - Backend `import main` ≈ **1.9 s**; `load_profile()` ≈ **169 ms**.
 - LLM calls per application: **2 min / 3 typical / 5 max-successful / 12 worst** (was 3/4/6/18
-  before increment 2).
+  before increment 2). **Unchanged by increment 1 of the agreed order** — that increment
+  lowers tokens per retry, not the number of retries.
 - Estimated cost per application (`gemini-3.8-flash`): **$0.016 / $0.026 / $0.048** (was
-  $0.027 / $0.038 / $0.060).
-- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below); the
-  increment did **not** change provider or model, so no re-verification was owed (decision 7).
+  $0.027 / $0.038 / $0.060 before increment 2). Increment 1 of the agreed order lowers the
+  typical case further (retry input 3,488 → 740 tokens on the recorded fixture) but the
+  figures in ASSESSMENT §5 are quoted against the fixture transcript, **not** the 6,438-token
+  production CV call, so they are not restated here as a production saving.
+- Pricing verified against ai.google.dev on 2026-10-23 (see ADR 0010 and D-5 below); neither
+  increment 2 nor increment 1 changed provider or model, so no re-verification was owed
+  (decision 7).
 
 ---
 

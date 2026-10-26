@@ -605,10 +605,13 @@ def test_layout_retry_shortens_the_cv_until_it_fits(
     assert result.token_usage.cv_attempts == 2
     manifest = read_json(Path(result.source_path).with_name('generation_result.json'))
     assert manifest['cv_page_history'] == [3, 2]
-    # The retry must be sent the current candidate, not the original prompt alone.
-    assert 'CURRENT CV:' in offline.last_prompt
-    assert 'LAYOUT CORRECTION' in offline.last_prompt
-    assert '2 words' not in offline.last_prompt
+    # The retry must be sent the *current* candidate, not the original prompt alone.
+    # Since Phase 3 item 1 it is a targeted retry: it carries the current CV and a
+    # delta brief, and no longer the whole context -- see tests/test_layout_retry.py.
+    retry = [p for p in offline.prompts if 'LAYOUT RETRY' in p]
+    assert len(retry) == 1, 'expected exactly one layout retry'
+    assert 'CURRENT CV:' in retry[0]
+    assert '2 words' not in retry[0]
 
 
 def test_layout_retry_budget_shrinks_with_each_attempt(
@@ -622,7 +625,7 @@ def test_layout_retry_budget_shrinks_with_each_attempt(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
 
-    budgets = [p for p in offline.prompts if 'LAYOUT CORRECTION' in p]
+    budgets = [p for p in offline.prompts if 'LAYOUT RETRY' in p]
     assert len(budgets) == 2
     assert 'approximately 650 words' in budgets[0]
     assert 'approximately 550 words' in budgets[1]

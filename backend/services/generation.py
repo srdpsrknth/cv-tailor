@@ -50,10 +50,19 @@ LAYOUT_BUDGET_FLOOR = 400
 _FACTS_CACHE_FIELD = "_cvtailor_facts_json"
 
 
-def parse_json_response(text: str) -> dict:
+def parse_json_response(text: str, accept_delta: bool = False) -> dict:
     """Use the same parser for first drafts, reviews, and length retries.
 
     Accept wrappers around complete JSON; never repair truncated document data.
+
+    ``accept_delta`` additionally accepts the *targeted* retry shape: an object of unit
+    ids such as ``{"experience[0].bullets[1]": "..."}``, which has no document key and
+    would otherwise be rejected as "not a document". It is off by default and is only
+    switched on for layout retries, so a draft that returns a stray object still fails
+    loudly rather than being treated as a partial document. Whether the object really
+    is a delta -- rather than an arbitrary JSON blob -- is then decided by
+    :func:`looks_like_cv_delta`, and every key is validated by
+    :func:`apply_cv_delta` before anything is merged.
     """
     if not isinstance(text, str) or not text.strip():
         raise ValueError("The model returned an empty document.")
@@ -63,9 +72,11 @@ def parse_json_response(text: str) -> dict:
             value, _ = decoder.raw_decode(text[start:].lstrip())
         except json.JSONDecodeError:
             continue
-        if isinstance(value, dict) and any(
-            key in value for key in ("cv", "cover_letter", "experience", "paragraphs")
-        ):
+        if not isinstance(value, dict):
+            continue
+        if any(key in value for key in ("cv", "cover_letter", "experience", "paragraphs")):
+            return value
+        if accept_delta and looks_like_cv_delta(value):
             return value
     raise ValueError("The model response did not contain a complete document JSON object.")
 
@@ -397,30 +408,253 @@ def build_cv_prompt(prompt_text: str, context: str) -> str:
 
 
 def layout_correction_instruction(page_count: int, budget: int, rules: ProfileRules) -> str:
-    """The shortening instruction for one layout retry."""
-    project_clause = ""
-    for needle, employer_rules in rules.special_employers.items():
-        expected_projects = employer_rules.get("project_count")
-        if expected_projects:
-            project_clause = (
-                f" Keep one {needle.capitalize()} attribution project with three concise "
-                "bullets; other projects can be summarized in role bullets."
-            )
-            break
+    """The shortening rules for one layout retry, without a heading.
+
+    The rules are byte-identical to what the whole-document instruction always said --
+    Phase 3, item 1 changed what the retry *sends* and what it *asks for*, not whether
+    these constraints still apply. The heading comes from
+    :func:`layout_retry_instruction`, which is the only caller: a retry is no longer a
+    ``LAYOUT CORRECTION`` (that string identified the old, whole-document contract), and
+    keeping it here would put two different labels on the same brief.
+    """
     return (
-        f"\nLAYOUT CORRECTION: The current CV rendered to {page_count} pages. "
+        f"The current CV rendered to {page_count} pages. "
         f"Reduce its body text to approximately {budget} words or fewer. "
         "Prioritize concise responsibilities; reduce repetitive bullets and less relevant project detail. "
         "Keep all employers and exact dates, education and core skills."
-        + project_clause +
-        " Do not change facts, shrink the font, or turn ongoing work into completed work. "
-        "Return the complete shorter CV JSON, not just changes.\nCURRENT CV:\n"
+        + pinned_project_clause(rules) +
+        " Do not change facts, shrink the font, or turn ongoing work into completed work."
+    )
+
+
+def pinned_project_clause(rules: ProfileRules) -> str:
+    """The project constraint implied by the candidate's own rules, if any.
+
+    Derived from ``rules`` rather than hardcoded, so a second candidate is not told
+    to keep an employer's project shape it does not have.
+    """
+    for needle, employer_rules in rules.special_employers.items():
+        expected_projects = employer_rules.get("project_count")
+        if expected_projects:
+            return (
+                f" Keep one {needle.capitalize()} attribution project with three concise "
+                "bullets; other projects can be summarized in role bullets."
+            )
+    return ""
+
+
+#: Marks a retry prompt. Deliberately not ``LAYOUT CORRECTION``: that string identified
+#: the old, whole-document contract, and a test must be able to tell the two apart.
+LAYOUT_RETRY_MARKER = "LAYOUT RETRY"
+
+
+def cv_body_words(cv: TailoredCV) -> int:
+    """Words of body text in the document, measured the way the brief talks about it.
+
+    Summary and responsibilities only. Bullets inside a *project* and the skills list
+    are deliberately excluded: they are the units the model consolidates and reorders
+    to make room, so counting them would make the number go up while the document got
+    shorter. Anchoring the budget to text the model may only shorten keeps the two
+    moving in the same direction.
+    """
+    return sum(len(line.split()) for line in cv.summary) + sum(
+        len(bullet.split()) for exp in cv.experience for bullet in exp.bullets
+    )
+
+
+def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
+    """The current CV's shape in one line: body length, summary and employer sizes.
+
+    The old brief told the model to hit "approximately 650 words" without ever saying
+    how long the document was -- the recorded fixtures are ~80-100 real words, so the
+    target described a document three to eight times the size of the one being
+    shortened. This line makes the target readable against reality, and it is measured
+    from the CV that was actually rendered.
+
+    The attempt number is included so that a correction loop, which re-sends the same
+    CV after an invalid retry, does not present a stale "shortening attempt 1" label.
+
+    It deliberately does **not** quote the CV's text back: the model wrote it, and
+    echoing it would restore the repetition this increment removes.
+    """
+    summary_words = sum(len(line.split()) for line in cv.summary)
+    bullet_words = sum(len(bullet.split()) for exp in cv.experience for bullet in exp.bullets)
+    employers = "; ".join(
+        f"{exp.company}: {len(exp.bullets)} bullets"
+        + (f", {len(exp.projects)} project(s)" if exp.projects else "")
+        for exp in cv.experience
+    )
+    return (
+        f"Shortening attempt {attempt}. Current body: {cv_body_words(cv)} words "
+        f"({summary_words} summary + {bullet_words} responsibility)."
+        + (f" Employers: {employers}." if employers else "")
+    )
+
+
+def layout_retry_instruction(
+    cv: TailoredCV, page_count: int, budget: int, attempt: int, rules: ProfileRules
+) -> str:
+    """The targeted brief for one layout retry.
+
+    Replaces the old "here is the whole context again, return the complete shorter CV"
+    instruction. Everything the retry needs to know about the *document* is measured
+    here, and the response may be a delta instead of a copy:
+
+    * the response may be a delta object of replacement values, merged onto the CV
+      that was just rendered (:func:`apply_cv_delta`);
+    * the complete-CV shape is still accepted, so a model that ignores the delta is not
+      a failure -- it is simply as expensive as before.
+
+    The context (profile, job description, prompt file) is deliberately absent: it was
+    sent on the draft call, and repeating it is what this increment removes.
+
+    The ``LAYOUT RETRY`` marker leads the brief so a retry is identifiable on its own,
+    and so a test can tell it apart from the old ``LAYOUT CORRECTION`` contract.
+    """
+    retry = layout_correction_instruction(page_count, budget, rules)
+    if attempt:
+        retry += (
+            f" This is shortening attempt {attempt + 1} and the CV still renders to "
+            f"{page_count} pages; cut deeper than last time, starting with the longest "
+            "units and the least relevant project detail."
+        )
+    return (
+        f"\n{LAYOUT_RETRY_MARKER}\n"
+        + retry
+        + "\nKeep the summary and every responsibility bullet; merge or shorten them "
+        "rather than removing a field. Do not rename, re-employer, re-date, remove an "
+        "achievement or a metric, or drop a supporting claim.\n"
+        + layout_inventory(cv, attempt + 1)
+        + '\nReturn either the complete shorter CV JSON, or a delta object of only the '
+        'units that change, e.g. {"summary": [...], "experience[0].bullets[1]": '
+        '"shorter text"}. Units not returned are kept unchanged.\nCURRENT CV:\n'
     )
 
 
 def layout_budget(attempt: int) -> int:
     """Body-word budget for a given failed layout attempt."""
     return max(LAYOUT_BUDGET_FLOOR, LAYOUT_BUDGET_START - attempt * LAYOUT_BUDGET_STEP)
+
+
+# --- the targeted delta -----------------------------------------------------------------
+
+#: Units a delta may replace. Everything it cannot address is a fact the CV was
+#: already validated on: employers, titles, dates, education, certifications, the
+#: work-authorization label, and the skills categories themselves.
+_DELTA_KEY_PATTERN = re.compile(
+    r"^(?:"
+    r"summary"
+    r"|experience\[\d+\]\.bullets"
+    r"|experience\[\d+\]\.bullets\[\d+\]"
+    r"|experience\[\d+\]\.projects\[\d+\]\.name"
+    r"|experience\[\d+\]\.projects\[\d+\]\.bullets"
+    r"|experience\[\d+\]\.projects\[\d+\]\.bullets\[\d+\]"
+    r"|skills\.[^.\[\]]+"
+    r")$"
+)
+
+
+def looks_like_cv_delta(data: dict) -> bool:
+    """True when a parsed retry response replaces units instead of returning the document.
+
+    A response containing ``cv`` or ``experience`` is a complete document, which is what
+    ``parse_json_response`` guarantees and what both fixture transcripts use. Anything
+    else with at least one recognisable delta key is a delta. A response that is
+    neither fails loudly rather than being guessed at.
+    """
+    if not isinstance(data, dict):
+        return False
+    if any(key in data for key in ("cv", "experience")):
+        return False
+    return bool(data) and all(isinstance(key, str) for key in data) and any(
+        _DELTA_KEY_PATTERN.match(key) for key in data
+    )
+
+
+def _require_strings(value, key: str) -> list:
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"unknown unit {key!r}: expected a string or a list of strings")
+    if not any(item.strip() for item in value):
+        raise ValueError(f"unknown unit {key!r}: an empty replacement would delete text")
+    return value
+
+
+def apply_cv_delta(cv: TailoredCV, delta: dict) -> TailoredCV:
+    """Merge a delta of replacement values onto a CV, returning a new CV.
+
+    This is why a targeted retry cannot break the promises ``validate_cv`` makes. The
+    input was already accepted by the gate, and the only units a delta may address are
+    prose the gate does not anchor a fact to: the summary, bullets, project names and
+    the skills list. Employers, titles, dates, education, certifications and the
+    work-authorization label are simply **not addressable**, so no delta can invent an
+    employer, change a date, or turn ongoing work into completed work.
+
+    A key that is not addressable, names a unit that does not exist, or carries a value
+    of the wrong type raises ``ValueError``. It is never ignored: silently dropping part
+    of a delta would produce a document the model did not ask for.
+
+    The result is a *copy*; the caller's CV is left untouched, so a rejected retry
+    cannot leave the accepted document half-edited.
+    """
+    merged = cv.model_copy(deep=True)
+    unknown: list[str] = []
+    for key, value in delta.items():
+        if not isinstance(key, str) or not _DELTA_KEY_PATTERN.match(key):
+            unknown.append(str(key))
+            continue
+        if key == "summary":
+            merged.summary = _require_strings(value, key)
+        elif key.startswith("skills."):
+            merged.skills[key[len("skills."):]] = _require_strings(value, key)
+        else:
+            _merge_experience_unit(merged, key, value)
+    if unknown:
+        raise ValueError(
+            "unknown unit(s) " + ", ".join(repr(item) for item in unknown)
+            + ": a delta may only replace the summary, bullets, project names/bullets "
+            "or an existing skills category"
+        )
+    return merged
+
+
+def _merge_experience_unit(cv: TailoredCV, key: str, value) -> None:
+    """Apply one ``experience[...]`` key, rejecting anything that does not exist."""
+    failure = ValueError(f"unknown unit {key!r}: no such unit in the current CV")
+    match = re.match(
+        r"^experience\[(\d+)\](?:\.bullets(?:\[(\d+)\])?|\.projects\[(\d+)\]"
+        r"\.(?:name|bullets(?:\[(\d+)\])?))$",
+        key,
+    )
+    if match is None:
+        raise failure
+    exp_index, bullet_index, project_index, project_bullet_index = match.groups()
+    if int(exp_index) >= len(cv.experience):
+        raise failure
+    exp = cv.experience[int(exp_index)]
+
+    if bullet_index is not None:
+        if int(bullet_index) >= len(exp.bullets):
+            raise failure
+        exp.bullets[int(bullet_index)] = _require_strings(value, key)[0]
+        return
+    if project_index is None:
+        exp.bullets = _require_strings(value, key)
+        return
+
+    if int(project_index) >= len(exp.projects):
+        raise failure
+    project = exp.projects[int(project_index)]
+    if project_bullet_index is not None:
+        if int(project_bullet_index) >= len(project.bullets):
+            raise failure
+        project.bullets[int(project_bullet_index)] = _require_strings(value, key)[0]
+    elif key.endswith(".name"):
+        project.name = _require_strings(value, key)[0]
+    else:
+        project.bullets = _require_strings(value, key)
+
 
 
 # --- the generation pipeline ----------------------------------------------------------
@@ -477,8 +711,17 @@ class DocumentGenerator:
         work_country: Optional[str] = None,
         company_name: Optional[str] = None,
         role_title: Optional[str] = None,
+        base_cv: Optional[TailoredCV] = None,
     ):
-        """Call the model until its response validates, or raise after three attempts."""
+        """Call the model until its response validates, or raise after three attempts.
+
+        ``base_cv`` names the document a CV retry is shortening. When it is supplied, a
+        response may be a *delta* (:func:`apply_cv_delta`) as well as a complete CV, and
+        either way the result re-enters :meth:`_build_model`, so ``validate_cv`` gates it
+        exactly as it gates a draft. There is no branch that returns a document the gate
+        has not seen, and no branch that quietly keeps ``base_cv`` when the model fails:
+        a retry that cannot be applied is retried and then raises.
+        """
         last_error = ""
         previous = ""
         for _ in range(MAX_VALIDATION_ATTEMPTS):
@@ -492,8 +735,19 @@ class DocumentGenerator:
             self.counts[kind].add(inputs, outputs)
             self.drafts.append({"component": kind, "response": response})
             try:
-                data = parse_json_response(response)
-                model = self._build_model(data, kind, work_country, company_name, role_title)
+                data = parse_json_response(response, accept_delta=base_cv is not None)
+                if base_cv is not None and looks_like_cv_delta(data):
+                    # A delta is merged onto the *validated* CV, then gated again. The
+                    # two checks are complementary: the merge guarantees employers,
+                    # titles and dates are unchanged; the gate guarantees the new prose
+                    # does not claim a banned tool, a forbidden summary verb, or
+                    # sponsorship.
+                    model = self._build_model(
+                        {"cv": apply_cv_delta(base_cv, data).model_dump()},
+                        kind, work_country, company_name, role_title,
+                    )
+                else:
+                    model = self._build_model(data, kind, work_country, company_name, role_title)
                 return model, data
             except ValueError as error:
                 last_error = str(error)
@@ -603,17 +857,31 @@ class DocumentGenerator:
         role_title: Optional[str],
         explanation: Optional[dict],
     ):
-        """One layout retry: revise the *current* candidate with a tighter budget.
+        """One layout retry: shorten the *current* candidate with a tighter budget.
 
-        Uses the identical complete-JSON parser and validation as every other call.
+        Until Phase 3 item 1 this re-sent ``cv_prompt`` -- prompt file, editorial
+        requirements, job description and the whole profile -- plus the complete CV, and
+        asked for a complete shorter CV. Measured on the recorded Nordwind run with a
+        real tokenizer, that retry sent more input (3,488 tokens) than the draft itself
+        (2,886) and asked for ~480 output tokens of JSON that were mostly a copy of the
+        previous response.
+
+        What is sent now is the retry brief and the current CV: the context was already
+        sent on the draft call, and a delta response can replace only the units that
+        actually need shortening. ``cv_prompt`` stays in the signature so callers are
+        unchanged, but it is deliberately no longer re-sent.
+
+        The gate is unchanged: see :meth:`generate`. ``extract_explanation`` is still
+        read first from the retry's own response, so a retry that returns its own
+        explanation supersedes the draft's.
         """
         self._status(f"CV is {page_count} pages; shortening content...")
         budget = layout_budget(attempt)
         cv, data = self.generate(
-            cv_prompt
-            + layout_correction_instruction(page_count, budget, self.rules)
+            layout_retry_instruction(cv, page_count, budget, attempt, self.rules)
             + cv.model_dump_json(indent=2),
             "cv", work_country, company_name, role_title,
+            base_cv=cv,
         )
         return cv, extract_explanation(data) or explanation
 

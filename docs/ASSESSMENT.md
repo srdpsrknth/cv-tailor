@@ -273,6 +273,15 @@ The per-call inputs are recomputed from the actual prompt bytes: the CV call gro
 (616 chars ≈ 288 tokens), and the ≈7,772-token review call disappears entirely. On the
 happy path that is a **41% reduction in input tokens** and **one fewer call**.
 
+> **A layout retry is no longer priced as a second CV call (Phase 3, increment 1 of the
+> agreed order).** The "Typical" and "Max successful" rows above charge each retry a full
+> ≈6,438-token CV call plus a full CV JSON. Since that increment a retry sends only the
+> targeted brief and the current CV — measured at **740 tokens** on the recorded fixture,
+> versus 3,488 before — so those two rows are now **upper bounds**, not estimates. They are
+> left as they stand because their per-call inputs come from the fixture transcript rather
+> than the 6,438-token production call, and restating a production saving from a fixture
+> measurement would be a derived figure presented as a measured one.
+
 > **Correction carried from the pre-increment table.** The old "Typical (4 calls)" row
 > stated 34,601 input tokens, which is the arithmetic of *five* calls (draft + review +
 > two retries + letter), not four. The call count and the token total disagreed. The rows
@@ -280,20 +289,23 @@ happy path that is a **41% reduction in input tokens** and **one fewer call**.
 > describe the same run. The old `Worst` row was also mislabelled: at 65,513 tokens it
 > described 6 calls @ ~10,919, i.e. the max-successful case, not the retry-exhausted one.
 
-**Dominant inefficiency (still open):** each layout retry re-sends the entire context
-*plus* the full previous CV JSON (≈7,772 tokens) to produce a shorter variant. With the
-review pass gone this is now the largest single source of repeated input.
+**Dominant inefficiency (RESOLVED — Phase 3, increment 1 of the agreed order, 2026-10-26):**
+each layout retry used to re-send the entire context *plus* the full previous CV JSON to
+produce a shorter variant. With the review pass gone this was the largest single source of
+repeated input. See the measured effect below.
 
 **Optimization opportunities (evidence-based, in priority order)**
 
-1. **Targeted layout retry instead of full regeneration** — send only the sections to shorten
-   as a delta. Est. **25–45%** of typical-case input cost. **Now the top opportunity.**
+1. ~~**Targeted layout retry instead of full regeneration**~~ — **DONE — Phase 3, increment 1
+   of the agreed order (2026-10-26).** The retry now sends a targeted brief and the current
+   CV, and accepts a delta merged onto the validated CV. Measured: retry input 3,488 → **740**
+   tokens on the recorded fixture. See the measured effect below.
 2. ~~**Remove or merge the editorial-review pass**~~ — **DONE — Phase 3, increment 2
    (2026-10-26).** The requirements were folded into the draft prompt
    (`generation.EDITORIAL_REQUIREMENTS`, injected by `build_cv_prompt`) and the second CV
    call was deleted. See the measured effect below.
 3. **Enable structured output** (`response_schema`) — removes the parse-failure retry loop,
-   the dominant tail risk.
+   the dominant tail risk. **Now the top opportunity, and the next increment.**
 4. ~~**Serialize the profile once** per application rather than per call.~~
    **DONE — Phase 3, increment 1 (2026-10-26).** The context block is now built once per
    application and reused by the CV prompt, the letter prompt and every layout retry
@@ -323,6 +335,39 @@ response. Validation is unchanged: the draft was always the document `validate_c
 and the review's output was re-validated from scratch anyway — so the pass bought a second
 draft, not a stronger gate. Two tests assert that an invalid draft still fails the run and
 that no letter is drafted from it.
+
+**Measured effect of optimisation 1 (2026-10-26).** Measured by driving the real pipeline
+with the recorded Nordwind transcript and counting the exact bytes each call receives.
+Counts use `tiktoken`'s `cl100k_base` as a **local proxy** — Gemini's tokenizer is not
+available offline, so these are not billed counts, but every before/after pair is on the
+same basis:
+
+| Retry input | Before | After |
+|---|---|---|
+| Retry prompt | 3,488 tok (16,508 chars) | **740 tok (3,301 chars)** |
+| of which context (profile + JD) | 1,408 tok | **0** |
+| Whole 3-call run | 8,365 tok | **5,617 tok** |
+| Retry output, delta vs whole CV | 386–481 tok | **91–267 tok** |
+
+The retry now sends **fewer input tokens than the draft call** (740 vs 2,886) rather than
+more. That is **−79% retry input** against the baseline retry, and **−33%** for the whole
+typical run; the run still pays for the draft and the letter, which this increment does not
+change. **Call counts are unchanged at 2/3/5** — this lowers tokens per retry, not the
+number of retries.
+
+The delta cannot weaken the gate. `validate_cv` runs on the *merged* document; the merge
+(`generation.apply_cv_delta`) can address only the summary, bullets, project names/bullets
+and existing skills categories, so employers, titles, dates, education, certifications and
+`work_authorization` are structurally unreachable and ongoing work cannot be completed by a
+retry. An unknown key raises, the retry goes through the unchanged 3-attempt correction
+loop, and the run then fails — there is no silent fallback that keeps the unshortened CV.
+
+> **Caveat on extrapolating to production.** The fixture documents are ~80–100 body words,
+> so on them the 650/550-word budget is not the binding constraint and a model using the
+> delta path has little to shorten. The saving scales with how much the retry actually
+> changes, and is therefore *larger* on a real ~650-word CV than the fixture shows. No paid
+> live run was made to confirm the delta path's behaviour on real documents; that belongs
+> to a budgeted evaluation, not to the offline suite.
 
 
 ---

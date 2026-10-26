@@ -103,10 +103,18 @@ def test_every_prompt_carries_the_serialized_profile(
         'a prompt did not carry the exact serialized profile'
 
 
-def test_a_layout_retry_reuses_the_serialized_profile(
+def test_a_layout_retry_does_not_re_send_the_serialized_profile(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
-    """The retry appends the *same* context; only the CV JSON after it differs."""
+    """The retry stopped appending the context, so the profile is sent exactly once.
+
+    Until Phase 3 item 1 this asserted the *opposite* -- that the retry re-used the
+    same serialized profile block -- because the retry re-sent the whole context and it
+    was that increment's job to prove the bytes were shared rather than rebuilt. Item 1
+    went further: the retry no longer re-sends the context at all, so the invariant
+    changed from "the same bytes every time" to "the context is sent once per
+    application". Re-sending it would now be the regression.
+    """
     offline = offline_service(analyst_session.texts())
     stub_renderers([3, 2])
 
@@ -115,15 +123,16 @@ def test_a_layout_retry_reuses_the_serialized_profile(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
 
-    # draft + one shorten + letter. The letter is drafted last, so the shortening prompt
-    # is the second -- assert on the prompt that carries the marker rather than on an
-    # index that ordering could change.
     assert offline.call_count == 3
     block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2)
-    assert all(block in prompt for prompt in offline.prompts)
-    shortening = [p for p in offline.prompts if 'LAYOUT CORRECTION' in p]
+    carrying = [p for p in offline.prompts if block in p]
+    assert len(carrying) == 2, (
+        'the profile block belongs on the draft and the letter, not on the retry'
+    )
+    shortening = [p for p in offline.prompts if 'LAYOUT RETRY' in p]
     assert len(shortening) == 1, 'expected exactly one layout retry'
-    assert block in shortening[0]
+    assert block not in shortening[0]
+    assert 'CURRENT CV:' in shortening[0]
 
 
 # --- the serialization itself now happens once ----------------------------------------

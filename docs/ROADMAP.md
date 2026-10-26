@@ -2,7 +2,7 @@
 
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
 complete, Milestone 1.1 is complete, **Phase 1 is complete**, **Phase 2 is complete and closed
-out**, and **Phase 3 is in progress** (increments 4 and 2 of 6 done — see [§Phase 3](#phase-3--llm-and-document-generation-improvements)).
+out**, and **Phase 3 is in progress** (increments 4, 2 and 1 of 6 done — see [§Phase 3](#phase-3--llm-and-document-generation-improvements)).
 Phases may be reordered, split or parallelised when dependencies justify it.
 
 Approved direction: **Option B — modular redesign, executed incrementally.** Keep the
@@ -193,14 +193,15 @@ order is **4 → 2 → 1 → 3**, then a new chat for **6**, and **5** only once
 Each is verified on its own, because each changes the call-count baseline the others are
 measured against; mixing them makes an intended change indistinguishable from a regression.
 Increment 2 changed the baseline: the counts are now **2 min / 3 typical / 5 max-successful**
-and those are what increment 1 must be measured against.
+and those are what increment 1 was measured against. **Increment 1 left those counts
+unchanged**, as intended.
 
 | # | Item | State |
 |---|---|---|
 | 4 | Serialise the profile once per application | **DONE** (`refactor:`, 2026-10-26) — byte-identical prompts, one serialisation per run; see §5 of [`ASSESSMENT.md`](ASSESSMENT.md) |
 | 2 | Remove or merge the editorial-review pass | **DONE** (`refactor:`, 2026-10-26) — requirements folded into the draft prompt, second CV call removed; calls 3/4/6 → **2/3/5**, best-case input tokens −41% |
-| 1 | Targeted layout retry instead of full regeneration | **Next in the agreed order** |
-| 3 | Enable structured output (`response_schema`) | Not started |
+| 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
+| 3 | Enable structured output (`response_schema`) | **Next in the agreed order** — new chat |
 | 6 | Provider interface, model routing, budget caps | Not started — new chat |
 | 5 | Cache validated results | Not started — only after 1–4 have settled |
 

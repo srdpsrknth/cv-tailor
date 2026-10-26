@@ -1,8 +1,8 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **309 passed**, 1 warning, ~107 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **279 passed**, 30 deselected, ~6 s.
+**Current baseline:** **324 passed**, 1 warning, ~108 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **294 passed**, 30 deselected, ~6 s.
 
 | | |
 |---|---|
@@ -12,13 +12,15 @@
 | Baseline after Phase 2 | 262 passed, ~106 s |
 | Baseline after the Phase 2 close-out | 282 passed, ~114 s |
 | Baseline after Phase 3 increment 1 | 298 passed, ~112 s |
-| **Baseline after Phase 3 increment 2** | **309 passed**, ~107 s |
+| Baseline after Phase 3 increment 2 | 309 passed, ~107 s |
+| **Baseline after Phase 3 increment 1 of the agreed order (targeted layout retry)** | **324 passed**, ~108 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
 The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, 190 → 262 in Phase 2,
-262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3 increment 1 (all new files), and
-298 → **309** in increment 2. The runtime increase is almost entirely `pdflatex`: real rendering
+262 → 282 in the 2026-10-26 close-out, 282 → 298 in Phase 3 increment 1 (all new files),
+298 → 309 in increment 2, and 309 → **324** in Phase 3 increment 1 of the agreed order
+(targeted layout retry). The runtime increase is almost entirely `pdflatex`: real rendering
 is exercised instead of mocked.
 
 > **Sandbox caveat.** Under the DSH `workspace-write` sandbox, pytest's `tmp_path` tests error
@@ -50,6 +52,19 @@ because removing the editorial-review call is precisely what they pinned:
 | `test_short_letter…`, `test_length_retry…` | dropped the now-nonexistent review response from the fake transcript | The transcript must match the calls the pipeline actually makes |
 | `test_profile_serialization.py:101`, `:121` | `call_count` 3 → 2, 4 → 3 | Same removal; the serialization invariant itself is untouched |
 
+Phase 3 increment 1 of the agreed order (targeted layout retry)'s exceptions — four tests
+that pinned the *old* retry contract, which is precisely what the increment replaces:
+
+| Test | Change | Why |
+|---|---|---|
+| `test_tailoring_pipeline.py::test_layout_retry_shortens_the_cv_until_it_fits` | asserted the retry was `offline.last_prompt`; now selects the retry by its marker | The letter is drafted last, so the old assertion was actually inspecting the **letter**; it only passed because the whole context was re-sent to the retry. It now pins the retry itself |
+| `test_tailoring_pipeline.py::test_layout_retry_budget_shrinks_with_each_attempt` | selects retries by `LAYOUT RETRY`, not `LAYOUT CORRECTION` | The 650/550 assertions are unchanged; only the marker moved |
+| `test_editorial_instructions.py::test_a_layout_retry_also_carries_the_requirements` | inverted — the retry no longer re-sends them; the draft still carries them exactly once | The checks still reach the model; the retry stopped re-sending the context |
+| `test_profile_serialization.py::test_a_layout_retry_reuses_the_serialized_profile` | inverted — the profile block is on the draft and letter **only** | Increment 1's invariant was "same bytes every time" *because* the retry re-sent the context; re-sending it is now the regression |
+
+`test_tailor_service.py:114` was not changed: its second clause (`'CURRENT CV:' in ...`) still
+holds on the targeted retry.
+
 Everything else passes unchanged. Rather than edit 32 call sites to thread a `profile_id` they
 are not about, `tests/conftest.py` sets `CVTAILOR_PROFILE_ID` and points `CVTAILOR_STORE` at a
 throwaway synthetic store once, for the whole suite.
@@ -60,11 +75,14 @@ throwaway synthetic store once, for the whole suite.
 |---|---|---|
 | `test_profile_serialization.py` | 16 | **New in increment 1.** The profile is serialized once per application; the rendered context is **byte-identical** with and without `profile_json` on every country-header branch; the `rules`-excluded facts memo returns the same text without re-serializing, never becomes a profile field, and does not un-ban a banned tool |
 | `test_editorial_instructions.py` | 11 | **New in increment 2.** The merged editorial requirements reach the **CV call only** (not the letter), are injected exactly once, and are carried by a layout retry too; the validation gate is unchanged (an invalid draft still fails the run and no letter is drafted from it); the call counts are **2/3/5** on the happy, typical and max-successful paths |
+| `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The retry sends the targeted brief and the current CV, with **no** profile, job description or prompt file; the brief reports the document's real body length; a delta response is merged onto the validated CV and **re-gated**, a full-CV response still works, an unknown/unaddressable key raises, a delta cannot write an employer/date/education field or complete an ongoing role, and an unappliable delta fails the run rather than silently keeping the long CV |
 
 `test_profile_serialization.py` was verified to be a real guard: **11 of its 16 tests fail
 against the pre-increment-1 code**. `test_editorial_instructions.py` likewise: **9 of its 11
 tests fail against the pre-increment-2 code** (checked by stashing `generation.py` and
-`tailor_service.py`).
+`tailor_service.py`). `test_layout_retry.py`: **13 of its 15 tests fail against `2a7632d`**,
+checked by adding a throwaway `git worktree` at that commit and running the new file there —
+no stashing in the working tree.
 
 ### Phase 2 additions
 

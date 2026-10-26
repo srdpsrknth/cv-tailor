@@ -71,10 +71,18 @@ def test_the_pipeline_sends_the_requirements_on_the_cv_call_only(
     assert offline.call_count == 2
 
 
-def test_a_layout_retry_also_carries_the_requirements(
+def test_a_layout_retry_no_longer_re_sends_the_requirements(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
-    """The retry reuses the same prompt, so it must not lose the editorial checks."""
+    """The retry stopped re-sending the brief, not the checks.
+
+    Until Phase 3 item 1 the retry re-sent the whole CV prompt, which carried these
+    requirements -- so this test asserted the retry carried them too. The retry is now
+    a targeted delta against the current CV and deliberately does not repeat the
+    context (see ``tests/test_layout_retry.py``). The requirement that matters is that
+    the *draft* carries them exactly once, and that the retry is gated identically:
+    a merge that broke a rule still fails, which is asserted there.
+    """
     offline = offline_service(analyst_session.texts())
     stub_renderers([3, 2])
 
@@ -83,9 +91,11 @@ def test_a_layout_retry_also_carries_the_requirements(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
 
-    shortening = [p for p in offline.prompts if 'LAYOUT CORRECTION' in p]
-    assert len(shortening) == 1
-    assert generation.EDITORIAL_REQUIREMENTS.strip() in shortening[0]
+    retries = [p for p in offline.prompts if 'LAYOUT RETRY' in p]
+    assert len(retries) == 1, 'the run must still have taken the retry path'
+    assert generation.EDITORIAL_REQUIREMENTS.strip() not in retries[0]
+    # Still exactly one call carrying them: the draft.
+    assert len(offline.prompts_containing(generation.EDITORIAL_REQUIREMENTS.strip())) == 1
 
 
 # --- the gate is unchanged --------------------------------------------------------------
