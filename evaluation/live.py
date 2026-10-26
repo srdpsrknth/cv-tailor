@@ -14,6 +14,7 @@ until it does, the set is a shortlist rather than a verdict.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from evaluation.cases import CASES, EvaluationCase, fixture_path
@@ -24,6 +25,25 @@ from evaluation.runner import live_run, plan
 
 def _read(path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _sandbox_store() -> str:
+    """A scratch store for evaluation output, inside the repository's ``.tmp/``.
+
+    The evaluation must not write a candidate's documents anywhere a real one lives,
+    and it must not need write access to the private store at all. ``.tmp/`` is
+    gitignored and already used for scratch work, so an evaluated run's job folders
+    land somewhere disposable and provably outside both the tracked tree and the real
+    store.
+
+    This is not only about privacy: the previous behaviour inherited the developer's
+    ``.env`` store, so a run wrote into ``<store>/outputs/<their id>/`` -- and on a
+    machine where that path is read-only it failed with a bare ``PermissionError``
+    that reads as a benchmark failure rather than a configuration one.
+    """
+    root = Path(__file__).resolve().parents[1] / ".tmp" / "evaluation-store"
+    root.mkdir(parents=True, exist_ok=True)
+    return str(root)
 
 
 def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
@@ -44,14 +64,38 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     profile = load_profile(str(fixture_path(case.profile_fixture)))
     posting = _read(fixture_path(case.posting_fixture))
 
+    # ``load_env_file=True``: the live run needs the provider's key, and ``.env`` is
+    # where this project keeps it (it is gitignored; see ADR 0011). This was ``False``
+    # while the suite was offline-only and made no call, which was correct then and
+    # wrong the moment it went live -- with ``False`` the key is invisible and *every*
+    # case fails with "OPENROUTER_API_KEY is not set", at zero cost, looking exactly
+    # like a benchmark where no model works.
+    #
+    # ``profile_id`` is overridden **away from whatever ``.env`` names**, and this is
+    # the privacy fix rather than tidiness. A developer's ``.env`` carries their own
+    # ``CVTAILOR_PROFILE_ID`` (this machine's says ``sreedeep``), and ``tailor_documents``
+    # files its output under that id. Left alone, an evaluation of *synthetic* fixtures
+    # would write job folders -- accepted documents included -- under a real candidate's
+    # profile, which is exactly the boundary ADR 0002/0011 exist to hold. The synthetic
+    # id is derived from the fixture so two cases cannot collide, and it is deliberately
+    # not a store id, so nothing here can be mistaken for a real candidate.
+    synthetic_id = f"eval_{case.name}"
     config = Config.from_env(
-        load_env_file=False,
+        load_env_file=True,
         overrides={
             "provider": "openrouter",
             "model": model.id,
             "profile_path": fixture_path(case.profile_fixture),
+            "profile_id": synthetic_id,
+            "profile_store_dir": _sandbox_store(),
         },
     )
+
+    # Fail **before** any paid work if the selected provider has no key. Without this
+    # the missing key surfaces as a per-case failure caught below and recorded as a
+    # metric, which is the one outcome a measurement must never produce: a
+    # misconfiguration that reads as a result. Cheap, and it costs nothing to be sure.
+    config.require_provider_key()
 
     try:
         result = tailor_service.tailor_documents(

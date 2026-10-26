@@ -24,6 +24,8 @@ the Gemini client is replaced and the OpenRouter transport is a recorded double.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from services import generation
@@ -254,6 +256,11 @@ def test_openrouter_translates_the_schema_into_its_own_envelope(monkeypatch):
 
     Verified against openrouter.ai/docs/features/structured-outputs on 2026-10-26:
     ``{"type": "json_schema", "json_schema": {"name", "strict", "schema"}}``.
+
+    **The schema inside is converted, not passed through**, and that assertion used to
+    be the opposite. Passing the SDK object through was the bug: it is not
+    JSON-serializable *and* it is not standard JSON Schema. See the dedicated tests
+    below for why that mattered in production.
     """
     sent = _record_openrouter_requests(monkeypatch)
     provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
@@ -262,11 +269,17 @@ def test_openrouter_translates_the_schema_into_its_own_envelope(monkeypatch):
 
     response_format = sent[-1]['json']['response_format']
     assert response_format['type'] == 'json_schema'
-    assert response_format['json_schema']['schema'] == generation.RESPONSE_SCHEMAS['cv']
     assert response_format['json_schema']['name']
     assert response_format['json_schema']['strict'] is True
     # The neutral schema must not also leak in under Gemini's key.
     assert 'response_schema' not in sent[-1]['json']
+
+    # It is plain JSON, not the SDK object.
+    schema = response_format['json_schema']['schema']
+    assert isinstance(schema, dict)
+    json.dumps(schema)  # would raise TypeError before the fix
+    # ...and the envelope the model is asked for survives the conversion.
+    assert set(schema.get('properties') or {}) >= {'cv'}
 
 
 def test_openrouter_requires_an_endpoint_that_supports_the_schema(monkeypatch):
@@ -281,6 +294,118 @@ def test_openrouter_requires_an_endpoint_that_supports_the_schema(monkeypatch):
     provider.generate('prompt', schema=generation.RESPONSE_SCHEMAS['cv'])
 
     assert sent[-1]['json']['provider'] == {'require_parameters': True}
+
+
+# --- the schema must be in the *standard* dialect, not the SDK's --------------------------
+
+def test_the_converted_schema_uses_lowercase_type_names(monkeypatch):
+    """The SDK spells types UPPERCASE; standard JSON Schema requires lowercase.
+
+    This is a real defect with real cost behind it. The conversion initially passed the
+    SDK's type names through, and a JSON-grammar endpoint does not degrade gracefully:
+    DeepInfra answered ``Grammar error: Invalid type: OBJECT`` and Parasail answered
+    ``Failed to compile json grammar ... Unsupported type``. Both are 400s, so the
+    attempt is paid for and produces nothing.
+
+    Invisible offline because ``types.Schema(type="OBJECT")`` is a *valid* object -- it
+    is simply not valid JSON Schema, and only the remote endpoint can say so.
+    """
+    sent = _record_openrouter_requests(monkeypatch)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    provider.generate('prompt', schema=generation.RESPONSE_SCHEMAS['cv'])
+
+    schema = sent[-1]['json']['response_format']['json_schema']['schema']
+    types_seen = set()
+
+    def collect(node):
+        if isinstance(node, dict):
+            value = node.get('type')
+            if isinstance(value, str):
+                types_seen.add(value)
+            elif isinstance(value, list):
+                types_seen.update(v for v in value if isinstance(v, str))
+            for child in node.values():
+                collect(child)
+        elif isinstance(node, list):
+            for child in node:
+                collect(child)
+
+    collect(schema)
+
+    assert types_seen, 'the schema declares no types at all'
+    for name in types_seen:
+        assert name == name.lower(), (
+            f'{name!r} is not a standard JSON Schema type name; endpoints that compile '
+            f'a JSON grammar reject the request outright'
+        )
+    assert {'object', 'string', 'array'} <= types_seen
+
+
+def test_the_converted_schema_drops_keywords_standard_validators_reject(monkeypatch):
+    """Gemini-only keywords must not reach a JSON-grammar endpoint.
+
+    ``nullable`` is translated into ``type: [..., "null"]`` rather than dropped, so a
+    field does not silently become required -- the compatibility fix must not change
+    the meaning of the schema.
+    """
+    sent = _record_openrouter_requests(monkeypatch)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    provider.generate('prompt', schema=generation.RESPONSE_SCHEMAS['cv'])
+
+    schema = sent[-1]['json']['response_format']['json_schema']['schema']
+    dumped = json.dumps(schema)
+    assert 'nullable' not in dumped
+    assert 'propertyOrdering' not in dumped and 'property_ordering' not in dumped
+
+
+def test_a_nullable_field_keeps_its_null_option(monkeypatch):
+    """Translating ``nullable`` to a ``"null"`` type is the point of translating it.
+
+    ``work_authorization`` is nullable in the CV schema. Dropping the keyword instead of
+    translating it would make the field mandatory in the constrained response -- a
+    behaviour change disguised as a compatibility fix, which is why it is asserted.
+    """
+    sent = _record_openrouter_requests(monkeypatch)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    provider.generate('prompt', schema=generation.RESPONSE_SCHEMAS['cv'])
+
+    schema = sent[-1]['json']['response_format']['json_schema']['schema']
+    work_auth = (
+        schema.get('properties', {})
+        .get('cv', {})
+        .get('properties', {})
+        .get('work_authorization')
+    )
+    assert work_auth is not None, 'the CV schema lost work_authorization'
+    declared = work_auth.get('type')
+    as_list = declared if isinstance(declared, list) else [declared]
+    assert 'null' in as_list, (
+        'a nullable field must keep "null" in its type, or the translation has '
+        'silently made it required'
+    )
+
+
+def test_a_plain_dict_schema_passes_through_unchanged(monkeypatch):
+    """The conversion must not rewrite a schema that is already standard.
+
+    A caller may hand a plain dict -- tests do -- and the dialect repair must be a
+    no-op there rather than a transformation that could alter it.
+    """
+    sent = _record_openrouter_requests(monkeypatch)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+    plain = {
+        'type': 'object',
+        'properties': {'ok': {'type': 'boolean'}},
+        'required': ['ok'],
+    }
+
+    provider.generate('prompt', schema=plain)
+
+    schema = sent[-1]['json']['response_format']['json_schema']['schema']
+    assert schema == plain
 
 
 def test_an_unconstrained_openrouter_call_does_not_require_parameters(monkeypatch):

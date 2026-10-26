@@ -486,3 +486,98 @@ class _CannedResponse:
     candidates: list = []
     usage_metadata = None
     text = '{"cv": {"title": "Recorded"}}'
+
+
+# --- the schemas must be *accepted* by the provider, not merely well-formed ---------------
+
+#: Keywords the Gemini API rejects outright. Verified against the live API on 2026-10-26:
+#: an otherwise identical schema succeeds without ``additionalProperties`` and fails with
+#: it, raising ``ValueError: additionalProperties is not supported in the Gemini API``.
+GEMINI_UNSUPPORTED_KEYWORDS = (
+    'additionalProperties',
+    'additional_properties',
+    '$schema',
+    'patternProperties',
+    'definitions',
+)
+
+
+def _walk_schema(node, path='$'):
+    """Yield ``(path, key, value)`` for every mapping entry in a dumped schema."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield path, key, value
+            yield from _walk_schema(value, f'{path}.{key}')
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _walk_schema(value, f'{path}[{index}]')
+
+
+def test_no_schema_uses_a_keyword_the_gemini_api_rejects():
+    """A schema the provider refuses is a paid failure, not a validation failure.
+
+    This is a regression guard with a real defect behind it. ``_cv_document_schema``
+    set ``additional_properties`` on ``skills``, and the Gemini API rejects that
+    keyword -- so **every schema-bearing draft call failed after three paid attempts
+    on the default provider**. It was invisible offline because the tests inspected
+    the schema object rather than asking whether the provider would accept it, and
+    the module's own comment claimed the keyword was unset while the code set it.
+
+    Asserted on the dumped schema, so it catches the keyword however it is spelled in
+    the SDK -- ``additional_properties`` in Python becomes ``additionalProperties`` on
+    the wire, and the API's complaint names the wire form.
+    """
+    from services import generation
+
+    for kind, schema in generation.RESPONSE_SCHEMAS.items():
+        dumped = schema.model_dump(exclude_none=True)
+        for path, key, _ in _walk_schema(dumped):
+            assert key not in GEMINI_UNSUPPORTED_KEYWORDS, (
+                f'{kind} schema sets {key!r} at {path}, which the Gemini API rejects '
+                f'with "not supported in the Gemini API". A draft call carrying this '
+                f'schema fails after three paid attempts.'
+            )
+
+
+def test_the_comment_and_the_code_agree_about_additional_properties():
+    """The schema's own documentation must describe the schema that exists.
+
+    The defect above survived review partly because the module comment stated
+    "``additionalProperties`` is left unset" while ``additional_properties`` was set
+    two screens later. A claim in a comment is not enforced by anything, so this
+    asserts the one property that was false and keeps the two in step.
+    """
+    from pathlib import Path
+
+    from services import generation
+
+    dumped = generation.RESPONSE_SCHEMAS['cv'].model_dump(exclude_none=True)
+    sets_it = any(
+        key in GEMINI_UNSUPPORTED_KEYWORDS for _, key, _ in _walk_schema(dumped)
+    )
+    source = Path(generation.__file__).read_text(encoding='utf-8')
+    claims_unset = '``additionalProperties`` is left unset' in source
+
+    assert not (sets_it and claims_unset), (
+        'the CV schema sets additionalProperties while the comment claims it is unset'
+    )
+
+
+def test_every_schema_keyword_is_one_the_sdk_models():
+    """A typo'd keyword is silently dropped by the SDK and changes nothing.
+
+    ``types.Schema`` admits only declared fields, so a misspelled keyword does not
+    raise -- it simply never reaches the provider, and the constraint the author
+    intended quietly does not exist. Asserted on the dumped form so that what is sent
+    is what was written.
+    """
+    from services import generation
+
+    for kind, schema in generation.RESPONSE_SCHEMAS.items():
+        dumped = schema.model_dump(exclude_none=True)
+        assert dumped, f'{kind} schema dumps to nothing'
+        assert 'properties' in dumped, f'{kind} schema declares no properties'
+        # The envelope the parser relies on must survive into the wire form.
+        assert kind in dumped['properties'], (
+            f'{kind} schema does not expose the {kind!r} envelope key'
+        )

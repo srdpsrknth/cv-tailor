@@ -6,6 +6,15 @@ Every test here is offline: ``doctor`` never contacts Google unless
 
 Commands are called through :func:`cli.main.main` with an explicit argv, so the
 tests cover the real parsing and dispatch rather than a reimplementation.
+
+**"No key configured" needs more than ``delenv``, and that was a real defect.**
+``Config.from_env`` loads ``.env`` by default, so a developer whose ``.env`` holds a
+*real* ``GEMINI_API_KEY`` defeats ``monkeypatch.delenv('GEMINI_API_KEY')``: the key is
+re-supplied from the file and the two ``generate`` tests below stop failing at the key
+check and start making **live, paid API calls**. They passed for months only because
+this project's ``.env`` shipped a placeholder. ``no_api_key`` closes that hole by
+patching the environment *and* the file-loading step, so "offline" is enforced rather
+than assumed.
 """
 from __future__ import annotations
 
@@ -21,6 +30,26 @@ sys.path.insert(0, str(ROOT / 'backend'))
 from cli.main import main  # noqa: E402
 
 from support import copy_content_json, latex_available  # noqa: E402
+
+
+@pytest.fixture
+def no_api_key(monkeypatch):
+    """Make "no API key is configured" true, whatever this machine's ``.env`` holds.
+
+    Both halves are needed. ``delenv`` alone is defeated by the ``.env`` file, and
+    patching the loader alone is defeated by a key already exported into the process
+    (``load_dotenv`` mutates ``os.environ`` process-wide, so a previous test's load
+    persists). Together they cannot be worked around by the environment the tests
+    happen to run in.
+    """
+    import config as config_module
+
+    for name in ('GEMINI_API_KEY', 'OPENROUTER_API_KEY'):
+        monkeypatch.delenv(name, raising=False)
+    # `load_dotenv(candidate)` is the only step that reads the file; making it a no-op
+    # leaves every other part of `from_env` under test.
+    monkeypatch.setattr(config_module, 'load_dotenv', lambda *a, **k: False)
+    return monkeypatch
 
 # Same two-part convention as the renderer suite: the `requires_latex` marker lets the
 # fast lane deselect the slow pdflatex work, and the skipif keeps the suite green on a
@@ -176,9 +205,8 @@ def test_render_rejects_malformed_content(tmp_path, capsys):
 
 
 @pytest.mark.requires_latex
-def test_render_produces_the_documents_without_an_api_key(tmp_path, capsys, monkeypatch):
+def test_render_produces_the_documents_without_an_api_key(tmp_path, capsys, no_api_key):
     """The whole point of the render path: real output, zero LLM calls."""
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     application = _scratch_application(tmp_path)
     content = application / 'source' / 'content.json'
 
@@ -195,13 +223,12 @@ def test_render_produces_the_documents_without_an_api_key(tmp_path, capsys, monk
 
 
 @pytest.mark.requires_latex
-def test_render_page_count_matches_the_existing_script(tmp_path, monkeypatch):
+def test_render_page_count_matches_the_existing_script(tmp_path, monkeypatch, no_api_key):
     """Acceptance criterion: the CLI reproduces the script's page count."""
     import subprocess
 
     from support import page_count
 
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     application = _scratch_application(tmp_path)
     content = application / 'source' / 'content.json'
 
@@ -239,8 +266,7 @@ def test_render_page_count_matches_the_existing_script(tmp_path, monkeypatch):
 
 # --- generate (failure paths only; never calls the API) -------------------------------
 
-def test_generate_without_an_api_key_fails_with_a_fix(monkeypatch, capsys):
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+def test_generate_without_an_api_key_fails_with_a_fix(no_api_key, capsys):
     code = main(['generate', '--job', 'x' * 200])
     assert code != 0
     err = capsys.readouterr().err
@@ -262,9 +288,8 @@ def test_generate_reports_a_missing_job_file(monkeypatch, tmp_path, capsys):
     assert 'not found' in capsys.readouterr().err.lower()
 
 
-def test_generate_accepts_a_job_file_path(monkeypatch, tmp_path, capsys):
+def test_generate_accepts_a_job_file_path(no_api_key, tmp_path, capsys):
     """With no key configured it must still get as far as the key check."""
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     job = tmp_path / 'job.txt'
     job.write_text('A sufficiently detailed job description for the CLI smoke test.' * 3,
                    encoding='utf-8')

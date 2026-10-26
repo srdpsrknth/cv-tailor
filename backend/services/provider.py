@@ -233,17 +233,31 @@ class OpenRouterProvider(Provider):
         self.timeout = timeout
 
     @staticmethod
-    def _response_format(schema: dict, name: str = "document") -> dict:
+    def _response_format(schema, name: str = "document") -> dict:
         """Translate a neutral JSON Schema into OpenRouter's ``response_format``.
 
         ``strict`` is set because OpenRouter's own guidance is to set it, but it is
         explicitly **not** relied upon: their documentation states enforcement
         varies by provider and exact compliance is not guaranteed on every
         endpoint. Validation still happens where it always did.
+
+        **The schema must be plain JSON, and it is not by default.** The pipeline's
+        schemas come from ``generation.RESPONSE_SCHEMAS``, which builds
+        ``google.genai.types.Schema`` objects because the Gemini SDK consumes them
+        directly. Those are *not* JSON-serializable — ``requests`` raises "Object of
+        type Schema is not JSON serializable" — so a schema-bearing OpenRouter call
+        failed on every attempt. The Gemini path never noticed, because it hands the
+        object to its own SDK, and the offline tests did not catch it because they
+        asserted the *shape* of this envelope rather than that it could be put on a
+        wire. ``_plain_schema`` is what closes that gap.
         """
         return {
             "type": "json_schema",
-            "json_schema": {"name": name, "strict": True, "schema": schema},
+            "json_schema": {
+                "name": name,
+                "strict": True,
+                "schema": _plain_schema(schema),
+            },
         }
 
     def generate(self, prompt, *, schema=None, max_tokens=None, model=None):
@@ -357,6 +371,98 @@ def _require_key(config, provider_name: str) -> str:
         f"{env_var} is not set for the {provider_name} provider. Add it to .env or "
         "pass --api-key. Run `cvtailor doctor` to check your setup."
     )
+
+
+#: Gemini's ``Schema`` spells its type enum in UPPERCASE (``"OBJECT"``, ``"STRING"``).
+#: Standard JSON Schema -- and therefore OpenRouter's ``response_format`` -- requires
+#: lowercase. This is not cosmetic: sending the uppercase form makes an endpoint that
+#: compiles JSON grammars reject the request outright, measured 2026-10-26 as
+#: "Grammar error: Invalid type: OBJECT" (DeepInfra) and "Failed to compile json
+#: grammar ... Unsupported type" (Parasail). The mapping is total over the enum the
+#: SDK defines; an unknown spelling is passed through unchanged so a future type is
+#: not silently dropped.
+_SCHEMA_TYPE_NAMES = {
+    "STRING": "string",
+    "NUMBER": "number",
+    "INTEGER": "integer",
+    "BOOLEAN": "boolean",
+    "ARRAY": "array",
+    "OBJECT": "object",
+    "NULL": "null",
+}
+
+#: Keywords Gemini's ``Schema`` accepts that standard JSON Schema does not, and that
+#: strict validators reject. ``nullable`` is expressed instead by widening ``type`` to
+#: include ``"null"``, which is the standard spelling of the same thing. Dropping it
+#: outright would quietly make a field mandatory, so it is *translated*, not removed.
+_GEMINI_ONLY_KEYWORDS = ("nullable", "property_ordering")
+
+
+def _plain_schema(schema: Any) -> Any:
+    """``schema`` as standard, JSON-serializable JSON Schema, whatever it arrived as.
+
+    Three cases, in order, because a provider must not care which one it is handed:
+
+    1. **Already plain** -- converted recursively (see below) rather than returned
+       as-is: a plain dict can still carry Gemini's uppercase type names if it was
+       built from the SDK, and the dialect is what the remote endpoint validates.
+    2. **A google ``Schema``** -- dumped with its own ``to_json_dict()``, which is the
+       SDK's supported conversion and yields the shape the Gemini route already sends.
+    3. **Anything else that can dump itself** -- falls back to ``model_dump``, so a
+       pydantic-shaped schema still works.
+
+    **Two dialect repairs happen here, and both were found by making a real call.**
+    The Gemini SDK's schema is not standard JSON Schema: its type names are
+    uppercase, and it admits keywords standard validators reject. Sending it verbatim
+    to a JSON-grammar endpoint does not degrade gracefully -- the endpoint refuses the
+    request. This was invisible offline because the tests asserted the *envelope* the
+    provider builds, not that an endpoint would accept what was inside it.
+    """
+    if isinstance(schema, dict):
+        return _plain_schema_dict(schema)
+    if isinstance(schema, list):
+        return [_plain_schema(item) for item in schema]
+    if schema is None or isinstance(schema, (str, int, float, bool)):
+        return schema
+    to_json_dict = getattr(schema, "to_json_dict", None)
+    if callable(to_json_dict):
+        return _plain_schema_dict(to_json_dict())
+    model_dump = getattr(schema, "model_dump", None)
+    if callable(model_dump):
+        return _plain_schema_dict(model_dump(exclude_none=True))
+    return schema
+
+
+def _plain_schema_dict(schema: dict) -> dict:
+    """One mapping, converted to the standard dialect (see :func:`_plain_schema`)."""
+    result: dict = {}
+    nullable = False
+    for key, value in schema.items():
+        if key in _GEMINI_ONLY_KEYWORDS:
+            if key == "nullable":
+                nullable = bool(value)
+            continue
+        if key == "type":
+            if isinstance(value, list):
+                result[key] = [_SCHEMA_TYPE_NAMES.get(str(v).upper(), v) for v in value]
+            elif isinstance(value, str):
+                result[key] = _SCHEMA_TYPE_NAMES.get(value.upper(), value)
+            else:
+                result[key] = value
+            continue
+        result[key] = _plain_schema(value)
+
+    # ``nullable: true`` becomes ``type: [<t>, "null"]``, which is how standard JSON
+    # Schema expresses it. Silently dropping the keyword would turn an optional field
+    # into a required one -- a correctness change disguised as a compatibility fix.
+    if nullable and "type" in result:
+        existing = result["type"]
+        if isinstance(existing, list):
+            if "null" not in existing:
+                result["type"] = existing + ["null"]
+        elif isinstance(existing, str) and existing != "null":
+            result["type"] = [existing, "null"]
+    return result
 
 
 def schema_is_sent(schema: Optional[dict]) -> bool:

@@ -735,9 +735,18 @@ def _cv_document_schema():
             "summary": types.Schema(type="ARRAY", items=types.Schema(type="STRING")),
             "skills": types.Schema(
                 type="OBJECT",
-                additional_properties=types.Schema(
-                    type="ARRAY", items=types.Schema(type="STRING")
-                ),
+                # ``additional_properties`` is deliberately **not** set here, and this
+                # is a fix rather than a simplification: the Gemini API rejects the
+                # keyword outright -- "additionalProperties is not supported in the
+                # Gemini API" -- so every schema-bearing draft call failed after three
+                # attempts on the default provider. Verified against the live API on
+                # 2026-10-26: an otherwise identical schema succeeds without it and
+                # fails with it.
+                #
+                # Nothing is lost. The comment above already claimed this keyword was
+                # unset; the code disagreed with its own comment. A map of category to
+                # skills needs no declaration for the *response* to be valid -- it is
+                # ``validate_cv`` that checks the contents, and it always was.
             ),
             "experience": types.Schema(
                 type="ARRAY",
