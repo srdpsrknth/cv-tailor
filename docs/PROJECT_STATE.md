@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `85879b5` — *docs: brief Phase 3 increment 3 and record the latest-commit header* (code at `9a45811`)
+**Latest commit:** `2e528e1` — *feat: enable structured output, scoped to the calls where it is safe* (Phase 3 increment 3)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
