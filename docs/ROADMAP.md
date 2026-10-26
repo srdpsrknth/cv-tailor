@@ -225,6 +225,39 @@ case. Running it needs authorisation, not more code. It answers two open questio
 which model is genuinely best per *accepted* result for this task, and whether structured output
 truncates on real documents (the question increment 3 could not settle offline).
 
+### Item 5 — cache validated results *(NEXT)*
+
+**Objective:** stop paying twice for work already done.
+
+**What is already true, and shapes the item.** Re-rendering an existing `content.json` costs
+**zero** LLM calls today — the render path is already free, and `render_application.py` is the
+route real revisions use. So the item is not "make rendering cheap"; it is about the *generation*
+path: the same profile against the same posting currently re-drafts from scratch every time.
+
+**Scope to decide and implement:**
+
+- **What the key is.** The obvious key is a hash of exactly what the model was shown — the
+  serialized profile bytes *plus* the job description *plus* the prompt and schema version — not
+  a `job_id` or a timestamp. Two runs that differ in any prompt byte must not share an entry, or
+  a prompt change would silently serve stale documents. Item 4 made the profile bytes a single,
+  stable, byte-identical block, which is what makes this keyed reliably.
+- **What is cached.** A **validated** result only. Caching a draft that failed the gate would
+  turn a retry loop's failures into a permanent answer.
+- **When it is invalidated.** Any change to the prompt files, the editorial requirements, the
+  schema, the model, or the profile. `model` is part of the key because item 6 added
+  per-task routing: two models can now serve the same posting.
+- **Where it lives.** Alongside the existing store layout, and **never** in the repository.
+  It is derived data, so it must be safe to delete.
+
+**Acceptance:** a repeat of an identical generation makes **0** LLM calls and produces a
+byte-identical accepted document; a changed prompt byte, model or profile makes a fresh call;
+and the existing call-count baseline (2/3/5, worst 12) is unchanged on a cold cache.
+
+**Testing:** recorded-response determinism, plus a test that fails if a prompt change is served
+from cache. **This item changes no call count on a cold cache** — if it does, say so explicitly.
+
+**Effort:** Medium.
+
 **Item 6 scope, including an owner requirement recorded 2026-10-26.** Item 6 builds the thin
 provider interface, model-per-task routing and optional budget caps. It also owns **model
 curation**, and the owner's instruction is explicit:

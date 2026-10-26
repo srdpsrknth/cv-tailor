@@ -262,85 +262,105 @@ Every entry in its blast-radius list was addressed:
   did not change; the two remain in step with each other;
 - **`tests/test_editorial_instructions.py`** — still pins 2/3/5 and still passes unchanged.
 
-### Phase 3, item 6 — briefing for the next chat (provider interface, routing, budget caps)
+### Phase 3, item 6 — briefing for the next chat (DISCHARGED 2026-10-26, live run still owed)
 
-**Start state:** `refactor/architecture-v2` at `67de8b1`, in sync with origin. Working tree
-clean. **351 passed** (~108 s) offline; fast lane **321 passed** (~6 s). `master` untouched at
-`1416177`. Nothing is uncommitted and nothing is half-done. **Increments 4, 2, 1 and 3 of
-Phase 3 are done — do not re-open any of them.**
+The briefing that stood here was **discharged** by the item 6 section at the top of this file.
+Every entry in its blast-radius list was addressed:
+
+- **`services/gemini_service.py`** — `_call_gemini` is still the only pipeline call site; the
+  pricing table moved to `services/pricing.py` (D-3, D-4 resolved), and `PRICING` here is now a
+  **derived view** of that one table, not a second copy;
+- **`_call_gemini`'s `kind` / `allow_delta`** — unchanged; `response_schema_for` still selects the
+  schema per call, and `schema=None` now reaches the provider as an explicit "send no constraint",
+  asserted on **both** providers by `tests/test_provider_interface.py`;
+- **`generation.RESPONSE_SCHEMAS`** — unchanged and still provider-specific in shape; the
+  OpenRouter implementation **translates** it into its own `response_format` envelope rather than
+  receiving a neutral object, so the constraint is not silently dropped;
+- **`config.py`** — `provider`, `openrouter_api_key`, `task_models` and `max_cost_usd` added, all
+  read once in `from_env()`, frozen, with `DEFAULT_MODEL` still in the pricing table and Gemini
+  still the default provider (decision 6);
+- **`ui/app.py`** — no longer duplicates the pricing table (D-4); it prices through
+  `services.pricing`, and a test fails if a model-keyed table grows back;
+- **`tests/test_tailoring_pipeline.py`** — still pins the pricing invariants and still passes
+  **unchanged**;
+- **`tests/test_structured_output.py`** — still pins the per-call schema scope on the real
+  `GenerateContentConfig`. One monkeypatch seam moved (`gemini_service.genai` → `provider.genai`);
+  **no assertion changed**;
+- **`tests/test_editorial_instructions.py`** — still pins 2/3/5 and still passes unchanged.
+
+**What the follow-up chat still owes is not code.** The budgeted live evaluation run is the one
+outstanding step; see "The one thing item 6 still owes" above for the commands, the projection and
+what it answers.
+
+**Superseded start state, kept for the record.** The briefing was written against
+`refactor/architecture-v2` at `67de8b1` with **351 passed** and fast lane **321**. The item
+finished at `68b91a6` with **436 passed** and fast lane **406**. `master` was untouched at
+`1416177` throughout, as it still is.
 
 **Baseline to verify, not re-derive:** call counts **2 / 3 / 5** (min / typical /
 max-successful) and 12 worst. Item 6 must not change them by accident; if it does, say so
-explicitly and explain why, exactly as increments 1 and 3 do.
+explicitly and explain why, exactly as increments 1 and 3 do. **They were not changed.**
 
-**What the item is.** [ADR 0005](DECISIONS/0005-llm-provider-interface.md) deferred a
+**What the item was.** [ADR 0005](DECISIONS/0005-llm-provider-interface.md) deferred a
 **thin provider interface** — a single `generate(prompt, *, schema, max_tokens, model)`
 contract — with Gemini as the default and OpenRouter as a second implementation;
-model-per-task routing; and optional budget caps. Re-confirm decisions 5, 6 and 7 when it
-begins.
+model-per-task routing; and optional budget caps. Decisions 5, 6 and 7 were re-confirmed at
+the start of the item.
 
-**Owner requirement recorded 2026-10-26 — model curation, and it is the heart of the item.**
+**Owner requirement recorded 2026-10-26 — model curation, and it was the heart of the item.**
+It is now recorded durably in [ADR 0005](DECISIONS/0005-llm-provider-interface.md)
+§"Model curation" and [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md), and the
+requirement itself is stated in the item 6 section at the top of this file. In short: do not
+expose the catalogue; research which model is genuinely best for CV and cover-letter generation
+on **price against content quality**; offer a small set spanning cost levels so the user sees the
+trade-off. A general leaderboard ranking is not evidence of fitness — the bar is a two-page CV
+that passes the factual gate, keeps every employer and date, meets the 290–310-word letter
+budget and returns schema-valid JSON. Cost is judged per **accepted** result.
 
-- OpenRouter exposes a **very large** catalogue. **Do not expose all of it.** A wall of
-  models hands the user a decision the tool should have made.
-- **Research which model is genuinely best for CV and cover-letter generation**, weighed on
-  **price against content quality**. Measured, not assumed.
-- **Offer a small curated set spanning different performance and cost levels**, so the
-  user sees the trade-off and chooses.
+**The three gating prerequisites — how each was met:**
 
-Why this is research rather than lookup: a model that tops a general leaderboard is not
-thereby suited to producing a two-page CV that passes the factual gate, keeps every employer
-and date, respects the 290–310-word letter budget and returns **schema-valid JSON**. The
-selection criteria ADR 0005 already names are the right ones — accuracy, completeness,
-relevance, writing quality, structured-output success, unnecessary claims, correction
-attempts, and **total cost per *accepted* result** (a cheap model that fails validation and
-burns three correction calls is not cheap).
+1. **The evaluation suite did not exist.** It now does: `evaluation/`, over the synthetic
+   profiles and anonymised postings in `tests/fixtures/`, **out of CI**, budget-capped and
+   reproducible. It is offline by default and **has not been run**.
+2. **Agree the method and a spending budget before any paid call.** Done: the owner approved the
+   method and a **$5** cap. The suite has still never made a paid call, and refuses an
+   over-budget plan before the first request.
+3. **Verify OpenRouter prices from OpenRouter's own listing.** Done, from
+   `https://openrouter.ai/api/v1/models` on 2026-10-26 (467 models, SHA-256 recorded). No figure
+   was carried over from a secondary source or invented.
 
-**Gating prerequisites, do not skip:**
+**Also in scope from the deferred list, both now resolved:** **D-3** (cost under-reported — the
+total priced with one flat rate while `input_long`/`output_long` tiers existed) and **D-4**
+(pricing duplicated in the UI). Both are fixed in `services/pricing.py`; see increment B above.
 
-1. **The evaluation suite does not exist yet.** It is the prerequisite for choosing the set.
-   It must run over the synthetic profiles and anonymised postings in `tests/fixtures/`, and
-   it stays **out of CI**: optional, budget-capped, reproducible.
-2. **Agree the method and a spending budget with the owner before any paid call** (ADR 0005).
-   The suite has never made a paid call and must not start by accident.
-3. **Verify OpenRouter prices from OpenRouter's own listing.** Do not carry a figure over
-   from a secondary source, and do not invent one. If the listing cannot be reached from the
-   session, say so and stop rather than guessing — the same rule D-5 followed for Gemini.
+**The question increment 3 could not settle offline is still open.** Whether structured output
+truncates on **real** documents remains **unverified**: increment 3 established offline that a
+truncated constrained response is rejected rather than parsed short, and item 6 preserved that
+contract, but no paid call was made. The suite built for it is the answer, and running it is the
+one step item 6 still owes.
 
-**Also in scope, from the deferred list:** **D-3** (cost under-reported: `calculate_token_usage`
-prices the total with one flat rate while `PRICING` defines `input_long`/`output_long` tiers)
-and **D-4** (pricing duplicated in the UI). Both are cost-accounting defects that would make
-any price-versus-quality comparison untrustworthy, so they belong with this item rather than
-after it.
+**Blast radius — what actually changed, for the record:**
 
-**The item also owns the one question increment 3 could not settle offline:** whether
-structured output truncates on **real** documents. Increment 3 established offline that a
-truncated constrained response is rejected rather than parsed short, and scoped the schema to
-protect against it — but no paid call was made, so the behaviour against the provider is
-**unverified**. A budgeted live run answers it, and it is exactly the kind of measurement this
-item's evaluation suite is for.
-
-**Blast radius — read before editing:**
-
-| Area | Why it matters |
+| Area | Outcome |
 |---|---|
-| `services/gemini_service.py` | `_call_gemini` is the only provider call site; `PRICING` and `_estimate_cost` are the single pricing source of truth (D-3, D-4) |
-| `_call_gemini`'s `kind` / `allow_delta` | Increment 3 added them to select the schema **per call**. A provider interface must preserve that contract, including the option of sending **no** schema on a call whose response is not a document |
-| `services/generation.py` `RESPONSE_SCHEMAS` | Provider-specific schema objects today. A second provider needs either a shared neutral schema or a translation layer — do not silently drop the constraint |
-| `config.py` | ADR 0010: no import-time reads, one `from_env()`, frozen `Config`, `DEFAULT_MODEL` must stay in `PRICING`. Model-per-task routing lands here |
-| `ui/app.py` | Duplicates the pricing table (D-4) — the single-source-of-truth fix is in scope |
-| `tests/test_tailoring_pipeline.py` | Pins the pricing-table invariants (D-5): `DEFAULT_MODEL in PRICING`, no retired rows, unknown model priced without crashing |
-| `tests/test_structured_output.py` | Pins the per-call schema scope. A provider swap must not silently disable structured output |
-| `tests/test_editorial_instructions.py` | Pins 2/3/5 — must keep passing |
+| `services/gemini_service.py` | Still the only pipeline call site. Pricing moved out to `services/pricing.py`; `PRICING` here is a **derived view**, not a table |
+| `_call_gemini`'s `kind` / `allow_delta` | Preserved. `schema=None` reaches the provider as "send no constraint" on **both** providers |
+| `services/generation.py` `RESPONSE_SCHEMAS` | Unchanged shape; OpenRouter **translates** it into its own `response_format` rather than receiving a neutral object |
+| `config.py` | `provider`, `openrouter_api_key`, `task_models`, `max_cost_usd` added — read once in `from_env()`, frozen, Gemini still the default, `DEFAULT_MODEL` still priced |
+| `ui/app.py` | No longer duplicates the pricing table (D-4); a test fails if a model-keyed table grows back |
+| `tests/test_tailoring_pipeline.py` | Pins the pricing invariants; passes **unchanged** |
+| `tests/test_structured_output.py` | Pins the per-call schema scope. One monkeypatch seam moved; **no assertion changed** |
+| `tests/test_editorial_instructions.py` | Pins 2/3/5; passes unchanged |
 
-**House rules that bit previous increments** (worth repeating): do not verify against old code
-by stashing or `git checkout --` in the working tree — use a throwaway `git worktree` at the
+**House rules that bit previous increments** (still worth repeating): do not verify against old
+code by stashing or `git checkout --` in the working tree — use a throwaway `git worktree` at the
 previous commit. Under this session's sandbox a new worktree may not be writable; point
-`TEMP`/`TMP` at a directory inside the main worktree and pass an absolute path to that
-worktree's pytest.
+`TEMP`/`TMP` at a directory inside the main worktree and pass an absolute path to that worktree's
+pytest. A test file importing a brand-new module should import it defensively and **fail** (not
+skip) when it is absent, so a broken import in the real tree cannot hide behind a skip.
 
 **Also open, deliberately not in item 6's scope:** D-13, D-14, D-15, A-6 (date validation),
-A-7, and blocker 8. Item 5 (caching) waits until 1–4 have settled.
+A-7, and blocker 8. **Item 5 (caching) is next** — items 1–4 have settled, so it is unblocked.
 
 ### Phase 3, increment 1 — targeted layout retry instead of full regeneration (2026-10-26)
 

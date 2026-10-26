@@ -70,8 +70,10 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > [ADR 0012](DECISIONS/0012-structured-output-scope.md). **Call counts are unchanged at
 > 2 / 3 / 5**; the schema is request metadata, not prompt content, so no prompt byte changed
 > and the §5 token and cost figures are unchanged. Truncation on **real** documents was not
-> observed either way — that needs a budgeted live run, and belongs to **item 6**. The suite
-> is **351 passed**.
+> observed either way — that needs a budgeted live run. **Phase 3 item 6 built the suite that
+> would answer it** (offline by default, projected at $1.68 against a $5 cap) and preserved the
+> per-call contract that makes the answer meaningful, but **the live run has still not been
+> made**. The suite is **436 passed** (351 after increment 3 alone).
 >
 > **Owner requirement recorded 2026-10-26 (scopes Phase 3 item 6).** OpenRouter exposes a very
 > large catalogue of models. **The tool must not surface all of them.** Phase 3 item 6 must
