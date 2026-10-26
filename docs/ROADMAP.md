@@ -201,7 +201,7 @@ unchanged**, as intended.
 | 4 | Serialise the profile once per application | **DONE** (`refactor:`, 2026-10-26) — byte-identical prompts, one serialisation per run; see §5 of [`ASSESSMENT.md`](ASSESSMENT.md) |
 | 2 | Remove or merge the editorial-review pass | **DONE** (`refactor:`, 2026-10-26) — requirements folded into the draft prompt, second CV call removed; calls 3/4/6 → **2/3/5**, best-case input tokens −41% |
 | 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
-| 3 | Enable structured output (`response_schema`) | **Next in the agreed order** — new chat |
+| 3 | Enable structured output (`response_schema`) | **Next in the agreed order** — new chat; briefing in [`PROJECT_STATE.md`](PROJECT_STATE.md) §"Phase 3, increment 3 — briefing for the next chat" |
 | 6 | Provider interface, model routing, budget caps | Not started — new chat |
 | 5 | Cache validated results | Not started — only after 1–4 have settled |
 

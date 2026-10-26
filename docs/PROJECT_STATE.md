@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `9a45811` — *refactor: send a targeted layout retry instead of a full regeneration* (Phase 3, increment 1 of the agreed order)
+**Latest commit:** `14e19e8` — *docs: carry the increment 1 baseline into the assessment status notes and testing table* (code at `9a45811`)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
@@ -115,6 +115,46 @@ chat. `_call_gemini`'s config and `response_mime_type` and `parse_json_response`
 3's to change; item 1 touched only the retry path and the parser's default-off flag.
 
 **Do not re-open increments 4 or 2.** Neither was touched by this increment.
+
+### Phase 3, increment 3 — briefing for the next chat (structured output)
+
+**Start state:** `refactor/architecture-v2` at `14e19e8`, in sync with origin. Working tree
+clean. **324 passed** (~107 s) offline; fast lane **294 passed** (~6 s). `master` untouched
+at `1416177`. Nothing is uncommitted and nothing is half-done.
+
+**The item.** ASSESSMENT §5 optimisation 3: enable Gemini's structured output so the
+`parse_json_response` brace-scan is no longer the failure path. Today `_call_gemini`
+**deliberately does not** set `response_mime_type="application/json"` — see the comment at
+`gemini_service.py:135-137`, which records that it *caused premature truncation of long
+document responses*. That comment is the whole reason the old `response_schema` code was
+deleted as dead (D-1). Treat it as the central design question: the increment must show
+that structured output does not reintroduce truncation, or must scope it to the calls where
+it is safe.
+
+**Baseline to verify, not re-derive:** call counts **2 / 3 / 5** (min / typical /
+max-successful) and 12 worst. Item 3 must not change them; if it does, say so explicitly and
+explain why, exactly as item 1's docs do.
+
+**Blast radius — read before editing:**
+
+| Area | Why it matters |
+|---|---|
+| `parse_json_response` | Item 1 added `accept_delta=False`, switched on for retries only. A schema change must not break the delta shape or make a malformed draft look valid |
+| `looks_like_cv_delta` / `apply_cv_delta` | The delta path is new; a `response_schema` that constrains the *document* shape will conflict with a delta response unless the schema allows both |
+| `extract_explanation` | Reads top level then nested `cv.`; a strict schema changes which shape the model returns |
+| `_call_gemini` | Config, `max_output_tokens`, retry loop. Do not change the model or provider (decision 7) |
+| Both fixture transcripts | If the response shape changes, `tools/build_fixtures.py` must regenerate them in step with each other (staging-root caveat in TESTING.md) |
+| `tests/test_editorial_instructions.py` | Pins 2/3/5 — must keep passing |
+
+**House rules that bit this increment** (worth repeating): do not verify against the old
+code by stashing or `git checkout --` in the working tree — use a throwaway `git worktree`
+at the previous commit. Item 1 lost its uncommitted implementation that way and had to
+rebuild it.
+
+**Also open, deliberately not in item 3's scope:** D-3 (cost uses one flat rate while
+`PRICING` defines long-context tiers), D-4, D-13, D-14, D-15, A-6 (date validation), A-7,
+and blocker 8. Item 6 (provider interface, model routing, budget caps) is a **separate new
+chat after item 3**; item 5 (caching) waits until 1–4 have settled.
 
 ### Phase 3, increment 2 — remove or merge the editorial-review pass (2026-10-26)
 
