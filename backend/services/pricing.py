@@ -56,6 +56,12 @@ PRICE_SOURCES = {
 #: bill the long rate for the whole request once the prompt crosses this.
 LONG_CONTEXT_THRESHOLD = 200_000
 
+#: How long a verified price may go unchecked before it is treated as stale. The owner
+#: set this rule on 2026-10-26: re-verify "if the last table update was longer than 2
+#: months". It is measured, not assumed -- between two reads of OpenRouter's listing on
+#: the *same day*, four entries had already moved (two halved).
+PRICE_MAX_AGE_DAYS = 62
+
 
 @dataclass(frozen=True)
 class ModelPrice:
@@ -111,6 +117,24 @@ PRICING: dict[tuple[str, str], ModelPrice] = {
     ("openrouter", "google/gemini-2.5-flash"): ModelPrice(input=0.30, output=2.50),
     ("openrouter", "google/gemini-2.5-flash-lite"): ModelPrice(input=0.10, output=0.40),
     ("openrouter", "google/gemini-3-flash-preview"): ModelPrice(input=0.50, output=3.00),
+
+    # --- The curated evaluation slate, added 2026-10-26 ------------------------
+    # These rows exist because the evaluation measures **cost per accepted result**,
+    # and that figure is read from `pricing.estimate_cost`. Without a row here
+    # `price_for` falls back to `(gemini, gemini-3.8-flash)` = $0.75/$3.75 for EVERY
+    # unpriced route, so a run would report a plausible and entirely wrong cost for
+    # each model -- `deepseek-v4-flash` at 8.2x too high, `claude-sonnet-5` at 2.7x
+    # too low -- and rank them on it. `tests/test_pricing.py` asserts each curated id
+    # is priced, so a model cannot be added to the set without its price.
+    #
+    # Read from the live listing on 2026-10-26 (see PRICE_SOURCES["openrouter"]).
+    ("openrouter", "deepseek/deepseek-v4-flash"): ModelPrice(input=0.091, output=0.182),
+    ("openrouter", "qwen/qwen3.8-flash"): ModelPrice(input=0.150, output=0.470),
+    ("openrouter", "z-ai/glm-5.3-flash"): ModelPrice(input=0.150, output=0.500),
+    ("openrouter", "mistralai/mistral-small-2603"): ModelPrice(input=0.150, output=0.600),
+    ("openrouter", "anthropic/claude-haiku-5.5"): ModelPrice(input=0.100, output=0.500),
+    ("openrouter", "openai/gpt-6-luna"): ModelPrice(input=0.100, output=0.500),
+    ("openrouter", "anthropic/claude-sonnet-5"): ModelPrice(input=2.000, output=10.000),
 }
 
 
@@ -173,3 +197,62 @@ def describe_tier(input_tokens: int, model: str, provider: str = DEFAULT_PROVIDE
     if price.has_long_tier and input_tokens > LONG_CONTEXT_THRESHOLD:
         return "long-context"
     return "standard"
+
+
+def source_age_days(provider: str, *, today=None) -> Optional[int]:
+    """How many days ago ``provider``'s prices were verified, or ``None``.
+
+    ``None`` means there is no recorded verification date at all, which is a different
+    and worse state than "old" -- an unverifiable row is not merely stale, it has no
+    provenance. Callers should treat ``None`` and an over-age value the same way.
+    """
+    from datetime import date, datetime
+
+    entry = PRICE_SOURCES.get(provider)
+    if not entry:
+        return None
+    raw = entry.get("verified_on")
+    if not raw:
+        return None
+    try:
+        verified = datetime.strptime(str(raw), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    return ((today or date.today()) - verified).days
+
+
+def is_stale(provider: str, *, max_age_days: int = PRICE_MAX_AGE_DAYS, today=None) -> bool:
+    """Whether ``provider``'s prices are due for re-verification.
+
+    **Fails towards "stale".** A missing date, an unparseable one, and an unknown
+    provider all return True: the safe reading of "I cannot prove these prices are
+    current" is that they are not. Returning False there would let a table with no
+    provenance pass forever, which is the failure this guard exists to prevent.
+    """
+    age = source_age_days(provider, today=today)
+    if age is None:
+        return True
+    return age > max_age_days
+
+
+def staleness_message(provider: str, *, today=None) -> Optional[str]:
+    """A one-line warning when ``provider``'s prices need re-verifying, else ``None``.
+
+    Exists so the CLI and the evaluation can *say* that a cost figure is old rather
+    than presenting a stale number with the same confidence as a fresh one.
+    """
+    age = source_age_days(provider, today=today)
+    entry = PRICE_SOURCES.get(provider) or {}
+    source = entry.get("source", "an unrecorded source")
+    if age is None:
+        return (
+            f"{provider} prices have no recorded verification date "
+            f"({source}); re-verify before trusting a cost figure."
+        )
+    if age > PRICE_MAX_AGE_DAYS:
+        return (
+            f"{provider} prices were last verified {age} days ago on "
+            f"{entry.get('verified_on')} ({source}), which is older than "
+            f"{PRICE_MAX_AGE_DAYS} days. Re-verify from the provider's own listing."
+        )
+    return None

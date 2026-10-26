@@ -269,3 +269,88 @@ def test_pricing_does_not_read_the_environment_at_import():
 
     assert 'os.getenv' not in source
     assert 'import os' not in source
+
+
+# --- a price is a fact with a timestamp ----------------------------------------------------
+
+def test_the_current_table_is_within_its_verification_window():
+    """A table nobody has re-checked is a table nobody should trust.
+
+    The owner's rule (2026-10-26): re-verify "if the last table update was longer than
+    2 months". This asserts the shipped table is inside that window, so the guard is a
+    real constraint on this repository rather than a helper nothing consults.
+    """
+    from services import pricing
+
+    for provider in ('gemini', 'openrouter'):
+        age = pricing.source_age_days(provider)
+        assert age is not None, f'{provider} has no recorded verification date'
+        assert age <= pricing.PRICE_MAX_AGE_DAYS, (
+            f'{provider} prices are {age} days old and need re-verifying'
+        )
+        assert pricing.is_stale(provider) is False
+
+
+def test_a_missing_verification_date_counts_as_stale():
+    """Fails towards stale: "cannot prove it is current" is not "is current".
+
+    Returning False here would let a row with no provenance pass forever, which is
+    exactly the failure the guard exists to prevent -- an unpriced *or* unverified
+    figure presented with the confidence of a checked one.
+    """
+    from services import pricing
+
+    assert pricing.source_age_days('a-provider-with-no-entry') is None
+    assert pricing.is_stale('a-provider-with-no-entry') is True
+
+
+def test_an_old_date_is_reported_as_stale():
+    """The window is enforced in both directions, not only for unknown providers."""
+    from datetime import date
+
+    from services import pricing
+
+    # Well past the two-month window the owner set.
+    future = date(2027, 6, 1)
+    age = pricing.source_age_days('openrouter', today=future)
+    assert age > pricing.PRICE_MAX_AGE_DAYS
+    assert pricing.is_stale('openrouter', today=future) is True
+
+    message = pricing.staleness_message('openrouter', today=future)
+    assert message is not None
+    assert 're-verify' in message.lower()
+    # The date and the source are named, so the fix is actionable rather than a nag.
+    assert '2026-10-26' in message
+    assert 'openrouter.ai' in message
+
+
+def test_a_fresh_table_produces_no_warning():
+    from datetime import date
+
+    from services import pricing
+
+    assert pricing.staleness_message('openrouter', today=date(2026, 10, 26)) is None
+
+
+def test_every_curated_model_is_priced_on_the_route_the_run_uses():
+    """An unpriced route does not raise -- it silently borrows the default's price.
+
+    ``price_for`` falls back to ``(gemini, gemini-3.8-flash)`` = $0.75/$3.75 for any
+    unknown route, so a curated model with no row would report the *same* invented cost
+    as every other unpriced one. Measured 2026-10-26: that would have billed
+    ``deepseek-v4-flash`` at 8.2x its real rate and ``claude-sonnet-5`` at 0.27x, and
+    the run would have ranked the models on it. The set and the table must agree.
+    """
+    from evaluation.curated_models import CURATED_MODELS, unpriced_entries
+
+    unpriced = unpriced_entries()
+    assert unpriced == (), (
+        'these curated models have no OpenRouter price row, so their cost would be '
+        f'invented from the default route: {[m.id for m in unpriced]}'
+    )
+    for model in CURATED_MODELS:
+        assert pricing.is_priced(model.id, 'openrouter'), model.id
+        # And the recorded rate is the one the table will actually bill.
+        row = pricing.price_for(model.id, 'openrouter')
+        assert row.input == model.input_per_1m, f'{model.id} input rate drifted'
+        assert row.output == model.output_per_1m, f'{model.id} output rate drifted'

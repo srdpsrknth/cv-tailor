@@ -68,17 +68,26 @@ class ProviderError(Exception):
 
 @dataclass(frozen=True)
 class ProviderResponse:
-    """One provider reply: the raw text and what it cost in tokens.
+    """One provider reply: the raw text, its token cost, and what it actually cost.
 
     ``text`` is returned unparsed on purpose. Every consumer downstream --
     ``parse_json_response``, ``apply_cv_delta``, ``validate_cv`` -- is provider
     independent, and keeping the text raw is what guarantees a second provider
     cannot quietly change the response contract.
+
+    ``reported_cost_usd`` is the provider's **own** figure for what this call cost,
+    or ``None`` when the provider does not report one. It is authoritative where it
+    exists: OpenRouter bills per *request*, and the same model routed to a different
+    upstream provider costs a different amount, which no static table can express.
+    ``None`` is a meaningful value, not a zero -- a caller must fall back to its own
+    estimate rather than treat an absent figure as free.
     """
 
     text: str
     input_tokens: int
     output_tokens: int
+    #: The provider's own charge for this call in USD, when it reports one.
+    reported_cost_usd: Optional[float] = None
 
 
 class Provider:
@@ -169,10 +178,23 @@ class GeminiProvider(Provider):
                         )
 
                 usage = response.usage_metadata
+                # Thinking tokens are billed as output but are **not** included in
+                # ``candidates_token_count`` -- Google's token docs are explicit that
+                # the output count excludes them and ``thoughts_token_count`` carries
+                # them separately. ``GeminiProvider`` deliberately turns thinking on
+                # (LOW_THINKING_MODELS), so reading only ``candidates_token_count``
+                # under-reported output tokens -- and therefore the cost -- on exactly
+                # the model this project ships. Summing the two is the billed figure.
+                candidates = (getattr(usage, "candidates_token_count", 0) or 0) if usage else 0
+                thoughts = (getattr(usage, "thoughts_token_count", 0) or 0) if usage else 0
                 return ProviderResponse(
                     text=response.text,
                     input_tokens=(usage.prompt_token_count if usage else 0) or 0,
-                    output_tokens=(usage.candidates_token_count if usage else 0) or 0,
+                    output_tokens=candidates + thoughts,
+                    # Gemini reports token counts only -- there is no cost field in
+                    # ``usage_metadata`` (verified against ai.google.dev, 2026-10-26),
+                    # so this stays None and the caller prices it from the table.
+                    reported_cost_usd=None,
                 )
             except Exception as error:  # noqa: BLE001 -- re-raised as ProviderError
                 last_error = error
@@ -268,6 +290,19 @@ class OpenRouterProvider(Provider):
                     text=text,
                     input_tokens=usage.get("prompt_tokens", 0) or 0,
                     output_tokens=usage.get("completion_tokens", 0) or 0,
+                    # OpenRouter's own figure for what this call was charged, in USD.
+                    # Their docs (usage-accounting, verified 2026-10-26) state it is
+                    # returned "automatically ... with every response ... No additional
+                    # parameters are required", and that the old
+                    # `usage: {include: true}` opt-in is deprecated and has no effect.
+                    # So this is read from the response already being parsed, and no
+                    # request body changed.
+                    #
+                    # It is authoritative in a way a price table cannot be: pricing is
+                    # per *request* and depends on which upstream provider served it.
+                    # Absent or unparseable, it stays None and the caller estimates --
+                    # an absent figure must never be read as "free".
+                    reported_cost_usd=_positive_float(usage.get("cost")),
                 )
             except Exception as error:  # noqa: BLE001 -- re-raised as ProviderError
                 last_error = error
@@ -331,6 +366,26 @@ def schema_is_sent(schema: Optional[dict]) -> bool:
     schema case without duplicating the ``is not None`` rule in three places.
     """
     return schema is not None
+
+
+def _positive_float(value: Any) -> Optional[float]:
+    """``value`` as a non-negative float, or ``None`` if it is not usable.
+
+    Used for a provider-reported cost, where the distinction that matters is
+    **absent versus zero**. A missing, null, malformed or negative figure must become
+    ``None`` so the caller estimates, because returning ``0.0`` would record a paid
+    call as free -- the exact dishonesty the cost accounting exists to prevent. A
+    genuine ``0.0`` (a free model) is preserved, since it is a real charge.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number < 0:
+        return None
+    return number
 
 
 def dumps_schema(schema: dict) -> str:

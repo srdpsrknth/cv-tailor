@@ -83,6 +83,12 @@ class GeminiService:
         self.spent_usd = 0.0
         #: How many provider calls this instance has made, reported when a cap trips.
         self.calls_made = 0
+        #: How many of those calls were priced from the provider's **own** reported
+        #: charge, and how many from the fallback table. Recorded so a run can state
+        #: which figure it is relying on: a cost table presented as a measurement is
+        #: the failure these two counters exist to make visible.
+        self.reported_calls = 0
+        self.estimated_calls = 0
 
         #: The provider this service speaks to. Built from the already-resolved
         #: config, so choosing a provider is a configuration decision and never an
@@ -186,21 +192,44 @@ class GeminiService:
 
         # The cap is checked against the running spend *before* the next call is made,
         # so a run stops at the budget instead of discovering the overrun afterwards.
-        self._record_spend(response.input_tokens, response.output_tokens, routed_model)
+        self._record_spend(
+            response.input_tokens, response.output_tokens, routed_model,
+            reported_cost_usd=response.reported_cost_usd,
+        )
 
         return response.text, response.input_tokens, response.output_tokens
 
     # --- cost accounting during a run --------------------------------------------------
 
-    def _record_spend(self, input_tokens: int, output_tokens: int, model: Optional[str] = None) -> None:
-        """Accumulate this call's estimated cost and enforce the budget cap.
+    def _record_spend(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        model: Optional[str] = None,
+        reported_cost_usd: Optional[float] = None,
+    ) -> None:
+        """Accumulate this call's cost and enforce the budget cap.
+
+        **The provider's own figure wins when it reports one.** OpenRouter returns
+        ``usage.cost`` -- the amount actually charged -- and it is authoritative in a
+        way no table can be, because pricing is per *request* and depends on which
+        upstream provider served it. The estimate is the fallback, for providers that
+        report only tokens (Gemini) and for anything that fails to report.
 
         Raises:
             GeminiServiceError: when the configured cap has been reached. It is raised
                 *after* accumulating, so the reported spend includes the call that hit
                 the limit, and before the pipeline issues another paid request.
         """
-        cost = self._estimate_cost(input_tokens, output_tokens, model=model)
+        if reported_cost_usd is None:
+            cost = self._estimate_cost(input_tokens, output_tokens, model=model)
+            #: Counted separately so a test can prove the table was actually consulted
+            #: rather than merely present. An estimate presented as a measurement is
+            #: the failure this distinction exists to catch.
+            self.estimated_calls += 1
+        else:
+            cost = reported_cost_usd
+            self.reported_calls += 1
         self.spent_usd += cost
         self.calls_made += 1
         # ``getattr`` for the same reason as routing: a config object without the cap
@@ -240,7 +269,23 @@ class GeminiService:
         total_output = cv_output_tokens + cl_output_tokens
         total_tokens = total_input + total_output
 
-        cost_usd = self._estimate_cost(total_input, total_output)
+        # **The accumulated spend wins when any call reported its own cost.**
+        # Re-pricing the run's totals from the table here would silently discard what
+        # the provider actually charged. That is not merely less accurate: the table
+        # prices a *route*, while OpenRouter bills per *request* depending on which
+        # upstream provider served it. So this prefers the figure the calls reported,
+        # and falls back to the table only when none did -- which is the Gemini case,
+        # where the API returns token counts and no cost at all.
+        #
+        # ``self.spent_usd`` accumulates across this service instance's calls, and a
+        # service is constructed per generation, so it is this run's total.
+        #
+        # ``getattr`` because a service can legitimately be built without ``__init__``
+        # -- tests construct one to exercise purely arithmetic paths -- and an object
+        # with no spend counters has made no calls, so the table is the right answer.
+        reported = getattr(self, "reported_calls", 0)
+        spent = getattr(self, "spent_usd", 0.0)
+        cost_usd = spent if reported else self._estimate_cost(total_input, total_output)
 
         return TokenUsage(
             cv_input_tokens=cv_input_tokens,

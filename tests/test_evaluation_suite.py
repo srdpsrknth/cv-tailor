@@ -271,11 +271,69 @@ def test_the_evaluation_still_names_a_provider_and_a_model():
 # --- the curated set --------------------------------------------------------------------------
 
 def test_the_set_is_small():
-    """Owner requirement: do NOT expose the catalogue."""
+    """Owner requirement: do NOT expose the catalogue.
+
+    The ceiling moved from 6 to 8 on 2026-10-26 by the owner's instruction, when the
+    first five-model draft was rejected for lacking variety ("three google models, one
+    claude and one deepseek -- fine but not much variety"). Widening the *ceiling* is
+    not the same as abandoning the requirement: the set must still be a decision the
+    tool has made, not a catalogue, so the proportion guard below is the one that
+    actually holds the line -- 8 of 467 is under 2% of the listing.
+    """
     from evaluation.curated_models import CURATED_MODELS, LISTING_MODEL_COUNT
 
-    assert len(CURATED_MODELS) <= 6, 'a wall of models is the thing to avoid'
+    assert len(CURATED_MODELS) <= 8, 'a wall of models is the thing to avoid'
     assert len(CURATED_MODELS) < LISTING_MODEL_COUNT / 10
+
+
+def test_the_set_spans_several_families():
+    """Owner requirement, recorded 2026-10-26: variety, not five near-copies.
+
+    The rejected draft was three Google models, one Anthropic and one DeepSeek. Five
+    entries from three vendors is really two engineering choices wearing five labels,
+    and it cannot answer the question the curation exists to ask -- whether a
+    non-Google model writes these documents as well.
+    """
+    from evaluation.curated_models import CURATED_MODELS
+
+    families = {model.id.split('/')[0] for model in CURATED_MODELS}
+    assert len(families) >= 5, f'too few distinct families: {sorted(families)}'
+
+
+def test_every_entry_is_recent_enough():
+    """Owner requirement, recorded 2026-10-26: "models from oct 2025 onwards only".
+
+    This is a real constraint rather than a preference, because the cheapest tiers of
+    any catalogue are cheap *because* they are old: the first draft's two cheapest
+    entries were a 2024 Mistral and a 2025-08 OpenAI model, and both would have been
+    dropped by this rule alone.
+    """
+    from datetime import date
+
+    from evaluation.curated_models import CURATED_MODELS, MIN_CREATED
+
+    floor = date.fromisoformat(MIN_CREATED)
+    for model in CURATED_MODELS:
+        assert model.created, f'{model.id} records no creation date'
+        created = date.fromisoformat(model.created)
+        assert created >= floor, (
+            f'{model.id} was created {model.created}, older than the {MIN_CREATED} floor'
+        )
+
+
+def test_every_entry_is_priced_on_the_route_the_run_uses():
+    """A curated model with no price row is silently priced at the default's rate.
+
+    Asserted here as well as in ``test_pricing.py`` because the two files guard
+    different things: that one protects the table, this one protects the set. Either
+    alone would let the other drift.
+    """
+    from evaluation.curated_models import unpriced_entries
+
+    assert unpriced_entries() == (), (
+        'a curated model without an OpenRouter price row would report the default '
+        "route's rate as its own cost, and the cost ranking would be fiction"
+    )
 
 
 def test_the_set_spans_different_cost_levels():

@@ -125,6 +125,19 @@ def dry_run(
     else:
         lines.append(f"Fixtures OK: all {len(cases)} case pairs resolve inside tests/fixtures/.")
     lines.append("")
+    # A projection is only as good as the prices behind it, and the owner's rule is
+    # to re-verify a table older than two months. Saying so *here* matters because
+    # this is the screen a spend is approved from: a stale figure presented without a
+    # warning is a number wearing the confidence of a checked one.
+    try:
+        from services.pricing import staleness_message
+
+        warning = staleness_message("openrouter")
+    except ImportError:  # pragma: no cover - the offline suite does not need pricing
+        warning = None
+    if warning:
+        lines.append(f"PRICE WARNING: {warning}")
+        lines.append("")
     lines.append(
         "No paid call has been made. A live run needs --live and an API key, and is "
         "refused outright if its projection exceeds the cap."

@@ -627,3 +627,213 @@ def test_the_happy_path_still_makes_two_calls_driven_through_the_pipeline(
     assert offline.call_count == 2
     assert [call['kind'] for call in offline.calls] == ['cv', 'cover_letter']
     assert not offline.exhausted
+
+
+# --- the provider's own cost figure, and when it is not available --------------------------
+
+def test_openrouter_reports_its_own_charge(monkeypatch):
+    """``usage.cost`` is read from the response and carried out as a money figure.
+
+    This is the authoritative number for a real run: OpenRouter bills per *request*
+    and depends on which upstream provider served it, so a static per-model table
+    cannot express it. Their docs state usage accounting is returned automatically
+    with every response and needs no request parameter, which is why no assertion
+    here inspects the request body -- nothing about the request changed.
+    """
+    sent = _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{"cv": {"title": "Recorded"}}'}}],
+        'usage': {'prompt_tokens': 1234, 'completion_tokens': 567, 'cost': 0.001234},
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='deepseek/deepseek-v4-flash')
+
+    response = provider.generate('prompt', model='deepseek/deepseek-v4-flash')
+
+    assert response.reported_cost_usd == pytest.approx(0.001234)
+    # The request is unchanged: no `usage` opt-in was added to obtain this.
+    assert 'usage' not in (sent[0]['json'] or {})
+
+
+def test_an_absent_reported_cost_is_none_never_zero(monkeypatch):
+    """A missing figure must not be read as "free".
+
+    ``None`` means "estimate it"; ``0.0`` means "this cost nothing". Conflating them
+    would record a paid call at $0.00, which is the one direction of error that
+    flatters a model -- and cost per accepted result is the ranking metric.
+    """
+    _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 10, 'completion_tokens': 5},
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='m')
+
+    response = provider.generate('prompt', model='m')
+
+    assert response.reported_cost_usd is None
+
+
+@pytest.mark.parametrize('reported', ['not-a-number', None, -1])
+def test_an_unusable_reported_cost_degrades_to_none(monkeypatch, reported):
+    """Malformed, null and negative all mean "no usable figure", not zero."""
+    _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 10, 'completion_tokens': 5, 'cost': reported},
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='m')
+
+    assert provider.generate('prompt', model='m').reported_cost_usd is None
+
+
+def test_a_genuinely_free_model_reports_zero_not_none(monkeypatch):
+    """A real $0 charge is a figure, and must survive as one."""
+    _record_openrouter_requests(monkeypatch, reply={
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 10, 'completion_tokens': 5, 'cost': 0},
+    })
+    provider = OpenRouterProvider(api_key='k', default_model='m')
+
+    assert provider.generate('prompt', model='m').reported_cost_usd == 0.0
+
+
+def test_gemini_reports_no_cost_because_the_api_has_none():
+    """``usage_metadata`` carries token counts only -- verified against ai.google.dev.
+
+    Gemini's response has no cost field, so this is ``None`` and the caller prices it
+    from the table. Asserted rather than assumed, because a future SDK change that
+    *did* add a cost would otherwise go unnoticed while the table quietly disagreed.
+    """
+    import sys
+    import types
+
+    from services.gemini_service import GeminiService
+
+    class _Usage:
+        prompt_token_count = 100
+        candidates_token_count = 50
+        thoughts_token_count = 0
+
+    class _Response:
+        candidates: list = []
+        text = '{}'
+        usage_metadata = _Usage()
+
+    class _Models:
+        def generate_content(self, **kwargs):
+            return _Response()
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.models = _Models()
+
+    config = _StubConfig(provider='gemini')
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(provider_module.genai, 'Client', _Client)
+        service = GeminiService(config=config)
+        text, _, _ = service._call_gemini('prompt', kind='cv')
+
+    assert text == '{}'
+    # The service tracked the call, and priced it from the table rather than a report.
+    assert service.reported_calls == 0
+    assert service.estimated_calls == 1
+
+
+def test_thinking_tokens_are_counted_as_output():
+    """Gemini bills thinking as output but excludes it from ``candidates_token_count``.
+
+    Google's token docs are explicit: the output count does **not** include thinking
+    tokens, which arrive separately in ``thoughts_token_count``. This project turns
+    thinking on for ``gemini-3.8-flash``, so reading only ``candidates_token_count``
+    under-reported the shipped model's output tokens and therefore its cost.
+    """
+    import sys
+    import types
+
+    from services.gemini_service import GeminiService
+
+    class _Usage:
+        prompt_token_count = 100
+        candidates_token_count = 500
+        thoughts_token_count = 250
+
+    class _Response:
+        candidates: list = []
+        text = '{}'
+        usage_metadata = _Usage()
+
+    class _Models:
+        def generate_content(self, **kwargs):
+            return _Response()
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.models = _Models()
+
+    config = _StubConfig(provider='gemini')
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(provider_module.genai, 'Client', _Client)
+        service = GeminiService(config=config)
+        _, _, output_tokens = service._call_gemini('prompt', kind='cv')
+
+    assert output_tokens == 750, 'thinking tokens are billed as output and must be counted'
+
+
+def test_a_reported_cost_replaces_the_table_in_the_run_total(monkeypatch):
+    """The headline figure a run reports is what the provider charged, not an estimate.
+
+    This is the guard that matters: before this, ``calculate_token_usage`` re-priced the
+    run's token totals from the table, silently discarding what the provider said. The
+    two disagree here on purpose, so passing this test requires the reported figure to
+    have won.
+    """
+    from services.gemini_service import GeminiService
+
+    class _Config(_StubConfig):
+        provider = 'openrouter'
+        model = 'deepseek/deepseek-v4-flash'
+
+        def model_for(self, task):
+            return 'deepseek/deepseek-v4-flash'
+
+        def budget_exceeded(self, spent):
+            return False
+
+    config = _Config()
+    service = object.__new__(GeminiService)
+    service.config = config
+    service.model = config.model
+    service.spent_usd = 0.0
+    service.calls_made = 0
+    service.reported_calls = 0
+    service.estimated_calls = 0
+
+    service._record_spend(1000, 500, 'deepseek/deepseek-v4-flash', reported_cost_usd=0.4321)
+
+    usage = service.calculate_token_usage(1000, 500, 0, 0)
+
+    assert usage.estimated_cost_usd == pytest.approx(0.4321)
+    assert service.reported_calls == 1
+    assert service.estimated_calls == 0
+
+
+def test_a_run_with_no_report_falls_back_to_the_table():
+    """Gemini reports no cost, so the table must still price the run."""
+    from services.gemini_service import GeminiService
+
+    class _Config(_StubConfig):
+        provider = 'gemini'
+
+    config = _Config()
+    service = object.__new__(GeminiService)
+    service.config = config
+    service.model = 'gemini-3.8-flash'
+    service.spent_usd = 0.0
+    service.calls_made = 0
+    service.reported_calls = 0
+    service.estimated_calls = 0
+
+    service._record_spend(1000, 500, 'gemini-3.8-flash')
+
+    usage = service.calculate_token_usage(1000, 500, 0, 0)
+
+    assert service.estimated_calls == 1
+    assert usage.estimated_cost_usd == pytest.approx(0.002625, abs=1e-6)
