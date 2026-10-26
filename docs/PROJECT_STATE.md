@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `a746884` — *docs: close out Phase 2 and record the owner's D-item decisions*
+**Latest commit:** `2943b45` — *refactor: serialise the profile once per application* (Phase 3, increment 4)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
@@ -67,6 +67,42 @@ fallback, so caching is never a requirement.
 **Test count: 282 → 298 passed** (~112 s), fully offline. Fast lane 252 → **268 passed**
 (~7 s). **No existing test was modified**, and the new file is `tests/test_profile_serialization.py`
 (16 tests, 11 of which fail against the pre-increment code).
+
+### Phase 3, increment 2 — briefing for the next chat (NOT STARTED)
+
+**Goal:** remove or merge the editorial-review pass — the second CV call in
+`DocumentGenerator.generate_pair` (`generation.py:545-557`), which today re-sends the whole
+context *plus* the full draft CV and returns a complete revised CV.
+
+**Why it is worth doing:** ASSESSMENT.md §5 measures it at **~25% of total input tokens and
+one whole call**, because the draft CV JSON is ~7,730 tokens on top of the ~6,150-token
+context that is sent again.
+
+**What will change for the next chat's baseline** (this is exactly why increment 1 froze its
+own baseline first): the happy-path call count drops **3 → 2**, the typical case **4 → 3**,
+and the max-successful **6 → 5**. The per-application cost estimates in §5 move as a result.
+Verify the *new* counts rather than assuming the arithmetic.
+
+**Known blast radius — read these before editing, they pin the current behaviour on purpose:**
+
+- `tests/test_tailoring_pipeline.py:47` — `offline.call_count == 3` on the happy path.
+- `tests/test_tailoring_pipeline.py:597` and `:765` — `cv_attempts` is 3 (draft + review + retry).
+- `tests/test_tailoring_pipeline.py:65` — the saved CV must equal the **reviewed** CV, not the
+  raw draft. Merging the passes must keep the letter built from the accepted CV.
+- `tests/test_tailoring_pipeline.py:148-230` — four tests take `tailoring_explanation` from the
+  **review** response (`cv_editorial_review`, including the nested and top-level variants, and
+  the layout-retry precedence case). If the review call goes away, the explanation must come
+  from the draft instead, and those fixtures/expectations change with it.
+- `tests/fixtures/llm_responses/analyst_nordwind/` and `marketer_lumen/` — both recorded
+  transcripts contain a `02_cv_editorial_review.json` step, so `responses.json` and the replay
+  order change. Regenerate with `tools/build_fixtures.py`, and keep both transcripts in step.
+- `EDITORIAL_REVIEW_INSTRUCTION` (`generation.py:355`) is item 2's to change; **it is
+  deliberately untouched in increment 1**, as is `parse_json_response`, `shorten_cv` /
+  `layout_correction_instruction`, and `_call_gemini`'s config (items 1 and 3).
+
+**Constraint carried over:** the suite must stay fully offline with no paid calls, and the
+"no silent fallback that bypasses validation" acceptance criterion still holds — folding the
+review into the draft must not weaken `validate_cv`.
 
 **Phase 2 — multi-profile architecture. COMPLETE and CLOSED OUT (code + tests + migration +
 docs + clean-up).**
