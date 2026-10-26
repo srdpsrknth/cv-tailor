@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `013bfe0` — *docs: brief Phase 3 increment 2 …* (increment 2's own commit follows)
+**Latest commit:** `7c0d58a` — *refactor: merge the editorial-review pass into the draft prompt* (Phase 3, increment 2)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
