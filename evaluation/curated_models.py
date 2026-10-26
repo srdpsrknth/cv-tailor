@@ -193,9 +193,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=0.00328,
         measured_notes=(
-            'Second. Cheapest per attempt, but 2/3 accepted with 3 correction calls: one'
-            'case failed the word-count gate. The cheapest per attempt and not per'
-            'accepted result is exactly the gap this metric exists to expose.'
+            'Second in both runs ($0.00328 and $0.00357). Cheapest per attempt, but 2/3 accepted '
+            'with correction calls each time: one case failed the word-count gate. Cheapest per '
+            'attempt and not per accepted result is exactly the gap this metric exists to expose.'
         ),
     ),
     CuratedModel(
@@ -214,9 +214,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=0.00582,
         measured_notes=(
-            '3/3 accepted, no correction calls, at a fifth of Claude Sonnet 5 per'
-            'accepted result -- so the expensive end of its own family is not needed for'
-            'this task. Asked in the anthropic-vertex dialect.'
+            'Third in both runs ($0.00582 and $0.00723). 3/3 accepted at about a fifth of Claude '
+            'Sonnet 5 per accepted result, so the expensive end of its own family is not needed '
+            'for this task. Asked in the anthropic-vertex dialect.'
         ),
     ),
     CuratedModel(
@@ -235,9 +235,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=0.00271,
         measured_notes=(
-            'WINNER. Best cost per accepted result in the study: 3/3 accepted with no'
-            'correction calls, at $0.00271 -- 42x cheaper than the incumbent default.'
-            'Asked in the strict dialect.'
+            'WINNER, and reproduced. Best cost per accepted result in both independent runs '
+            '($0.00271 and $0.00353), 3/3 accepted with no correction calls in each, at roughly '
+            '40x less than the incumbent default. Asked in the strict dialect.'
         ),
     ),
     # --- balanced ----------------------------------------------------------------
@@ -256,9 +256,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=None,
         measured_notes=(
-            '0/3 accepted, and the failure is specific: it leaked schema text into the'
-            'output, returning a fragment such as a completionState object as the value'
-            'of skills instead of a list of skills. Its 81.3% IFBench score did not'
+            '0/3 accepted in both runs. The failure is specific and reproducible: it leaked '
+            'schema text into the output, returning a fragment such as a completionState object '
+            'as the value of skills instead of a list of skills. Its 81.3% IFBench score did not '
             'predict this task.'
         ),
     ),
@@ -278,9 +278,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=None,
         measured_notes=(
-            '0/3 accepted. It omitted role, start_date and end_date from every work'
-            'experience entry -- precisely the fields the factual gate exists to'
-            'protect. Its low measured hallucination rate did not predict this either.'
+            '0/3 accepted in both runs. It omitted role, start_date and end_date from every work '
+            'experience entry -- precisely the fields the factual gate exists to protect. Its low '
+            'measured hallucination rate did not predict this either.'
         ),
     ),
     CuratedModel(
@@ -299,10 +299,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=None,
         measured_notes=(
-            '0/3 accepted, but inconclusive rather than damning: every call was'
-            'rate-limited (HTTP 429) by its provider, so it never produced a document to'
-            'judge. The one candidate whose result should be re-measured before it is'
-            'judged.'
+            '0/3 accepted, and INCONCLUSIVE rather than failed: every call in both runs was '
+            'rate-limited (HTTP 429) by its provider, so it never produced a document to judge. '
+            'The one candidate that should be re-measured before it is judged.'
         ),
     ),
     # --- frontier ----------------------------------------------------------------
@@ -323,8 +322,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=0.11384,
         measured_notes=(
-            'The incumbent default, kept as the control. 3/3 accepted but with 2'
-            "correction calls and 42x the winner's cost per accepted result."
+            'The incumbent default, kept as the control. 3/3 accepted in both runs but with 2 '
+            "correction calls each time, at roughly 40x the winner's cost per accepted result. "
+            'This is the number a switch would be justified against.'
         ),
     ),
     CuratedModel(
@@ -343,9 +343,9 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=0.15709,
         measured_notes=(
-            'The most expensive candidate and the worst value: 3/3 accepted at 1'
-            "correction call, for 58x the winner's cost per accepted result. It works,"
-            'and it is not worth it here.'
+            'The most expensive candidate and the poorest value: 3/3 accepted at 1 correction '
+            "call, for about 55x the winner's cost per accepted result. It works, and the "
+            'measurement says it is not worth it here.'
         ),
     ),
 )
