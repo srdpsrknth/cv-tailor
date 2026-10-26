@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** *(Phase 3, increment 1 — `refactor: send a targeted layout retry instead of a full regeneration`; sha recorded in the next commit's header)*
+**Latest commit:** `9a45811` — *refactor: send a targeted layout retry instead of a full regeneration* (Phase 3, increment 1 of the agreed order)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
