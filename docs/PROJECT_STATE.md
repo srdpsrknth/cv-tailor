@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `2230c86` — *feat: cache validated generations, keyed by the bytes the model was shown* (Phase 3 item 5)
+**Latest commit:** `8310e91` — *fix: keep the generation cache out of the repository* (Phase 3 item 5)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
@@ -247,7 +247,7 @@ tests still inspect the real `GenerateContentConfig`, so they remain a check of 
 
 ### Phase 3, item 6 — the live run is the only work left (briefing current as of item 5)
 
-**Start state for the next chat:** `refactor/architecture-v2` at `2230c86`. Working tree clean,
+**Start state for the next chat:** `refactor/architecture-v2` at `8310e91`. Working tree clean,
 nothing half-done. **480 passed** (~116 s) offline; fast lane **450**. `master` untouched at
 `1416177`.
 
