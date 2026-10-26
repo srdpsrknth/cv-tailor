@@ -3,18 +3,15 @@ Google Gemini API service for CV and cover letter tailoring.
 Handles API calls, token tracking, cost estimation, and error handling.
 """
 import os
-import time
 from typing import Optional, Tuple
-
-from google import genai
-from google.genai import types
 
 from config import DEFAULT_MODEL, Config
 from models.requests import TokenUsage
 from services.generation import response_schema_for
+from services.provider import ProviderError, build_provider
 
 # Re-exported for callers that only need the model name.
-__all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL"]
+__all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL", "ProviderError"]
 
 # Pricing (per 1M tokens in USD), verified against ai.google.dev on 2026-10-23.
 # Free tier: 15 requests/min, 1.5M tokens/day
@@ -49,17 +46,30 @@ PRICING = {
 }
 
 
-class GeminiServiceError(Exception):
-    """Custom exception for Gemini service errors."""
+class GeminiServiceError(ProviderError):
+    """Custom exception for provider service errors.
+
+    Kept as a subclass of :class:`~services.provider.ProviderError` so existing
+    ``except GeminiServiceError`` clauses keep catching what they always did, while
+    new code can catch the provider-neutral type.
+    """
+
     pass
 
 
 class GeminiService:
-    """Service for interacting with Google Gemini API."""
+    """Drives a provider through the interface ADR 0005 specifies.
+
+    The name is historical: this is now the pipeline's *client* of whatever
+    provider ``config`` names, and ``_call_gemini`` is the one call site the
+    generation pipeline uses. Renaming it is deliberately left to a later,
+    separately verified increment so that this refactor changes no call count and
+    no prompt byte.
+    """
 
     def __init__(self, config: Optional[Config] = None, api_key: Optional[str] = None):
         """
-        Initialize Gemini service.
+        Initialize the service.
 
         Args:
             config: resolved configuration. Built from the environment only when
@@ -67,17 +77,33 @@ class GeminiService:
             api_key: explicit key, overriding the configured one.
         """
         self.config = config or Config.from_env()
-        self.api_key = api_key or self.config.require_api_key()
+        # The key is resolved by ``build_provider`` from the *selected* provider's
+        # field, so a caller passing an explicit one does not need the configured key
+        # to exist, and the Gemini key is never used for an OpenRouter call.
+        self.api_key = api_key or self.config.require_provider_key()
 
-        self.client = genai.Client(api_key=self.api_key)
         self.model = self.config.model
         self.temperature = self.config.temperature
         self.max_output_tokens = self.config.max_output_tokens
 
+        #: Running spend for this service instance, used to enforce the optional cap.
+        #: Starts at zero on every construction, so a cap bounds one run rather than
+        #: accumulating across unrelated runs in a long-lived process.
+        self.spent_usd = 0.0
+        #: How many provider calls this instance has made, reported when a cap trips.
+        self.calls_made = 0
+
+        #: The provider this service speaks to. Built from the already-resolved
+        #: config, so choosing a provider is a configuration decision and never an
+        #: import-time one (ADR 0010). An explicit ``api_key`` overrides the key of
+        #: whichever provider is selected -- never the other provider's.
+        self.provider = build_provider(self.config, api_key=api_key)
+
     def _estimate_cost(
         self,
         input_tokens: int,
-        output_tokens: int
+        output_tokens: int,
+        model: Optional[str] = None,
     ) -> float:
         """
         Estimate cost for token usage in USD.
@@ -85,13 +111,17 @@ class GeminiService:
         Args:
             input_tokens: Number of input tokens
             output_tokens: Number of output tokens
+            model: the model these tokens were billed against. Defaults to
+                ``self.model``. It is a parameter because model-per-task routing
+                means one run can use several models, and pricing them all at the
+                service default would misreport the cost.
 
         Returns:
             Cost in USD
         """
         # An unlisted model must still be priced without crashing. Fall back to the
         # configured default's rates rather than to a removed legacy model.
-        pricing = PRICING.get(self.model, PRICING[DEFAULT_MODEL])
+        pricing = PRICING.get(model or self.model, PRICING[DEFAULT_MODEL])
 
         # Calculate cost per million tokens
         input_cost = (input_tokens / 1_000_000) * pricing["input"]
@@ -109,7 +139,7 @@ class GeminiService:
         allow_delta: bool = False,
     ) -> Tuple[str, int, int]:
         """
-        Call Gemini API with retry logic.
+        Call the configured provider, preserving the per-call response contract.
 
         Args:
             prompt: The prompt to send
@@ -125,68 +155,70 @@ class GeminiService:
             Tuple of (response_text, input_tokens, output_tokens)
 
         Raises:
-            GeminiServiceError: If API call fails after retries
+            GeminiServiceError: If the call fails after retries
         """
-        # Use provided max_output_tokens or fall back to instance default
-        tokens_limit = max_output_tokens if max_output_tokens is not None else self.max_output_tokens
-
         # The schema is per *call*, not per service: the draft and the letter always
         # return one complete document, so they are constrained; a layout retry may
         # return a delta and is therefore not. See generation.RESPONSE_SCHEMAS for why
         # structured output is scoped rather than enabled everywhere -- an earlier
         # blanket application of response_mime_type caused premature truncation of long
         # document responses (D-1).
+        #
+        # ``None`` here is the whole point of the scope: it is passed through to the
+        # provider as "send no constraint", so a provider swap cannot quietly turn the
+        # retry into a constrained call. tests/test_provider_interface.py pins it.
         schema = response_schema_for(kind, allow_delta=allow_delta)
 
-        for attempt in range(max_retries):
-            try:
-                config = types.GenerateContentConfig(
-                    temperature=self.temperature,
-                    max_output_tokens=tokens_limit,
-                )
-                # Keep reasoning from exhausting the document response budget.
-                if self.model == "gemini-3.8-flash":
-                    config.thinking_config = types.ThinkingConfig(thinking_level="low")
+        # Model-per-task routing (ADR 0005). A layout retry is its own task, because
+        # shortening an existing document is cheaper work than drafting one. A task
+        # with no configured override keeps ``self.model``, so routing stays opt-in.
+        #
+        # ``getattr`` rather than a direct call: a config object that predates routing
+        # (a caller's own, or a test double) means "no routing configured", which is
+        # exactly ``self.model``. Requiring the method would make an unrelated config
+        # unable to make a call at all.
+        task = "layout_retry" if allow_delta else (kind or "")
+        model_for = getattr(self.config, "model_for", None)
+        routed_model = model_for(task) if (task and model_for) else self.model
 
-                # Mime type and schema travel together: JSON mode without a schema still
-                # changes the envelope, so a call that is not schema-constrained keeps
-                # both unset and the tolerant parser stays the path it always was.
-                if schema is not None:
-                    config.response_mime_type = "application/json"
-                    config.response_schema = schema
+        try:
+            response = self.provider.generate(
+                prompt,
+                schema=schema,
+                max_tokens=max_output_tokens if max_output_tokens is not None else self.max_output_tokens,
+                model=routed_model,
+            )
+        except ProviderError as error:
+            raise GeminiServiceError(str(error)) from error
 
-                response = self.client.models.generate_content(
-                    model=self.model,
-                    contents=prompt,
-                    config=config
-                )
+        # The cap is checked against the running spend *before* the next call is made,
+        # so a run stops at the budget instead of discovering the overrun afterwards.
+        self._record_spend(response.input_tokens, response.output_tokens, routed_model)
 
+        return response.text, response.input_tokens, response.output_tokens
 
-                # Check finish reason for debugging truncation issues
-                if response.candidates and len(response.candidates) > 0:
-                    finish_reason = response.candidates[0].finish_reason
-                    # Log if it's not a natural stop (STOP = 1)
-                    if finish_reason and finish_reason != 1:
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.warning(f"Gemini finish_reason: {finish_reason} (expected STOP=1)")
+    # --- cost accounting during a run --------------------------------------------------
 
-                # Extract token usage
-                usage = response.usage_metadata
-                input_tokens = usage.prompt_token_count if usage else 0
-                output_tokens = usage.candidates_token_count if usage else 0
+    def _record_spend(self, input_tokens: int, output_tokens: int, model: Optional[str] = None) -> None:
+        """Accumulate this call's estimated cost and enforce the budget cap.
 
-                return response.text, input_tokens, output_tokens
-
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    # Exponential backoff
-                    wait_time = 2 ** attempt
-                    print(f"Gemini API error (attempt {attempt + 1}/{max_retries}): {e}")
-                    print(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    raise GeminiServiceError(f"Gemini API call failed after {max_retries} attempts: {e}")
+        Raises:
+            GeminiServiceError: when the configured cap has been reached. It is raised
+                *after* accumulating, so the reported spend includes the call that hit
+                the limit, and before the pipeline issues another paid request.
+        """
+        cost = self._estimate_cost(input_tokens, output_tokens, model=model)
+        self.spent_usd += cost
+        self.calls_made += 1
+        # ``getattr`` for the same reason as routing: a config object without the cap
+        # concept means "no cap configured", not "crash on every call".
+        budget_exceeded = getattr(self.config, "budget_exceeded", None)
+        if budget_exceeded is not None and budget_exceeded(self.spent_usd):
+            raise GeminiServiceError(
+                f"Cost cap reached: ${self.spent_usd:.6f} spent against "
+                f"CVTAILOR_MAX_COST_USD=${self.config.max_cost_usd:.6f} after "
+                f"{self.calls_made} call(s). No further requests were made."
+            )
 
     def calculate_token_usage(
         self,

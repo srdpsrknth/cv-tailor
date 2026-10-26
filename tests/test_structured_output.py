@@ -438,11 +438,16 @@ def _capture_configs(monkeypatch):
     """Patch the SDK's client factory; every call's config is appended to the list.
 
     ``types.GenerateContentConfig`` itself stays **real** -- the assertions inspect the
-    object the service actually builds, including ``response_schema``, rather than a
+    object the provider actually builds, including ``response_schema``, rather than a
     stub of it. Only the client is replaced, so no request can leave the process and
     the suite stays offline.
+
+    The patch targets ``services.provider``, which is where the Gemini request is built
+    since Phase 3 item 6 introduced the provider interface. The assertions below are
+    unchanged: they still inspect the real config object, so this remains a check of
+    what is *sent* rather than of how the service is wired.
     """
-    from services import gemini_service
+    from services import provider as provider_module
 
     recorded: list = []
 
@@ -454,7 +459,7 @@ def _capture_configs(monkeypatch):
             recorded.append(config)
             return _CannedResponse()
 
-    monkeypatch.setattr(gemini_service.genai, 'Client', Client)
+    monkeypatch.setattr(provider_module.genai, 'Client', Client)
     return recorded
 
 

@@ -21,8 +21,21 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 #: The model assumed when none is configured. Kept in sync with PRICING, which is
-#: asserted to contain it.
+#: asserted to contain it. Decision 6 keeps Gemini's latest Flash as the default.
 DEFAULT_MODEL = "gemini-3.8-flash"
+
+#: The provider used when none is configured (ADR 0005, decision 6).
+DEFAULT_PROVIDER = "gemini"
+
+#: Providers this build can construct. A name outside this set fails closed rather
+#: than falling back to the default, because a silent provider substitution would
+#: change the response contract underneath the caller.
+KNOWN_PROVIDERS = ("gemini", "openrouter")
+
+#: Tasks that may have their own model, and the environment variable suffix for
+#: each. Model-per-task routing (ADR 0005) exists so a cheap model can serve
+#: routine work while document writing keeps the stronger one.
+ROUTABLE_TASKS = ("cv", "cover_letter", "layout_retry")
 
 #: Directory used as the profile store when none is configured (ADR 0011 expects a
 #: sibling directory outside the repository; this keeps a bare checkout working).
@@ -51,6 +64,20 @@ class Config:
     #: An explicit profile file, bypassing the store. Only ever set by a caller that
     #: named a file on purpose (``--profile <path>``, tests). It is never inferred.
     profile_path: Optional[Path] = None
+    #: Which provider implementation to speak to (ADR 0005). ``gemini`` by default.
+    provider: str = DEFAULT_PROVIDER
+    #: Key for the OpenRouter provider. Separate from ``api_key`` because the two
+    #: providers are authenticated independently and neither substitutes for the
+    #: other; a missing key for the *selected* provider fails closed.
+    openrouter_api_key: Optional[str] = None
+    #: Per-task model overrides (ADR 0005's model-per-task routing). A task absent
+    #: from this mapping uses :attr:`model`, so routing is opt-in per task and an
+    #: unconfigured task cannot accidentally get a weaker model.
+    task_models: Optional[dict] = None
+    #: Optional ceiling on a single generation run's estimated cost, in USD. ``None``
+    #: means no cap. This is a *guard*, not an estimate: when the accumulated cost
+    #: would exceed it the run stops rather than continuing to spend.
+    max_cost_usd: Optional[float] = None
 
     # --- construction -----------------------------------------------------------------
 
@@ -107,6 +134,56 @@ class Config:
         # branch that fills this in with a default path.
         profile = overrides.pop("profile_path", None)
 
+        # --- provider selection (ADR 0005) ---------------------------------------
+        # An unknown name is rejected here, at config time, rather than silently
+        # falling back to Gemini: a provider substitution would change the response
+        # contract without the caller asking for it.
+        provider = overrides.pop("provider", None) or os.getenv("CVTAILOR_PROVIDER", "").strip() or DEFAULT_PROVIDER
+        provider = str(provider).strip().lower()
+        if provider not in KNOWN_PROVIDERS:
+            raise ConfigError(
+                f"Unknown provider {provider!r}. Known providers: "
+                f"{', '.join(KNOWN_PROVIDERS)}. Set CVTAILOR_PROVIDER."
+            )
+
+        # --- model-per-task routing (ADR 0005) ------------------------------------
+        # Opt-in per task. A task with no override falls back to ``model``, so
+        # configuring routing for one task cannot silently weaken another.
+        task_models = dict(overrides.pop("task_models", None) or {})
+        for task in ROUTABLE_TASKS:
+            if task in task_models and task_models[task]:
+                continue
+            env_name = f"CVTAILOR_MODEL_{task.upper()}"
+            value = os.getenv(env_name, "").strip()
+            if value:
+                task_models[task] = value
+        unknown_tasks = sorted(set(task_models) - set(ROUTABLE_TASKS))
+        if unknown_tasks:
+            raise ConfigError(
+                f"Unknown task(s) in model routing: {', '.join(unknown_tasks)}. "
+                f"Routable tasks: {', '.join(ROUTABLE_TASKS)}."
+            )
+
+        # --- optional budget cap --------------------------------------------------
+        # A cap exists so an evaluation or a real run cannot spend without limit.
+        # A malformed value is an error, never a silently-ignored cap: a budget
+        # that fails open is worse than no budget, because it looks like one.
+        max_cost_usd = overrides.pop("max_cost_usd", None)
+        if max_cost_usd is None:
+            raw_cost = os.getenv("CVTAILOR_MAX_COST_USD", "").strip()
+            max_cost_usd = raw_cost or None
+        if max_cost_usd is not None:
+            try:
+                max_cost_usd = float(max_cost_usd)
+            except (TypeError, ValueError) as error:
+                raise ConfigError(
+                    f"CVTAILOR_MAX_COST_USD must be a number of USD, got {max_cost_usd!r}."
+                ) from error
+            if max_cost_usd < 0:
+                raise ConfigError(
+                    f"CVTAILOR_MAX_COST_USD must not be negative, got {max_cost_usd}."
+                )
+
         config = cls(
             project_root=project_root,
             outputs_dir=outputs_dir,
@@ -119,6 +196,14 @@ class Config:
             profile_store_dir=profile_store_dir,
             profile_id=str(profile_id) if profile_id is not None else None,
             profile_path=Path(profile) if profile else None,
+            provider=provider,
+            openrouter_api_key=(
+                overrides.pop("openrouter_api_key", None)
+                or os.getenv("OPENROUTER_API_KEY")
+                or None
+            ),
+            task_models=task_models,
+            max_cost_usd=max_cost_usd,
         )
         if overrides:
             raise TypeError(f"Unknown config overrides: {sorted(overrides)}")
@@ -156,6 +241,58 @@ class Config:
         if "profile_id" in changes and changes["profile_id"] is not None:
             changes["profile_id"] = str(changes["profile_id"])
         return replace(self, **changes)
+
+    # --- provider and routing ---------------------------------------------------------
+
+    def model_for(self, task: str) -> str:
+        """Return the model this config routes ``task`` to (ADR 0005).
+
+        Falls back to :attr:`model` for a task with no override, so routing is
+        opt-in and an unconfigured task never gets a weaker model by accident.
+        An unknown task falls back too rather than raising: a new call site must
+        not be able to crash a run by asking for a model, and falling back to the
+        configured default is the behaviour every existing caller already had.
+        """
+        return (self.task_models or {}).get(task) or self.model
+
+    @property
+    def provider_name(self) -> str:
+        """The configured provider's name, normalised."""
+        return (self.provider or DEFAULT_PROVIDER).strip().lower()
+
+    def require_provider_key(self) -> str:
+        """Return the API key for the **selected** provider, or fail closed.
+
+        Each provider is authenticated separately and neither key substitutes for
+        the other, so selecting OpenRouter without its key is an error rather than
+        a silent attempt to use the Gemini key.
+        """
+        if self.provider_name == "openrouter":
+            if not self.openrouter_api_key:
+                raise ConfigError(
+                    "OPENROUTER_API_KEY is not set. Add it to .env "
+                    f"({self.project_root / '.env'}) or pass --api-key. "
+                    "Run `cvtailor doctor` to check your setup."
+                )
+            return self.openrouter_api_key
+        return self.require_api_key()
+
+    # --- optional budget cap ----------------------------------------------------------
+
+    @property
+    def has_cost_cap(self) -> bool:
+        """True when a spending cap is configured."""
+        return self.max_cost_usd is not None
+
+    def budget_exceeded(self, spent_usd: float) -> bool:
+        """Whether ``spent_usd`` has reached the configured cap.
+
+        With no cap configured this is always False, so the unconfigured path
+        behaves exactly as it did before caps existed.
+        """
+        if self.max_cost_usd is None:
+            return False
+        return spent_usd >= self.max_cost_usd
 
     # --- profiles ---------------------------------------------------------------------
 
