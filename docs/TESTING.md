@@ -1,8 +1,8 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **478 passed**, 1 warning, ~116 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **448 passed**, 30 deselected, ~13 s.
+**Current baseline:** **480 passed**, 1 warning, ~116 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **450 passed**, 30 deselected, ~13 s.
 
 | | |
 |---|---|
@@ -18,7 +18,7 @@
 | Baseline after Phase 3 item 6, increment A (provider interface, routing, budget caps) | 390 passed, ~113 s |
 | Baseline after Phase 3 item 6, increment B (D-3, D-4 — route- and tier-aware pricing) | 407 passed, ~112 s |
 | **Baseline after Phase 3 item 6, increment C (evaluation suite, curated set)** | **436 passed**, ~115 s |
-| **Baseline after Phase 3 item 5 (validated-generation cache)** | **478 passed**, ~116 s |
+| **Baseline after Phase 3 item 5 (validated-generation cache)** | **480 passed**, ~116 s |
 | Paid API calls | **none** — verified with `GEMINI_API_KEY` unset |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
@@ -27,7 +27,7 @@ The suite grew 12 → 141 in Milestone 1.1, 141 → 190 in Phase 1, 190 → 262 
 298 → 309 in increment 2, 309 → 324 in Phase 3 increment 1 of the agreed order
 (targeted layout retry), 324 → **351** in increment 3 (structured output), 351 → **390**
 in item 6 increment A, 390 → **407** in increment B, 407 → **436** in increment C, and
-436 → **478** in item 5 (one new file, plus one pre-existing test — see below).
+436 → **480** in item 5 (one new file, plus one pre-existing test — see below).
 The runtime increase is almost entirely `pdflatex`: real rendering is exercised instead of
 mocked.
 
@@ -107,7 +107,7 @@ throwaway synthetic store once, for the whole suite.
 | `test_provider_interface.py` | 39 | **New in Phase 3 item 6, increment A.** The single `generate(prompt, *, schema, max_tokens, model)` contract; `schema=None` reaches **both** providers as "send no constraint", so the layout retry and an unknown kind stay unconstrained while the draft and letter keep theirs; OpenRouter's `response_format` envelope is **translated**, not passed through, and a schema call also sends `provider.require_parameters`; no silent fallback (unknown provider, missing key for the *selected* provider, and provider failure all raise); `ProviderError` is deliberately **not** a `ValueError`, because the correction loop catches `ValueError`; model-per-task routing including the `layout_retry` task; the budget cap refuses a malformed value, stops further calls, and prices a routed model as itself; the 2-call happy path driven through the real pipeline |
 | `test_pricing.py` | 17 | **New in item 6, increment B (D-3, D-4).** The long-context tier is applied to the tokens and selected on the input count; the old flat rate would have **halved** the estimate for `gemini-2.5-pro` at 300k tokens; a half-defined long pair is not a tier; the route is part of the price key (Gemini direct $0.75/$3.75 vs OpenRouter $0.825/$4.125); an unpriced route is distinguishable from a priced one and the fallback target always exists; every route records a dated source; the UI carries **no** model-keyed table and prices through `services.pricing`; only `pricing.py` defines the table (parsed with `ast`, not string-matched); the compatibility view in `gemini_service` is derived, not a second table |
 | `test_evaluation_suite.py` | 29 | **New in item 6, increment C.** The suite is offline by default and the default cap is the agreed $5; the whole curated run is projected **under** budget; a plan is refused **before** the first call, a missing cap is a refusal rather than "unlimited", and the cap is re-checked before every call rather than only at the start; a live run needs explicit authorisation and an over-budget one spends **nothing**; nothing under `evaluation/` is collected by pytest and CI does not invoke it; cases resolve only inside `tests/fixtures/`, a path that escapes is refused, and the suite never names the private store; the curated set is small, spans three cost tiers cheapest-first, and every entry is **UNMEASURED** with no invented quality claim; recorded rates and structured-output support **match the listing**; cost per **accepted** result is the headline metric and a model that accepts nothing reports `None`, never `0.0` |
-| `test_generation_cache.py` | 42 | **New in Phase 3 item 5.** The key is the bytes the model was shown: identical inputs give an identical 64-character digest, and each of the 13 ingredients changes it on its own — including `model_cv` and `model_cl` **separately**, because item 6's routing lets two models serve one posting, and the schema digest, because the schema is request metadata and not in either prompt file. A **prompt-file edit is not served from cache** (asserted through the real pipeline: the model is shown the new prompt and a fresh draft is paid for). An identical repeat makes **0** LLM calls and produces byte-identical `content.json`; a hit reports **zero** usage rather than the original run's tokens, while the original figures survive as `original_usage`; a hit still writes a complete job folder with the restored raw responses as `drafts.json`; and a hit uses a new `job_id` rather than overwriting the first application. **Only a validated result is stored**: a failed draft, a CV that never fits, and a failed repeat all store nothing and leave any earlier entry untouched — asserted by counting entries *during* rendering, so a write that happened before the page-count gate would be caught. The store is **always safe to delete**: a deleted cache regenerates, and an empty, malformed, truncated, wrong-format-version, no-longer-validating or wrong-shape entry is a **miss** rather than a failure. `use_cache=False` re-drafts and still stores. The cache lives at `<store>/cache/<profile_id>/`, fails closed without a profile id, cannot be read across candidates, and refuses a key that is not a 64-character lowercase hex digest. Cold-cache call counts stay at **2/3/5** |
+| `test_generation_cache.py` | 44 | **New in Phase 3 item 5.** The key is the bytes the model was shown: identical inputs give an identical 64-character digest, and each of the 13 ingredients changes it on its own — including `model_cv` and `model_cl` **separately**, because item 6's routing lets two models serve one posting, and the schema digest, because the schema is request metadata and not in either prompt file. A **prompt-file edit is not served from cache** (asserted through the real pipeline: the model is shown the new prompt and a fresh draft is paid for). An identical repeat makes **0** LLM calls and produces byte-identical `content.json`; a hit reports **zero** usage rather than the original run's tokens, while the original figures survive as `original_usage`; a hit still writes a complete job folder with the restored raw responses as `drafts.json`; and a hit uses a new `job_id` rather than overwriting the first application. **Only a validated result is stored**: a failed draft, a CV that never fits, and a failed repeat all store nothing and leave any earlier entry untouched — asserted by counting entries *during* rendering, so a write that happened before the page-count gate would be caught. The store is **always safe to delete**: a deleted cache regenerates, and an empty, malformed, truncated, wrong-format-version, no-longer-validating or wrong-shape entry is a **miss** rather than a failure. `use_cache=False` re-drafts and still stores. The cache lives at `<store>/cache/<profile_id>/`, fails closed without a profile id, cannot be read across candidates, and refuses a key that is not a 64-character lowercase hex digest. Cold-cache call counts stay at **2/3/5**. **Two tests guard the repository boundary** — that a loose `--profile <path>` run (the branch `evaluation/live.py` takes) still caches in the store and leaves the repository root clean; both were verified to **fail** against the first implementation, which put the cache beside the outputs |
 
 `test_profile_serialization.py` was verified to be a real guard: **11 of its 16 tests fail
 against the pre-increment-1 code**. `test_editorial_instructions.py` likewise: **9 of its 11
@@ -134,8 +134,10 @@ skips**.
 `test_generation_cache.py` imports `services.cache_store` defensively and **fails** when it is
 absent, so against `def7fe0` the file errors at collection: `services.cache_store could not be
 imported`. That is the correct outcome — the module is new — and it is stated plainly rather than
-hidden behind a skip. With that one guard neutralised (and only that guard), **37 of the 42 tests
-fail against `def7fe0`**. The 5 that pass there are named rather than glossed over:
+hidden behind a skip. Two mechanical edits are then needed to make the rest of the file runnable
+there at all — the import guard, and the three `use_cache` keywords, because that parameter does
+not exist at `def7fe0`. With exactly those two neutralised and no assertion relaxed, **39 of the 44
+tests fail against `def7fe0`**. The 5 that pass there are named rather than glossed over:
 `test_a_model_change_is_not_served_from_cache` and `test_a_profile_change_is_not_served_from_cache`
 pass because they assert a *fresh call happens*, which is also what code with no cache does;
 `test_a_hit_reports_the_original_explanation`,
@@ -314,7 +316,7 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | `test_editorial_instructions.py` | 11 | **New in Phase 3 increment 2.** The merged editorial requirements reach the CV call only; the gate is unchanged; call counts are 2/3/5 |
 | `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The targeted retry, the delta merge, and the fact that a delta cannot bypass the gate |
 | `test_structured_output.py` | 27 | **New in Phase 3 increment 3.** Structured output is scoped per call; the schema constrains the envelope, not the document body; a truncated response is rejected; the gate and the call counts are unchanged |
-| `test_generation_cache.py` | 42 | **New in Phase 3 item 5.** The cache key is the bytes the model was shown and no two different inputs share it; only a validated result is stored; a prompt, model, provider, country or profile change is a miss; a hit costs 0 calls and returns byte-identical documents with no reported cost; and the store is derived data, so deletion and corruption both degrade to regenerating |
+| `test_generation_cache.py` | 44 | **New in Phase 3 item 5.** The cache key is the bytes the model was shown and no two different inputs share it; only a validated result is stored; a prompt, model, provider, country or profile change is a miss; a hit costs 0 calls and returns byte-identical documents with no reported cost; and the store is derived data, so deletion and corruption both degrade to regenerating |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
 | `test_portability.py` | 2 | *(pre-existing)* pdflatex discovery and `LATEX_COMPILER` override |
@@ -451,9 +453,9 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | `python -m pytest -q` (after Phase 3 item 6, increment A — provider interface) | 390 passed, ~113 s |
 | `python -m pytest -q` (after Phase 3 item 6, increment B — D-3/D-4 pricing) | 407 passed, ~112 s |
 | `python -m pytest -q` (**after Phase 3 item 6, increment C** — evaluation suite, curation) | **436 passed**, ~114 s |
-| `python -m pytest -q` (**after Phase 3 item 5** — validated-generation cache) | **478 passed**, ~116 s |
-| Fast lane `-m "not requires_latex"` (current) | **448 passed**, 30 deselected, ~13 s |
-| `test_generation_cache.py` | 42 passed, ~2 s (no LaTeX, no network) |
+| `python -m pytest -q` (**after Phase 3 item 5** — validated-generation cache) | **480 passed**, ~116 s |
+| Fast lane `-m "not requires_latex"` (current) | **450 passed**, 30 deselected, ~13 s |
+| `test_generation_cache.py` | 44 passed, ~2 s (no LaTeX, no network) |
 | `test_api.py` | 20 passed, ~2 s (no LaTeX, no network) |
 | `test_renderers_documents.py` | 34 passed, ~20 s |
 | `test_render_application_determinism.py` | 11 passed, ~73 s |

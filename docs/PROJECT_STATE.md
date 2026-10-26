@@ -3,7 +3,7 @@
 **Last updated:** 2026-10-26
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `def7fe0` — *docs: define item 5 and retire the discharged item 6 briefing* (item 5's code follows in this increment)
+**Latest commit:** `2230c86` — *feat: cache validated generations, keyed by the bytes the model was shown* (Phase 3 item 5)
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ---
@@ -38,7 +38,7 @@ for them again. It now stores a **validated** generation under
 
 | Commit | What it did |
 |---|---|
-| *(this increment)* | `services/cache_store.py`: the key, the entry and the store; the pipeline reads before its first call and writes after the page-count gate; `--no-cache` and the API's `use_cache` bypass. [ADR 0015](DECISIONS/0015-generation-cache.md) |
+| `2230c86` | `services/cache_store.py`: the key, the entry and the store; the pipeline reads before its first call and writes after the page-count gate; `--no-cache` and the API's `use_cache` bypass. [ADR 0015](DECISIONS/0015-generation-cache.md) |
 
 **The key is the bytes the model was shown, and that is enforced structurally rather than by
 convention.** `cache_store.serialize_profile_bytes(profile)` produces one string, and that same
@@ -89,6 +89,23 @@ A hit still writes a **complete job folder**, including the restored raw respons
 `drafts.json`, because the cache replaces the generation and not the persistence — the user asked
 for an application and gets one, with the same audit trail.
 
+**One defect was found during the push review and fixed before pushing.** `_cache_root` originally
+put the cache *beside the outputs*, which for a loose `--profile <path>` run means
+`<repo>/cache/`. That is wrong twice over: a cache entry holds the **accepted CV and cover letter**,
+so it is real candidate data and belongs in the private store (ADR 0011); and while `<repo>/outputs/`
+is gitignored, a sibling `<repo>/cache/` is **not**, so such a run would have dropped real documents
+into the public repository's working tree, where a routine `git add -A` could stage them.
+
+It was reachable, not theoretical: **`evaluation/live.py` drives the real pipeline with a loose
+`profile_path`**, so item 6's paid live run — the one thing Phase 3 still owes — would have taken
+exactly that branch. `_cache_root` now roots the cache in `config.store.root` **unconditionally**,
+since the store root is configuration (ADR 0004) and available whether or not a profile file was
+named. Two tests guard it: the resolver, and an end-to-end loose-path run asserted against the real
+repository root. Both were verified to **fail** against the original code.
+
+This is also why the "no eviction policy" follow-up is safe to defer: the directory is now provably
+inside the private store, so the whole tree remains deletable without touching anything public.
+
 **Call counts are UNCHANGED at 2/3/5 on a cold cache** (min/typical/max-successful), 12 worst.
 This is stated explicitly because the item's scope required it: item 5 adds a lookup **before** the
 first call and a write **after** the last one, and adds no request. On a **hit** the count is
@@ -110,14 +127,16 @@ records it as such.
 user who edits the profile, changes the country, switches model or edits a prompt gets a fresh
 draft. That is the invalidation contract the item asked for, not a miss to be optimised away.
 
-**Tests: 436 → 478 passed** (~116 s), fully offline, no paid calls. Fast lane 406 → **448 passed**
-(~13 s). New file `tests/test_generation_cache.py` (42 tests). Verified against a throwaway
+**Tests: 436 → 480 passed** (~116 s), fully offline, no paid calls. Fast lane 406 → **450 passed**
+(~13 s). New file `tests/test_generation_cache.py` (44 tests). Verified against a throwaway
 `git worktree` at `def7fe0` (not by stashing): the file's defensive import **fails** there
 (`services.cache_store could not be imported`), which is the correct outcome for a brand-new
-module; with that one guard neutralised and nothing else changed, **37 of the 42 fail**. The 5 that
-pass there are named rather than glossed over — two assert *that a fresh call happens*, which is
-also what code with no cache does, and three assert that a second ordinary run reproduces the
-first's documents, which is trivially true when there is no cache to differ from.
+module; with that one guard neutralised — and the three `use_cache` keywords commented out,
+because that parameter does not exist at `def7fe0` — **39 of the 44 fail**. The 5 that
+pass there are named rather than glossed over — two assert *that a fresh call happens*,
+which is also what code with no cache does, and three assert that a second ordinary run
+reproduces the first's documents, which is trivially true when there is no cache to differ
+from. Both repository-boundary guards fail there too, as they must.
 
 **One existing test was modified, and the reason is worth recording.**
 `test_layout_retry.py::test_a_delta_that_breaks_a_profile_rule_is_rejected` runs the same profile
@@ -226,11 +245,14 @@ tests still inspect the real `GenerateContentConfig`, so they remain a check of 
 
 **Do not re-open increments 4, 2, 1 or 3.** None was touched.
 
-### Phase 3, item 6 — briefing retained for the follow-up chat
+### Phase 3, item 6 — the live run is the only work left (briefing current as of item 5)
 
-**Start state for the follow-up:** `refactor/architecture-v2` at `215ba08`. Working tree clean,
-nothing half-done. **436 passed** (~115 s) offline; fast lane **406**. `master` untouched at
+**Start state for the next chat:** `refactor/architecture-v2` at `2230c86`. Working tree clean,
+nothing half-done. **480 passed** (~116 s) offline; fast lane **450**. `master` untouched at
 `1416177`.
+
+**This is now the *only* outstanding work in Phase 3.** Items 4, 2, 1, 3 and 5 are done and
+committed; item 6's offline groundwork is done. Nothing else in the agreed order is pending.
 
 **What to do next, in order:**
 
@@ -260,6 +282,7 @@ nothing half-done. **436 passed** (~115 s) offline; fast lane **406**. `master` 
 | `tests/test_editorial_instructions.py` | Pins 2/3/5 — must keep passing |
 | `tests/test_provider_interface.py` | Pins the per-call schema contract across the indirection |
 | `tests/test_pricing.py` | Pins D-3/D-4, including that no second pricing table exists |
+| `services/cache_store.py` | Item 5's cache. `evaluation/live.py` drives the real pipeline with a **loose `profile_path`**, so a live run **does** read and write this cache. That is why `_cache_root` roots it in the store unconditionally — see the item 5 section's "one defect found and fixed" note. Do **not** put the cache beside the outputs for a loose-path run: `outputs/` is gitignored and a sibling `cache/` is not |
 
 **House rules that bit previous increments** (worth repeating): do not verify against old code by
 stashing or `git checkout --` in the working tree — use a throwaway `git worktree`. Under this
@@ -814,7 +837,7 @@ Re-confirm each decision when its phase begins.
 | Stable app on `master` | Working, untouched, own `.venv` and `.env` (ports 8000/8501) |
 | Dev branch | 34 commits ahead of `master` — Phases 1 and 2 complete, Phase 3 items 4, 2, 1, 3, 5 and item 6's offline groundwork done |
 | Dev worktree runnable? | **Yes** — `.venv`, `.env` (ports 8001/8502) |
-| Test baseline | **478 passed** (~116 s); fast lane `-m "not requires_latex"` → 448 passed (~13 s) |
+| Test baseline | **480 passed** (~116 s); fast lane `-m "not requires_latex"` → 450 passed (~13 s) |
 | CLI | **Working** — `python cvtailor.py <command>`; `profile list/show/new/import/export`, `generate` (with `--no-cache`), `render`, `doctor` |
 | Providers | **Gemini (default) and OpenRouter**, behind one `generate(...)` contract; model-per-task routing; optional `CVTAILOR_MAX_COST_USD` cap |
 | Pricing | **One source of truth** — `services/pricing.py`, route- and tier-aware (D-3, D-4 resolved) |
@@ -832,8 +855,8 @@ Re-confirm each decision when its phase begins.
 
 ### Verified baseline facts
 
-- `.venv\Scripts\python.exe -m pytest -q` → **478 passed**, 1 warning (~116 s), offline.
-- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **448 passed**,
+- `.venv\Scripts\python.exe -m pytest -q` → **480 passed**, 1 warning (~116 s), offline.
+- Fast lane `.venv\Scripts\python.exe -m pytest -q -m "not requires_latex"` → **450 passed**,
   30 deselected (~13 s).
 - Fully offline: verified with `GEMINI_API_KEY` unset; no paid API calls in the suite. **No paid
   call has ever been made in this repository.**
@@ -847,7 +870,7 @@ Re-confirm each decision when its phase begins.
   file, **no existing test modified**), 351 → **390** in item 6 increment A (one new file,
   plus one monkeypatch-seam update in `test_structured_output.py` with no assertion changed),
   390 → **407** in increment B (one new file), and 407 → **436** in increment C (one new file),
-  and 436 → **478** in Phase 3 item 5 (one new file, plus the one existing test recorded in
+  and 436 → **480** in Phase 3 item 5 (one new file, plus the one existing test recorded in
   that item's section — the first time an existing test was edited *because the cache made two
   identical runs non-independent*, not because behaviour was being pinned).
   In Phase 2,
@@ -878,7 +901,7 @@ Re-confirm each decision when its phase begins.
   curated set are new code with no predecessor, so there is no old behaviour to fail against.
   The file guards the new code's *properties* (offline by default, cap fails closed, out of CI,
   unmeasured markers, rates match the listing) rather than diffing behaviour.
-- `tests/test_generation_cache.py` (Phase 3 item 5): **37 of its 42 tests fail against `def7fe0`**
+- `tests/test_generation_cache.py` (Phase 3 item 5): **39 of its 44 tests fail against `def7fe0`**
   once its own defensive import guard is neutralised, verified in a throwaway worktree. The file
   imports `services.cache_store` defensively and **fails** (not skips) when it is absent, so
   against `def7fe0` it errors at collection — the correct outcome for a new module, stated rather

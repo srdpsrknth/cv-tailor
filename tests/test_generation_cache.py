@@ -429,6 +429,102 @@ def test_the_cache_is_written_into_the_store_and_never_the_repository(
     assert str(isolated_service) in str(cache.path_for(cache.keys()[0]))
 
 
+def test_a_loose_profile_path_still_caches_in_the_store_not_the_repository(
+    tmp_path,
+):
+    """The case a live evaluation run takes, and the one that was wrong at first.
+
+    ``evaluation/live.py`` drives the real pipeline with ``profile_path`` set (a fixture
+    file, not a store id), which is the branch that puts *outputs* in the repository's
+    gitignored ``outputs/``. The cache must **not** follow it there: an entry holds the
+    accepted documents, and a sibling ``<repo>/cache/`` is not gitignored, so a live run
+    would have written real candidate data into the public repository's working tree.
+
+    Asserted on the resolver directly rather than by running the suite, because the
+    evaluation suite makes no call offline and this is the path it *would* take.
+    """
+    import config as config_module
+    from services import tailor_service as module
+
+    store_root = tmp_path / 'a-real-store'
+    config = config_module.Config.from_env(
+        load_env_file=False,
+        overrides={
+            'project_root': tmp_path / 'repo',
+            'profile_store_dir': store_root,
+            'profile_path': tmp_path / 'fixtures' / 'synthetic_analyst.yaml',
+        },
+    )
+    assert config.profile_path is not None, 'this test is about the loose-path branch'
+
+    root = module._cache_root(config)
+
+    assert root == store_root / 'cache'
+    assert 'repo' not in root.parts, 'the cache must never be rooted in the repository'
+
+
+def test_the_repository_root_has_no_cache_directory_after_a_loose_profile_run(
+    repo_root, tmp_path, monkeypatch, offline_service, stub_renderers, analyst_session,
+):
+    """No run may leave a ``cache/`` directory in the repository — driven end to end.
+
+    This is the guard that matters, and it has to take the **loose ``--profile`` path**,
+    because that is the branch a live evaluation run takes and the only one that could
+    put the cache in the repository: a store-id run roots outputs in the store anyway.
+
+    Asserted on the real repository root, so a change that moves the cache back beside
+    the outputs is caught here rather than during a paid run.
+    """
+    from support import load_profile
+
+    repo_cache = Path(repo_root) / 'cache'
+    assert not any(repo_cache.rglob('*.json')) if repo_cache.exists() else True, (
+        'the repository already holds cache entries from an earlier run'
+    )
+
+    # The loose-path branch, with a store that is NOT the repository -- exactly the
+    # shape ``evaluation/live.py`` builds.
+    store_root = tmp_path / 'private-store'
+    store_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv('CVTAILOR_STORE', str(store_root))
+    # A loose profile file bypasses the store *lookup*, but an id is still required:
+    # it names the output segment and the cache segment (ADR 0003), and nothing about
+    # that changes when the profile comes from a file.
+    monkeypatch.setenv('CVTAILOR_PROFILE_ID', 'eval_case')
+    monkeypatch.setattr(
+        service, 'PROJECT_ROOT', tmp_path / 'repo-root-outside-the-real-one',
+    )
+
+    from config import Config
+
+    profile_path = Path(repo_root) / 'tests' / 'fixtures' / 'profiles' / 'synthetic_analyst.yaml'
+    config = Config.from_env(
+        load_env_file=False,
+        overrides={
+            'project_root': tmp_path / 'repo-root-outside-the-real-one',
+            'profile_store_dir': store_root,
+            'profile_path': profile_path,
+            'profile_id': 'eval_case',
+        },
+    )
+    assert config.profile_path is not None, 'this test is about the loose-path branch'
+
+    offline_service(analyst_session.texts())
+    stub_renderers([2])
+    service.tailor_documents(
+        analyst_session.job_description_text, load_profile('synthetic_analyst'),
+        company_name=NORDWIND, role_title=ANALYST_ROLE, config=config,
+    )
+
+    # The entry landed in the store, under the candidate segment...
+    stored = GenerationCache(store_root / 'cache' / 'eval_case')
+    assert stored.count() == 1, 'the cache must be written into the store'
+    # ...and the real repository gained nothing.
+    assert not (Path(repo_root) / 'cache').exists() or not any(
+        (Path(repo_root) / 'cache').rglob('*.json')
+    ), 'a loose-profile run wrote cache entries into the repository'
+
+
 def test_deleting_the_cache_costs_a_regeneration_and_nothing_else(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):

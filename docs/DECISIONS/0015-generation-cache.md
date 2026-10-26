@@ -47,7 +47,7 @@ keyed by a digest of the bytes the model was shown.**
 | When an entry is written | After the page-count gate passes, and nowhere else |
 | What it holds | The accepted CV and letter, the explanation, the raw responses, the provider, the routed models, and the run's usage |
 | On read | The stored documents are **re-validated through the same gate**, at no API cost |
-| Location | `<store>/cache/<profile_id>/`, a sibling of `outputs/` (ADR 0011) |
+| Location | `<store>/cache/<profile_id>/`, a sibling of `outputs/` (ADR 0011) — **always the store, never the repository**, including when the caller named a loose `--profile <path>` |
 | Deletion | Always safe. Any read failure is a **miss**, never an error |
 | Bypass | `use_cache=False` (CLI `--no-cache`, API `use_cache: false`) |
 
@@ -92,6 +92,16 @@ profile block that was sent.
   leave a half-written entry that a later run would read as valid.
 - **The candidate segment is in the path** and `profile_id` is validated, so two
   candidates cannot read each other's entries (ADR 0003).
+- **The cache is rooted in the store unconditionally — never beside the outputs.** The
+  first implementation put it beside `outputs/`, which for a loose `--profile <path>`
+  run means `<repo>/cache/`. That was wrong: an entry holds the accepted CV and letter,
+  so it is real candidate data; and `<repo>/outputs/` is gitignored while a sibling
+  `<repo>/cache/` is **not**, so such a run would have written real documents into the
+  public repository's working tree. It was reachable — `evaluation/live.py` drives the
+  pipeline with a loose `profile_path`, so the paid live run would have taken that
+  branch. The store root is configuration (ADR 0004) and is available either way, so
+  there is no case that needs the fallback. Two tests guard it, both verified to fail
+  against the original code.
 
 ## Consequences
 
@@ -132,4 +142,5 @@ profile block that was sent.
 | Delete a no-longer-valid entry on read | Makes a read mutate state, and a read-only store (a mounted or copied cache) would start failing. Overwriting on the next write is enough |
 | Report the original run's token totals on a hit | Puts a cost on a run that made no call |
 | Put the cache inside `<store>/outputs/` | Anything listing a candidate's applications would start returning cache entries |
+| Put the cache beside the outputs when the caller named a loose `--profile <path>` | `<repo>/outputs/` is gitignored but a sibling `<repo>/cache/` is not, so this wrote real accepted documents into the public repository's working tree. `evaluation/live.py` takes exactly this branch, so it was reachable by the paid live run. The store root is available either way, so the fallback bought nothing |
 | Evict by LRU or by age | Real complexity (a policy, a clock, a size budget) for a single-user tool where the whole directory is safe to delete. Deferred, and recorded as an open follow-up |

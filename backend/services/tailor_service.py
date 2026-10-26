@@ -160,18 +160,21 @@ def _schema_digest() -> str:
     ).hexdigest()
 
 
-def _cache_root(config: Config, outputs_root: Path) -> Path:
-    """Where this run's cache lives: beside the documents it caches.
+def _cache_root(config: Config) -> Path:
+    """Where the cache lives: always inside the private store (ADR 0011).
 
-    The store's own ``cache/`` tree (ADR 0011) when the store is authoritative, so no
-    real document data is written into the public repository. A caller that named a
-    loose ``--profile <path>`` names no store and gets its outputs in the repository's
-    ``outputs/``; its cache follows the outputs, which keeps every test that asserts
-    the output layout true as well.
+    **Never the repository.** A cache entry holds the accepted CV and cover letter --
+    the same real candidate data ``outputs/`` holds -- so it is subject to the same
+    boundary. It is deliberately *not* placed beside ``outputs/`` when the store is not
+    authoritative: ``<repo>/outputs/`` is gitignored, so a loose ``--profile <path>``
+    run writing there is contained, but a sibling ``<repo>/cache/`` would not be
+    gitignored and a live evaluation run would drop real documents into the public
+    repository's working tree.
+
+    The store root is configuration (ADR 0004) and is available whether or not the
+    caller named a profile file, so there is no case that needs a fallback.
     """
-    if config.profile_path is None:
-        return config.store.root / "cache"
-    return outputs_root.parent / "cache"
+    return config.store.root / "cache"
 
 
 def _cache_read(
@@ -361,7 +364,7 @@ def tailor_documents(
         rules_fingerprint=rules_fingerprint(generator.rules),
         format_version=CACHE_FORMAT_VERSION,
     )
-    cache = GenerationCache(_cache_root(config, outputs_root) / resolved_profile_id)
+    cache = GenerationCache(_cache_root(config) / resolved_profile_id)
     entry = None
     cv = cl = explanation = None
     if use_cache:

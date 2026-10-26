@@ -86,7 +86,7 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > safe, and a stored document is re-validated on read because the cache is an editable file on
 > disk. See [ADR 0015](DECISIONS/0015-generation-cache.md). **Call counts on a cold cache are
 > unchanged at 2 / 3 / 5, worst 12** — the item adds a lookup and a write, not a request. The
-> suite is **478 passed**.
+> suite is **480 passed**.
 >
 > **Owner requirement recorded 2026-10-26 (scopes Phase 3 item 6).** OpenRouter exposes a very
 > large catalogue of models. **The tool must not surface all of them.** Phase 3 item 6 must
