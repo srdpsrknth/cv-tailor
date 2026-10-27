@@ -3,8 +3,28 @@
 **Last updated:** 2026-10-27
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `e53ef8a` — *feat: switch the default to the model the study selected*
+**Latest commit:** `6a16633` — *refactor: rename GeminiService to LLMService, and the module to match*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Current naming: `LLMService` in `backend/services/llm_service.py`
+
+Renamed from `GeminiService` / `services/gemini_service.py` on 2026-10-27 (`6a16633`). The
+class drives **any** provider, so the old name described a Gemini-only design that had not
+existed since the provider interface landed. Also renamed: `_call_gemini` →
+`_call_provider`, `GeminiServiceError` → `LLMServiceError`.
+
+**A pure rename, proven mechanically**: every added line equals a removed line once the
+four names are normalised, the test count is identical before and after, and `git` records
+it as a rename at 96% similarity.
+
+**ADRs were deliberately not updated.** `docs/DECISIONS/` still contains the old names in
+five records, because an ADR states what was decided at the time; rewriting history to use
+a name that did not then exist would falsify the record. This file describes the present.
+
+**Names still containing "gemini", and why they are correct:** `GEMINI_API_KEY` and
+`GEMINI_MODEL` name the Gemini *provider*, which remains supported; `PRICING` in
+`llm_service.py` is the Gemini route's rows; and the `gemini-2.5-*` entries in
+`services/pricing.py` are live routes.
 
 ## The switch is done: `openai/gpt-6-luna` on OpenRouter
 
