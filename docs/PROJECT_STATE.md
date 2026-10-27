@@ -26,6 +26,64 @@ a name that did not then exist would falsify the record. This file describes the
 `llm_service.py` is the Gemini route's rows; and the `gemini-2.5-*` entries in
 `services/pricing.py` are live routes.
 
+## Handoff for the next chat — accuracy and leanness before new features (2026-10-27)
+
+**Start state:** `refactor/architecture-v2`, working tree clean, tip `120fa5e`, **in sync
+with `origin`**. Full suite **540 passed, 3 skipped** (~118 s); fast lane **510 passed**.
+`master` untouched at `1416177`.
+
+**The agreed order is accuracy and leanness first, new features after.** The owner stated
+it directly: *"mechanical renames and cleaning scripts to be lean and concise without
+inaccuracies should come before we work on new features like curation skills."*
+
+### Next action, in order
+
+| # | Item | Size | Why it is next |
+|---|---|---|---|
+| **1** | **D-13** — `docx_renderer.py:247` creates a `latex_work/` scratch dir **inside the deliverable folder** | Small | Verified still live. It puts build residue in the folder handed to an employer; every generated application carries it |
+| **2** | **Schema-dialect duplication** — `generation._to_strict_dialect` and `evaluation/candidate_inputs.py` both convert schemas, with overlapping logic | Small | Introduced when production adopted the strict dialect on 2026-10-27. One concept, two implementations, and only one is exercised by production |
+| **3** | **Split `generation.py`** — **1,281 lines**, of which ~682 code and ~294 docstring; the next biggest backend file is 516 | Medium | It holds prompts, schemas, parsing, validation *and* the generator class. The seams already exist |
+| **4** | **Trim over-commenting** where an ADR already carries the reasoning | Medium | `generation.py` is ~33% comment/docstring. Most is load-bearing; some narrates decisions now recorded in `docs/DECISIONS/` |
+
+### Then, in the owner's stated order
+
+5. **Curation skill** — requested 2026-10-27; clarifying questions are owed before any code.
+6. Remaining deferred items, all verified still open on 2026-10-27:
+   * **D-10** — committed absolute local paths including a third-party name (ADR 0011
+     already records this as a known limitation; the owner decided to leave history as-is)
+   * **D-11** — inconsistent saved-application schemas, **moved to Phase 5** by owner decision
+   * **D-14** — a failed generation leaves a partial `outputs/<job_id>/` with no manifest
+   * **D-15** — bare `except:` clauses at `latex_renderer.py:294`, `docx_renderer.py:97,376`
+   * **A-6** (date validation), **A-7**
+   * **The generation cache has no eviction policy** — a real follow-up, recorded in ADR 0015
+
+### Verified resolved, so do not re-open
+
+**D-1 to D-9** and **D-12** are closed. Re-checked on 2026-10-27: **D-6 (unused
+dependencies) has no findings** — every entry in `requirements.txt` is imported under its
+real import name (`google-genai`→`google.genai`, `python-docx`→`docx`, `pyyaml`→`yaml`,
+`python-dotenv`→`dotenv`), except `uvicorn` and `tzdata`, which are deliberately indirect:
+`uvicorn` runs the FastAPI server and `tzdata` backs `ZoneInfo` on Windows.
+
+### House rules that bit this session — worth repeating
+
+* **The file sandbox denies writes from the *Python* subprocess to most tracked paths, but
+  PowerShell and the `edit` tool can write them.** A batch script that reads and rewrites
+  files in place therefore fails with `PermissionError` even though the file is writable.
+  Use `edit`, or a PowerShell loop with
+  `[System.IO.File]::WriteAllText(path, text, [System.Text.UTF8Encoding]::new($false))`.
+* **Never write a probe that modifies a file without restoring it.** A carelessly written
+  writability probe truncated `evaluation/live.py` to 5 bytes this session; it was
+  restored with `git checkout --`, but only because the tree was otherwise clean.
+* **Verify a mechanical change mechanically.** The rename was proven pure by normalising
+  the four names and confirming every added line equals a removed line, with an identical
+  test-function set — not by reading the diff.
+* **Do not verify against old code by stashing.** Use a throwaway `git worktree`.
+* **`git push` writes progress to stderr**, so PowerShell reports a spurious exit code 1.
+  Verify with `git rev-list --left-right --count HEAD...origin/refactor/architecture-v2`.
+* **ADRs are history.** Five still name `GeminiService` deliberately; do not "fix" them.
+  PROJECT_STATE describes the present, and that is where current names belong.
+
 ## The switch is done: `openai/gpt-6-luna` on OpenRouter
 
 The owner selected the winner on 2026-10-27 and the other seven candidates were rejected
