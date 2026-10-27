@@ -336,7 +336,16 @@ after increment 2**
 > The measured cost per **accepted** result, which is the figure that matters:
 > `openai/gpt-6-luna` **$0.00271**, `deepseek-v4-flash` **$0.00328**,
 > `claude-haiku-5.5` **$0.00582**, `gemini-3.8-flash` **$0.11384**, `claude-sonnet-5`
-> **$0.15709**. **The shipped default is 42× the cheapest model that does the job.**
+> **$0.15709**. **The default has since changed on this evidence.** The owner selected
+> `openai/gpt-6-luna` on 2026-10-27 and the switch shipped in `e53ef8a`, so the table
+> above is the *study's comparison* rather than a description of what the tool now uses:
+> the previous default was roughly **30-40x** the cheapest model that does the job, and
+> it is no longer the default.
+>
+> **The measured figures for the model now shipped**, end to end through the real CLI:
+> **$0.0026** for a synthetic profile (CV 1 page, letter 1 page / 302 words) and
+> **$0.0032** for the owner's real profile against a real posting (CV 2 pages, letter 1
+> page / 301 words, all six employers with correct dates).
 
 The per-call inputs are recomputed from the actual prompt bytes: the CV call grows from
 ≈6,150 to ≈6,438 tokens because the draft prompt now carries the editorial requirements

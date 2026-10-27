@@ -27,8 +27,11 @@ and factual review are not.
 ## Decision
 
 Introduce a **thin provider interface** (a single `generate(prompt, *, schema, max_tokens,
-model)` contract) with Gemini as the default and OpenRouter as a second implementation.
+model)` contract) with OpenRouter as the default and Gemini as the second implementation.
 Allow model-per-task configuration. Keep pricing in **one** module.
+
+> The default provider was Gemini when this was written. It became OpenRouter on
+> 2026-10-27 with the model switch above, because the selected model is served there.
 
 **Do not** adopt a large LLM orchestration framework, and **do not** switch providers or
 models before benchmarking.
@@ -36,6 +39,21 @@ models before benchmarking.
 **Keep Gemini's latest Flash model as the default.** Benchmark cost, performance and output
 quality before switching anything. Before any paid evaluation: agree the method and a
 spending budget with the owner.
+
+> **Discharged 2026-10-27 — the benchmark was made, and the default changed on its
+> evidence.** The rule above was followed rather than waived. A study
+> ([0016](0016-per-candidate-inputs-and-one-winner.md)) measured eight candidates on this
+> task, and the owner selected **`openai/gpt-6-luna` on OpenRouter**, which accepted 3/3
+> cases with no correction calls in three independent runs at **$0.00281 per accepted
+> result against the previous default's $0.086-$0.114** — roughly 30-40x cheaper. That
+> model is now `DEFAULT_MODEL` and OpenRouter is `DEFAULT_PROVIDER`; `gemini-3.8-flash`
+> remains available and priced.
+>
+> **This is the only evidence that discharges the rule.** The earlier position — "Gemini
+> stays the default because no benchmark exists" — was correct while it was true, and the
+> switch happened because the benchmark now does. See
+> [0014](0014-evaluation-suite-and-curation.md) for the suite, and for the corrected
+> result of `qwen3.8-flash`, which the first run wrongly recorded as a failure.
 
 ### Model curation (owner requirement, 2026-10-26)
 

@@ -1,58 +1,51 @@
 # Project state
 
-**Last updated:** 2026-10-26 (evening)
+**Last updated:** 2026-10-27
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `968be28` — *fix: address the cover letter to the employer, not to the case id*
+**Latest commit:** `e53ef8a` — *feat: switch the default to the model the study selected*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-## The study has run, and the winner is `openai/gpt-6-luna`
+## The switch is done: `openai/gpt-6-luna` on OpenRouter
 
-**$0.6637 total spend for the session** (OpenRouter's own accounting) against the owner's
-$5 cap. Eight candidates, three cases each, inputs retooled per candidate (ADR 0016).
+The owner selected the winner on 2026-10-27 and the other seven candidates were rejected
+and removed. **The default is now `openai/gpt-6-luna` via OpenRouter**, replacing
+`gemini-3.8-flash` — roughly **30-40x cheaper per accepted result** ($0.00281 against
+$0.086-$0.114) for a document that passes the same factual and layout gates.
 
-| model | accepted | cost / accepted |
-|---|---|---|
-| **`openai/gpt-6-luna`** | **3/3** | **$0.00271** |
-| `deepseek/deepseek-v4-flash` | 2/3 | $0.00328 |
-| `anthropic/claude-haiku-5.5` | 3/3 | $0.00582 |
-| `google/gemini-3.8-flash` | 3/3 | $0.11384 |
-| `anthropic/claude-sonnet-5` | 3/3 | $0.15709 |
-| `qwen/qwen3.8-flash` | 0/3 | none accepted |
-| `z-ai/glm-5.3-flash` | 0/3 | none accepted |
-| `mistralai/mistral-small-2603` | 0/3 | none accepted |
+**Verified end to end on live runs, both paths the owner asked for:**
 
-**The winner is 42× cheaper per accepted result than the model this project ships**, and
-it accepted 3/3 with no correction calls. The owner's hypothesis — that this task does not
-need expensive models — is confirmed by measurement.
+| | CV | letter | cost | checked |
+|---|---|---|---|---|
+| **synthetic** profile | 1 page | 1 page, 302 words | **$0.0026** | all employers, dates, roles present |
+| **owner's real** profile (6 roles) | 2 pages | 1 page, 301 words | **$0.0032** | all 6 employers with correct dates, incl. `Aklamio 2026-02 -> present` |
 
-**The next action is the owner's, not the agent's.** The `measured` marker is
-deliberately **not** set: the owner stated that writing, PDF and layout quality are theirs
-to judge before a ranking is final, and this suite measures **none** of those three. The
-reading packet is at `.tmp/reading-packet/` — 14 accepted runs with their PDFs and DOCX,
-grouped by synthetic profile, with a README explaining what to look at.
+Rendered pages inspected: no orphan headings, no clipping, ligatures and typography
+correct, sensible page break.
 
-**After that judgement**, in order: set `verified="measured"` and the final ranking in
-`evaluation/curated_models.py`; then decide whether to switch `DEFAULT_MODEL` (an ADR
-0005 decision that the benchmark now supports, unlike before); then build the curation
-skill the owner asked for.
+**Two things a future reader must know, because both were silent:**
 
-**Outstanding and known:**
+1. **The production schema had to change with the model.** OpenAI's strict mode refuses
+   the Gemini-shaped schema outright (HTTP 400), so `generation._to_strict_dialect`
+   converts every response schema at build time: lowercase type names, every object
+   requiring all its properties with `additionalProperties: false`, `skills` as an array
+   of `{category, items}`, and `tailoring_explanation` **required but nullable**.
+2. **`GEMINI_MODEL` could have quietly undone the switch, and did.** It was read for any
+   provider, so the owner's existing `GEMINI_MODEL=gemini-3.8-flash` overrode the new
+   default and ran the old model through OpenRouter — where the bare name is not even a
+   priced route. Nothing failed; OpenRouter resolved it and returned a document.
+   `_resolve_model` now honours only the selected provider's own variable.
 
-1. **`mistral-small-2603` is inconclusive, not failed** — every call was rate-limited
-   (429), so it produced no document to judge. Re-measure before judging it.
-2. **Seven provider/model defects were found and fixed** in this session (see below);
-   more may be latent, since each was only visible under a real call.
-3. **The curation skill is not built.** The owner asked for one that re-runs this study
-   when new models arrive; clarifying questions are owed first.
+**Total spend for the whole effort: $1.91** of the owner's $5 cap, covering eleven paid
+diagnostic runs, schema verification against three provider families, and three complete
+studies.
 
 ---
 
 ## Active task
 
-**Phase 3 — the budgeted live evaluation run.** Items 4, 2, 1, 3 and 5 are done; item 6's
-offline groundwork is done, and its **slate and cost accounting were reworked on
-2026-10-26 at the owner's instruction**. The live run is still the only outstanding work.
+**Phase 3 is complete.** Items 4, 2, 1, 3, 5 and 6 are all done, and item 6's study has
+run, been recorded, and its outcome shipped as the new default.
 
 | Item | State |
 |---|---|
@@ -60,10 +53,17 @@ offline groundwork is done, and its **slate and cost accounting were reworked on
 | **2. Remove or merge the editorial-review pass** | **DONE** (`7c0d58a`) |
 | **1. Targeted layout retry instead of full regeneration** | **DONE** (`9a45811`) |
 | **3. Enable structured output (`response_schema`)** | **DONE** (`2e528e1` → `85879b5`); see ADR 0012 |
-| **6. Provider interface, model routing, budget caps, and the curated model set** | Groundwork **DONE**; slate + cost accounting **reworked 2026-10-26** (`00fd229`). **The budgeted live run has NOT been made** |
+| **6. Provider interface, model routing, budget caps, and the curated model set** | **DONE** — interface, routing, caps and D-3/D-4 landed as increments A–C; the **study ran**, named a winner, and the switch shipped (`e53ef8a`). See ADRs 0014 and 0016 |
 | **5. Cache validated results** | **DONE** (`2230c86` → `8310e91`); see ADR 0015 |
 
-### 2026-10-26 (latest) — the slate, the cost source, and the cache (two commits)
+### 2026-10-27 — the switch
+
+The owner selected `openai/gpt-6-luna` and rejected the other seven. `e53ef8a` made it the
+default and moved the strict schema dialect into production, because the new model's
+provider refuses the Gemini-shaped one outright. Verified live on both a synthetic and the
+owner's real profile. Details at the top of this file.
+
+### 2026-10-26 — the study, the corrected result, and the cost source (three commits)
 
 **`6d5fa58` — the evaluation no longer reads or writes the generation cache.** `live.py`
 drives the real pipeline with a loose `profile_path` and did not pass `use_cache`, so a

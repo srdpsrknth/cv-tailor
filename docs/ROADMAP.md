@@ -2,11 +2,11 @@
 
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
 complete, Milestone 1.1 is complete, **Phase 1 is complete**, **Phase 2 is complete and closed
-out**, and **Phase 3 is complete** — increments 4, 2, 1 and 3 are done, item 6's groundwork is
-done, item 5 is done, and **item 6's study has now run**: eight candidates were measured and
-`openai/gpt-6-luna` is the recommended model at **$0.00271 per accepted result**, 42× cheaper
-than the incumbent default. What remains is the owner's own quality judgement of the accepted
-documents, not further measurement.
+out**, and **Phase 3 is complete**. Increments 4, 2, 1 and 3 are done, item 5 is done, and
+item 6's **study ran, selected a winner, and shipped the switch**: the default is now
+**`openai/gpt-6-luna` on OpenRouter** at **$0.00281 per accepted result**, roughly 30-40x
+cheaper than the `gemini-3.8-flash` default it replaced, verified end to end on both a
+synthetic and the owner's real profile.
 See [§Phase 3](#phase-3--llm-and-document-generation-improvements).
 Phases may be reordered, split or parallelised when dependencies justify it.
 
@@ -207,29 +207,43 @@ counts unchanged**, as intended.
 | 2 | Remove or merge the editorial-review pass | **DONE** (`refactor:`, 2026-10-26) — requirements folded into the draft prompt, second CV call removed; calls 3/4/6 → **2/3/5**, best-case input tokens −41% |
 | 1 | Targeted layout retry instead of full regeneration | **DONE** (`refactor:`, 2026-10-26) — the retry sends a targeted brief and the current CV instead of re-sending the whole context, and accepts a delta of replacement values merged onto the validated CV; retry input 3,488 → **740** tokens on the recorded fixture, calls unchanged at **2/3/5** |
 | 3 | Enable structured output (`response_schema`) | **DONE** (`feat:`, 2026-10-26) — JSON mode and a schema on the CV draft and the cover letter; the layout retry is deliberately left unconstrained because its response may be a delta. The schema requires the response *envelope* and leaves the document body open, which is what keeps D-1's truncation from returning. Calls unchanged at **2/3/5**; see [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
-| 6 | Provider interface, model routing, budget caps, and the curated model set | **DONE** (`feat:`/`fix:`, 2026-10-26) — the interface, routing, caps and D-3/D-4 landed as increments A–C; the **study then ran** and named a winner. See the close-out below and [ADR 0016](DECISIONS/0016-per-candidate-inputs-and-one-winner.md) |
+| 6 | Provider interface, model routing, budget caps, and the curated model set | **DONE** (`feat:`/`fix:`, 2026-10-26/27) — the interface, routing, caps and D-3/D-4 landed as increments A–C; the **study then ran**, the owner selected `openai/gpt-6-luna`, and the switch shipped in `e53ef8a`. See the close-out below and [ADR 0016](DECISIONS/0016-per-candidate-inputs-and-one-winner.md) |
 | 5 | Cache validated results | **DONE** (`feat:`, 2026-10-26) — a validated generation is stored under `<store>/cache/<profile_id>/`, keyed by the bytes the model was shown; a repeat makes **0** LLM calls and produces byte-identical documents. Cold-cache call counts unchanged at **2/3/5**; see [ADR 0015](DECISIONS/0015-generation-cache.md) |
 
-### Item 6 close-out — the study ran (2026-10-26)
+### Item 6 close-out — the study ran, and the winner shipped (2026-10-26/27)
 
-**The study is complete.** Eight candidates, three cases each, **$0.6637 spent for the
-whole session** against the owner's $5 cap. Ranked by cost per **accepted** result:
+**The study is complete and its outcome is in production.** Eight candidates, three cases
+each, on live calls; the owner then selected one. **$1.91 was spent in total** across the
+whole effort — eleven diagnostic runs, schema verification against three provider
+families, and three complete studies — against the owner's $5 cap.
 
-| model | accepted | cost / accepted | note |
+| model | accepted | cost / accepted | outcome |
 |---|---|---|---|
-| **`openai/gpt-6-luna`** | **3/3** | **$0.00271** | **winner** — no correction calls, 42× cheaper than the default |
-| `deepseek/deepseek-v4-flash` | 2/3 | $0.00328 | cheapest per attempt; one word-count failure |
-| `anthropic/claude-haiku-5.5` | 3/3 | $0.00582 | clean, at a fifth of its own family's flagship |
-| `google/gemini-3.8-flash` | 3/3 | $0.11384 | the incumbent default, kept as the control |
-| `anthropic/claude-sonnet-5` | 3/3 | $0.15709 | works; 58× the winner for no measured gain |
-| `qwen/qwen3.8-flash` | 0/3 | none | leaked schema text into `skills` |
-| `z-ai/glm-5.3-flash` | 0/3 | none | omitted `role`/dates from every experience entry |
-| `mistralai/mistral-small-2603` | 0/3 | none | **inconclusive** — every call rate-limited (429) |
+| **`openai/gpt-6-luna`** | **3/3** | **$0.00281** | **SELECTED — now the default** |
+| `anthropic/claude-haiku-5.5` | 3/3 | $0.00594 | rejected |
+| `qwen/qwen3.8-flash` | 3/3 | $0.01269 | rejected — see the correction below |
+| `deepseek/deepseek-v4-flash` | 1/3 | $0.02036 | rejected |
+| `google/gemini-3.8-flash` | 2/3 | $0.08607 | rejected — was the default |
+| `anthropic/claude-sonnet-5` | 3/3 | $0.13743 | rejected |
+| `z-ai/glm-5.3-flash` | 0/3 | none | rejected — omits employer dates at any ceiling |
+| `mistralai/mistral-small-2603` | 0/3 | none | rejected — rate-limited in all three runs |
 
-**The acceptance bar did not move, and the `measured` marker is not set.** Results are
-recorded; the final ranking awaits the owner's own reading of the accepted documents,
-because this suite measures no prose and no rendering. Packet:
-`.tmp/reading-packet/`.
+**The winner was reproduced three times**: 3/3 accepted with no correction calls every
+run, at roughly **30-40x lower cost per accepted result** than the default it replaced.
+The switch landed in `e53ef8a` and was verified end to end on a synthetic profile and the
+owner's real one.
+
+**One result was corrected, and the error was ours.** `qwen3.8-flash` was first recorded
+as 0/3 because it returned an **empty body** at the default 8,000-token ceiling — a
+reasoning model spends its budget thinking before it writes. At 32,000 tokens it accepts
+3/3. Scoring that as a model failure ranked *this project's ceiling* rather than the
+model, which is exactly the error the study's own machinery exists to prevent.
+`glm-5.3-flash` had the same symptom and a different cause: it omits `role`,
+`start_date` and `end_date` from every employer at any ceiling, and that failure is real.
+
+**The acceptance bar never moved.** Same profiles, same postings, same validation rules,
+same word-count gate for every candidate; only the *asking* varied, which is the whole
+point of [ADR 0016](DECISIONS/0016-per-candidate-inputs-and-one-winner.md).
 
 **What the study established beyond the ranking:**
 

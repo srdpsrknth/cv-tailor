@@ -1,8 +1,23 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **533 passed**, 1 warning, ~119 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **503 passed**, 30 deselected, ~17 s.
+**Current baseline:** **543 passed**, 1 warning, ~119 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **513 passed**, 30 deselected, ~16 s.
+
+**The default is now `openai/gpt-6-luna` on OpenRouter** (2026-10-27), selected by the
+study and switched in `e53ef8a`. Two consequences for anyone running these tests:
+
+* **The shipped response schema is strict** — `additionalProperties: false`, every
+  declared property required, `skills` as an array of `{category, items}`, and
+  `tailoring_explanation` required-but-**nullable** (strict mode forbids an optional
+  property; null is how "optional" is expressed). `tests/test_structured_output.py`
+  asserts all of that, including that the Gemini rendering strips the keyword Gemini
+  rejects.
+* **A provider-specific model variable no longer leaks across providers.** `GEMINI_MODEL`
+  is honoured only when Gemini is selected; `CVTAILOR_MODEL` is the provider-neutral one
+  and outranks it. This is a regression guard with a real cause: the owner's existing
+  `GEMINI_MODEL=gemini-3.8-flash` silently overrode the new default and ran the old model
+  through OpenRouter, where the bare name is not even a priced route.
 
 | | |
 |---|---|
@@ -104,7 +119,7 @@ throwaway synthetic store once, for the whole suite.
 | `test_profile_serialization.py` | 16 | **New in increment 1.** The profile is serialized once per application; the rendered context is **byte-identical** with and without `profile_json` on every country-header branch; the `rules`-excluded facts memo returns the same text without re-serializing, never becomes a profile field, and does not un-ban a banned tool |
 | `test_editorial_instructions.py` | 11 | **New in increment 2.** The merged editorial requirements reach the **CV call only** (not the letter), are injected exactly once, and are carried by a layout retry too; the validation gate is unchanged (an invalid draft still fails the run and no letter is drafted from it); the call counts are **2/3/5** on the happy, typical and max-successful paths |
 | `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The retry sends the targeted brief and the current CV, with **no** profile, job description or prompt file; the brief reports the document's real body length; a delta response is merged onto the validated CV and **re-gated**, a full-CV response still works, an unknown/unaddressable key raises, a delta cannot write an employer/date/education field or complete an ongoing role, and an unappliable delta fails the run rather than silently keeping the long CV |
-| `test_structured_output.py` | 27 | **New in Phase 3 increment 3.** Structured output is **scoped, not global**: the CV draft and the cover letter send `response_mime_type="application/json"` with a per-kind `response_schema`; the layout retry (`allow_delta=True`) and any unknown document kind send **neither**. The schema requires the envelope key and leaves the document body open — asserted by walking the emitted schema for `required` inside the body and for `additionalProperties: false` — which is what keeps D-1's truncation from returning. Both `tailoring_explanation` shapes (top level and nested) still reach `TailoringExplanation`, an omitted explanation is still accepted, a truncated constrained response is **rejected** rather than parsed short, `validate_cv` is still the only gate, and the happy/typical paths stay at 2 and 3 calls |
+| `test_structured_output.py` | 31 | **New in Phase 3 increment 3.** Structured output is **scoped, not global**: the CV draft and the cover letter send `response_mime_type="application/json"` with a per-kind `response_schema`; the layout retry (`allow_delta=True`) and any unknown document kind send **neither**. **The shipped schema is strict since 2026-10-27**: every object requires all its properties with `additionalProperties: false`, `skills` is an array of `{category, items}`, and `tailoring_explanation` is required-but-**nullable** (strict mode forbids an optional property, so null is how "optional" is expressed). Both explanation shapes reach `TailoringExplanation`, an omitted one is still accepted, a truncated constrained response is **rejected** rather than parsed short, `validate_cv` is still the only gate, and the happy/typical paths stay at 2 and 3 calls |
 | `test_provider_interface.py` | **49** | **New in Phase 3 item 6, increment A; 10 added 2026-10-26.** The single `generate(prompt, *, schema, max_tokens, model)` contract; `schema=None` reaches **both** providers as "send no constraint", so the layout retry and an unknown kind stay unconstrained while the draft and letter keep theirs; OpenRouter's `response_format` envelope is **translated**, not passed through, and a schema call also sends `provider.require_parameters`; no silent fallback (unknown provider, missing key for the *selected* provider, and provider failure all raise); `ProviderError` is deliberately **not** a `ValueError`, because the correction loop catches `ValueError`; model-per-task routing including the `layout_retry` task; the budget cap refuses a malformed value, stops further calls, and prices a routed model as itself; the 2-call happy path driven through the real pipeline. **Added 2026-10-26:** the provider's own `usage.cost` is carried out as a money figure and needs **no** request parameter; an absent, malformed, null or negative figure degrades to `None` and **never** `0.0`, while a genuine `$0` charge survives as one; Gemini reports no cost and is therefore priced from the table; Gemini's **thinking tokens count as output** (billed as output, excluded from `candidates_token_count`); and a reported cost **replaces** the table in the run total — the guard that matters most, since `calculate_token_usage` previously re-priced the run's totals from the table and silently discarded what the provider actually charged |
 | `test_pricing.py` | **22** | **New in item 6, increment B (D-3, D-4); 5 added 2026-10-26.** The long-context tier is applied to the tokens and selected on the input count; the old flat rate would have **halved** the estimate for `gemini-2.5-pro` at 300k tokens; a half-defined long pair is not a tier; the route is part of the price key (Gemini direct $0.75/$3.75 vs OpenRouter $0.825/$4.125); an unpriced route is distinguishable from a priced one and the fallback target always exists; every route records a dated source; the UI carries **no** model-keyed table and prices through `services.pricing`; only `pricing.py` defines the table (parsed with `ast`, not string-matched); the compatibility view in `gemini_service` is derived, not a second table. **Added 2026-10-26:** the shipped table is inside its verification window and not stale for either route, so the rule constrains this repository rather than decorating it; a **missing** verification date counts as stale, because "cannot prove it is current" is not "is current"; a date past the window is reported as stale with the date and source named; a fresh table produces no warning; and **every curated model is priced on the OpenRouter route at the rate the table will actually bill** — without a row, `price_for` silently borrows the default route's rate and every unpriced model reports the same invented cost |
 | `test_evaluation_suite.py` | **34** | **New in item 6, increment C; 5 added 2026-10-26.** The suite is offline by default and the default cap is the agreed $5; the whole curated run is projected **under** budget; a plan is refused **before** the first call, a missing cap is a refusal rather than "unlimited", and the cap is re-checked before every call rather than only at the start; a live run needs explicit authorisation and an over-budget one spends **nothing**; nothing under `evaluation/` is collected by pytest and CI does not invoke it; cases resolve only inside `tests/fixtures/`, a path that escapes is refused, and the suite never names the private store; the curated set is small, spans three cost tiers cheapest-first, and every entry is **UNMEASURED** with no invented quality claim; recorded rates and structured-output support **match the listing**; cost per **accepted** result is the headline metric and a model that accepts nothing reports `None`, never `0.0`. **Added 2026-10-26:** the suite **bypasses the generation cache**, asserted on the call it actually makes, because a cache hit reports zero usage and would score as an accepted case costing $0.00 — a fabricated best result; the bypass did not cost the run its routing; the set spans at least 5 distinct families; **every entry is created on or after 2025-10-01**; and every entry is priced on the route the run uses |
@@ -280,20 +295,24 @@ cannot make a paid call through it, which a test asserts.
 # Default: prices the run and stops. Makes no API call.
 .venv\Scripts\python.exe -m evaluation
 
-# Show the curated set, its tiers and its verification status
+# Show the set and its verification status
 .venv\Scripts\python.exe -m evaluation --list-models
 
-# A live run. Paid, requires an agreed budget (ADR 0005) and OPENROUTER_API_KEY in .env.
-.venv\Scripts\python.exe -m evaluation --live --cap-usd 5
+# **Clear the sandbox first**, or an earlier run's artefacts are reused.
+Remove-Item -Recurse -Force .tmp\evaluation-store
 
-# Restrict to some of the curated set (an uncurated id is refused, not passed through)
-.venv\Scripts\python.exe -m evaluation --live --cap-usd 5 --models deepseek/deepseek-v4-flash
+# A live run. Paid: needs an agreed budget (ADR 0005) and OPENROUTER_API_KEY in .env.
+.venv\Scripts\python.exe -m evaluation --live --cap-usd 5
 ```
 
-The whole curated run — **8 models across 7 families**, all created 2025-10 or later — is
-projected at **$1.6467** against the owner's **$5** budget, upper-bounded at 12 calls per
-case. A plan whose projection exceeds `--cap-usd` is refused **before** the first call,
-and the cap is re-checked before every call.
+The suite now compares **the single selected model**, so a run is a re-measurement rather
+than a comparison. To compare candidates again, add them to `CURATED_MODELS` with an
+input profile each — `evaluation/candidate_inputs.py` documents the per-family
+adaptations a new candidate is likely to need, and `has_cost_spread` is the check that a
+re-added set is a meaningful comparison rather than near-identical prices.
+
+A plan whose projection exceeds `--cap-usd` is refused **before** the first call, and the
+cap is re-checked before every call.
 
 **The dry run is the screen a spend is approved from, so it also reports price
 staleness.** `PRICE_MAX_AGE_DAYS` is 62 (the owner's "re-verify if older than 2 months"
@@ -381,7 +400,6 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 | `test_profile_serialization.py` | 16 | **New in Phase 3 increment 1.** One serialization per application; byte-identical prompts; the rules-excluded facts memo |
 | `test_editorial_instructions.py` | 11 | **New in Phase 3 increment 2.** The merged editorial requirements reach the CV call only; the gate is unchanged; call counts are 2/3/5 |
 | `test_layout_retry.py` | 15 | **New in Phase 3 increment 1 of the agreed order.** The targeted retry, the delta merge, and the fact that a delta cannot bypass the gate |
-| `test_structured_output.py` | 27 | **New in Phase 3 increment 3.** Structured output is scoped per call; the schema constrains the envelope, not the document body; a truncated response is rejected; the gate and the call counts are unchanged |
 | `test_generation_cache.py` | 44 | **New in Phase 3 item 5.** The cache key is the bytes the model was shown and no two different inputs share it; only a validated result is stored; a prompt, model, provider, country or profile change is a miss; a hit costs 0 calls and returns byte-identical documents with no reported cost; and the store is derived data, so deletion and corruption both degrade to regenerating |
 | `test_tailor_service.py` | 9 | *(pre-existing)* layout retry, fenced JSON, 3-page rejection, short-letter correction, country context, invented tools/dates, sign-off in body, Streamlit selector |
 | `test_docx_renderer.py` | 1 | *(pre-existing)* XML-sensitive text preserved in the DOCX |
@@ -532,5 +550,5 @@ Keep deterministic software testing and LLM quality evaluation strictly separate
 | pdflatex per run | ≈ 2.9 s (run twice per compile) |
 | LLM calls: min / typical / max-successful / worst | **2 / 3 / 5 / 12** (was 3 / 4 / 6 / 18 before increment 2; **unchanged** by the targeted layout retry, by structured output, by all three of item 6's increments, by item 5 on a **cold** cache, and by the cost/curation increment — which changes what a call is *charged*, not how many are made) |
 | LLM calls on a **cache hit** | **0** — item 5. An identical profile + posting + prompt set + schema + provider + models + rules is served from `<store>/cache/<profile_id>/`. The evaluation suite opts **out** of this, so a live run always measures the model |
-| Evaluation suite | **not run** — offline by default; whole curated run (8 models, 7 families) projected at **$1.6467** against a **$5** cap |
+| Evaluation suite | **run**, 2026-10-26/27 — eight candidates compared and the winner selected. Total spend for the whole effort **$1.91** of the owner's **$5** cap. Live runs verified end to end at **$0.0026** (synthetic) and **$0.0032** (owner's real profile) per application |
 | Cost per application (`gemini-3.8-flash`, priced from the table) | **$0.016 / $0.026 / $0.048** (was $0.027 / $0.038 / $0.060). An OpenRouter run reports the provider's own `usage.cost` instead of this estimate |

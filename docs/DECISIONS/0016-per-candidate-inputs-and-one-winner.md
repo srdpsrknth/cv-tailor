@@ -47,14 +47,47 @@ Four parts:
 1. **The curated set becomes the study's candidate list**, not a user-facing ladder. Its
    job is to be the shortlist the study compares; presenting eight options to the user
    was never the requirement and is now explicitly not the deliverable.
-2. **Inputs are retooled per candidate** — the response schema and the prompt. A model is
-   judged on its best achievable configuration, so the comparison answers "how well can
-   this model do this job?" rather than "how well does this model tolerate a schema
-   written for a different provider?".
+2. **Inputs are retooled per candidate** — the response schema, the prompt, and the
+   output ceiling. A model is judged on its best achievable configuration.
 3. **The metric is unchanged: cost per accepted result**, from the provider's own
    reported charge.
 4. **The output is one recommendation.** The product's curated set becomes that model,
    and the schema shipped is the one that model was measured with.
+
+### The outcome, 2026-10-27
+
+The study ran; the owner selected **`openai/gpt-6-luna`** and rejected the other seven.
+The switch landed in `e53ef8a`:
+
+| rank | model | accepted | cost / accepted | outcome |
+|---|---|---|---|---|
+| 1 | `openai/gpt-6-luna` | 3/3 | **$0.00281** | **selected — now the default** |
+| 2 | `anthropic/claude-haiku-5.5` | 3/3 | $0.00594 | rejected |
+| 3 | `qwen/qwen3.8-flash` | 3/3 | $0.01269 | rejected |
+| 4 | `deepseek/deepseek-v4-flash` | 1/3 | $0.02036 | rejected |
+| 5 | `google/gemini-3.8-flash` | 2/3 | $0.08607 | rejected — was the default |
+| 6 | `anthropic/claude-sonnet-5` | 3/3 | $0.13743 | rejected |
+| 7 | `z-ai/glm-5.3-flash` | 0/3 | none | rejected — omits employer dates |
+| 8 | `mistralai/mistral-small-2603` | 0/3 | none | rejected — rate-limited throughout |
+
+The winner was reproduced across **three** independent runs: 3/3 accepted with no
+correction calls every time, at **roughly 30-40x lower cost per accepted result** than
+the default it replaced.
+
+**Selecting the model forced the production schema to change, and that is the part worth
+remembering.** OpenAI's strict mode refuses the Gemini-shaped schema outright, so
+switching the model without switching the schema would have broken every draft call with
+HTTP 400. The strict dialect moved from `evaluation/` into
+`generation._to_strict_dialect`, and the conversion is now what production sends.
+
+**One result was corrected after the first study, and the correction was ours.**
+`qwen3.8-flash` was recorded as 0/3 because it returned an **empty body** at the default
+8,000-token ceiling — a reasoning model spends its budget thinking before it writes.
+Given 32,000 tokens it accepted 3/3. Scoring that as a model failure ranked *this
+project's ceiling* rather than the model, which is precisely the error this ADR exists to
+prevent, committed by the machinery built to prevent it. `glm-5.3-flash` had the same
+symptom and a different cause: it omits `role`, `start_date` and `end_date` from every
+employer at any ceiling, and that failure is genuine.
 
 ### Fairness is the load-bearing property
 
