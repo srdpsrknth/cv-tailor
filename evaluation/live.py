@@ -153,6 +153,16 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
 
     service = GeminiService(config=config, render_schema=render_schema)
 
+    # A candidate that spends most of its budget on reasoning needs a higher ceiling, or
+    # it emits *nothing* -- measured: `qwen3.8-flash` and `z-ai/glm-5.3-flash` both
+    # returned `finish_reason: length` with 8,000 reasoning tokens and an empty body at
+    # the default 8,000 ceiling, and both produced valid ~5,000-character documents at
+    # 32,000. Scoring that empty result as a model failure ranks this project's ceiling
+    # instead of the model, which is what the first study did when it recorded both as
+    # 0/3. The acceptance bar itself is unchanged.
+    if candidate.max_output_tokens is not None:
+        service.max_output_tokens = candidate.max_output_tokens
+
     try:
         result = tailor_service.tailor_documents(
             posting, profile, config=config, service=service,

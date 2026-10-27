@@ -57,6 +57,21 @@ VERTEX_OPTIONAL_PARAMETER_LIMIT = 24
 
 DIALECT_ANTHROPIC_VERTEX = "anthropic-vertex"
 
+#: Output ceiling for a candidate that spends a large share of its budget on reasoning.
+#:
+#: **Not a preference -- a measurement.** A reasoning model emits its thinking before
+#: the document and is billed for it as output, so an 8,000-token ceiling left
+#: `qwen3.8-flash` and `z-ai/glm-5.3-flash` with *nothing*: `finish_reason: length`,
+#: 8,000 reasoning tokens, `content_len: 0`. Both produced valid ~5,000-character
+#: documents at 32,000. Scoring the empty result as a model failure would have ranked
+#: this project's ceiling rather than the models -- and did, in the first study, where
+#: both were recorded as 0/3.
+#:
+#: 32,000 is chosen because qwen needed it: at 16,000 it was still empty. The ceiling is
+#: generous rather than tuned, since a budget that is never consumed costs nothing, while
+#: one that is too low silently deletes a candidate.
+REASONING_MODEL_OUTPUT_TOKENS = 32_000
+
 
 @dataclass(frozen=True)
 class CandidateInputs:
@@ -76,12 +91,35 @@ class CandidateInputs:
     rationale: str = ""
     #: Prompt fragments replaced for this candidate, by fragment name.
     prompt_overrides: dict = field(default_factory=dict)
+    #: Output-token ceiling for this candidate. ``None`` uses the pipeline's configured
+    #: ``max_output_tokens`` (8,000), which is the Gemini-shaped default.
+    #:
+    #: **This is a measurement-fairness parameter, not a tuning knob.** A reasoning model
+    #: emits its thinking *before* the document and is billed for it as output, so a
+    #: ceiling that suits a non-reasoning model can leave a reasoning one with nothing
+    #: left to write in. Measured on 2026-10-27: `qwen3.8-flash` and
+    #: `z-ai/glm-5.3-flash` consumed the **entire** 8,000-token budget as reasoning and
+    #: returned an empty string -- `finish_reason: length`, `content_len: 0`. Raised to
+    #: 32,000 both produced valid 4,900-5,400-character documents.
+    #:
+    #: That is not a weak model failing a task; it is a ceiling too low for its output
+    #: shape, and scoring it as a failure would rank the shape rather than the model.
+    #: Every candidate is still judged by the identical acceptance bar.
+    max_output_tokens: Optional[int] = None
+    #: Why this ceiling, when it is not the default. Required alongside a non-default
+    #: value for the same reason as ``dialect``.
+    output_rationale: str = ""
 
     def __post_init__(self) -> None:
         if self.dialect != DIALECT_GEMINI and not self.rationale.strip():
             raise ValueError(
                 f"{self.model_id}: a non-default schema dialect must record why it is "
                 "needed, or the adaptation is invisible in the results"
+            )
+        if self.max_output_tokens is not None and not self.output_rationale.strip():
+            raise ValueError(
+                f"{self.model_id}: a non-default output ceiling must record why it is "
+                "needed, or a raised budget is indistinguishable from favouritism"
             )
 
 
@@ -122,10 +160,27 @@ CANDIDATE_INPUTS: tuple[CandidateInputs, ...] = (
     CandidateInputs(
         model_id="qwen/qwen3.8-flash",
         dialect=DIALECT_GEMINI,
+        max_output_tokens=REASONING_MODEL_OUTPUT_TOKENS,
+        output_rationale=(
+            "Spends its entire output budget on reasoning before writing. Measured "
+            "2026-10-27 against the real CV prompt: at 8,000 tokens it returned "
+            "finish_reason=length with 8,000 reasoning tokens and content_len=0, and at "
+            "16,000 the same; at 32,000 it produced a valid 4,974-character document. "
+            "The 8,000 ceiling is the Gemini-shaped default and is simply too low for "
+            "this model's output shape."
+        ),
     ),
     CandidateInputs(
         model_id="z-ai/glm-5.3-flash",
         dialect=DIALECT_GEMINI,
+        max_output_tokens=REASONING_MODEL_OUTPUT_TOKENS,
+        output_rationale=(
+            "Same failure as qwen3.8-flash, measured the same day: at an 8,000 ceiling "
+            "it returned 8,000 reasoning tokens with content_len=0. It succeeded from "
+            "16,000, where it finished with a 5,446-character document and 6,598 "
+            "reasoning tokens. At 32,000 it emitted 8,183 reasoning tokens of a "
+            "9,341-token output."
+        ),
     ),
     CandidateInputs(
         model_id="mistralai/mistral-small-2603",

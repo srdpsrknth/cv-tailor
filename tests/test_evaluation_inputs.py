@@ -231,6 +231,60 @@ def test_an_unknown_dialect_is_refused():
         to_dialect({'type': 'object'}, 'not-a-dialect')
 
 
+# --- the output ceiling is a fairness parameter, and it must be justified --------------------
+
+def test_a_reasoning_model_gets_a_ceiling_it_can_finish_in():
+    """The 8,000-token default left two models with an **empty** response.
+
+    This is the defect that made the first study wrong about two candidates. Measured
+    against the real CV prompt on 2026-10-27: `qwen3.8-flash` at an 8,000 ceiling
+    returned `finish_reason: length` with 8,000 reasoning tokens and
+    ``content_len: 0`` -- and again at 16,000 -- while at 32,000 it produced a valid
+    4,974-character document. `z-ai/glm-5.3-flash` behaved the same way and succeeded
+    from 16,000.
+
+    Scoring the empty response as a model failure ranks *this project's ceiling* rather
+    than the model, and both were recorded as 0/3 before this was understood.
+    """
+    from evaluation.candidate_inputs import REASONING_MODEL_OUTPUT_TOKENS
+
+    for model_id in ('qwen/qwen3.8-flash', 'z-ai/glm-5.3-flash'):
+        candidate = inputs_for(model_id)
+        assert candidate.max_output_tokens is not None, (
+            f'{model_id} emptied its response at the default ceiling and must be given '
+            f'one it can finish in'
+        )
+        assert candidate.max_output_tokens >= REASONING_MODEL_OUTPUT_TOKENS
+        # qwen was still empty at 16,000, so the budget must exceed that.
+        assert candidate.max_output_tokens > 16_000
+
+
+def test_an_unchanged_ceiling_stays_the_default():
+    """Candidates that finish inside 8,000 must not be handed a larger budget.
+
+    The adaptation is for a measured failure, not a general increase: giving every model
+    more room would make the runs incomparable for no reason, and a budget that is never
+    consumed costs nothing while a divergent one obscures the comparison.
+    """
+    for model_id in ('openai/gpt-6-luna', 'deepseek/deepseek-v4-flash',
+                     'anthropic/claude-haiku-5.5', 'google/gemini-3.8-flash'):
+        assert inputs_for(model_id).max_output_tokens is None, model_id
+
+
+def test_a_raised_ceiling_must_record_why():
+    """A bigger budget without a reason is indistinguishable from favouritism."""
+    with pytest.raises(ValueError, match='output ceiling must record why'):
+        CandidateInputs(model_id='vendor/model', max_output_tokens=64_000)
+
+    # The default needs no justification, or every entry would carry boilerplate.
+    CandidateInputs(model_id='vendor/model')
+
+    # And every raised ceiling in the shipped study carries one.
+    for candidate in CANDIDATE_INPUTS:
+        if candidate.max_output_tokens is not None:
+            assert candidate.output_rationale.strip(), candidate.model_id
+
+
 # --- the study's candidates are the curated set ----------------------------------------------
 
 def test_every_curated_model_has_an_input_profile():

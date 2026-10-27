@@ -59,3 +59,14 @@ class TailorResponse(BaseModel):
     token_usage: TokenUsage
     tailoring_explanation: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
+    #: Which provider and models actually produced this document set.
+    #:
+    #: Recorded because a generated CV is otherwise **unattributable**: the job folder
+    #: is named after the case and a timestamp, so nothing on disk said which model
+    #: wrote it. That is harmless for a single application and a real problem for a
+    #: study comparing eight of them -- the first reading packet could not be used for
+    #: the judgement it was built for, because the reader had no way to tell which model
+    #: produced which document. The cache entry carried this information and the
+    #: manifest did not, which is the kind of asymmetry only a comparison exposes.
+    provider: Optional[str] = None
+    models: Optional[Dict[str, str]] = None

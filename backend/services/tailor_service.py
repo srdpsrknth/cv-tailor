@@ -487,6 +487,17 @@ def tailor_documents(
         cv_page_count=page_count, cover_letter_page_count=cl_pages,
         source_path=str(applications.source_folder / "content.json"),
         tailoring_explanation=explanation_dict,
+        # Recorded on the **manifest**, not only in the cache entry, so a generated
+        # document is attributable from the folder it lives in. Without this the study's
+        # reading packet could not be used for the judgement it exists to support: the
+        # folder name carries the case and a timestamp, and nothing on disk said which
+        # model wrote the document.
+        provider=config.provider_name,
+        models={
+            "cv": config.model_for("cv"),
+            "cover_letter": config.model_for("cover_letter"),
+            "layout_retry": config.model_for("layout_retry"),
+        },
         message=(
             f"CV checked: {page_count} pages. Cover letter: {cl_pages} page, "
             f"{sum(len(p.split()) for p in cl.paragraphs)} words."

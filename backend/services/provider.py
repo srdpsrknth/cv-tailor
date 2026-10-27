@@ -53,6 +53,17 @@ logger = logging.getLogger(__name__)
 #: ``_call_gemini`` retry budget so call counts are unchanged by this refactor.
 MAX_REQUEST_ATTEMPTS = 3
 
+#: Backoff for a **rate-limited** retry, in seconds. Longer than the generic 1s/2s
+#: because a 429 means the provider is throttling: retrying immediately, or a second
+#: later, is refused again. Measured 2026-10-27: `mistral-small-2603` was recorded as
+#: accepting nothing across two whole study runs purely because its upstream 429
+#: outlasted the generic backoff, while the identical request succeeded seconds later.
+RATE_LIMIT_BASE_DELAY_SECONDS = 8
+
+#: Ceiling on any retry wait. Bounded so a genuinely unavailable provider fails the run
+#: rather than holding it open: this is a retry policy, not a queue.
+MAX_RETRY_DELAY_SECONDS = 30
+
 #: OpenRouter's OpenAI-compatible endpoint.
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -371,7 +382,18 @@ class OpenRouterProvider(Provider):
             except Exception as error:  # noqa: BLE001 -- re-raised as ProviderError
                 last_error = error
                 if attempt < MAX_REQUEST_ATTEMPTS - 1:
-                    wait_time = 2 ** attempt
+                    # **A 429 needs a longer wait than a transport error.** Measured
+                    # 2026-10-27: `mistral-small-2603` returned 429 on every attempt of
+                    # two full study runs because Mistral rate-limits its shared pool
+                    # upstream, and the identical request succeeded seconds later. The
+                    # generic 1s/2s backoff was too short to outlast it, so a temporary
+                    # upstream limit was recorded as a model that accepted nothing --
+                    # three times over, in both runs.
+                    #
+                    # The wait stays bounded: this is still a retry and not a queue, so a
+                    # provider that is down for minutes fails rather than hanging a paid
+                    # run indefinitely.
+                    wait_time = _retry_delay(attempt, error)
                     print(f"OpenRouter error (attempt {attempt + 1}/{MAX_REQUEST_ATTEMPTS}): {error}")
                     print(f"Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
@@ -379,6 +401,26 @@ class OpenRouterProvider(Provider):
         raise ProviderError(
             f"OpenRouter call failed after {MAX_REQUEST_ATTEMPTS} attempts: {last_error}"
         )
+
+
+def _retry_delay(attempt: int, error: Exception) -> int:
+    """Seconds to wait before retry ``attempt`` (zero-based) after ``error``.
+
+    A rate limit gets a materially longer wait than a transport error, because the two
+    need different things: a dropped connection is worth retrying almost immediately,
+    whereas a 429 means the *provider* is throttling and an immediate retry will simply
+    be refused again. Measured 2026-10-27: `mistral-small-2603` was recorded as accepting
+    nothing across two whole study runs, purely because its upstream 429 outlasted a 1s
+    and then a 2s backoff -- the identical request succeeded seconds later.
+
+    Bounded at :data:`MAX_RETRY_DELAY_SECONDS` so a provider that is genuinely down fails
+    the run instead of holding it open. This is a retry policy, not a queue.
+    """
+    text = str(error).lower()
+    rate_limited = "429" in text or "too many requests" in text
+    if rate_limited:
+        return min(RATE_LIMIT_BASE_DELAY_SECONDS * (2 ** attempt), MAX_RETRY_DELAY_SECONDS)
+    return 2 ** attempt
 
 
 def build_provider(config, api_key: Optional[str] = None) -> Provider:

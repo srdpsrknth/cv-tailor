@@ -386,6 +386,50 @@ def test_a_404_without_require_parameters_is_not_special_cased(monkeypatch):
     assert 'provider' not in sent[0]
 
 
+# --- a rate limit needs a longer wait than a transport error ---------------------------------
+
+def test_a_rate_limit_waits_longer_than_a_transport_error():
+    """A 429 is the provider throttling, so retrying a second later is refused again.
+
+    Measured 2026-10-27: `mistral-small-2603` was recorded as accepting **nothing**
+    across two complete study runs -- three cases each, 0/3 both times -- purely because
+    its upstream 429 outlasted a 1s-then-2s backoff. The identical request succeeded
+    seconds later when tried by hand. So a temporary provider limit was being reported
+    as a model that cannot do the task.
+    """
+    from services.provider import (
+        MAX_RETRY_DELAY_SECONDS,
+        RATE_LIMIT_BASE_DELAY_SECONDS,
+        _retry_delay,
+    )
+
+    rate_limited = _retry_delay(0, RuntimeError('429 Client Error: Too Many Requests'))
+    transport = _retry_delay(0, RuntimeError('Connection reset by peer'))
+
+    assert rate_limited == RATE_LIMIT_BASE_DELAY_SECONDS
+    assert rate_limited > transport, 'a rate limit must outlast more than one second'
+
+    # It grows, and it stops: a provider that is genuinely down must fail the run
+    # rather than hold it open.
+    delays = [_retry_delay(attempt, RuntimeError('429 too many requests')) for attempt in range(6)]
+    assert delays == sorted(delays)
+    assert max(delays) == MAX_RETRY_DELAY_SECONDS
+
+
+def test_the_phrase_too_many_requests_also_counts_as_a_rate_limit():
+    """Some transports surface the reason without the status code."""
+    from services.provider import RATE_LIMIT_BASE_DELAY_SECONDS, _retry_delay
+
+    assert _retry_delay(0, RuntimeError('Too Many Requests')) == RATE_LIMIT_BASE_DELAY_SECONDS
+
+
+def test_a_non_rate_limit_error_keeps_the_fast_backoff():
+    """The longer wait is for rate limits only; everything else stays quick."""
+    from services.provider import _retry_delay
+
+    assert [_retry_delay(a, RuntimeError('boom')) for a in range(3)] == [1, 2, 4]
+
+
 # --- the schema must be in the *standard* dialect, not the SDK's --------------------------
 
 def test_the_converted_schema_uses_lowercase_type_names(monkeypatch):
