@@ -39,7 +39,14 @@ class TokenUsage(BaseModel):
     estimated_cost_usd: float = 0.0
     cv_attempts: int = 1
     cl_attempts: int = 1
-    model_name: str = "gemini-2.5-flash"
+    #: Which model produced this run. **Required**: every construction site passes it
+    #: (``gemini_service.calculate_token_usage`` sets ``model_name=self.model``), so a
+    #: default would be unreachable code. It used to default to the literal
+    #: ``"gemini-2.5-flash"``, which was misleading twice over -- it named a model this
+    #: project does not use, and it implied a usage record could exist without knowing
+    #: which model it was billed against, which is the one thing a cost record must not
+    #: be vague about.
+    model_name: str
     #: Which route the run was billed on. Part of the record because the same model
     #: costs different amounts direct and through a gateway, so a model name alone
     #: does not identify a price (D-3/D-4).
