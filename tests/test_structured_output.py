@@ -58,49 +58,94 @@ def test_the_document_schemas_are_exported_for_both_documents():
     assert set(generation.RESPONSE_SCHEMAS) == {'cv', 'cover_letter'}
 
 
-def test_the_cv_schema_requires_the_document_and_nothing_else():
-    """The envelope is strict about *being* the envelope; the document stays flexible.
+def _dumped(kind: str) -> dict:
+    """The schema for ``kind`` as plain JSON data.
 
-    The prompt asks for `{"cv": ..., "tailoring_explanation": ...}`, but the recorded
-    fixtures show the explanation is genuinely optional in practice and
-    ``extract_explanation`` reads it defensively. Requiring it would convert a
-    missing-but-harmless key into a failed run, so only ``cv`` is required.
+    The production schema is a **plain dict** in the strict dialect since the switch to
+    `openai/gpt-6-luna` (2026-10-27); it used to be a ``google.genai.types.Schema``.
+    Reading it through this helper keeps the assertions about the *contract* rather than
+    about which representation happens to carry it.
     """
-    schema = generation.RESPONSE_SCHEMAS['cv'].model_dump(exclude_none=True)
+    schema = generation.RESPONSE_SCHEMAS[kind]
+    if hasattr(schema, 'model_dump'):
+        return schema.model_dump(exclude_none=True)
+    return schema
 
-    assert schema['type'] == 'OBJECT'
-    assert schema['required'] == ['cv']
-    assert set(schema['properties']) == {'cv', 'tailoring_explanation'}
+
+def test_the_cv_schema_requires_the_document_and_nothing_else():
+    """The envelope is strict about *being* the envelope; the explanation stays optional
+    **in meaning**.
+
+    The prompt asks for `{"cv": ..., "tailoring_explanation": ...}`, and the recorded
+    fixtures show the explanation is genuinely optional in practice while
+    ``extract_explanation`` reads it defensively.
+
+    Strict mode nevertheless **requires every declared property**, measured against the
+    live API: omitting one returns *"'required' is required to be supplied and to be an
+    array including every key in properties. Missing 'tailoring_explanation'."* So the
+    property is required but its type admits **null**, which is how a strict schema
+    expresses "present but empty". Nothing downstream changes: a null explanation is no
+    explanation, and `extract_explanation` already treats it that way.
+    """
+    schema = _dumped('cv')
+
+    assert schema['type'] == 'object'
+    # Required, because strict mode demands it...
+    assert set(schema['required']) == {'cv', 'tailoring_explanation'}
+    # ...but nullable, because it is optional in meaning.
+    assert 'null' in schema['properties']['tailoring_explanation']['type']
 
 
 def test_the_letter_schema_requires_the_cover_letter():
-    schema = generation.RESPONSE_SCHEMAS['cover_letter'].model_dump(exclude_none=True)
+    schema = _dumped('cover_letter')
 
-    assert schema['type'] == 'OBJECT'
+    assert schema['type'] == 'object'
     assert schema['required'] == ['cover_letter']
 
 
-def test_the_cv_schema_leaves_the_document_body_open():
-    """No `required` inside `cv`, and no `additionalProperties: false` anywhere.
+def test_the_cv_schema_is_strict_throughout():
+    """Every object forbids additional properties and names what it requires.
 
-    This is the anti-truncation decision, and it is deliberately the *opposite* of
-    what "strict structured output" usually means. A schema that enumerates and
-    requires every field of a ~1,350-token document makes the provider allocate and
-    emit far more constrained output, and a response cut off mid-document is exactly
-    the failure the deleted code suffered. Constraining the *envelope* buys the parse
-    guarantee this increment actually wants (the response is a JSON object with a
-    `cv`/`cover_letter` key, so the brace-scan is no longer the failure path) while
-    leaving the document's own length and shape to the model.
+    **This asserts the opposite of what it used to, and the reversal is the decision.**
+    The original design left the document body open, on the reasoning that requiring a
+    ~1,350-token document's every field makes a constrained response longer and so more
+    cut-off-prone. That reasoning was sound for Gemini and is **not optional** for the
+    selected model: OpenAI's strict mode refuses the request outright --
+
+        Invalid schema for response_format: In context=('properties', 'cv'),
+        'additionalProperties' is required to be supplied and to be false.
+
+    -- so a schema that leaves the body open cannot be sent at all (ADR 0016).
+
+    The truncation risk this design was managing is real and is now handled where it
+    belongs: the output ceiling. Measured, no constrained response truncated at 8,000
+    tokens, while every token of the budget went to reasoning in the models that failed.
     """
-    schema = generation.RESPONSE_SCHEMAS['cv'].model_dump(exclude_none=True)
+    schema = _dumped('cv')
 
     def walk(node, path='$'):
         if isinstance(node, dict):
-            assert 'additionalProperties' not in node or node['additionalProperties'] is not False, (
-                f'{path} forbids additional properties; a strict body is what truncated'
-            )
-            if path.endswith('.cv') or path == '$.cv':
-                assert 'required' not in node, f'{path} requires fields inside the document body'
+            if node.get('type') == 'object':
+                assert node.get('additionalProperties') is False, (
+                    f'{path} does not forbid additional properties; strict mode requires it'
+                )
+                declared = set(node.get('properties') or {})
+                required = set(node.get('required') or [])
+                # Strict mode requires **every** declared property, with no exceptions.
+                # The explanation stays optional *in meaning* by admitting null in its
+                # type rather than by being absent from `required`.
+                assert required == declared, (
+                    f'{path} does not require every property it declares '
+                    f'(missing: {sorted(declared - required)})'
+                )
+                for name, prop in (node.get('properties') or {}).items():
+                    if name == 'tailoring_explanation':
+                        types = prop.get('type')
+                        as_list = types if isinstance(types, list) else [types]
+                        assert 'null' in as_list, (
+                            f'{path}.{name} is required but not nullable, so a document '
+                            f'without an explanation would fail validation'
+                        )
             for key, value in node.items():
                 walk(value, f'{path}.{key}')
         elif isinstance(node, list):
@@ -110,23 +155,52 @@ def test_the_cv_schema_leaves_the_document_body_open():
     walk(schema)
 
 
-def test_the_cv_schema_exposes_the_unit_ids_a_delta_would_need():
-    """`cv` stays an object the *server* can validate, so the contract is not vacuous.
+def test_the_cv_schema_describes_the_document_it_expects():
+    """``cv`` is a described object, so the contract is not vacuous.
 
-    A bare ``{"cv": {"type": "OBJECT"}}`` would satisfy "requires the document" while
-    constraining nothing at all. The body is described -- properties listed, nothing
-    required -- which is the middle ground the comment above argues for.
+    A bare ``{"cv": {"type": "object"}}`` would satisfy "requires the document" while
+    constraining nothing. The body names its fields, which is what makes the response
+    checkable by the provider as well as by ``validate_cv``.
     """
-    schema = generation.RESPONSE_SCHEMAS['cv'].model_dump(exclude_none=True)
+    schema = _dumped('cv')
     cv = schema['properties']['cv']
 
-    assert cv['type'] == 'OBJECT'
+    assert cv['type'] == 'object'
     assert {'summary', 'skills', 'experience'} <= set(cv['properties'])
     experience_items = cv['properties']['experience']['items']
     assert {'company', 'role', 'start_date', 'end_date', 'bullets'} <= set(
         experience_items['properties']
     )
-    assert 'required' not in experience_items
+    # The fields the factual gate exists to protect are now *required*, which is a
+    # direct improvement: `glm-5.3-flash` failed the study by omitting them, and a
+    # schema that names them as required gives the provider a reason to include them.
+    assert {'company', 'role', 'start_date', 'end_date'} <= set(
+        experience_items.get('required') or []
+    )
+
+
+def test_the_cv_schema_exposes_the_unit_ids_a_delta_would_need():
+    """`cv` stays an object the *server* can validate, so the contract is not vacuous.
+
+    A bare ``{"cv": {"type": "object"}}`` would satisfy "requires the document" while
+    constraining nothing at all. The body names its fields, so the response is checkable
+    by the provider as well as by ``validate_cv``.
+    """
+    schema = _dumped('cv')
+    cv = schema['properties']['cv']
+
+    assert cv['type'] == 'object'
+    assert {'summary', 'skills', 'experience'} <= set(cv['properties'])
+    experience_items = cv['properties']['experience']['items']
+    assert {'company', 'role', 'start_date', 'end_date', 'bullets'} <= set(
+        experience_items['properties']
+    )
+    # Strict mode requires them, which is a direct improvement: `glm-5.3-flash` failed
+    # the study by omitting exactly these fields, and naming them as required gives the
+    # provider a reason to include them.
+    assert {'company', 'role', 'start_date', 'end_date'} <= set(
+        experience_items.get('required') or []
+    )
 
 
 # --- what is sent on each call ------------------------------------------------------------
@@ -369,7 +443,7 @@ def test_both_explanation_shapes_survive_a_schema_constrained_response(
 
 def test_the_schema_permits_a_nested_explanation():
     """The envelope must not *forbid* what `extract_explanation` still accepts."""
-    schema = generation.RESPONSE_SCHEMAS['cv'].model_dump(exclude_none=True)
+    schema = _dumped('cv')
 
     assert 'tailoring_explanation' in schema['properties']['cv']['properties']
 
@@ -523,61 +597,79 @@ def test_no_schema_uses_a_keyword_the_gemini_api_rejects():
     the schema object rather than asking whether the provider would accept it, and
     the module's own comment claimed the keyword was unset while the code set it.
 
-    Asserted on the dumped schema, so it catches the keyword however it is spelled in
-    the SDK -- ``additional_properties`` in Python becomes ``additionalProperties`` on
-    the wire, and the API's complaint names the wire form.
+    Asserted on the raw schema, so it catches the keyword however the SDK spelled it --
+    ``additional_properties`` in Python becomes ``additionalProperties`` on the wire, and
+    the API's complaint names the wire form.
+
+    **The production schema now *does* set ``additionalProperties``, and that is the
+    switch.** OpenAI's strict mode requires it (ADR 0016), so this test asserts the rule
+    that still holds: **Gemini must never receive it**, which the provider layer now
+    guarantees by rendering the schema per route rather than by keeping it out of the
+    schema entirely.
     """
     from services import generation
+    from services.provider import _plain_schema
 
     for kind, schema in generation.RESPONSE_SCHEMAS.items():
-        dumped = schema.model_dump(exclude_none=True)
-        for path, key, _ in _walk_schema(dumped):
+        dumped = _plain_schema(schema) if hasattr(schema, 'model_dump') else schema
+        assert 'additionalProperties' in json.dumps(dumped), (
+            f'{kind} must be strict: the selected model refuses a schema without '
+            f'additionalProperties: false'
+        )
+        # ...and it must never be sent to Gemini, which rejects that keyword outright.
+        from evaluation.candidate_inputs import DIALECT_GEMINI, to_dialect
+
+        gemini_form = to_dialect(dumped, DIALECT_GEMINI)
+        for path, key, _ in _walk_schema(gemini_form):
             assert key not in GEMINI_UNSUPPORTED_KEYWORDS, (
-                f'{kind} schema sets {key!r} at {path}, which the Gemini API rejects '
-                f'with "not supported in the Gemini API". A draft call carrying this '
-                f'schema fails after three paid attempts.'
+                f'{kind} would send {key!r} at {path} to Gemini, which rejects it with '
+                f'"not supported in the Gemini API"'
             )
 
 
 def test_the_comment_and_the_code_agree_about_additional_properties():
     """The schema's own documentation must describe the schema that exists.
 
-    The defect above survived review partly because the module comment stated
-    "``additionalProperties`` is left unset" while ``additional_properties`` was set
-    two screens later. A claim in a comment is not enforced by anything, so this
-    asserts the one property that was false and keeps the two in step.
+    The original defect survived review partly because the module comment stated
+    "``additionalProperties`` is left unset" while ``additional_properties`` was set two
+    screens later. Inverted now that strict mode requires the keyword: the comment must
+    not still claim it is absent, or the next reader will remove it and break every call.
     """
     from pathlib import Path
 
     from services import generation
 
-    dumped = generation.RESPONSE_SCHEMAS['cv'].model_dump(exclude_none=True)
+    dumped = _dumped('cv')
     sets_it = any(
         key in GEMINI_UNSUPPORTED_KEYWORDS for _, key, _ in _walk_schema(dumped)
     )
     source = Path(generation.__file__).read_text(encoding='utf-8')
-    claims_unset = '``additionalProperties`` is left unset' in source
 
-    assert not (sets_it and claims_unset), (
-        'the CV schema sets additionalProperties while the comment claims it is unset'
+    assert sets_it, 'the shipped CV schema must be strict'
+    # The stale claim is gone from the source.
+    assert '``additionalProperties`` is left unset' not in source, (
+        'the module still claims additionalProperties is unset, which would invite '
+        'removing the keyword strict mode requires'
     )
 
 
-def test_every_schema_keyword_is_one_the_sdk_models():
-    """A typo'd keyword is silently dropped by the SDK and changes nothing.
+def test_every_schema_keyword_reaches_the_wire():
+    """A typo'd keyword is silently dropped and the constraint quietly does not exist.
 
-    ``types.Schema`` admits only declared fields, so a misspelled keyword does not
-    raise -- it simply never reaches the provider, and the constraint the author
-    intended quietly does not exist. Asserted on the dumped form so that what is sent
-    is what was written.
+    The production schema is plain data now rather than an SDK object, so the failure
+    mode moved: a misspelled key is no longer dropped by a validating model, it is sent
+    to the provider and rejected there. Asserted on the wire form, which is what the
+    provider actually validates.
     """
     from services import generation
 
     for kind, schema in generation.RESPONSE_SCHEMAS.items():
-        dumped = schema.model_dump(exclude_none=True)
+        dumped = _dumped(kind)
         assert dumped, f'{kind} schema dumps to nothing'
         assert 'properties' in dumped, f'{kind} schema declares no properties'
         # The envelope the parser relies on must survive into the wire form.
         assert kind in dumped['properties'], (
             f'{kind} schema does not expose the {kind!r} envelope key'
         )
+        # The wire form must be JSON-serializable: it is put in a request body.
+        json.dumps(dumped)

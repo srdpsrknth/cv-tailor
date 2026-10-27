@@ -686,14 +686,27 @@ def _merge_experience_unit(cv: TailoredCV, key: str, value) -> None:
 #   :func:`apply_cv_delta` or make the provider silently substitute a whole-document answer
 #   for the cheaper delta. That call therefore sends **no** schema.
 #
-# Why this is not merely a compromise: the anti-truncation property is designed into the
-# schema, not hoped for. Descriptions are deliberate -- they are what the provider shows the
-# model -- but ``additionalProperties`` is left unset and no field inside a document is
-# ``required``. Enumerating and requiring a ~1,350-token document's every field is what makes
-# a constrained response long and cut-off-prone, and a cut-off response is invalid JSON.
-# Constraining the *envelope* buys the parse guarantee this increment wants (the response is
-# an object carrying ``cv``/``cover_letter``, never prose or a bare array) while leaving the
-# document's own length and shape to the model.
+# Why this is not merely a compromise: the parse guarantee is designed into the schema,
+# not hoped for. Descriptions are deliberate -- they are what the provider shows the
+# model -- and the *envelope* key (`cv` / `cover_letter`) is required, so the response is
+# always an object carrying the document and ``parse_json_response``'s brace-scan stops
+# being the failure path.
+#
+# **The body is now strict too, which reversed the original decision** (ADR 0016). This
+# comment used to say that ``additionalProperties`` was left unset and no field inside a
+# document was ``required``, on the reasoning that enumerating a ~1,350-token document
+# makes a constrained response longer and so more cut-off-prone. That reasoning was sound
+# for Gemini and is **not permitted** by the selected model: OpenAI's strict mode refuses
+# a schema without ``additionalProperties: false`` outright --
+#
+#     Invalid schema for response_format: In context=('properties', 'cv'),
+#     'additionalProperties' is required to be supplied and to be false.
+#
+# so leaving the body open is not a trade-off available to us. The truncation risk it was
+# managing is real and is handled where it belongs: the **output ceiling**. Measured, no
+# constrained response truncated at 8,000 tokens, while every token of the budget went to
+# reasoning in the models that failed. `_to_strict_dialect` performs the conversion, and
+# `tailoring_explanation` stays optional even there.
 
 
 def _tailoring_explanation_schema():
@@ -825,17 +838,142 @@ def _document_response_schema(envelope_key: str, document):
     )
 
 
+def _to_strict_dialect(schema):
+    """Convert a Gemini-flavoured ``Schema`` into strict JSON Schema for the wire.
+
+    **Why the shipped contract is now strict.** The study of 2026-10-26/27 selected
+    ``openai/gpt-6-luna`` as the model (ADR 0016), and OpenAI's strict mode *requires*
+    ``additionalProperties: false`` on every object. Verified live: sending the previous
+    Gemini-shaped schema to that model returns
+
+        Invalid schema for response_format: In context=('properties', 'cv'),
+        'additionalProperties' is required to be supplied and to be false.
+
+    so switching the model without also switching the schema would have broken every
+    draft call immediately -- HTTP 400, no document.
+
+    Three transformations, each demanded by a measured error rather than assumed:
+
+    1. **Type names lowercased.** The SDK spells them ``"OBJECT"``; standard JSON Schema
+       requires ``"object"``. Uppercase made DeepInfra answer *"Grammar error: Invalid
+       type: OBJECT"* and Parasail *"Failed to compile json grammar"*.
+    2. **Every object marked ``required`` with ``additionalProperties: false``.** This
+       is what OpenAI demands, and it also satisfies Anthropic-behind-Vertex, whose
+       ceiling is on *optional* parameters (27 optional raised a 400; zero satisfies it).
+    3. **A free-form map becomes an array.** ``skills`` is a category-to-skills map, and
+       a map is *defined* by allowing arbitrary keys -- the exact opposite of
+       ``additionalProperties: false``. It is expressed as ``[{category, items}, ...]``,
+       which carries the same document; ``TailoredCV`` accepts both spellings.
+
+    ``nullable`` is translated to a ``"null"`` type rather than dropped, so an optional
+    field does not silently become required -- the compatibility fix must not change what
+    the schema means.
+    """
+    import copy
+
+    dumped = schema.model_dump(exclude_none=True)
+
+    type_names = {
+        "STRING": "string", "NUMBER": "number", "INTEGER": "integer",
+        "BOOLEAN": "boolean", "ARRAY": "array", "OBJECT": "object", "NULL": "null",
+    }
+
+    def convert(node):
+        if isinstance(node, list):
+            return [convert(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+
+        result = {}
+        nullable = bool(node.pop("nullable", False))
+        for key, value in node.items():
+            if key in ("property_ordering",):
+                continue
+            if key == "type" and isinstance(value, str):
+                result[key] = type_names.get(value.upper(), value)
+            else:
+                result[key] = convert(value)
+
+        if nullable and "type" in result:
+            existing = result["type"]
+            if isinstance(existing, list):
+                if "null" not in existing:
+                    result["type"] = existing + ["null"]
+            elif existing != "null":
+                result["type"] = [existing, "null"]
+
+        if result.get("type") == "object" and isinstance(result.get("properties"), dict):
+            # **Every declared property must be required**, including the explanation.
+            #
+            # Strict mode enforces this literally: omitting one produces
+            #   "Invalid schema for response_format: ... 'required' is required to be
+            #    supplied and to be an array including every key in properties.
+            #    Missing 'tailoring_explanation'."
+            # Measured against the live API on 2026-10-27, and it broke the first real
+            # CLI run after the switch.
+            #
+            # The explanation must still be *optional in meaning* -- it is commentary,
+            # and forcing it would turn a harmless omission into a failed validation and
+            # a wasted paid call. Strict mode permits that via `null`: the property is
+            # required but its type admits null, so "no explanation" is expressed rather
+            # than omitted. `extract_explanation` already treats an absent or null value
+            # as no explanation, so nothing downstream changes.
+            properties = result["properties"]
+            for name in ("tailoring_explanation",):
+                if name in properties:
+                    declared = properties[name].get("type")
+                    if isinstance(declared, str) and declared != "null":
+                        properties[name]["type"] = [declared, "null"]
+                    elif isinstance(declared, list) and "null" not in declared:
+                        properties[name]["type"] = declared + ["null"]
+            result["required"] = sorted(properties)
+            result["additionalProperties"] = False
+        return result
+
+    converted = convert(copy.deepcopy(dumped))
+
+    # ``skills`` is the one free-form map: a map and `additionalProperties: false`
+    # contradict each other, so it is respelled as an array of {category, items}.
+    cv_properties = ((converted.get("properties") or {}).get("cv") or {}).get("properties")
+    if isinstance(cv_properties, dict):
+        skills = cv_properties.get("skills")
+        if isinstance(skills, dict) and skills.get("type") == "object" and "properties" not in skills:
+            cv_properties["skills"] = {
+                "type": "array",
+                "description": (
+                    "Skill groups. Each entry names a category and lists its skills -- "
+                    "the same information as a category-to-skills map, as an array."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "category": {"type": "string"},
+                        "items": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["category", "items"],
+                    "additionalProperties": False,
+                },
+            }
+
+    # The SDK type is no longer carried: the wire form is this plain dict, and keeping a
+    # `Schema` here would let a caller send the old dialect again by accident.
+    return converted
+
+
 def _build_response_schemas() -> dict:
     """Build the per-document schemas once, at import.
 
     Building them here rather than per call keeps the cost off the generation path.
     They are plain data describing a contract, not per-run state, so a module-level
     mapping is correct -- this is deliberately *not* an environment read (ADR 0010).
+
+    Every schema is rendered into the **strict** dialect (see :func:`_to_strict_dialect`),
+    because the selected model requires it and a schema is sent to the provider as-is.
     """
     return {
-        "cv": _document_response_schema("cv", _cv_document_schema()),
-        "cover_letter": _document_response_schema(
-            "cover_letter", _cover_letter_document_schema()
+        "cv": _to_strict_dialect(_document_response_schema("cv", _cv_document_schema())),
+        "cover_letter": _to_strict_dialect(
+            _document_response_schema("cover_letter", _cover_letter_document_schema())
         ),
     }
 

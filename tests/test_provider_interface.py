@@ -751,21 +751,34 @@ def test_the_cap_stops_further_calls(monkeypatch):
     """The run raises once spend reaches the cap, instead of continuing to spend."""
     calls: list = []
 
+    from config import Config
+    from services import pricing
+    from services.gemini_service import GeminiService
+
+    # The token count is derived from the **actual** default price rather than hard-coded,
+    # so this keeps testing the cap when the default model changes. It previously reported
+    # a fixed 2,000,000 tokens with the note "$0.75 per 1M input on the default model" --
+    # true for the Gemini default, but the default is now `openai/gpt-6-luna` at $0.10/1M,
+    # so 2M tokens cost $0.20 and never reached the $1.00 cap. The assertion failed for an
+    # arithmetic reason, not because the cap stopped working.
+    price = pricing.price_for(pricing.DEFAULT_MODEL, pricing.DEFAULT_PROVIDER)
+    over_cap_tokens = int((1.0 / price.input) * 1_000_000) + 1_000_000
+
     class RecordingProvider(Provider):
         name = 'recording'
 
         def generate(self, prompt, *, schema=None, max_tokens=None, model=None):
             calls.append(model)
-            return ProviderResponse(text='{"cv": {"title": "x"}}', input_tokens=2_000_000, output_tokens=0)
-
-    from config import Config
-    from services.gemini_service import GeminiService
+            return ProviderResponse(
+                text='{"cv": {"title": "x"}}',
+                input_tokens=over_cap_tokens,
+                output_tokens=0,
+            )
 
     config = Config.from_env(load_env_file=False, overrides={'max_cost_usd': 1.0})
     service = GeminiService(config=config, api_key='k')
     service.provider = RecordingProvider()
 
-    # $0.75 per 1M input on the default model, so 2M tokens is $1.50: over the cap.
     with pytest.raises(Exception, match='Cost cap reached'):
         service._call_gemini('draft', kind='cv')
 

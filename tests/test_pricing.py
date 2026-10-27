@@ -47,9 +47,20 @@ def _require_the_pricing_module():
 # --- D-3: the tier is applied to the tokens -------------------------------------------------
 
 def test_a_prompt_over_the_threshold_is_priced_at_the_long_rate():
-    """The defect: this used to be charged at the short rate and under-reported."""
-    under = pricing.estimate_cost(100_000, 0, 'gemini-2.5-pro')
-    over = pricing.estimate_cost(300_000, 0, 'gemini-2.5-pro')
+    """The defect: this used to be charged at the short rate and under-reported.
+
+    The **route is named explicitly**, and that is a correctness fix rather than
+    tidiness. These calls previously omitted ``provider`` and therefore went through
+    ``price_for``'s fallback, which targets whatever the default route happens to be.
+    They passed only while that default was a Gemini model carrying the same long tier;
+    switching the default to an OpenAI model on OpenRouter made them fall back to a price
+    with **no** long tier, and the assertions failed.
+
+    Naming the route is what the route-keyed table exists for, and it makes the test
+    assert the Gemini row it is actually about instead of an accident of configuration.
+    """
+    under = pricing.estimate_cost(100_000, 0, 'gemini-2.5-pro', provider='gemini')
+    over = pricing.estimate_cost(300_000, 0, 'gemini-2.5-pro', provider='gemini')
 
     # 3x the tokens at 2x the rate, so strictly more than 3x the cost.
     assert over > under * 3
@@ -64,7 +75,7 @@ def test_the_old_flat_rate_would_have_under_reported_the_long_case():
     is $0.75 -- the old estimate was **half** the real cost.
     """
     flat = (300_000 / 1_000_000) * 1.25
-    correct = pricing.estimate_cost(300_000, 0, 'gemini-2.5-pro')
+    correct = pricing.estimate_cost(300_000, 0, 'gemini-2.5-pro', provider='gemini')
 
     assert flat == pytest.approx(0.375)
     assert correct == pytest.approx(0.75)
@@ -72,9 +83,16 @@ def test_the_old_flat_rate_would_have_under_reported_the_long_case():
 
 
 def test_the_long_tier_also_applies_to_output():
-    """Both halves of the pair are re-rated, not just the input."""
-    short = pricing.estimate_cost(1_000, 100_000, 'gemini-2.5-pro')
-    long = pricing.estimate_cost(300_000, 100_000, 'gemini-2.5-pro')
+    """Both halves of the pair are re-rated, not just the input.
+
+    The route is named explicitly: these calls used to omit ``provider`` and therefore
+    went through the fallback, passing only while the default route happened to be a
+    Gemini model carrying the same long tier. Switching the default to an OpenAI model
+    on OpenRouter made them price against a row with no long tier (see
+    ``test_a_prompt_over_the_threshold_is_priced_at_the_long_rate``).
+    """
+    short = pricing.estimate_cost(1_000, 100_000, 'gemini-2.5-pro', provider='gemini')
+    long = pricing.estimate_cost(300_000, 100_000, 'gemini-2.5-pro', provider='gemini')
 
     # Output: 100k at $15/1M = $1.50 on the long tier versus $1.00 on the short.
     assert short == pytest.approx(0.00125 + 1.00)
@@ -84,14 +102,14 @@ def test_the_long_tier_also_applies_to_output():
 def test_the_threshold_is_chosen_on_the_input_count_alone():
     """Providers re-rate the whole request when the *prompt* crosses the threshold."""
     # 200,000 exactly is not "over" it.
-    assert pricing.estimate_cost(200_000, 0, 'gemini-2.5-pro') == pytest.approx(0.25)
-    assert pricing.estimate_cost(200_001, 0, 'gemini-2.5-pro') == pytest.approx(0.5000025)
+    assert pricing.estimate_cost(200_000, 0, 'gemini-2.5-pro', provider='gemini') == pytest.approx(0.25)
+    assert pricing.estimate_cost(200_001, 0, 'gemini-2.5-pro', provider='gemini') == pytest.approx(0.5000025)
 
 
 def test_a_model_with_no_long_tier_is_unaffected_by_the_threshold():
     """Most models have one rate; the tier logic must not invent a second."""
-    short = pricing.estimate_cost(1_000, 0, 'gemini-2.5-flash')
-    long = pricing.estimate_cost(1_000_000, 0, 'gemini-2.5-flash')
+    short = pricing.estimate_cost(1_000, 0, 'gemini-2.5-flash', provider='gemini')
+    long = pricing.estimate_cost(1_000_000, 0, 'gemini-2.5-flash', provider='gemini')
 
     assert short == pytest.approx(0.0003)
     assert long == pytest.approx(0.30)
@@ -106,17 +124,28 @@ def test_a_half_defined_long_pair_is_not_treated_as_a_tier():
 
 def test_the_tier_is_describable_for_the_user():
     """The UI shows why a cost moved, not only that it did."""
-    assert pricing.describe_tier(1_000, 'gemini-2.5-pro') == 'standard'
-    assert pricing.describe_tier(300_000, 'gemini-2.5-pro') == 'long-context'
-    assert pricing.describe_tier(300_000, 'gemini-2.5-flash') == 'standard'
+    assert pricing.describe_tier(1_000, 'gemini-2.5-pro', provider='gemini') == 'standard'
+    assert pricing.describe_tier(300_000, 'gemini-2.5-pro', provider='gemini') == 'long-context'
+    assert pricing.describe_tier(300_000, 'gemini-2.5-flash', provider='gemini') == 'standard'
 
 
 def test_the_estimate_reaches_the_token_usage_record():
-    """Driven through ``calculate_token_usage``, which is what the pipeline calls."""
+    """Driven through ``calculate_token_usage``, which is what the pipeline calls.
+
+    The service is given an explicit ``config`` naming the Gemini route. It previously
+    had none, so ``_estimate_cost`` fell back to ``pricing.DEFAULT_PROVIDER`` -- which was
+    Gemini when this was written and is OpenRouter now, where ``gemini-2.5-pro`` has no
+    long tier. The test was asserting an accident of the default rather than the long-tier
+    behaviour it is named for.
+    """
     from services.gemini_service import GeminiService
+
+    class _Config:
+        provider = 'gemini'
 
     service = object.__new__(GeminiService)
     service.model = 'gemini-2.5-pro'
+    service.config = _Config()
 
     usage = service.calculate_token_usage(
         cv_input_tokens=300_000, cv_output_tokens=0,
@@ -248,14 +277,21 @@ def test_only_the_pricing_module_defines_the_table():
 
 
 def test_the_compatibility_view_matches_the_single_source():
-    """``gemini_service.PRICING`` is a derived view, never a second table."""
+    """``gemini_service.PRICING`` is a derived view, never a second table.
+
+    The view is by definition the **Gemini-route** rows, exposed under their bare model
+    names -- that is the shape this module used to publish. The lookup therefore names
+    the ``gemini`` route rather than ``pricing.DEFAULT_PROVIDER``: the default moved to
+    OpenRouter on 2026-10-27, and asking for the view's rows under the *default* route
+    looked in the wrong half of the table and failed.
+    """
     from services.gemini_service import PRICING
 
     for model, row in PRICING.items():
-        price = pricing.PRICING[(pricing.DEFAULT_PROVIDER, model)]
+        price = pricing.PRICING[('gemini', model)]
         assert row['input'] == price.input
         assert row['output'] == price.output
-    # And it does not include another route's rows.
+    # It carries the Gemini route's rows only, not another route's.
     assert not any('google/' in model for model in PRICING)
 
 

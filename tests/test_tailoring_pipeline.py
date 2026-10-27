@@ -826,16 +826,25 @@ def test_an_unknown_model_is_priced_without_crashing():
 
     The fallback used to point at a legacy pricing row. Removing stale rows is only
     safe while the fallback target is itself always present -- this test pins that.
-    """
-    from services.gemini_service import DEFAULT_MODEL, PRICING, GeminiService
 
-    assert DEFAULT_MODEL in PRICING, 'the fallback target must always be priced'
+    Asserted against the **single pricing table** on its default route, not against
+    ``gemini_service.PRICING``, which is the Gemini-route view only. That view stopped
+    containing the default model when the default moved to OpenRouter (2026-10-27), and
+    the invariant here is about the table the fallback actually reads.
+    """
+    from services import pricing
+    from services.gemini_service import GeminiService
+
+    assert pricing.is_priced(pricing.DEFAULT_MODEL, pricing.DEFAULT_PROVIDER), (
+        'the fallback target must always be priced'
+    )
 
     service_double = object.__new__(GeminiService)
     service_double.model = 'a-model-that-does-not-exist'
     cost = service_double._estimate_cost(1_000_000, 1_000_000)
 
-    assert cost == PRICING[DEFAULT_MODEL]['input'] + PRICING[DEFAULT_MODEL]['output']
+    fallback = pricing.PRICING[(pricing.DEFAULT_PROVIDER, pricing.DEFAULT_MODEL)]
+    assert cost == fallback.input + fallback.output
 
 
 def test_no_retired_model_rows_remain_in_pricing():

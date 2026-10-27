@@ -25,6 +25,13 @@ __all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL", "P
 #: load-bearing invariants in ``tests/test_tailoring_pipeline.py`` -- that
 #: ``DEFAULT_MODEL`` is priced, and that no retired row is -- keep being asserted
 #: against something real.
+#:
+#: **The route is named ``"gemini"`` literally, not ``DEFAULT_PROVIDER``.** It used to
+#: be the latter, which happened to be correct only while Gemini *was* the default. When
+#: the default moved to OpenRouter on 2026-10-27 this view silently started returning the
+#: OpenRouter rows -- prefixed ids like ``google/gemini-3.8-flash`` rather than the bare
+#: names it promises, and nothing from the route it is named after. A view defined by
+#: "the Gemini route" must not be keyed on whichever route happens to be default.
 PRICING = {
     model: {
         "input": price.input,
@@ -33,7 +40,7 @@ PRICING = {
         **({"output_long": price.output_long} if price.output_long is not None else {}),
     }
     for (provider, model), price in pricing.PRICING.items()
-    if provider == pricing.DEFAULT_PROVIDER
+    if provider == "gemini"
 }
 
 

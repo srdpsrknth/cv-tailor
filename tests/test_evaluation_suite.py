@@ -113,15 +113,29 @@ def test_the_cap_is_checked_before_every_call_not_only_at_the_start():
         )
 
     models = tuple(sorted(CURATED_MODELS, key=lambda m: m.input_per_1m))
-    # Start below the cap, then let spend cross it: 0.50/case crosses 1.75 after 4 cases.
-    cap = 1.75
+    total_cases = len(CASES) * len(models)
+
+    # The cap is derived from the **actual** case count rather than hard-coded, so the
+    # test keeps testing what it is named for when the set size changes. It previously
+    # assumed eight models: with one model, 3 cases at $0.50 is $1.50 and never reaches
+    # a $1.75 cap, so the run completed and the assertion below failed -- not because the
+    # cap was unenforced, but because the arithmetic no longer crossed it.
+    #
+    # The check is `spent >= cap` **before** each case, and spend accumulates after it,
+    # so the cap must be reached by the first N-1 cases. With N cases at $0.50 a cap of
+    # 0.50*(N-2)+eps is crossed after N-1 of them -- leaving the last unrun, which is
+    # what proves the check happens mid-run rather than only at the start.
+    per_case = 0.50
+    assert total_cases > 2, 'the mid-run check needs cases after the cap is crossed'
+    cap = per_case * (total_cases - 2) + 0.01
     assert not plan(CASES, models, cap_usd=cap).exceeds(), 'the start-check must pass'
+    assert cap < per_case * total_cases, 'the cap must be crossable mid-run'
 
     live_run(cases=CASES, models=models, cap_usd=cap, authorised=True, run_one=run_one)
 
-    total_cases = len(CASES) * len(models)
     assert len(seen) < total_cases, (
-        'the run completed every case, so the cap was not enforced mid-run'
+        f'the run completed all {total_cases} cases against a cap of ${cap:.2f}, so the '
+        f'cap was not enforced mid-run'
     )
     assert len(seen) >= 1
 
@@ -370,18 +384,38 @@ def test_the_set_is_small():
     assert len(CURATED_MODELS) < LISTING_MODEL_COUNT / 10
 
 
-def test_the_set_spans_several_families():
-    """Owner requirement, recorded 2026-10-26: variety, not five near-copies.
+def test_the_set_offers_exactly_one_model():
+    """**The tool makes the decision.** This replaced a test asserting variety.
 
-    The rejected draft was three Google models, one Anthropic and one DeepSeek. Five
-    entries from three vendors is really two engineering choices wearing five labels,
-    and it cannot answer the question the curation exists to ask -- whether a
-    non-Google model writes these documents as well.
+    The owner's requirement was always that the tool chooses rather than presenting a
+    catalogue. The study of 2026-10-26/27 measured eight candidates and the owner selected
+    `openai/gpt-6-luna`, rejecting the rest (ADR 0016). So the earlier variety assertions
+    -- five families, a spread of costs -- described a *shortlist*, which is no longer
+    what this is. What survives is the requirement they were serving: no wall of models.
+    """
+    from evaluation.curated_models import CURATED_MODELS, LISTING_MODEL_COUNT
+
+    assert len(CURATED_MODELS) == 1, (
+        'the tool offers one model; a shortlist is what the study was for'
+    )
+    assert len(CURATED_MODELS) < LISTING_MODEL_COUNT / 10
+
+
+def test_the_offered_model_is_the_one_the_study_selected():
+    """The single entry must be the measured winner, not whichever was left behind.
+
+    A hard-coded id, because this is a decision and not a computation: if the offered
+    model changes, that is a new decision requiring a new measurement, and this assertion
+    is what forces it to be a deliberate edit rather than a side effect.
     """
     from evaluation.curated_models import CURATED_MODELS
 
-    families = {model.id.split('/')[0] for model in CURATED_MODELS}
-    assert len(families) >= 5, f'too few distinct families: {sorted(families)}'
+    assert [m.id for m in CURATED_MODELS] == ['openai/gpt-6-luna']
+    selected = CURATED_MODELS[0]
+    assert selected.accepted == selected.attempted, (
+        'the selected model accepted every case in the study'
+    )
+    assert selected.cost_per_accepted is not None
 
 
 def test_every_entry_is_recent_enough():
@@ -420,13 +454,22 @@ def test_every_entry_is_priced_on_the_route_the_run_uses():
     )
 
 
-def test_the_set_spans_different_cost_levels():
-    """Owner requirement: so the user sees the trade-off and decides."""
-    from evaluation.curated_models import curated_models, has_cost_spread
+def test_a_single_model_set_has_no_cost_spread_to_offer():
+    """The old spread requirement described a shortlist, and there is no longer one.
 
-    assert has_cost_spread(), 'the set must span genuinely different cost levels'
-    tiers = {model.tier for model in curated_models()}
-    assert tiers == {'economy', 'balanced', 'frontier'}
+    `has_cost_spread` is kept because it is the check the *next* curation needs: if a
+    study compares candidates again, rising back above the threshold is what proves the
+    comparison is meaningful rather than eight near-identical prices. With one model
+    there is nothing to spread, and asserting a spread here would be false.
+    """
+    from evaluation.curated_models import CURATED_MODELS, curated_models, has_cost_spread
+
+    assert len(CURATED_MODELS) == 1
+    assert has_cost_spread() is False, (
+        'a single model cannot span cost levels; if this ever passes, the set grew and '
+        'the curation tests need revisiting'
+    )
+    assert [m.tier for m in curated_models()] == ['economy']
 
 
 def test_the_set_is_ordered_cheapest_first():

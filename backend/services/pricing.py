@@ -85,11 +85,13 @@ class ModelPrice:
         return self.input_long is not None and self.output_long is not None
 
 
-#: The default route. Decision 6 keeps Gemini's latest Flash as the default model.
-DEFAULT_PROVIDER = "gemini"
+#: The default route. Switched to OpenRouter on 2026-10-27 together with the selected
+#: model: `openai/gpt-6-luna` is served there, and the study measured it at roughly
+#: 30-40x less per accepted result than the Gemini default it replaced (ADR 0016).
+DEFAULT_PROVIDER = "openrouter"
 
 #: The model assumed when none is configured. Must exist below, asserted by a test.
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "openai/gpt-6-luna"
 
 
 #: ``(provider, model) -> ModelPrice``. One table, one place (D-4).

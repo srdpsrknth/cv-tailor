@@ -21,11 +21,22 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 #: The model assumed when none is configured. Kept in sync with PRICING, which is
-#: asserted to contain it. Decision 6 keeps Gemini's latest Flash as the default.
-DEFAULT_MODEL = "gemini-3.8-flash"
+#: asserted to contain it.
+#:
+#: **Switched from `gemini-3.8-flash` on 2026-10-27**, on the study's measurement rather
+#: than on reputation (ADR 0005 requires benchmarking before a switch; ADR 0016 records
+#: the study). `openai/gpt-6-luna` accepted 3/3 cases with **no** correction calls in
+#: every run, at **$0.00281 per accepted result against the previous default's
+#: $0.08607-$0.11384** -- roughly 30-40x cheaper for a document that passes the same
+#: factual and layout gates.
+DEFAULT_MODEL = "openai/gpt-6-luna"
 
-#: The provider used when none is configured (ADR 0005, decision 6).
-DEFAULT_PROVIDER = "gemini"
+#: The provider used when none is configured (ADR 0005).
+#:
+#: Switched to OpenRouter with the model above, because the selected model is served
+#: there. The previous default was Gemini, and `gemini-3.8-flash` remains available and
+#: priced -- it is simply no longer what the tool picks for you.
+DEFAULT_PROVIDER = "openrouter"
 
 #: Providers this build can construct. A name outside this set fails closed rather
 #: than falling back to the default, because a silent provider substitution would
@@ -188,7 +199,11 @@ class Config:
             project_root=project_root,
             outputs_dir=outputs_dir,
             api_key=overrides.pop("api_key", None) or os.getenv("GEMINI_API_KEY") or None,
-            model=overrides.pop("model", None) or os.getenv("GEMINI_MODEL", DEFAULT_MODEL),
+            model=_resolve_model(
+                overrides.pop("model", None),
+                provider=provider,
+                env=os.environ,
+            ),
             temperature=float(overrides.pop("temperature", None) or os.getenv("GEMINI_TEMPERATURE", "0.3")),
             max_output_tokens=int(
                 overrides.pop("max_output_tokens", None) or os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8000")
@@ -357,6 +372,51 @@ class Config:
                 "Run `cvtailor doctor` to check your setup."
             )
         return self.api_key
+
+
+#: Environment variables that name a model, per provider. ``GEMINI_MODEL`` is
+#: **Gemini-specific**, and that distinction became load-bearing on 2026-10-27: the
+#: default provider moved to OpenRouter while the owner's ``.env`` still carried
+#: ``GEMINI_MODEL=gemini-3.8-flash``. Because the variable was read for *any* provider,
+#: it silently overrode the new default and the tool ran the old, ~30x more expensive
+#: model through OpenRouter -- where the bare name ``gemini-3.8-flash`` is not even a
+#: priced route, so its cost was reported from the wrong row.
+#:
+#: Nothing failed loudly. The call resolved to ``google/gemini-3.8-flash`` and returned a
+#: document, which is precisely why this needed fixing rather than documenting: a
+#: provider-specific setting must not decide another provider's model.
+PROVIDER_MODEL_ENV = {
+    "gemini": "GEMINI_MODEL",
+    "openrouter": "OPENROUTER_MODEL",
+}
+
+
+def _resolve_model(override, *, provider: str, env) -> str:
+    """The model to use, honouring only the selected provider's own variable.
+
+    Precedence: an explicit ``override``, then the provider-neutral ``CVTAILOR_MODEL``,
+    then the selected provider's own variable, then :data:`DEFAULT_MODEL`. A *different*
+    provider's variable is ignored on purpose -- see :data:`PROVIDER_MODEL_ENV`.
+
+    The neutral variable outranks the provider-specific one because it is the more
+    explicit statement of intent: a caller who sets ``CVTAILOR_MODEL`` has named the
+    model deliberately, whereas ``GEMINI_MODEL`` may simply be a leftover from a
+    previous configuration.
+    """
+    if override:
+        return override
+
+    neutral = (env.get("CVTAILOR_MODEL") or "").strip()
+    if neutral:
+        return neutral
+
+    own = PROVIDER_MODEL_ENV.get(provider)
+    if own:
+        value = (env.get(own) or "").strip()
+        if value:
+            return value
+
+    return DEFAULT_MODEL
 
 
 class ConfigError(Exception):

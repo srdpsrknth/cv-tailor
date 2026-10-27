@@ -128,25 +128,35 @@ class CandidateInputs:
 #:
 #: Each non-default entry records the **measured** error that forced it. An entry
 #: without one is an assumption, and `tests/test_evaluation_inputs.py` rejects it.
+#: How each candidate is asked. **One entry: the selected model.**
+#:
+#: The rejected candidates' profiles were removed with them (owner's decision,
+#: 2026-10-27). A model absent from this mapping is asked the **shipped** way, which is
+#: now the strict dialect -- the shape production sends.
+#:
+#: The adaptations that were measured during the study, kept for the next curation
+#: because each is a property of a *provider family* rather than of one model:
+#:
+#: * **OpenAI** strict mode requires ``additionalProperties: false`` on every object, and
+#:   cannot express a free-form map, so ``skills`` must be an array of ``{category,
+#:   items}``. Sending the Gemini-shaped schema returns
+#:   ``invalid_json_schema``.
+#: * **Anthropic behind Vertex** rejects a schema with more than 24 *optional*
+#:   parameters: ``Schemas contains too many optional parameters (27)... (limit: 24)``.
+#:   Requiring every field satisfies it, which the strict dialect now does globally.
+#: * **Google Gemini** rejects ``additionalProperties`` outright --
+#:   ``not supported in the Gemini API`` -- so that keyword must be stripped for it.
+#: * **Reasoning models** (`qwen3.8-flash`, `glm-5.3-flash`) spent an entire 8,000-token
+#:   budget on reasoning and returned an **empty** body. They need a higher ceiling; see
+#:   :data:`REASONING_MODEL_OUTPUT_TOKENS`.
+#:
+#: Each non-default entry records the **measured** error that forced it. An entry without
+#: one is an assumption, and `tests/test_evaluation_inputs.py` rejects it.
 CANDIDATE_INPUTS: tuple[CandidateInputs, ...] = (
     CandidateInputs(
-        model_id="deepseek/deepseek-v4-flash",
-        dialect=DIALECT_GEMINI,
-    ),
-    CandidateInputs(
-        model_id="anthropic/claude-haiku-5.5",
-        dialect=DIALECT_ANTHROPIC_VERTEX,
-        rationale=(
-            "Routed to Anthropic models behind Google Vertex, which rejects a schema "
-            "with more than 24 optional parameters: measured 'Schemas contains too many "
-            "optional parameters (27), which would make grammar compilation inefficient. "
-            "Reduce the number of optional parameters (limit: 24)'. The count of 27 is a "
-            "consequence of ADR 0012 leaving the document body optional, so satisfying "
-            "Vertex means requiring the body's fields for this candidate."
-        ),
-    ),
-    CandidateInputs(
         model_id="openai/gpt-6-luna",
+        # The selected model, and the reason the shipped schema is strict: its provider
+        # refuses anything else, so `evaluation` and production now agree by construction.
         dialect=DIALECT_STRICT,
         rationale=(
             "OpenAI's strict mode requires additionalProperties to be false on every "
@@ -154,48 +164,8 @@ CANDIDATE_INPUTS: tuple[CandidateInputs, ...] = (
             "('properties', 'cv'), 'additionalProperties' is required to be supplied and "
             "to be false'. It also cannot express a free-form map, so `skills` is asked "
             "for as an array of {category, items} rather than an object keyed by "
-            "category. Verified live: all three families then accept the request."
-        ),
-    ),
-    CandidateInputs(
-        model_id="qwen/qwen3.8-flash",
-        dialect=DIALECT_GEMINI,
-        max_output_tokens=REASONING_MODEL_OUTPUT_TOKENS,
-        output_rationale=(
-            "Spends its entire output budget on reasoning before writing. Measured "
-            "2026-10-27 against the real CV prompt: at 8,000 tokens it returned "
-            "finish_reason=length with 8,000 reasoning tokens and content_len=0, and at "
-            "16,000 the same; at 32,000 it produced a valid 4,974-character document. "
-            "The 8,000 ceiling is the Gemini-shaped default and is simply too low for "
-            "this model's output shape."
-        ),
-    ),
-    CandidateInputs(
-        model_id="z-ai/glm-5.3-flash",
-        dialect=DIALECT_GEMINI,
-        max_output_tokens=REASONING_MODEL_OUTPUT_TOKENS,
-        output_rationale=(
-            "Same failure as qwen3.8-flash, measured the same day: at an 8,000 ceiling "
-            "it returned 8,000 reasoning tokens with content_len=0. It succeeded from "
-            "16,000, where it finished with a 5,446-character document and 6,598 "
-            "reasoning tokens. At 32,000 it emitted 8,183 reasoning tokens of a "
-            "9,341-token output."
-        ),
-    ),
-    CandidateInputs(
-        model_id="mistralai/mistral-small-2603",
-        dialect=DIALECT_GEMINI,
-    ),
-    CandidateInputs(
-        model_id="google/gemini-3.8-flash",
-        dialect=DIALECT_GEMINI,
-    ),
-    CandidateInputs(
-        model_id="anthropic/claude-sonnet-5",
-        dialect=DIALECT_ANTHROPIC_VERTEX,
-        rationale=(
-            "Same family and same Vertex routing as claude-haiku-5.5, so the same "
-            "24-optional-parameter ceiling applies."
+            "category. The production schema was converted to match, so this entry now "
+            "documents the shape the pipeline sends rather than an evaluation-only one."
         ),
     ),
 )

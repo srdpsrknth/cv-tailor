@@ -175,58 +175,60 @@ NATURAL_COST_ORDER = ("economy", "balanced", "frontier")
 #: verdict on this task, no benchmark measures CV prose, and the leaderboards consulted
 #: warn that their rank predicts deployment only weakly.** They exist here to choose
 #: eight candidates worth paying to test, which is all they can support.
+#: The selected model. **One entry, because the tool makes the decision** -- the owner's
+#: original requirement, now backed by measurement rather than by a shortlist.
+#:
+#: **The study of 2026-10-26/27 measured eight candidates** (ADR 0016) and the owner chose
+#: `openai/gpt-6-luna`; the other seven are rejected and removed rather than kept as
+#: options. The measured figures, recorded here because the next curation needs to know
+#: what was compared:
+#:
+#: | rank | model | accepted | cost / accepted | outcome |
+#: |---|---|---|---|---|
+#: | 1 | `openai/gpt-6-luna` | 3/3 | **$0.00281** | **selected** |
+#: | 2 | `anthropic/claude-haiku-5.5` | 3/3 | $0.00594 | rejected |
+#: | 3 | `qwen/qwen3.8-flash` | 3/3 | $0.01269 | rejected |
+#: | 4 | `deepseek/deepseek-v4-flash` | 1/3 | $0.02036 | rejected |
+#: | 5 | `google/gemini-3.8-flash` | 2/3 | $0.08607 | rejected -- was the default |
+#: | 6 | `anthropic/claude-sonnet-5` | 3/3 | $0.13743 | rejected |
+#: | 7 | `z-ai/glm-5.3-flash` | 0/3 | none | rejected -- omits employer dates |
+#: | 8 | `mistralai/mistral-small-2603` | 0/3 | none | rejected -- never ran (429) |
+#:
+#: The winner was reproduced across **three** independent runs: 3/3 accepted with no
+#: correction calls every time, at roughly **30-40x lower cost per accepted result** than
+#: the default it replaced.
+#:
+#: **Two candidates were rejected on measured evidence before the study even ran**, and
+#: both would have looked like good value on a capability ranking:
+#:
+#: * `minimax/minimax-m3.1-flash` scores 42.7 on the Artificial Analysis Intelligence
+#:   Index but reports a **93% hallucination rate** on AA-Omniscience: when it does not
+#:   know, it answers anyway rather than abstaining. This tool's hardest rule is "do not
+#:   invent an achievement", so a model that never abstains is disqualified however cheap
+#:   it is. Its predecessor `minimax-m3` measures 18.4%, so the family's calibration moved
+#:   75 points in one release.
+#: * `google/gemini-2.5-flash-lite` (2025-07) is the cheapest thing that clears the
+#:   capability screen and is too old to keep under the owner's floor.
+#:
+#: **What the pre-study evidence could and could not do.** OpenRouter's listing supplied
+#: prices, ids, creation dates and the `structured_outputs` flag for all 467 models, of
+#: which 189 met every structural requirement. Constraint-following evidence came from
+#: IFBench and non-fabrication evidence from AA-Omniscience's hallucination rate. Neither
+#: is a verdict on this task -- **no benchmark measures CV prose**, and the leaderboards
+#: consulted warn their rank predicts deployment only weakly. They chose candidates worth
+#: paying to test, which is all they can support. The study then decided, and it
+#: contradicted them twice: `qwen3.8-flash` (81.3% IFBench) failed until our own output
+#: ceiling was fixed, and `glm-5.3-flash` (27.6% hallucination) fails on omitted dates.
 CURATED_MODELS: tuple[CuratedModel, ...] = (
-    # --- economy -----------------------------------------------------------------
-    CuratedModel(
-        id="deepseek/deepseek-v4-flash",
-        tier="economy",
-        label="DeepSeek V4 Flash",
-        guidance=(
-            "The cheapest option per run, and the only surviving entry from the "
-            "original shortlist. A very large output ceiling. Trial it on a role you "
-            "do not care much about."
-        ),
-        input_per_1m=0.091,
-        output_per_1m=0.182,
-        created="2026-04-24",
-        accepted=1,
-        attempted=3,
-        cost_per_accepted=0.02036,
-        measured_notes=(
-            'Variable across runs: 2/3 in both earlier studies, 1/3 in the corrected one, with no '
-            'correction calls recorded. The failures were word-count and truncation related '
-            'rather than factual. Treat its position as the least stable in the table.'
-        ),
-    ),
-    CuratedModel(
-        id="anthropic/claude-haiku-5.5",
-        tier="economy",
-        label="Claude Haiku 5.5",
-        guidance=(
-            "Anthropic's small model at an economy price -- a fifth of Claude Sonnet "
-            "5 per run. The interesting question this entry answers is whether the "
-            "expensive end is needed at all."
-        ),
-        input_per_1m=0.100,
-        output_per_1m=0.500,
-        created="2026-10-07",
-        accepted=3,
-        attempted=3,
-        cost_per_accepted=0.00594,
-        measured_notes=(
-            '3/3 accepted with no correction calls, at about a fifth of Claude Sonnet 5 per '
-            'accepted result -- so the expensive end of its own family is not needed for this '
-            'task. Asked in the anthropic-vertex dialect.'
-        ),
-    ),
     CuratedModel(
         id="openai/gpt-6-luna",
         tier="economy",
-        label="GPT-6 Luna",
+        label="GPT-6 Luna (selected)",
         guidance=(
-            "OpenAI's newest small model, priced with the economy tier. Paired with "
-            "Haiku 5.5 to test whether a current small model from a frontier lab "
-            "matches a mid-price specialist on this task."
+            "The model this tool uses. Selected by measurement: it accepted every "
+            "evaluation case with no correction calls, at a fraction of the cost of the "
+            "model it replaced, while keeping every employer and date and meeting the "
+            "letter's word budget."
         ),
         input_per_1m=0.100,
         output_per_1m=0.500,
@@ -235,122 +237,10 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=0.00281,
         measured_notes=(
-            'WINNER in all three runs. 3/3 accepted with no correction calls every time, at '
-            'roughly 40x less than the incumbent default per accepted result. Asked in the strict '
-            'dialect.'
-        ),
-    ),
-    # --- balanced ----------------------------------------------------------------
-    CuratedModel(
-        id="qwen/qwen3.8-flash",
-        tier="balanced",
-        label="Qwen3.8 Flash",
-        guidance=(
-            "Strong measured constraint-following (81.3% on IFBench) at a low price. "
-            "A different family from everything else here."
-        ),
-        input_per_1m=0.150,
-        output_per_1m=0.470,
-        created="2026-08-26",
-        accepted=3,
-        attempted=3,
-        cost_per_accepted=0.01269,
-        measured_notes=(
-            'CORRECTED, and the correction matters. Recorded as 0/3 in the first study, which was '
-            "this project's error rather than the model's: at the default 8,000-token ceiling it "
-            'returned finish_reason=length with 8,000 reasoning tokens and an EMPTY body -- a '
-            'reasoning model spends its budget thinking before writing. Given a 32,000 ceiling it '
-            'accepts 3/3 with no correction calls. Its strong public constraint-following '
-            'evidence was right and the harness defeated it.'
-        ),
-    ),
-    CuratedModel(
-        id="z-ai/glm-5.3-flash",
-        tier="balanced",
-        label="GLM-5.3 Flash",
-        guidance=(
-            "High measured intelligence at a flash price, with a low hallucination "
-            "rate (27.6%) -- which matters here, because the failure this tool most "
-            "needs to avoid is a confidently invented achievement."
-        ),
-        input_per_1m=0.150,
-        output_per_1m=0.500,
-        created="2026-08-26",
-        accepted=0,
-        attempted=3,
-        cost_per_accepted=None,
-        measured_notes=(
-            'A GENUINE defect, confirmed at a raised ceiling. It omits role, start_date and '
-            'end_date from EVERY work-experience entry -- the fields the factual gate exists to '
-            'protect -- and does so at 32,000 tokens as well as 8,000, so unlike qwen3.8-flash '
-            'this is not a budget artifact. It emits a well-formed document with the dates '
-            'missing, which is precisely the failure that must not ship.'
-        ),
-    ),
-    CuratedModel(
-        id="mistralai/mistral-small-2603",
-        tier="balanced",
-        label="Mistral Small 4",
-        guidance=(
-            "The entry with the strongest *documented* schema guarantee: Mistral's own "
-            "API reference specifies json_schema with strict enforcement, rather than "
-            "leaving it to be inferred from a catalogue flag."
-        ),
-        input_per_1m=0.150,
-        output_per_1m=0.600,
-        created="2026-03-16",
-        accepted=0,
-        attempted=3,
-        cost_per_accepted=None,
-        measured_notes=(
-            'INCONCLUSIVE, not failed, and reproducibly so across three runs: every call was '
-            'rate-limited (HTTP 429) by its upstream provider. A longer backoff (8s/16s) did not '
-            'outlast it. It never produced a document to judge, so no verdict about the model is '
-            'warranted either way.'
-        ),
-    ),
-    # --- frontier ----------------------------------------------------------------
-    CuratedModel(
-        id="google/gemini-3.8-flash",
-        tier="frontier",
-        label="Gemini 3.8 Flash (the default)",
-        guidance=(
-            "The control. This is the model the project already uses for real "
-            "applications, so every other entry is measured against something known "
-            "rather than against a leaderboard. Through OpenRouter it costs slightly "
-            "more than going direct to Google."
-        ),
-        input_per_1m=0.825,
-        output_per_1m=4.125,
-        created="2026-09-02",
-        accepted=2,
-        attempted=3,
-        cost_per_accepted=0.08607,
-        measured_notes=(
-            'The incumbent default, kept as the control. Accepted 3/3 in the two earlier runs and '
-            "2/3 in the corrected one, at roughly 30x the winner's cost per accepted result. This "
-            'is the number a switch would be justified against.'
-        ),
-    ),
-    CuratedModel(
-        id="anthropic/claude-sonnet-5",
-        tier="frontier",
-        label="Claude Sonnet 5",
-        guidance=(
-            "The expensive end, for a posting where the writing quality matters most. "
-            "Roughly 20x the cheapest entry per run, so use it deliberately -- and "
-            "note that Haiku 5.5 above exists to test whether it is worth it."
-        ),
-        input_per_1m=2.00,
-        output_per_1m=10.00,
-        created="2026-06-30",
-        accepted=3,
-        attempted=3,
-        cost_per_accepted=0.13743,
-        measured_notes=(
-            'The most expensive candidate and the poorest value: 3/3 accepted with no correction '
-            "calls, for about 50x the winner's cost per accepted result. It works reliably and "
-            'the measurement says it is not worth it here.'
+            'SELECTED. 3/3 accepted with no correction calls in all three independent '
+            'runs, at $0.00281 per accepted result against the previous default at '
+            '$0.08607-$0.11384. Asked in the strict dialect, which the production path '
+            'now sends.'
         ),
     ),
 )
