@@ -35,7 +35,7 @@ from services.cache_store import (
     rules_fingerprint,
     serialize_profile_bytes,
 )
-from services.gemini_service import GeminiService
+from services.llm_service import LLMService
 from services.profile_store import (
     ProfileMismatchError,
     UnknownProfileError,
@@ -241,7 +241,7 @@ def tailor_documents(
     rules: Optional[ProfileRules] = None,
     profile_id: Optional[str] = None,
     use_cache: bool = True,
-    service: Optional["GeminiService"] = None,
+    service: Optional["LLMService"] = None,
 ) -> TailorResponse:
     """Produce a two-page CV and a one-page cover letter, and persist them.
 
@@ -274,9 +274,9 @@ def tailor_documents(
         if config is None:
             config = Config.from_env(load_env_file=False, overrides={"project_root": PROJECT_ROOT})
             # Constructed with no arguments so an injected double can stand in for it.
-            service = GeminiService()
+            service = LLMService()
         else:
-            service = GeminiService(config=config)
+            service = LLMService(config=config)
 
     # Fail closed, and fail *early*: an unresolvable candidate must cost nothing and
     # must not leave a half-written folder behind.

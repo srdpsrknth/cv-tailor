@@ -130,8 +130,8 @@ def offline_service(monkeypatch):
     def install(texts, inputs_per_call=100, outputs_per_call=20) -> OfflineGemini:
         offline = OfflineGemini(texts, inputs_per_call, outputs_per_call)
         created.append(offline)
-        # `tailor_documents` calls GeminiService() with no arguments.
-        monkeypatch.setattr(service, 'GeminiService', lambda *a, **kw: offline)
+        # `tailor_documents` calls LLMService() with no arguments.
+        monkeypatch.setattr(service, 'LLMService', lambda *a, **kw: offline)
         return offline
 
     install.created = created

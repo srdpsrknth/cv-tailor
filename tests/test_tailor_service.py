@@ -72,9 +72,9 @@ def configure(monkeypatch, tmp_path, profile, pages, responses):
     # ``<tmp_path>/outputs`` -- exactly what these tests assert against.
     monkeypatch.setenv('OUTPUTS_DIR', str(tmp_path / 'mirror'))
     fake = Mock()
-    fake._call_gemini.side_effect = [(text, 100, 20) for text in responses]
+    fake._call_provider.side_effect = [(text, 100, 20) for text in responses]
     fake.calculate_token_usage.side_effect = lambda **kw: TokenUsage(**kw, model_name='test')
-    monkeypatch.setattr(service, 'GeminiService', lambda: fake)
+    monkeypatch.setattr(service, 'LLMService', lambda: fake)
     page_counts = iter(pages)
     def latex_factory(outputs_dir):
         renderer = Mock()
@@ -111,7 +111,7 @@ def test_length_retry_accepts_fenced_json_and_saves_final_content(monkeypatch, t
     assert Path(result.cv_path).read_bytes() == (Path(result.source_path).parent.parent / 'CV.pdf').read_bytes()
     history = json.loads(Path(result.source_path).with_name('generation_result.json').read_text())
     assert history['cv_page_history'] == [3, 2]
-    assert shorter['summary'][0] in fake._call_gemini.call_args_list[-1].args[0] or 'CURRENT CV:' in fake._call_gemini.call_args_list[-1].args[0]
+    assert shorter['summary'][0] in fake._call_provider.call_args_list[-1].args[0] or 'CURRENT CV:' in fake._call_provider.call_args_list[-1].args[0]
 
 
 def test_three_page_cv_is_never_reported_as_success(monkeypatch, tmp_path, profile):
@@ -133,7 +133,7 @@ def test_short_letter_is_corrected_instead_of_silently_accepted(monkeypatch, tmp
                      [cv, json.dumps({'cover_letter': short}), json.dumps({'cover_letter': cl_data()})])
     result = service.tailor_documents('A sufficiently detailed job description.', profile)
     assert result.token_usage.cl_attempts == 2
-    assert '8 words' in fake._call_gemini.call_args_list[-1].args[0]
+    assert '8 words' in fake._call_provider.call_args_list[-1].args[0]
 
 
 def test_truncated_json_and_unreadable_pdf_fail():
@@ -155,7 +155,7 @@ def test_selected_country_controls_prompt_header_and_saved_context(monkeypatch, 
     saved = json.loads(Path(result.source_path).read_text())
     assert saved['work_country'] == country
     assert saved['cv']['work_authorization'] == 'German EU Blue Card holder'
-    assert all(f'explicit user selection; overrides country inference): {country}' in call.args[0] for call in fake._call_gemini.call_args_list)
+    assert all(f'explicit user selection; overrides country inference): {country}' in call.args[0] for call in fake._call_provider.call_args_list)
 
 
 def test_streamlit_passes_selected_work_country(monkeypatch):

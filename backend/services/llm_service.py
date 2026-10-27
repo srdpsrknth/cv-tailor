@@ -16,7 +16,7 @@ from services.generation import response_schema_for
 from services.provider import ProviderError, build_provider
 
 # Re-exported for callers that only need the model name or the table.
-__all__ = ["GeminiService", "GeminiServiceError", "PRICING", "DEFAULT_MODEL", "ProviderError"]
+__all__ = ["LLMService", "LLMServiceError", "PRICING", "DEFAULT_MODEL", "ProviderError"]
 
 #: Re-exported **view** of the single pricing table, for callers that still import it
 #: from here. It is a derived mapping, not a second table: it exposes the Gemini-route
@@ -44,22 +44,22 @@ PRICING = {
 }
 
 
-class GeminiServiceError(ProviderError):
+class LLMServiceError(ProviderError):
     """Custom exception for provider service errors.
 
     Kept as a subclass of :class:`~services.provider.ProviderError` so existing
-    ``except GeminiServiceError`` clauses keep catching what they always did, while
+    ``except LLMServiceError`` clauses keep catching what they always did, while
     new code can catch the provider-neutral type.
     """
 
     pass
 
 
-class GeminiService:
+class LLMService:
     """Drives a provider through the interface ADR 0005 specifies.
 
     The name is historical: this is now the pipeline's *client* of whatever
-    provider ``config`` names, and ``_call_gemini`` is the one call site the
+    provider ``config`` names, and ``_call_provider`` is the one call site the
     generation pipeline uses. Renaming it is deliberately left to a later,
     separately verified increment so that this refactor changes no call count and
     no prompt byte.
@@ -144,7 +144,7 @@ class GeminiService:
             input_tokens, output_tokens, model or self.model, provider=provider,
         )
 
-    def _call_gemini(
+    def _call_provider(
         self,
         prompt: str,
         max_retries: int = 3,
@@ -169,7 +169,7 @@ class GeminiService:
             Tuple of (response_text, input_tokens, output_tokens)
 
         Raises:
-            GeminiServiceError: If the call fails after retries
+            LLMServiceError: If the call fails after retries
         """
         # The schema is per *call*, not per service: the draft and the letter always
         # return one complete document, so they are constrained; a layout retry may
@@ -216,7 +216,7 @@ class GeminiService:
                 model=routed_model,
             )
         except ProviderError as error:
-            raise GeminiServiceError(str(error)) from error
+            raise LLMServiceError(str(error)) from error
 
         # The cap is checked against the running spend *before* the next call is made,
         # so a run stops at the budget instead of discovering the overrun afterwards.
@@ -245,7 +245,7 @@ class GeminiService:
         report only tokens (Gemini) and for anything that fails to report.
 
         Raises:
-            GeminiServiceError: when the configured cap has been reached. It is raised
+            LLMServiceError: when the configured cap has been reached. It is raised
                 *after* accumulating, so the reported spend includes the call that hit
                 the limit, and before the pipeline issues another paid request.
         """
@@ -264,7 +264,7 @@ class GeminiService:
         # concept means "no cap configured", not "crash on every call".
         budget_exceeded = getattr(self.config, "budget_exceeded", None)
         if budget_exceeded is not None and budget_exceeded(self.spent_usd):
-            raise GeminiServiceError(
+            raise LLMServiceError(
                 f"Cost cap reached: ${self.spent_usd:.6f} spent against "
                 f"CVTAILOR_MAX_COST_USD=${self.config.max_cost_usd:.6f} after "
                 f"{self.calls_made} call(s). No further requests were made."

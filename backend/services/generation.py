@@ -1078,7 +1078,7 @@ class DocumentGenerator:
                 if last_error
                 else ""
             )
-            response, inputs, outputs = self.service._call_gemini(
+            response, inputs, outputs = self.service._call_provider(
                 prompt + feedback, kind=kind, allow_delta=base_cv is not None,
             )
             self.counts[kind].add(inputs, outputs)

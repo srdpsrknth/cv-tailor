@@ -1,7 +1,7 @@
 """Phase 3, item 3: structured output (`response_schema`) is on, and scoped safely.
 
-`_call_gemini` deliberately did **not** set `response_mime_type="application/json"`.
-The comment at `gemini_service.py:135-137` recorded why -- it caused premature
+`_call_provider` deliberately did **not** set `response_mime_type="application/json"`.
+The comment at `llm_service.py:135-137` recorded why -- it caused premature
 truncation of long document responses -- and that comment is the reason the original
 `response_schema` code was deleted as dead in Phase 1 (D-1).
 
@@ -209,7 +209,7 @@ def test_a_draft_call_sends_the_schema_and_json_mime_type(monkeypatch):
     """The CV draft is the call the schema is for: its response is always a document."""
     sent = _capture_configs(monkeypatch)
 
-    _service_without_network()._call_gemini('draft prompt', kind='cv')
+    _service_without_network()._call_provider('draft prompt', kind='cv')
 
     config = sent[-1]
     assert config.response_mime_type == 'application/json'
@@ -219,7 +219,7 @@ def test_a_draft_call_sends_the_schema_and_json_mime_type(monkeypatch):
 def test_a_letter_call_sends_its_own_schema(monkeypatch):
     sent = _capture_configs(monkeypatch)
 
-    _service_without_network()._call_gemini('letter prompt', kind='cover_letter')
+    _service_without_network()._call_provider('letter prompt', kind='cover_letter')
 
     assert sent[-1].response_schema == generation.RESPONSE_SCHEMAS['cover_letter']
 
@@ -239,7 +239,7 @@ def test_a_layout_retry_sends_no_schema(monkeypatch):
     """
     sent = _capture_configs(monkeypatch)
 
-    _service_without_network()._call_gemini('retry brief', kind='cv', allow_delta=True)
+    _service_without_network()._call_provider('retry brief', kind='cv', allow_delta=True)
 
     assert sent[-1].response_schema is None
     assert sent[-1].response_mime_type is None
@@ -254,7 +254,7 @@ def test_an_unknown_kind_is_not_given_a_schema(monkeypatch):
     """
     sent = _capture_configs(monkeypatch)
 
-    _service_without_network()._call_gemini('prompt', kind='some_future_document')
+    _service_without_network()._call_provider('prompt', kind='some_future_document')
 
     assert sent[-1].response_schema is None
 
@@ -264,8 +264,8 @@ def test_the_schema_choice_comes_from_the_caller_not_the_prompt(monkeypatch):
     sent = _capture_configs(monkeypatch)
     gemini = _service_without_network()
 
-    gemini._call_gemini('same prompt text', kind='cv')
-    gemini._call_gemini('same prompt text', kind='cover_letter')
+    gemini._call_provider('same prompt text', kind='cv')
+    gemini._call_provider('same prompt text', kind='cover_letter')
 
     assert sent[0].response_schema != sent[1].response_schema
 
@@ -538,24 +538,24 @@ def _capture_configs(monkeypatch):
 
 
 def _service_without_network(api_key: str = 'unit-test-key'):
-    """A `GeminiService` whose client is the recording one, built without credentials.
+    """A `LLMService` whose client is the recording one, built without credentials.
 
     ``_capture_configs`` has already replaced ``genai.Client``, so the constructor
     picks up the recording client. The key is a literal placeholder: nothing reads the
     environment, and no request can leave the process.
     """
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     class _Config:
         model = 'gemini-3.8-flash'
         temperature = 0.3
         max_output_tokens = 8000
 
-    return GeminiService(config=_Config(), api_key=api_key)
+    return LLMService(config=_Config(), api_key=api_key)
 
 
 class _CannedResponse:
-    """Just enough of a provider response for `_call_gemini` to return cleanly."""
+    """Just enough of a provider response for `_call_provider` to return cleanly."""
 
     candidates: list = []
     usage_metadata = None

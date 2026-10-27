@@ -40,7 +40,7 @@ class TokenUsage(BaseModel):
     cv_attempts: int = 1
     cl_attempts: int = 1
     #: Which model produced this run. **Required**: every construction site passes it
-    #: (``gemini_service.calculate_token_usage`` sets ``model_name=self.model``), so a
+    #: (``llm_service.calculate_token_usage`` sets ``model_name=self.model``), so a
     #: default would be unreachable code. It used to default to the literal
     #: ``"gemini-2.5-flash"``, which was misleading twice over -- it named a model this
     #: project does not use, and it implied a usage record could exist without knowing

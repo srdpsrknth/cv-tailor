@@ -211,16 +211,16 @@ def test_no_schema_means_no_constraint_on_gemini(monkeypatch):
 
 
 def test_the_service_passes_none_through_for_the_layout_retry(monkeypatch):
-    """Driven through ``_call_gemini``, which is where the scope is decided.
+    """Driven through ``_call_provider``, which is where the scope is decided.
 
     The retry's response may be a delta of unit ids with no document key, so it must
     reach the provider with no schema -- exactly as it did before this refactor.
     """
     configs = _record_gemini_configs(monkeypatch)
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(config=_StubConfig(), api_key='k')
-    service._call_gemini('retry brief', kind='cv', allow_delta=True)
+    service = LLMService(config=_StubConfig(), api_key='k')
+    service._call_provider('retry brief', kind='cv', allow_delta=True)
 
     assert configs[-1].response_schema is None
     assert configs[-1].response_mime_type is None
@@ -228,11 +228,11 @@ def test_the_service_passes_none_through_for_the_layout_retry(monkeypatch):
 
 def test_the_service_still_constrains_the_draft_and_the_letter(monkeypatch):
     configs = _record_gemini_configs(monkeypatch)
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(config=_StubConfig(), api_key='k')
-    service._call_gemini('draft', kind='cv')
-    service._call_gemini('letter', kind='cover_letter')
+    service = LLMService(config=_StubConfig(), api_key='k')
+    service._call_provider('draft', kind='cv')
+    service._call_provider('letter', kind='cover_letter')
 
     assert configs[0].response_schema == generation.RESPONSE_SCHEMAS['cv']
     assert configs[1].response_schema == generation.RESPONSE_SCHEMAS['cover_letter']
@@ -241,10 +241,10 @@ def test_the_service_still_constrains_the_draft_and_the_letter(monkeypatch):
 def test_an_unknown_kind_is_still_sent_no_schema(monkeypatch):
     """A future document type must not inherit the CV's constraints by accident."""
     configs = _record_gemini_configs(monkeypatch)
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(config=_StubConfig(), api_key='k')
-    service._call_gemini('prompt', kind='some_future_document')
+    service = LLMService(config=_StubConfig(), api_key='k')
+    service._call_provider('prompt', kind='some_future_document')
 
     assert configs[-1].response_schema is None
 
@@ -692,16 +692,16 @@ def test_the_layout_retry_task_routes_to_its_configured_model(monkeypatch):
             sent.append({'schema': schema, 'model': model})
             return ProviderResponse(text='{"cv": {"title": "Recorded"}}', input_tokens=1, output_tokens=1)
 
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(
+    service = LLMService(
         config=_StubConfig(task_models={'layout_retry': 'cheap-model', 'cv': 'strong-model'}),
         api_key='k',
     )
     service.provider = RecordingProvider()
 
-    service._call_gemini('draft', kind='cv')
-    service._call_gemini('retry', kind='cv', allow_delta=True)
+    service._call_provider('draft', kind='cv')
+    service._call_provider('retry', kind='cv', allow_delta=True)
 
     assert sent[0]['model'] == 'strong-model'
     assert sent[1]['model'] == 'cheap-model'
@@ -710,12 +710,12 @@ def test_the_layout_retry_task_routes_to_its_configured_model(monkeypatch):
 def test_the_configured_provider_is_used_for_a_real_call(monkeypatch):
     """End of the wiring: selecting OpenRouter routes the pipeline's call to it."""
     sent = _record_openrouter_requests(monkeypatch)
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(
+    service = LLMService(
         config=_StubConfig(provider='openrouter', openrouter_api_key='k', model='vendor/model')
     )
-    service._call_gemini('draft', kind='cv')
+    service._call_provider('draft', kind='cv')
 
     assert sent[-1]['url'] == provider_module.OPENROUTER_CHAT_URL
     assert sent[-1]['json']['model'] == 'vendor/model'
@@ -753,7 +753,7 @@ def test_the_cap_stops_further_calls(monkeypatch):
 
     from config import Config
     from services import pricing
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     # The token count is derived from the **actual** default price rather than hard-coded,
     # so this keeps testing the cap when the default model changes. It previously reported
@@ -776,11 +776,11 @@ def test_the_cap_stops_further_calls(monkeypatch):
             )
 
     config = Config.from_env(load_env_file=False, overrides={'max_cost_usd': 1.0})
-    service = GeminiService(config=config, api_key='k')
+    service = LLMService(config=config, api_key='k')
     service.provider = RecordingProvider()
 
     with pytest.raises(Exception, match='Cost cap reached'):
-        service._call_gemini('draft', kind='cv')
+        service._call_provider('draft', kind='cv')
 
     assert len(calls) == 1, 'the cap must stop the *next* call, and this one is the first'
     assert service.spent_usd > 1.0
@@ -793,13 +793,13 @@ def test_spend_is_accumulated_per_call_and_reported(monkeypatch):
         def generate(self, prompt, *, schema=None, max_tokens=None, model=None):
             return ProviderResponse(text='{}', input_tokens=1_000_000, output_tokens=0)
 
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(config=_StubConfig(), api_key='k')
+    service = LLMService(config=_StubConfig(), api_key='k')
     service.provider = RecordingProvider()
 
-    service._call_gemini('a', kind='cv')
-    service._call_gemini('b', kind='cover_letter')
+    service._call_provider('a', kind='cv')
+    service._call_provider('b', kind='cover_letter')
 
     assert service.calls_made == 2
     # 2 x 1M input tokens at $0.75/1M.
@@ -808,9 +808,9 @@ def test_spend_is_accumulated_per_call_and_reported(monkeypatch):
 
 def test_a_routed_model_is_priced_as_itself_not_as_the_default():
     """Model-per-task routing means one run can bill against several models."""
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
-    service = GeminiService(config=_StubConfig(), api_key='k')
+    service = LLMService(config=_StubConfig(), api_key='k')
 
     cheap = service._estimate_cost(1_000_000, 0, model='gemini-2.5-flash-lite')
     strong = service._estimate_cost(1_000_000, 0, model='gemini-3.8-flash')
@@ -833,13 +833,13 @@ def test_a_provider_failure_raises_and_does_not_retry_elsewhere(monkeypatch):
             attempts.append(model)
             raise ProviderError('simulated provider outage')
 
-    from services.gemini_service import GeminiService, GeminiServiceError
+    from services.llm_service import LLMService, LLMServiceError
 
-    service = GeminiService(config=_StubConfig(), api_key='k')
+    service = LLMService(config=_StubConfig(), api_key='k')
     service.provider = FailingProvider()
 
-    with pytest.raises(GeminiServiceError, match='simulated provider outage'):
-        service._call_gemini('draft', kind='cv')
+    with pytest.raises(LLMServiceError, match='simulated provider outage'):
+        service._call_provider('draft', kind='cv')
 
     assert len(attempts) == 1, 'a provider failure must not be retried on another provider'
 
@@ -854,10 +854,10 @@ def test_provider_error_is_not_a_value_error():
 
 
 def test_the_service_error_stays_compatible_with_the_provider_error():
-    """Existing ``except GeminiServiceError`` clauses keep catching what they did."""
-    from services.gemini_service import GeminiServiceError
+    """Existing ``except LLMServiceError`` clauses keep catching what they did."""
+    from services.llm_service import LLMServiceError
 
-    assert issubclass(GeminiServiceError, ProviderError)
+    assert issubclass(LLMServiceError, ProviderError)
 
 
 # --- the call-count baseline is unchanged --------------------------------------------------------
@@ -866,14 +866,14 @@ def test_the_call_counts_are_unchanged_by_the_provider_refactor():
     """2 / 3 / 5 must survive: the interface adds routing, not calls."""
     import inspect
 
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
     from services import generation as generation_module
 
     # One provider call per generate() attempt, exactly as before.
     source = inspect.getsource(generation_module.DocumentGenerator.generate)
-    assert source.count('self.service._call_gemini(') == 1
+    assert source.count('self.service._call_provider(') == 1
     # The service delegates once, so there is no second call site hiding here.
-    assert inspect.getsource(GeminiService._call_gemini).count('self.provider.generate(') == 1
+    assert inspect.getsource(LLMService._call_provider).count('self.provider.generate(') == 1
 
 
 def test_the_happy_path_still_makes_two_calls_driven_through_the_pipeline(
@@ -1036,7 +1036,7 @@ def test_gemini_reports_no_cost_because_the_api_has_none():
     import sys
     import types
 
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     class _Usage:
         prompt_token_count = 100
@@ -1060,8 +1060,8 @@ def test_gemini_reports_no_cost_because_the_api_has_none():
 
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(provider_module.genai, 'Client', _Client)
-        service = GeminiService(config=config)
-        text, _, _ = service._call_gemini('prompt', kind='cv')
+        service = LLMService(config=config)
+        text, _, _ = service._call_provider('prompt', kind='cv')
 
     assert text == '{}'
     # The service tracked the call, and priced it from the table rather than a report.
@@ -1080,7 +1080,7 @@ def test_thinking_tokens_are_counted_as_output():
     import sys
     import types
 
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     class _Usage:
         prompt_token_count = 100
@@ -1103,8 +1103,8 @@ def test_thinking_tokens_are_counted_as_output():
     config = _StubConfig(provider='gemini')
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(provider_module.genai, 'Client', _Client)
-        service = GeminiService(config=config)
-        _, _, output_tokens = service._call_gemini('prompt', kind='cv')
+        service = LLMService(config=config)
+        _, _, output_tokens = service._call_provider('prompt', kind='cv')
 
     assert output_tokens == 750, 'thinking tokens are billed as output and must be counted'
 
@@ -1117,7 +1117,7 @@ def test_a_reported_cost_replaces_the_table_in_the_run_total(monkeypatch):
     two disagree here on purpose, so passing this test requires the reported figure to
     have won.
     """
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     class _Config(_StubConfig):
         provider = 'openrouter'
@@ -1130,7 +1130,7 @@ def test_a_reported_cost_replaces_the_table_in_the_run_total(monkeypatch):
             return False
 
     config = _Config()
-    service = object.__new__(GeminiService)
+    service = object.__new__(LLMService)
     service.config = config
     service.model = config.model
     service.spent_usd = 0.0
@@ -1149,13 +1149,13 @@ def test_a_reported_cost_replaces_the_table_in_the_run_total(monkeypatch):
 
 def test_a_run_with_no_report_falls_back_to_the_table():
     """Gemini reports no cost, so the table must still price the run."""
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     class _Config(_StubConfig):
         provider = 'gemini'
 
     config = _Config()
-    service = object.__new__(GeminiService)
+    service = object.__new__(LLMService)
     service.config = config
     service.model = 'gemini-3.8-flash'
     service.spent_usd = 0.0

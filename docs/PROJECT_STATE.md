@@ -302,7 +302,7 @@ scopes structured output *per call*, and one call (the layout retry) must send *
 because its response may be a delta of unit ids with no document key. The provider layer receives
 `schema=None` on that call and passes it through as "send no constraint" on **both** providers, so
 a provider swap cannot quietly turn the retry into a constrained call. `response_schema_for`
-remains the single decision point; `_call_gemini` is still the single call site.
+remains the single decision point; `_call_provider` is still the single call site.
 
 **OpenRouter's schema envelope is not Gemini's, so it is translated rather than passed through.**
 Their contract is `response_format={"type": "json_schema", "json_schema": {"name", "strict",
@@ -372,7 +372,7 @@ the curated set are new code with no predecessor, so there is no old behaviour t
 and the file guards the new code's properties instead.
 
 **No existing test was modified in behaviour.** One seam moved:
-`tests/test_structured_output.py` patched `gemini_service.genai.Client` and now patches
+`tests/test_structured_output.py` patched `llm_service.genai.Client` and now patches
 `provider.genai.Client`, which is where the request is built. **No assertion changed** — those
 tests still inspect the real `GenerateContentConfig`, so they remain a check of what is *sent*.
 
@@ -408,7 +408,7 @@ committed; item 6's offline groundwork is done. Nothing else in the agreed order
 | Area | Why it matters |
 |---|---|
 | `services/provider.py` | The one place a request is built. `schema=None` must stay meaning "send no constraint" |
-| `services/gemini_service.py` | `_call_gemini` is still the only pipeline call site; `PRICING` here is a **derived view**, not a table |
+| `services/llm_service.py` | `_call_provider` is still the only pipeline call site; `PRICING` here is a **derived view**, not a table |
 | `services/pricing.py` | The single pricing source (D-4). A new row needs a dated entry in `PRICE_SOURCES` |
 | `evaluation/curated_models.py` | The curated set and the UNMEASURED markers |
 | `evaluation/live.py` | The **only** place a paid call can originate; imported lazily, only after the cap check |
@@ -430,7 +430,7 @@ item 5 section at the top of this file.
 
 ### Phase 3, increment 3 — enable structured output, scoped (2026-10-26)
 
-**What changed.** `_call_gemini` now sends
+**What changed.** `_call_provider` now sends
 `response_mime_type="application/json"` together with a `response_schema`, **but only on
 the calls whose response is always one complete document**: the CV draft and the cover
 letter. The layout retry is deliberately left unconstrained, because since item 1 its
@@ -439,7 +439,7 @@ response may be a **delta** — an object of unit ids such as
 cannot express. Recorded in [ADR 0012](DECISIONS/0012-structured-output-scope.md).
 
 **Why scoping is the answer to the truncation question, not a dodge.** The comment at the
-old `gemini_service.py:135-137` recorded that JSON mode *caused premature truncation of
+old `llm_service.py:135-137` recorded that JSON mode *caused premature truncation of
 long document responses*, and that comment is why the original `response_schema` code was
 deleted as dead (D-1). The anti-truncation property is therefore **designed into the
 schema** rather than hoped for:
@@ -515,7 +515,7 @@ Every entry in its blast-radius list was addressed:
   delta**, which is asserted by `test_a_layout_retry_sends_no_schema`;
 - **`extract_explanation`** — both shapes still work; the schema permits the top-level and
   the nested explanation and requires neither, and both are exercised end to end;
-- **`_call_gemini`** — config, `max_output_tokens` and the retry loop are otherwise
+- **`_call_provider`** — config, `max_output_tokens` and the retry loop are otherwise
   unchanged, and **neither the provider nor the model was changed** (decision 7);
 - **Both fixture transcripts** — deliberately *not* regenerated, because the response shape
   did not change; the two remain in step with each other;
@@ -526,10 +526,10 @@ Every entry in its blast-radius list was addressed:
 The briefing that stood here was **discharged** by the item 6 section at the top of this file.
 Every entry in its blast-radius list was addressed:
 
-- **`services/gemini_service.py`** — `_call_gemini` is still the only pipeline call site; the
+- **`services/llm_service.py`** — `_call_provider` is still the only pipeline call site; the
   pricing table moved to `services/pricing.py` (D-3, D-4 resolved), and `PRICING` here is now a
   **derived view** of that one table, not a second copy;
-- **`_call_gemini`'s `kind` / `allow_delta`** — unchanged; `response_schema_for` still selects the
+- **`_call_provider`'s `kind` / `allow_delta`** — unchanged; `response_schema_for` still selects the
   schema per call, and `schema=None` now reaches the provider as an explicit "send no constraint",
   asserted on **both** providers by `tests/test_provider_interface.py`;
 - **`generation.RESPONSE_SCHEMAS`** — unchanged and still provider-specific in shape; the
@@ -543,7 +543,7 @@ Every entry in its blast-radius list was addressed:
 - **`tests/test_tailoring_pipeline.py`** — still pins the pricing invariants and still passes
   **unchanged**;
 - **`tests/test_structured_output.py`** — still pins the per-call schema scope on the real
-  `GenerateContentConfig`. One monkeypatch seam moved (`gemini_service.genai` → `provider.genai`);
+  `GenerateContentConfig`. One monkeypatch seam moved (`llm_service.genai` → `provider.genai`);
   **no assertion changed**;
 - **`tests/test_editorial_instructions.py`** — still pins 2/3/5 and still passes unchanged.
 
@@ -602,8 +602,8 @@ one step item 6 still owes.
 
 | Area | Outcome |
 |---|---|
-| `services/gemini_service.py` | Still the only pipeline call site. Pricing moved out to `services/pricing.py`; `PRICING` here is a **derived view**, not a table |
-| `_call_gemini`'s `kind` / `allow_delta` | Preserved. `schema=None` reaches the provider as "send no constraint" on **both** providers |
+| `services/llm_service.py` | Still the only pipeline call site. Pricing moved out to `services/pricing.py`; `PRICING` here is a **derived view**, not a table |
+| `_call_provider`'s `kind` / `allow_delta` | Preserved. `schema=None` reaches the provider as "send no constraint" on **both** providers |
 | `services/generation.py` `RESPONSE_SCHEMAS` | Unchanged shape; OpenRouter **translates** it into its own `response_format` rather than receiving a neutral object |
 | `config.py` | `provider`, `openrouter_api_key`, `task_models`, `max_cost_usd` added — read once in `from_env()`, frozen, Gemini still the default, `DEFAULT_MODEL` still priced |
 | `ui/app.py` | No longer duplicates the pricing table (D-4); a test fails if a model-keyed table grows back |
@@ -705,7 +705,7 @@ is exactly what this increment replaces — none was "fixed" to make a broken ch
 `shorter['summary'][0] in ... or 'CURRENT CV:' in ...`, and the second clause still holds.
 
 **Next action: Phase 3, item 3 — enable structured output (`response_schema`)**, in a new
-chat. `_call_gemini`'s config and `response_mime_type` and `parse_json_response` are item
+chat. `_call_provider`'s config and `response_mime_type` and `parse_json_response` are item
 3's to change; item 1 touched only the retry path and the parser's default-off flag.
 **DISCHARGED 2026-10-26** — see the increment 3 section at the top of this file.
 
@@ -858,7 +858,7 @@ Every item in its blast-radius list was addressed:
 - `EDITORIAL_REVIEW_INSTRUCTION` was replaced by `EDITORIAL_REQUIREMENTS`, as item 2 owned.
 
 **Item 1's baseline is now frozen at 2/3/5.** Do not touch `shorten_cv` or
-`layout_correction_instruction` outside item 1, and do not touch `_call_gemini`'s config,
+`layout_correction_instruction` outside item 1, and do not touch `_call_provider`'s config,
 `response_mime_type` or `parse_json_response` outside item 3.
 
 **Phase 2 — multi-profile architecture. COMPLETE and CLOSED OUT (code + tests + migration +
@@ -1140,7 +1140,7 @@ Re-confirm each decision when its phase begins.
 
 ### Resolved in Phase 1
 
-- ~~Dead code: `validate_api_key`, `create_gemini_service`, `ErrorResponse`, `TailoredOutput`~~
+- ~~Dead code: `validate_api_key`, `create_llm_service`, `ErrorResponse`, `TailoredOutput`~~
   — removed (D-2, D-7). `response_schema` was removed here too, as dead code (D-1), and was
   **made live again** in Phase 3 increment 3, scoped per call — see
   [ADR 0012](DECISIONS/0012-structured-output-scope.md).

@@ -130,7 +130,7 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     # would have made every *failing* model look free -- and cost per accepted result
     # is the ranking metric, so the worst performers would have looked like the best
     # value. Constructed through the same factory the pipeline would use.
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     # Each candidate is asked in a dialect its providers accept (ADR 0016). Without
     # this, three of the eight failed *every* call for a reason that was ours, not the
@@ -151,7 +151,7 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
 
         return schema_for_candidate(model.id, _plain_schema(schema))
 
-    service = GeminiService(config=config, render_schema=render_schema)
+    service = LLMService(config=config, render_schema=render_schema)
 
     # A candidate that spends most of its budget on reasoning needs a higher ceiling, or
     # it emits *nothing* -- measured: `qwen3.8-flash` and `z-ai/glm-5.3-flash` both

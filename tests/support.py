@@ -105,7 +105,7 @@ class RecordedSession:
 # --- offline LLM double -------------------------------------------------------------
 
 class OfflineGemini:
-    """Stands in for :class:`GeminiService` without any network access.
+    """Stands in for :class:`LLMService` without any network access.
 
     Replays recorded responses in order. Every call is recorded so tests can assert on
     the prompt that was actually sent — which is how profile/JD/country context
@@ -126,7 +126,7 @@ class OfflineGemini:
         self.calls: list[dict] = []
         self.exhausted = False
 
-    def _call_gemini(self, prompt, *args, **kwargs):
+    def _call_provider(self, prompt, *args, **kwargs):
         self.prompts.append(prompt)
         self.calls.append({
             'kind': kwargs.get('kind'),

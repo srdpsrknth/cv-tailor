@@ -1,6 +1,6 @@
 """One place where environment configuration is read.
 
-Previously ``gemini_service`` and ``main`` read ``os.getenv`` at module import,
+Previously ``llm_service`` and ``main`` read ``os.getenv`` at module import,
 which made the model and output paths fixed for the process lifetime and made
 tests awkward. Configuration is now an explicit object that can be built at any
 time, so a caller (the CLI, the API, a test) decides *when* the environment is

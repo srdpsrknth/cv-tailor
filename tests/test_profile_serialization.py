@@ -10,7 +10,7 @@ Two things this file is careful about:
   to what it received before, so the central assertion compares the rendered prompt
   against ``profile.model_dump_json(indent=2)`` directly rather than against a
   paraphrase of it. Wording changes belong to Phase 3 item 2, not here.
-* **It is not a call-count change.** The number of ``_call_gemini`` calls is pinned
+* **It is not a call-count change.** The number of ``_call_provider`` calls is pinned
   by ``test_tailoring_pipeline.py`` and is asserted again here, because the whole
   point of removing repeated *work* is that repeated *calls* stay put.
 

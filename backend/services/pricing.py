@@ -3,7 +3,7 @@
 Before this module the price of a model lived in two places and was applied
 wrongly in the third:
 
-* ``gemini_service.PRICING`` held the table;
+* ``llm_service.PRICING`` held the table;
 * ``ui/app.py`` held a **second, stale copy** (it still listed
   ``gemini-1.5-flash``, retired in Phase 1) and divided tokens by it, which is
   **D-4**: two tables can disagree, and the one a user sees was the stale one;

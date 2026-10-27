@@ -894,18 +894,18 @@ def test_an_unknown_model_is_priced_without_crashing():
     safe while the fallback target is itself always present -- this test pins that.
 
     Asserted against the **single pricing table** on its default route, not against
-    ``gemini_service.PRICING``, which is the Gemini-route view only. That view stopped
+    ``llm_service.PRICING``, which is the Gemini-route view only. That view stopped
     containing the default model when the default moved to OpenRouter (2026-10-27), and
     the invariant here is about the table the fallback actually reads.
     """
     from services import pricing
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     assert pricing.is_priced(pricing.DEFAULT_MODEL, pricing.DEFAULT_PROVIDER), (
         'the fallback target must always be priced'
     )
 
-    service_double = object.__new__(GeminiService)
+    service_double = object.__new__(LLMService)
     service_double.model = 'a-model-that-does-not-exist'
     cost = service_double._estimate_cost(1_000_000, 1_000_000)
 
@@ -915,7 +915,7 @@ def test_an_unknown_model_is_priced_without_crashing():
 
 def test_no_retired_model_rows_remain_in_pricing():
     """Legacy rows mispriced nothing but actively misled; they are gone (D-5)."""
-    from services.gemini_service import PRICING
+    from services.llm_service import PRICING
 
     for retired in ('gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-3-pro-preview'):
         assert retired not in PRICING, f'{retired} is retired and must not be priced'

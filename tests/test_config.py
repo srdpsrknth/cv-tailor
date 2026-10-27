@@ -44,7 +44,7 @@ def test_default_model_is_always_priced():
     """The pricing fallback relies on this; see the pricing tests.
 
     Checked against the **single pricing table**, on the default *route*. This used to
-    check ``gemini_service.PRICING``, which is the Gemini-route view only, so it passed
+    check ``llm_service.PRICING``, which is the Gemini-route view only, so it passed
     while Gemini was the default and fails now that the default is an OpenRouter model --
     even though that model is correctly priced. The invariant is "the fallback target
     exists in the table", which is what this asserts.
@@ -215,11 +215,11 @@ def test_importing_the_backend_modules_does_not_read_the_environment(monkeypatch
     monkeypatch.setenv('GEMINI_MODEL', 'hostile-model')
     monkeypatch.setenv('OUTPUTS_DIR', 'hostile-dir')
 
-    from services import gemini_service
+    from services import llm_service
 
-    importlib.reload(gemini_service)
+    importlib.reload(llm_service)
 
-    assert not hasattr(gemini_service, 'GEMINI_MODEL')
-    assert not hasattr(gemini_service, 'GEMINI_API_KEY')
+    assert not hasattr(llm_service, 'GEMINI_MODEL')
+    assert not hasattr(llm_service, 'GEMINI_API_KEY')
     # Importing must not have created the hostile directory as a side effect.
     assert not (PROJECT_ROOT / 'hostile-dir').exists()

@@ -138,12 +138,12 @@ def test_the_estimate_reaches_the_token_usage_record():
     long tier. The test was asserting an accident of the default rather than the long-tier
     behaviour it is named for.
     """
-    from services.gemini_service import GeminiService
+    from services.llm_service import LLMService
 
     class _Config:
         provider = 'gemini'
 
-    service = object.__new__(GeminiService)
+    service = object.__new__(LLMService)
     service.model = 'gemini-2.5-pro'
     service.config = _Config()
 
@@ -268,7 +268,7 @@ def test_only_the_pricing_module_defines_the_table():
             for target in targets:
                 name = getattr(target, 'id', None)
                 # A table is a dict literal; the compatibility *view* in
-                # gemini_service is a comprehension over the single source, so it is
+                # llm_service is a comprehension over the single source, so it is
                 # explicitly not a second table.
                 if name == 'PRICING' and isinstance(node.value, ast.Dict):
                     defining.append(path.name)
@@ -277,7 +277,7 @@ def test_only_the_pricing_module_defines_the_table():
 
 
 def test_the_compatibility_view_matches_the_single_source():
-    """``gemini_service.PRICING`` is a derived view, never a second table.
+    """``llm_service.PRICING`` is a derived view, never a second table.
 
     The view is by definition the **Gemini-route** rows, exposed under their bare model
     names -- that is the shape this module used to publish. The lookup therefore names
@@ -285,7 +285,7 @@ def test_the_compatibility_view_matches_the_single_source():
     OpenRouter on 2026-10-27, and asking for the view's rows under the *default* route
     looked in the wrong half of the table and failed.
     """
-    from services.gemini_service import PRICING
+    from services.llm_service import PRICING
 
     for model, row in PRICING.items():
         price = pricing.PRICING[('gemini', model)]

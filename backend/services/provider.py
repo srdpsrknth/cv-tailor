@@ -50,7 +50,7 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 #: Attempts per request before a provider gives up. Matches the historical
-#: ``_call_gemini`` retry budget so call counts are unchanged by this refactor.
+#: ``_call_provider`` retry budget so call counts are unchanged by this refactor.
 MAX_REQUEST_ATTEMPTS = 3
 
 #: Backoff for a **rate-limited** retry, in seconds. Longer than the generic 1s/2s
@@ -135,7 +135,7 @@ class Provider:
 class GeminiProvider(Provider):
     """Google Gemini, the default provider (decision 6).
 
-    The request body is the one ``_call_gemini`` has always built; only its home
+    The request body is the one ``_call_provider`` has always built; only its home
     moved. ``thinking_level="low"`` is kept for ``gemini-3.8-flash`` because it
     stops reasoning tokens from exhausting the document budget.
     """
