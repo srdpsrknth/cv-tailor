@@ -189,13 +189,13 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.091,
         output_per_1m=0.182,
         created="2026-04-24",
-        accepted=2,
+        accepted=1,
         attempted=3,
-        cost_per_accepted=0.00328,
+        cost_per_accepted=0.02036,
         measured_notes=(
-            'Second in both runs ($0.00328 and $0.00357). Cheapest per attempt, but 2/3 accepted '
-            'with correction calls each time: one case failed the word-count gate. Cheapest per '
-            'attempt and not per accepted result is exactly the gap this metric exists to expose.'
+            'Variable across runs: 2/3 in both earlier studies, 1/3 in the corrected one, with no '
+            'correction calls recorded. The failures were word-count and truncation related '
+            'rather than factual. Treat its position as the least stable in the table.'
         ),
     ),
     CuratedModel(
@@ -212,11 +212,11 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         created="2026-10-07",
         accepted=3,
         attempted=3,
-        cost_per_accepted=0.00582,
+        cost_per_accepted=0.00594,
         measured_notes=(
-            'Third in both runs ($0.00582 and $0.00723). 3/3 accepted at about a fifth of Claude '
-            'Sonnet 5 per accepted result, so the expensive end of its own family is not needed '
-            'for this task. Asked in the anthropic-vertex dialect.'
+            '3/3 accepted with no correction calls, at about a fifth of Claude Sonnet 5 per '
+            'accepted result -- so the expensive end of its own family is not needed for this '
+            'task. Asked in the anthropic-vertex dialect.'
         ),
     ),
     CuratedModel(
@@ -233,11 +233,11 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         created="2026-09-22",
         accepted=3,
         attempted=3,
-        cost_per_accepted=0.00271,
+        cost_per_accepted=0.00281,
         measured_notes=(
-            'WINNER, and reproduced. Best cost per accepted result in both independent runs '
-            '($0.00271 and $0.00353), 3/3 accepted with no correction calls in each, at roughly '
-            '40x less than the incumbent default. Asked in the strict dialect.'
+            'WINNER in all three runs. 3/3 accepted with no correction calls every time, at '
+            'roughly 40x less than the incumbent default per accepted result. Asked in the strict '
+            'dialect.'
         ),
     ),
     # --- balanced ----------------------------------------------------------------
@@ -252,14 +252,16 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.150,
         output_per_1m=0.470,
         created="2026-08-26",
-        accepted=0,
+        accepted=3,
         attempted=3,
-        cost_per_accepted=None,
+        cost_per_accepted=0.01269,
         measured_notes=(
-            '0/3 accepted in both runs. The failure is specific and reproducible: it leaked '
-            'schema text into the output, returning a fragment such as a completionState object '
-            'as the value of skills instead of a list of skills. Its 81.3% IFBench score did not '
-            'predict this task.'
+            'CORRECTED, and the correction matters. Recorded as 0/3 in the first study, which was '
+            "this project's error rather than the model's: at the default 8,000-token ceiling it "
+            'returned finish_reason=length with 8,000 reasoning tokens and an EMPTY body -- a '
+            'reasoning model spends its budget thinking before writing. Given a 32,000 ceiling it '
+            'accepts 3/3 with no correction calls. Its strong public constraint-following '
+            'evidence was right and the harness defeated it.'
         ),
     ),
     CuratedModel(
@@ -278,9 +280,11 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=None,
         measured_notes=(
-            '0/3 accepted in both runs. It omitted role, start_date and end_date from every work '
-            'experience entry -- precisely the fields the factual gate exists to protect. Its low '
-            'measured hallucination rate did not predict this either.'
+            'A GENUINE defect, confirmed at a raised ceiling. It omits role, start_date and '
+            'end_date from EVERY work-experience entry -- the fields the factual gate exists to '
+            'protect -- and does so at 32,000 tokens as well as 8,000, so unlike qwen3.8-flash '
+            'this is not a budget artifact. It emits a well-formed document with the dates '
+            'missing, which is precisely the failure that must not ship.'
         ),
     ),
     CuratedModel(
@@ -299,9 +303,10 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         attempted=3,
         cost_per_accepted=None,
         measured_notes=(
-            '0/3 accepted, and INCONCLUSIVE rather than failed: every call in both runs was '
-            'rate-limited (HTTP 429) by its provider, so it never produced a document to judge. '
-            'The one candidate that should be re-measured before it is judged.'
+            'INCONCLUSIVE, not failed, and reproducibly so across three runs: every call was '
+            'rate-limited (HTTP 429) by its upstream provider. A longer backoff (8s/16s) did not '
+            'outlast it. It never produced a document to judge, so no verdict about the model is '
+            'warranted either way.'
         ),
     ),
     # --- frontier ----------------------------------------------------------------
@@ -318,13 +323,13 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.825,
         output_per_1m=4.125,
         created="2026-09-02",
-        accepted=3,
+        accepted=2,
         attempted=3,
-        cost_per_accepted=0.11384,
+        cost_per_accepted=0.08607,
         measured_notes=(
-            'The incumbent default, kept as the control. 3/3 accepted in both runs but with 2 '
-            "correction calls each time, at roughly 40x the winner's cost per accepted result. "
-            'This is the number a switch would be justified against.'
+            'The incumbent default, kept as the control. Accepted 3/3 in the two earlier runs and '
+            "2/3 in the corrected one, at roughly 30x the winner's cost per accepted result. This "
+            'is the number a switch would be justified against.'
         ),
     ),
     CuratedModel(
@@ -341,11 +346,11 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         created="2026-06-30",
         accepted=3,
         attempted=3,
-        cost_per_accepted=0.15709,
+        cost_per_accepted=0.13743,
         measured_notes=(
-            'The most expensive candidate and the poorest value: 3/3 accepted at 1 correction '
-            "call, for about 55x the winner's cost per accepted result. It works, and the "
-            'measurement says it is not worth it here.'
+            'The most expensive candidate and the poorest value: 3/3 accepted with no correction '
+            "calls, for about 50x the winner's cost per accepted result. It works reliably and "
+            'the measurement says it is not worth it here.'
         ),
     ),
 )
