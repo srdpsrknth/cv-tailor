@@ -383,3 +383,101 @@ def test_the_acceptance_bar_does_not_vary_by_candidate():
             f'{forbidden!r} appears in candidate inputs; the acceptance bar must not be '
             f'tunable per candidate or the ranking measures the tuning'
         )
+
+
+# --- one implementation of the dialect, not two ----------------------------------------------
+
+def test_the_evaluation_and_production_share_one_dialect_implementation():
+    """The two copies are gone: `candidate_inputs` *is* `generation`'s function.
+
+    There were two implementations of one concept, and only production's was exercised
+    end to end -- so a drift between them would have surfaced as the evaluation measuring
+    a schema the pipeline never sends, or approving one a real call refuses. Identity is
+    asserted rather than equality, because two equal functions can drift again tomorrow
+    while one object cannot.
+    """
+    from services import generation
+
+    assert candidate_inputs.to_dialect is generation.to_dialect
+    assert candidate_inputs.reshape_free_form_maps is generation.reshape_free_form_maps
+    assert candidate_inputs.count_optional_parameters is generation.count_optional_parameters
+    assert candidate_inputs.SKILLS_AS_ARRAY is generation.SKILLS_AS_ARRAY
+    assert candidate_inputs.DIALECT_STRICT == generation.DIALECT_STRICT
+    assert candidate_inputs.DIALECT_GEMINI == generation.DIALECT_GEMINI
+    assert (candidate_inputs.DIALECT_ANTHROPIC_VERTEX
+            == generation.DIALECT_ANTHROPIC_VERTEX)
+
+
+def test_the_evaluation_module_no_longer_defines_a_second_converter():
+    """A regression guard on the source, in case a copy is pasted back in.
+
+    An import-level check alone would pass while a dead second implementation sat beside
+    it -- which is exactly the state this change removed.
+    """
+    text = open(candidate_inputs.__file__, encoding='utf-8').read()
+
+    for redefined in ('def to_dialect(', 'def reshape_free_form_maps(',
+                      'def count_optional_parameters(', 'def strip_additional(',
+                      'def require_all('):
+        assert redefined not in text, (
+            f'{redefined!r} is defined again in candidate_inputs; the dialect conversion '
+            f'must have exactly one implementation, in services.generation'
+        )
+
+
+def test_the_selected_model_is_asked_the_schema_production_ships():
+    """The property the collapse buys: both routes now agree by construction.
+
+    `openai/gpt-6-luna` is the shipped default, so why it needs a dialect entry at all
+    is precisely that production adopted the strict dialect. If the evaluation's
+    rendering ever differed from the shipped schema, the study would be scoring a
+    request the pipeline never makes.
+    """
+    from services import generation
+    from services.provider import _plain_schema
+
+    shipped = generation.RESPONSE_SCHEMAS['cv']
+    rendered = schema_for_candidate('openai/gpt-6-luna', _plain_schema(shipped))
+
+    assert json.dumps(rendered, sort_keys=True) == json.dumps(shipped, sort_keys=True), (
+        'the evaluation renders the selected model a different schema than production '
+        'sends'
+    )
+
+
+def test_collapsing_the_dialects_did_not_change_the_shipped_schema():
+    """The schemas the pipeline sends are pinned byte-for-byte.
+
+    The response-schema digest is an ingredient of the generation cache key
+    (ADR 0015), so an accidental change here would silently invalidate every cached
+    generation *and* alter the request. These are the exact digests from before the two
+    implementations were collapsed -- which exposed that they had already disagreed:
+    the evaluation's copy described `skills.category` and `skills.items`, production's
+    did not. Production's bytes are the ones kept.
+    """
+    import hashlib
+
+    from services import generation
+
+    digests = {
+        kind: hashlib.sha256(
+            json.dumps(schema, sort_keys=True).encode('utf-8')).hexdigest()
+        for kind, schema in generation.RESPONSE_SCHEMAS.items()
+    }
+
+    # Measured before the collapse (at c937440) and unchanged after it. The response
+    # schema is part of the generation cache key, so a change here is a cache
+    # invalidation and a different request to the model -- never a refactor.
+    assert digests == {
+        'cv': 'd08062c622fb9321c73d628854a453955400d7778ef130eaa7b900b8f40654cb',
+        'cover_letter': 'e259b8d12006eda91cabe6beae70e8d4b8f8ecfd3081a307677092379241f844',
+    }, f'the shipped response schemas changed: {digests}'
+
+    # The specific disagreement the collapse exposed: the evaluation's copy of
+    # `skills` described `category` and `items`, production's did not. Production's
+    # bytes are the ones kept. Adding them back is a prompt change and must be
+    # committed as one.
+    skills = generation.RESPONSE_SCHEMAS['cv']['properties']['cv']['properties']['skills']
+    assert skills['type'] == 'array'
+    assert 'description' not in skills['items']['properties']['category']
+    assert 'description' not in skills['items']['properties']['items']
