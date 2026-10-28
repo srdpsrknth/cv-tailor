@@ -6,7 +6,9 @@ from __future__ import annotations
 from datetime import date
 import logging
 import re
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -243,9 +245,11 @@ class DocxRenderer:
         # Use all paragraphs from the tailored cover letter (not limited to 3)
         body_paras = tailored_cl.paragraphs or []
 
-        # Create temporary working directory for LaTeX compilation
-        work_dir = docx_path.parent / "latex_work"
-        work_dir.mkdir(exist_ok=True)
+        # Scratch space for the pdflatex run, deliberately **outside** the deliverable
+        # folder: `docx_path.parent` is the folder handed to an employer, so building
+        # there ships `main.tex`, the setup/ copies and the .aux/.log residue with every
+        # application. `tempfile` also keeps two concurrent renders from colliding.
+        work_dir = Path(tempfile.mkdtemp(prefix="cvtailor_latex_"))
 
         # Copy template files to working directory
         template_root = Path(__file__).resolve().parents[2] / "cover_letter_latex_template"
@@ -318,9 +322,13 @@ class DocxRenderer:
             tex_path.write_text(latex_content, encoding="utf-8")
             logger.info(f"Created LaTeX file: {tex_path}")
         except Exception as e:
+            shutil.rmtree(work_dir, ignore_errors=True)
             raise Exception(f"Failed to write LaTeX file: {e}")
 
-        # Compile with pdflatex
+        # Compile with pdflatex. The scratch directory is removed on **every** exit path,
+        # success or failure: a failed compile used to leave `main.tex` and `setup/`
+        # behind, and while it was created inside the deliverable folder that residue
+        # shipped with the application.
         try:
             from renderers.latex_renderer import LaTeXRenderer
             compiler = LaTeXRenderer()._resolve_pdflatex_path()
@@ -353,12 +361,6 @@ class DocxRenderer:
             shutil.copy(pdf_src, pdf_dst)
             logger.info(f"Generated professional template PDF: {pdf_dst}")
 
-            # Clean up working directory
-            try:
-                shutil.rmtree(work_dir)
-            except:
-                pass
-
             return pdf_dst
 
         except FileNotFoundError:
@@ -368,6 +370,8 @@ class DocxRenderer:
         except Exception as e:
             logger.error(f"LaTeX compilation error: {e}")
             raise Exception(f"LaTeX compilation error: {e}")
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def create_docx_renderer(

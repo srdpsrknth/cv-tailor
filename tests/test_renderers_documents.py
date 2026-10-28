@@ -389,6 +389,59 @@ def test_docx_letter_pdf_is_one_page_when_latex_is_available(tmp_path):
     assert page_count(Path(pdf)) == 1, 'cover letter must fit one page'
 
 
+# --- D-13: no build residue in the deliverable folder ----------------------------------
+
+def test_a_failed_pdf_compile_leaves_no_scratch_dir_in_the_deliverable_folder(tmp_path, monkeypatch):
+    """D-13: ``latex_work/`` must never land beside the documents handed to an employer.
+
+    The deliverable folder is the one an application ships from, so a scratch directory
+    there means the application carries the build residue. This is the **failure** path:
+    when the compile raises, the cleanup at the end of the happy path never runs, so the
+    directory and its ``main.tex`` survive -- which is how the defect was reachable in
+    practice, and why the happy path alone did not show it.
+
+    Asserted on the folder's *contents* rather than on the source, so any future spelling
+    of "make a scratch dir next to the output" is caught.
+    """
+    from renderers.latex_renderer import LaTeXRenderer
+
+    deliverable = tmp_path / 'outputs' / 'adjoe'
+    deliverable.mkdir(parents=True)
+    renderer = DocxRenderer(outputs_dir=str(deliverable))
+    # A compiler path that resolves but cannot run: the compile fails, as a broken TeX
+    # installation or a timeout would.
+    monkeypatch.setattr(
+        LaTeXRenderer, '_resolve_pdflatex_path', lambda self: 'definitely-not-pdflatex')
+
+    profile = load_profile('synthetic_analyst')
+    letter = TailoredCoverLetter(
+        company_name='Adjoe', role_title='Analyst',
+        paragraphs=['Dear Hiring Manager,'] + ['Body text.'] * 3,
+        signature_name=profile.identity.full_name,
+    )
+    with pytest.raises(Exception):
+        renderer.render_cover_letter(letter, profile, job_position='Analytical Engineer')
+
+    residue = sorted(p.name for p in deliverable.iterdir() if p.is_dir())
+    assert residue == [], f'scratch directories left in the deliverable folder: {residue}'
+
+
+@needs_latex
+def test_a_real_render_leaves_only_documents_in_the_deliverable_folder(tmp_path):
+    """The success path: the scratch dir is gone and only the deliverables remain."""
+    deliverable = tmp_path / 'outputs' / 'real'
+    deliverable.mkdir(parents=True)
+    profile = load_profile('synthetic_analyst')
+    letter = TailoredCoverLetter.model_validate(
+        read_json('content', 'valid_content.json')['cover_letter'])
+    renderer = create_docx_renderer(outputs_dir=str(deliverable))
+    _, pdf = renderer.render_cover_letter(letter, profile, job_position='Analytical Engineer')
+
+    assert pdf is not None, 'cover-letter PDF generation failed'
+    residue = sorted(p.name for p in deliverable.iterdir() if p.is_dir())
+    assert residue == [], f'scratch directories left in the deliverable folder: {residue}'
+
+
 # --- renderer construction guards ------------------------------------------------------
 
 def test_docx_renderer_requires_its_template(tmp_path):
