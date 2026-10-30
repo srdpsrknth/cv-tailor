@@ -137,6 +137,20 @@ class ListingEntry:
             "max_completion_tokens": self.max_completion_tokens,
         }
 
+    def cost_for(self, input_tokens: int, output_tokens: int) -> float:
+        """Cost of a run of this shape on this model, in USD.
+
+        Present here as well as on ``CuratedModel`` because a *screened* candidate is a
+        listing entry and not a curated one, and the screen must price a slate before
+        anything is curated. Two identical arithmetic bodies would be the drift this
+        project keeps removing, so this is deliberately the same one-line formula --
+        and ``tests/test_screen.py`` asserts the two agree on a shared id rather than
+        trusting that they do.
+        """
+        return (input_tokens / 1_000_000) * self.prompt + (
+            output_tokens / 1_000_000
+        ) * self.completion
+
 
 @dataclass(frozen=True)
 class ListingRecord:

@@ -21,6 +21,7 @@ from evaluation.curated_models import (
     unmeasured_entries,
 )
 from evaluation.runner import DEFAULT_CAP_USD, BudgetExceeded, dry_run, plan
+from evaluation.screen import MAX_SLATE as DEFAULT_SLATE_CAP
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--list-models", action="store_true",
         help="show the curated set and exit",
+    )
+    parser.add_argument(
+        "--screen", nargs="?", const="", default=None, metavar="LISTING_JSON",
+        help=(
+            "propose a candidate slate from a listing record, offline. With no "
+            "argument, uses the most recent committed record in evaluation/. This "
+            "makes no API call and spends nothing."
+        ),
+    )
+    parser.add_argument(
+        "--cap-slate", type=int, default=None,
+        help=f"how many candidates --screen may propose (default {DEFAULT_SLATE_CAP})",
     )
     return parser
 
@@ -97,12 +110,64 @@ def _print_models() -> None:
     )
 
 
+def _run_screen(argument: str, cap: int) -> int:
+    """Propose a candidate slate. Offline: no key, no network, no spending.
+
+    The ``--live`` path is deliberately not reachable from here. Screening is the step
+    *before* a spend is approved, so it must be runnable by someone who has not yet
+    decided to spend anything -- which means it cannot share a code path with spending.
+    """
+    from pathlib import Path
+
+    from evaluation.listing import latest_record, load_record
+    from evaluation.screen import screen_record
+
+    path = Path(argument) if argument else latest_record()
+    if path is None:
+        raise SystemExit(
+            "No committed listing record in evaluation/ and no path given.\n"
+            "Commit a screened record first, or pass one: "
+            "python -m evaluation --screen path/to/listing.json"
+        )
+    if not path.exists():
+        raise SystemExit(f"No such listing record: {path}")
+
+    print(f"Listing record: {path}")
+    record = load_record(path)
+
+    # The control is the model actually shipped, so every challenger is measured against
+    # something real rather than against a leaderboard position (ADR 0016).
+    #
+    # Read from the curated set rather than from ``services.pricing.DEFAULT_MODEL``, and
+    # that is deliberate: this module runs as ``python -m evaluation`` from the repository
+    # root, where ``backend/`` is not on ``sys.path`` -- the tests get it from
+    # ``conftest.py``, and the paid path imports the backend lazily inside
+    # ``evaluation.live``, after the cap check. Reaching into ``services`` at argument
+    # parsing time would make ``--screen`` fail on a machine where the offline half
+    # works perfectly well, which is exactly the wrong failure for the step that decides
+    # whether to spend anything. The curated set is the record of what ships, and it is
+    # asserted equal to ``pricing.DEFAULT_MODEL`` by tests/test_config.py.
+    from evaluation.curated_models import CURATED_MODELS
+
+    control = CURATED_MODELS[0].id if len(CURATED_MODELS) == 1 else None
+    slate = screen_record(record, control_id=control, cap=cap)
+
+    print(slate.describe())
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
 
     if args.list_models:
         _print_models()
         return 0
+
+    if args.screen is not None:
+        return _run_screen(
+            args.screen,
+            args.cap_slate if args.cap_slate is not None else DEFAULT_SLATE_CAP,
+        )
 
     models = _selected_models(args.models)
 
