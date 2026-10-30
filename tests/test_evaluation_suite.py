@@ -551,49 +551,58 @@ def test_every_entry_records_the_listing_it_came_from():
 def test_no_curated_model_lacks_structured_output_support():
     """A model that cannot be relied on for schema-valid JSON is not an option.
 
-    Asserted from the recorded listing rather than from reputation: this is the
-    filter that excludes the otherwise-cheapest candidates.
+    Asserted from a listing **committed to this repository** rather than from reputation.
+    This is the filter that excludes the otherwise-cheapest candidates.
+
+    **It used to skip.** The listing was a 467-model JSON blob under ``.tmp/``, which is
+    gitignored, so in a fresh working copy this test could not run at all -- and a guard
+    that skips whenever its evidence is missing is not a guard. ``evaluation.listing``
+    now commits a screened *record* of that listing (six fields per model, above the
+    owner's recency floor) alongside the digest of the full payload, so this runs
+    everywhere and fails when the evidence is absent.
     """
-    import json
-    from pathlib import Path
-
     from evaluation.curated_models import CURATED_MODELS
+    from evaluation.listing import latest_record, load_record
 
-    # The listing is not committed (it is a 467-model JSON blob); when it is absent the
-    # test says so rather than passing vacuously.
-    listing = Path(__file__).resolve().parents[1] / '.tmp' / 'openrouter_models_2026-10-26.json'
-    if not listing.exists():
-        pytest.skip(
-            'the recorded OpenRouter listing is not present in this working copy; '
-            'the curated ids were read from it and hashed in evaluation.curated_models'
-        )
-    data = json.loads(listing.read_text(encoding='utf-8'))
-    by_id = {r['id']: r for r in data['data']}
+    path = latest_record()
+    assert path is not None, (
+        'no committed listing record: the curated ids were read from a listing that is '
+        'no longer in the repository, so nothing here can be checked'
+    )
+    record = load_record(path)
 
     for model in CURATED_MODELS:
-        assert model.id in by_id, f'{model.id} is no longer in the listing'
-        entry = by_id[model.id]
-        params = entry.get('supported_parameters') or []
-        assert 'structured_outputs' in params, f'{model.id} does not support structured output'
+        entry = record.find(model.id)
+        assert entry is not None, (
+            f'{model.id} is curated but absent from the committed listing record '
+            f'({path.name}); its support for structured output cannot be checked'
+        )
+        assert entry.structured_outputs, (
+            f'{model.id} does not support structured output'
+        )
 
 
 def test_the_recorded_rates_match_the_listing():
-    """A price that drifted from the listing is worse than no price."""
-    import json
-    from pathlib import Path
+    """A price that drifted from the listing is worse than no price.
 
+    The ranking metric is cost per **accepted** result, so a stale rate misranks every
+    candidate at once while looking entirely plausible. Compared against the committed
+    record; see the note on the test above for why this no longer skips.
+    """
     from evaluation.curated_models import CURATED_MODELS
+    from evaluation.listing import latest_record, load_record, price_disagreements
 
-    listing = Path(__file__).resolve().parents[1] / '.tmp' / 'openrouter_models_2026-10-26.json'
-    if not listing.exists():
-        pytest.skip('recorded listing not present in this working copy')
-    data = json.loads(listing.read_text(encoding='utf-8'))
-    by_id = {r['id']: r for r in data['data']}
+    path = latest_record()
+    assert path is not None, 'no committed listing record to check the prices against'
+    record = load_record(path)
 
-    for model in CURATED_MODELS:
-        pricing = by_id[model.id]['pricing']
-        assert model.input_per_1m == pytest.approx(float(pricing['prompt']) * 1e6)
-        assert model.output_per_1m == pytest.approx(float(pricing['completion']) * 1e6)
+    disagreements = price_disagreements(
+        {m.id: (m.input_per_1m, m.output_per_1m) for m in CURATED_MODELS},
+        record,
+    )
+    assert disagreements == (), (
+        f'curated prices disagree with {path.name}: {disagreements}'
+    )
 
 
 def test_an_uncurated_model_is_not_findable():
