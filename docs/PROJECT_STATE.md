@@ -1,59 +1,185 @@
 # Project state
 
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-30
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `6a16633` — *refactor: rename GeminiService to LLMService, and the module to match*
+**Latest commit:** `9b8df51` — *docs: drop comments that narrate what the ADRs already record*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-## Current naming: `LLMService` in `backend/services/llm_service.py`
+## Stage B is complete — accuracy and leanness before new features (2026-10-30)
 
-Renamed from `GeminiService` / `services/gemini_service.py` on 2026-10-27 (`6a16633`). The
-class drives **any** provider, so the old name described a Gemini-only design that had not
-existed since the provider interface landed. Also renamed: `_call_gemini` →
-`_call_provider`, `GeminiServiceError` → `LLMServiceError`.
+The owner's stated order was: *"mechanical renames and cleaning scripts to be lean and
+concise without inaccuracies should come before we work on new features like curation
+skills."* All four cleaning items are now done, **one commit each**, followed by this
+documentation commit. Nothing was bundled.
 
-**A pure rename, proven mechanically**: every added line equals a removed line once the
-four names are normalised, the test count is identical before and after, and `git` records
-it as a rename at 96% similarity.
+| # | Item | Commit | Outcome |
+|---|---|---|---|
+| **1** | **D-13** — `latex_work/` scratch dir inside the deliverable folder | `c937440` | **Fixed.** Now `tempfile.mkdtemp()` + `finally` cleanup |
+| **2** | **Schema-dialect duplication** | `ac1c902` | **Collapsed.** One implementation in `services/generation`, `evaluation` delegates |
+| **3** | **Split `generation.py`** — was 1,465 lines | `bc2c3d9` | **Split** into six modules + a 118-line facade |
+| **4** | **Trim over-commenting** | `9b8df51` | **Trimmed** 87 lines, proven comment-only |
 
-**ADRs were deliberately not updated.** `docs/DECISIONS/` still contains the old names in
-five records, because an ADR states what was decided at the time; rewriting history to use
-a name that did not then exist would falsify the record. This file describes the present.
+**Test baseline moved 538 → 555 passed, 5 skipped** (~120 s), fully offline, no paid calls.
+**`master` untouched at `1416177`** throughout. Nothing has been pushed.
 
-**Names still containing "gemini", and why they are correct:** `GEMINI_API_KEY` and
-`GEMINI_MODEL` name the Gemini *provider*, which remains supported; `PRICING` in
-`llm_service.py` is the Gemini route's rows; and the `gemini-2.5-*` entries in
-`services/pricing.py` are live routes.
+### The baseline is 538/5, not the 540/3 the previous handoff recorded
 
-## Handoff for the next chat — accuracy and leanness before new features (2026-10-27)
+Worth stating because it is the number a future session should verify against. Two tests
+in `tests/test_evaluation_suite.py` **skip** because the recorded OpenRouter listing
+(`.tmp/openrouter_models_2026-10-26.json`, 467 models, gitignored) is absent from this
+working copy; the other three were already skipping for their own documented reasons.
+**No test was failing.** The drift is environmental, not a regression.
 
-**Start state:** `refactor/architecture-v2`, working tree clean, tip `120fa5e`, **in sync
-with `origin`**. Full suite **540 passed, 3 skipped** (~118 s); fast lane **510 passed**.
+### What each item actually found, because three of the four were not what they looked like
+
+**D-13 was on the failure path, not the happy path.** The scratch directory was removed at
+the end of the `try`, so a *successful* render left nothing behind -- which is why it
+looked cosmetic. When the compile raised (a broken TeX install, a timeout), the cleanup
+never ran and `main.tex` plus the copied `setup/` survived **inside the deliverable
+folder**. The first two tests written for this asserted on the success path and **passed
+against the unfixed code**, which is what exposed the mistake; the corrected failure-path
+test fails on the old code with `['latex_work']`.
+
+**The two dialect implementations had already drifted.** They agreed on the shipped
+`cv` schema only because the difference was in a field neither test compared: production
+built `SKILLS_AS_ARRAY` inline *without* `description` fields on `category` and `items`,
+while `evaluation`'s module-level copy had them. Collapsing forced a choice, and the
+choice was **production's bytes**, so the change stays a pure refactor -- the schema
+digest is an ingredient of the generation cache key (ADR 0015), so the other choice would
+have silently invalidated every cached generation. Adding the descriptions back is a
+**prompt change** and belongs in a prompt change.
+
+**The split silently dropped a 40-line comment block.** It documented why structured
+output is scoped per call and why the body is strict anyway — the reasoning ADR 0012 and
+ADR 0016 record — and it sat *between* two top-level statements, so no AST node owned it.
+A scan of every comment run not covered by a statement found it (plus four
+section-divider banners, left out deliberately, and sixteen documented constants, carried
+correctly). **This is the failure mode of AST-boundary refactoring: comments between
+statements have no owner.** The block was restored verbatim and **amended into the split
+commit**, since the split is what dropped it.
+
+### House rules confirmed this session
+
+* **The Python subprocess cannot write tracked paths; PowerShell and `edit` can.** Writing
+  the six split modules with `Path.write_text` failed with `PermissionError` on files that
+  are plainly writable. The workaround that works: have the script emit to `.tmp/`, then
+  copy with `[System.IO.File]::WriteAllText($dst, $txt, [System.Text.UTF8Encoding]::new($false))`.
+* **`.git` is a *file* in this worktree, not a directory**, so `Out-File .git/COMMIT_MSG`
+  fails. Write commit messages to `$env:TEMP`.
+* **PowerShell's `>` and `Out-File -Encoding utf8` write a UTF-8 BOM**, which makes a
+  Python file unparseable (`invalid non-printable character U+FEFF`). Strip it at byte
+  level, or write with `UTF8Encoding($false)`.
+* **Prove a refactor mechanically.** The split was verified by comparing normalised
+  statement bodies (61/61, none edited); the trim by comparing token streams with comments
+  and docstrings stripped (identical in all four files); the schema collapse by hashing
+  `RESPONSE_SCHEMAS` before and after. Each caught something reading the diff would not.
+* **`git push` writes progress to stderr**, so PowerShell reports a spurious exit 1.
+  Verify with `git rev-list --left-right --count HEAD...origin/refactor/architecture-v2`.
+* **ADRs are history.** Five still name `GeminiService` deliberately; do not "fix" them.
+* **Never verify against old code by stashing** — use a throwaway `git worktree`.
+
+## Handoff for the next chat — the curation skill (2026-10-30)
+
+**Start state:** `refactor/architecture-v2` at `9b8df51`, working tree clean, **not
+pushed** (remote is at `f7635ea`). Full suite **555 passed, 5 skipped** (~120 s);
 `master` untouched at `1416177`.
 
-**The agreed order is accuracy and leanness first, new features after.** The owner stated
-it directly: *"mechanical renames and cleaning scripts to be lean and concise without
-inaccuracies should come before we work on new features like curation skills."*
+**The cleaning stage is done, so the next objective is distinct: the curation skill.**
+The owner asked for it on 2026-10-27 and **clarifying questions are owed before any
+code** — they are written out in the section below, ready to ask. Do not start building
+it from the conversation; the questions exist because several design choices are the
+owner's to make.
 
-### Next action, in order
+### What is already known about the curation skill, so it is not re-derived
 
-| # | Item | Size | Why it is next |
-|---|---|---|---|
-| **1** | **D-13** — `docx_renderer.py:247` creates a `latex_work/` scratch dir **inside the deliverable folder** | Small | Verified still live. It puts build residue in the folder handed to an employer; every generated application carries it |
-| **2** | **Schema-dialect duplication** — `generation._to_strict_dialect` and `evaluation/candidate_inputs.py` both convert schemas, with overlapping logic | Small | Introduced when production adopted the strict dialect on 2026-10-27. One concept, two implementations, and only one is exercised by production |
-| **3** | **Split `generation.py`** — **1,281 lines**, of which ~682 code and ~294 docstring; the next biggest backend file is 516 | Medium | It holds prompts, schemas, parsing, validation *and* the generator class. The seams already exist |
-| **4** | **Trim over-commenting** where an ADR already carries the reasoning | Medium | `generation.py` is ~33% comment/docstring. Most is load-bearing; some narrates decisions now recorded in `docs/DECISIONS/` |
+**The owner's stated need, 2026-10-26:** *"a skill that re-runs this curation when new
+models arrive, so the set can be refreshed without repeating this session's manual
+research."* The manual research it replaces took a full session and is recorded in the
+2026-10-26 section below and in [ADR 0014](DECISIONS/0014-evaluation-suite-and-curation.md).
+
+**The machinery it would drive already exists** and is offline-by-default, budget-capped
+and out of CI:
+
+* `evaluation/curated_models.py` — the curated set, every entry marked `verified`
+  (`price+capability` today; `measured` only after a real run) with `measured_notes`.
+  **A test deliberately fails until the marker is updated**, so a quality claim cannot
+  drift ahead of the evidence.
+* `evaluation/candidate_inputs.py` — per-candidate dialect, prompt overrides and output
+  ceiling, each required to record *why* it was adapted.
+* `evaluation/live.py` — the **only** place a paid call can originate, imported lazily
+  after the cap check; it reads only `tests/fixtures/`, so a live run cannot send a real
+  candidate's profile to a third party.
+* `evaluation/` CLI — `python -m evaluation` is a **free dry run** showing the plan;
+  `--live --cap-usd N` spends. An over-budget **projection is refused before any call**.
+
+**The constraints that are settled and must not be re-litigated:** cost is judged per
+**accepted** result, never per call; no quality ranking may be claimed from a leaderboard
+(ADR 0005 requires measurement before a model switch, and no benchmark measures CV prose);
+the curated set spans cost tiers and nothing older than 2025-10; the acceptance bar is
+identical for every candidate — only the *asking* may vary.
+
+### The clarifying questions owed before any code
+
+**Ask these in the chat; the owner has not answered them.** They are grouped by the
+decision they block, and each is a genuine fork rather than a detail.
+
+**Scope and trigger**
+
+1. **What triggers a re-curation?** A manual command the owner runs, or something that
+   also *detects* that new models exist? The second needs a live query to OpenRouter and
+   a diff against the recorded listing — a different build.
+2. **Does the skill replace the curated set, or propose a diff for approval?** The
+   former is one command; the latter needs a review artefact and a decision point.
+3. **Must it re-run the full study on every candidate, or screen first and only measure
+   survivors?** Screening is cheap and offline (price, capability, `structured_outputs`,
+   recency); measuring costs money per candidate.
+
+**Money**
+
+4. **What is the standing budget for one curation run**, and is it per-run or per-month?
+   The last study was $1.91 of a $5 cap. A standing cap needs a different guard from a
+   one-off approval.
+5. **Does a re-curation run need the owner's explicit yes each time** (as the current
+   `--live` does), or may the skill spend up to the cap autonomously?
+6. **When a new model wins, does the skill switch the default itself or only report?**
+   Switching changes what every future application is generated with.
+
+**Judgement the owner reserved**
+
+7. **Who judges writing and layout quality?** `evaluation/` measures none of it — it
+   records `cv_page_count` and nothing else about rendering. The owner said they would
+   judge these themselves. So: does the skill stop at a ranked shortlist with readable
+   artefacts, or is a human-judgement step part of its workflow?
+8. **What makes a result a failure rather than a ranking?** The last study rejected
+   `minimax-m3.1-flash` for a **93% hallucination rate** before spending on it. Are there
+   other disqualifiers (a stated hallucination ceiling, a minimum acceptance rate)?
+
+**Form**
+
+9. **Is this a Claude-style skill file** (`.agents/skills/<name>/SKILL.md`, like
+   `cv-tailor-application`) — instructions an agent follows — **or a CLI subcommand**
+   (`cvtailor curate`)? They are different deliverables. The existing `evaluation/` CLI
+   already covers the mechanical half, which argues for the skill being the *procedure*
+   and the CLI staying the *tool*.
+10. **Does it need to be reproducible from the repository alone?** The last study recorded
+    its listing by SHA-256 but the 467-model JSON is gitignored, so two tests skip without
+    it. A skill that re-runs curation needs a policy for that artefact.
 
 ### Then, in the owner's stated order
 
-5. **Curation skill** — requested 2026-10-27; clarifying questions are owed before any code.
-6. Remaining deferred items, all verified still open on 2026-10-27:
+6. Remaining deferred items, all verified still open on 2026-10-30:
    * **D-10** — committed absolute local paths including a third-party name (ADR 0011
      already records this as a known limitation; the owner decided to leave history as-is)
    * **D-11** — inconsistent saved-application schemas, **moved to Phase 5** by owner decision
    * **D-14** — a failed generation leaves a partial `outputs/<job_id>/` with no manifest
-   * **D-15** — bare `except:` clauses at `latex_renderer.py:294`, `docx_renderer.py:97,376`
+     (**D-13's residue is fixed; the missing-manifest half is still open**)
+   * **D-15** — bare `except:` clauses. **Re-verified 2026-10-30: only ONE remains**,
+     `latex_renderer.py:295`. The three the register named are down to one: the
+     `docx_renderer.py` pair are gone (`:97` and `:376` in the old numbering — the
+     former is now `except Exception:` at `:88`/`:100`, and the latter was removed with
+     D-13, where the `try/except: pass` cleanup became `finally: rmtree(ignore_errors=True)`).
+     **The register's line numbers are stale; re-locate before fixing.**
    * **A-6** (date validation), **A-7**
    * **The generation cache has no eviction policy** — a real follow-up, recorded in ADR 0015
 

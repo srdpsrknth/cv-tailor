@@ -175,6 +175,47 @@ tailor_documents()                             backend/services/tailor_service.p
 
 ## 2. Architecture review
 
+**Stage B (2026-10-30) — the generation pipeline is now six modules.** `A-3` split
+`tailor_documents` into `services/generation.py` plus `application_store.py`, but
+`generation.py` then grew to **1,465 lines** holding five unrelated concerns — the
+schema dialect, the response schemas, prompt construction, response parsing and the
+layout delta, the validation rules and gates, and the generator — against 516 for the
+next biggest backend file. Nothing failed while it grew, which is why it did.
+
+It is now split along those seams, with `generation.py` kept as a thin **facade** so no
+call site moved:
+
+| Module | Lines | Owns |
+|---|---|---|
+| `services.schema_dialect` | 270 | The one schema-dialect conversion, shared with the study |
+| `services.response_schemas` | 217 | The response contract sent per document kind |
+| `services.prompts` | 226 | Context, draft briefs, retry briefs, prompt paths |
+| `services.validation` | 240 | `ProfileRules` and the document gates |
+| `services.cv_delta` | 183 | Response parsing and the layout retry's delta |
+| `services.pipeline` | 310 | `DocumentGenerator`: call, validate, retry |
+| `services.generation` | 118 | The facade — imports and `__all__`, no logic |
+
+The split was **proven mechanical**: every top-level statement was moved by AST boundary
+and compared byte-for-byte against the original (61 of 61, none edited, dropped or
+duplicated), and every public re-export is the *same object* as its home rather than a
+copy. `tests/test_generation_split.py` pins the facade's completeness, the alias
+property, a per-module line ceiling, and the response-schema digests.
+
+**One seam genuinely moved and is worth knowing.** A test observed the validation gate by
+patching `generation.validate_cv`; that no longer intercepts, because a rebind on an
+aliasing module cannot affect what `pipeline` resolves at call time. The gate is now
+called through `services.validation`, and the test patches there. **No assertion
+changed.**
+
+**The schema dialect is one implementation, not two.** `generation._to_strict_dialect`
+and `evaluation/candidate_inputs.to_dialect` both converted schemas, and only
+production's was exercised end to end. Collapsing them **found that they had already
+drifted**: production built `SKILLS_AS_ARRAY` inline without `description` fields on
+`category`/`items`, while the evaluation's copy had them. Production's bytes were kept,
+which is what makes the collapse a pure refactor — the schema digest is an ingredient of
+the generation cache key (ADR 0015), so the other choice would have silently invalidated
+every cached generation.
+
 **Strengths worth preserving**
 - Clean separation of *models / services / renderers / prompts*; renderers are genuinely
   independent of the LLM and of the UI.
@@ -218,9 +259,9 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 | **D-10** | Committed absolute local paths incl. a third-party name | `applications/.../booking.../source/initial_generation_result.json:4-6` | **Owner decision 2026-10-26: leave history as-is.** The file is untracked and gitignored with the rest of `applications/`, so it cannot be re-committed; it remains retrievable from past commits of the public remote. This is the same accepted limitation [ADR 0011](DECISIONS/0011-private-store-location.md) records, and no rewrite or force-push is approved. |
 | **D-11** | Saved applications have inconsistent schemas (`application_context.txt`/`.json`, `posting.txt`, `job_posting.json`, `application_form.json`, `finalize_booking.py`) | `applications/**` listing | **Owner decision 2026-10-26: deferred to Phase 5**, not done in Phase 2. [ADR 0009](DECISIONS/0009-interfaces-and-archive.md) named Phase 2, but the archive left the public repository in Phase 2 and now lives in the private store, so the migration is a Phase 5 concern (Application management owns application schemas). The old archive stays readable as-is until then. |
 | **D-12** | ~~Two near-identical `_escape_latex` and three `_slugify` implementations~~ **RESOLVED in Phase 1** | `latex_renderer.py:349,357`, `docx_renderer.py:130,143`, `tailor_service.py:29` | **Consolidated** into `utils/text.py`. Behaviour was verified identical to both originals across the escaping edge cases — including the pre-existing quirk where the braces in `\textbackslash{}` are themselves escaped — and that is now pinned by a test. |
-| **D-13** | `outputs/<job_id>/latex_work/` scratch dir created inside the deliverable folder | `docx_renderer.py:264` | **Still open.** Use a temp dir. |
-| **D-14** | Failed generations leave a partial `outputs/<job_id>/` with no `generation_result.json` | verified in master worktree: adjoe dir lacks the manifest | **Partially addressed:** failures write an explicit `status: failed` manifest through `ApplicationStore.save_failure`. Pinning this in a test was deferred — `docx_renderer.py:264` can still leave residue. |
-| **D-15** | `except:` bare clauses swallow errors | `latex_renderer.py:294`, `docx_renderer.py:97,376` | **Still open.** Narrow. |
+| **D-13** | ~~`outputs/<job_id>/latex_work/` scratch dir created inside the deliverable folder~~ **RESOLVED 2026-10-30** | was `docx_renderer.py:247` | **Fixed** (`c937440`). ~~Use a temp dir.~~ The directory now comes from `tempfile.mkdtemp()` — outside the deliverable folder, and unique per render — and removal moved to a `finally`, so it happens on every exit path. **The defect was on the failure path, not the happy one:** a successful render removed the directory at the end of the `try`, so it looked cosmetic; when the compile raised, the cleanup never ran and `main.tex` plus the copied `setup/` survived inside the folder handed to an employer. Two tests added — the failure-path one **fails against the pre-fix code** with `['latex_work']`. |
+| **D-14** | Failed generations leave a partial `outputs/<job_id>/` with no `generation_result.json` | verified in master worktree: adjoe dir lacks the manifest | **Partially addressed:** failures write an explicit `status: failed` manifest through `ApplicationStore.save_failure`. Pinning this in a test was deferred. **Update 2026-10-30: the residue half is now fixed** — D-13's `latex_work/` no longer appears in the deliverable folder on the failure path, verified. **The missing-manifest half remains open.** |
+| **D-15** | `except:` bare clauses swallow errors | `latex_renderer.py:294`, `docx_renderer.py:97,376` | **Still open, but narrower than the register says — re-verified 2026-10-30.** **One** bare clause remains, `latex_renderer.py:295`; the `docx_renderer.py` pair are gone (the second was removed with D-13, where `try/except: pass` cleanup became `finally: rmtree(ignore_errors=True)`). **The recorded line numbers are stale; re-locate before fixing.** |
 
 ---
 
