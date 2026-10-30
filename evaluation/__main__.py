@@ -66,6 +66,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--cap-slate", type=int, default=None,
         help=f"how many candidates --screen may propose (default {DEFAULT_SLATE_CAP})",
     )
+    parser.add_argument(
+        "--detect", nargs="?", const="", default=None, metavar="NEW_LISTING_JSON",
+        help=(
+            "diff a freshly read listing against the most recent committed record: "
+            "models added, repriced, withdrawn. Offline and REPORT-only -- it cannot "
+            "spend and there is no path from it to --live."
+        ),
+    )
+    parser.add_argument(
+        "--report", nargs="?", const="", default=None, metavar="SCORES_JSON",
+        help=(
+            "turn a finished run into a curation proposal: the ranked table, the "
+            "disqualifications, and the diff it WOULD make. Writes nothing."
+        ),
+    )
     return parser
 
 
@@ -156,6 +171,116 @@ def _run_screen(argument: str, cap: int) -> int:
     return 0
 
 
+def _run_detect(argument: str) -> int:
+    """Report what changed in the catalogue. Offline: no key, no spend, no writes.
+
+    Deliberately **not** wired to ``--live`` in any direction. Detection could have been
+    automatic, and it is not: a provider's routine catalogue churn would then be able to
+    trigger spending without anyone deciding to. The two are separate commands so the
+    separation is structural rather than a convention someone has to remember.
+    """
+    from pathlib import Path
+
+    from evaluation.curation_diff import detect_changes
+    from evaluation.listing import latest_record, load_record
+
+    previous_path = latest_record()
+    if previous_path is None:
+        raise SystemExit(
+            "No committed listing record in evaluation/, so there is nothing to diff "
+            "against. Commit a screened record first."
+        )
+    current_path = Path(argument) if argument else None
+    if current_path is None:
+        raise SystemExit(
+            "Pass the freshly read listing to diff against the committed record:\n"
+            "  python -m evaluation --detect path/to/new_listing.json\n"
+            "Reading a new listing is a network call this command deliberately does "
+            "not make for you."
+        )
+    if not current_path.exists():
+        raise SystemExit(f"No such listing record: {current_path}")
+
+    from evaluation.curated_models import CURATED_MODELS
+
+    watch = tuple(m.id for m in CURATED_MODELS)
+    print(f"Committed record: {previous_path}")
+    print(f"New record:       {current_path}")
+    print()
+    detection = detect_changes(
+        load_record(previous_path), load_record(current_path), watch=watch
+    )
+    print(detection.describe())
+    return 0
+
+
+def _run_report(argument: str) -> int:
+    """Render a curation proposal from a finished run. Reads only; writes nothing."""
+    import json
+    from pathlib import Path
+
+    if not argument:
+        raise SystemExit(
+            "Pass the run's scores to report on:\n"
+            "  python -m evaluation --report path/to/scores.json\n"
+            "See evaluation/curation_diff.py for the shape this expects."
+        )
+    path = Path(argument)
+    if not path.exists():
+        raise SystemExit(f"No such scores file: {path}")
+
+    from evaluation.curation_diff import proposal_from_scores
+    from evaluation.metrics import CaseResult, ModelScore
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    scores = []
+    # The dialect a candidate was asked in, collected from the constructed results rather
+    # than from the raw payload. Reading it off the dicts was the first version and it
+    # raised AttributeError on the first run -- the payload is JSON, so its "results" are
+    # dicts, and only the CaseResult objects have the attribute.
+    dialects: dict = {}
+    for row in payload.get("models", []):
+        results = [
+            CaseResult(
+                model_id=row["model_id"],
+                case_name=case.get("case_name", ""),
+                accepted=bool(case.get("accepted")),
+                cost_usd=float(case.get("cost_usd", 0.0)),
+                calls=int(case.get("calls", 0)),
+                correction_calls=int(case.get("correction_calls", 0)),
+                schema_dialect=case.get("schema_dialect", ""),
+            )
+            for case in row.get("results", [])
+        ]
+        scores.append(ModelScore(model_id=row["model_id"], label=row.get("label", ""),
+                                 results=results))
+        observed = next((r.schema_dialect for r in results if r.schema_dialect), "")
+        if observed:
+            dialects[row["model_id"]] = observed
+
+    proposal = proposal_from_scores(
+        scores,
+        current_model=payload.get("current_model", ""),
+        minimum_rate=float(payload.get("minimum_rate", 2 / 3)),
+        dialects=dialects,
+        run_reference=payload.get("run_reference", str(path)),
+        run_notes=tuple(payload.get("run_notes", ())),
+    )
+
+    verdicts = payload.get("verdicts") or {}
+    if verdicts:
+        from evaluation.curation_diff import apply_verdicts
+
+        proposal = apply_verdicts(proposal, verdicts)
+
+    print(proposal.describe())
+    print()
+    print(proposal.diff_for_curated_models())
+    print()
+    print(proposal.diff_for_candidate_inputs())
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -168,6 +293,12 @@ def main(argv=None) -> int:
             args.screen,
             args.cap_slate if args.cap_slate is not None else DEFAULT_SLATE_CAP,
         )
+
+    if args.detect is not None:
+        return _run_detect(args.detect)
+
+    if args.report is not None:
+        return _run_report(args.report)
 
     models = _selected_models(args.models)
 
