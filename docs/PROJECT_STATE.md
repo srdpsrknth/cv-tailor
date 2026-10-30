@@ -180,6 +180,13 @@ decision they block, and each is a genuine fork rather than a detail.
      former is now `except Exception:` at `:88`/`:100`, and the latter was removed with
      D-13, where the `try/except: pass` cleanup became `finally: rmtree(ignore_errors=True)`).
      **The register's line numbers are stale; re-locate before fixing.**
+   * **D-16 (NEW, 2026-10-30)** — `_resolve_pdflatex_path` returns the **bare** command
+     name `"pdflatex"` rather than the path `shutil.which` resolved, so a `subprocess.run`
+     whose `cwd` differs from the invoking directory raises `FileNotFoundError`. Latent in
+     production because the CLI runs from the repository root; **found by running a render
+     with a scratch dir on another drive while verifying D-13**, and confirmed
+     **pre-existing** (the function is unchanged at `f7635ea`). Fix: return the resolved
+     path. See the register entry for the two follow-on checks.
    * **A-6** (date validation), **A-7**
    * **The generation cache has no eviction policy** — a real follow-up, recorded in ADR 0015
 
