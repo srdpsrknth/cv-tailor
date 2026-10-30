@@ -6,7 +6,9 @@ out**, and **Phase 3 is complete**. Increments 4, 2, 1 and 3 are done, item 5 is
 item 6's **study ran, selected a winner, and shipped the switch**: the default is now
 **`openai/gpt-6-luna` on OpenRouter** at **$0.00281 per accepted result**, roughly 30-40x
 cheaper than the `gemini-3.8-flash` default it replaced, verified end to end on both a
-synthetic and the owner's real profile.
+synthetic and the owner's real profile. **The curation skill is complete** (2026-10-30) — the
+set can now be refreshed by procedure rather than by a research session; see
+[ADR 0017](DECISIONS/0017-curation-skill.md).
 See [§Phase 3](#phase-3--llm-and-document-generation-improvements).
 Phases may be reordered, split or parallelised when dependencies justify it.
 
@@ -209,6 +211,43 @@ counts unchanged**, as intended.
 | 3 | Enable structured output (`response_schema`) | **DONE** (`feat:`, 2026-10-26) — JSON mode and a schema on the CV draft and the cover letter; the layout retry is deliberately left unconstrained because its response may be a delta. The schema requires the response *envelope* and leaves the document body open, which is what keeps D-1's truncation from returning. Calls unchanged at **2/3/5**; see [ADR 0012](DECISIONS/0012-structured-output-scope.md) |
 | 6 | Provider interface, model routing, budget caps, and the curated model set | **DONE** (`feat:`/`fix:`, 2026-10-26/27) — the interface, routing, caps and D-3/D-4 landed as increments A–C; the **study then ran**, the owner selected `openai/gpt-6-luna`, and the switch shipped in `e53ef8a`. See the close-out below and [ADR 0016](DECISIONS/0016-per-candidate-inputs-and-one-winner.md) |
 | 5 | Cache validated results | **DONE** (`feat:`, 2026-10-26) — a validated generation is stored under `<store>/cache/<profile_id>/`, keyed by the bytes the model was shown; a repeat makes **0** LLM calls and produces byte-identical documents. Cold-cache call counts unchanged at **2/3/5**; see [ADR 0015](DECISIONS/0015-generation-cache.md) |
+
+### The curation skill — re-running the model study (2026-10-30) *(COMPLETE)*
+
+**Objective.** Make the curated set refreshable when new models arrive, without repeating the
+manual research the first curation took a full session.
+
+**User value.** The tool keeps using the cheapest model that actually works for this task, as
+the catalogue moves under it — rather than drifting onto a model that has been repriced or
+superseded. And the refresh is a short, auditable procedure instead of a research session.
+
+**Deliverables, all landed. One commit per item.**
+
+| # | Item | Commit | Outcome |
+|---|---|---|---|
+| 1 | A portable, committable listing record | `0970c7e` | `evaluation/listing.py` + a 267-model committed record; **two skips retired** |
+| 2 | The screen: a proposed slate, with every rejection reasoned | `56b8a4c` | `--screen`, offline and free |
+| 3 | Detection, and a curation diff that writes nothing | `6016b5e` | `--detect` reports; `--report` proposes and is **inert** |
+| 4 | The reading packet, and the human judgement step | `78b436a` | `--packet` + a `VERDICTS.md`; a candidate is ineligible without a verdict |
+| 5 | The curation skill file | `3a9adeb` | `.agents/skills/cv-model-curation/SKILL.md` — the procedure |
+| 6 | Documentation and the decision record | *(this commit)* | [ADR 0017](DECISIONS/0017-curation-skill.md) |
+
+**Acceptance criteria, and how each was met.**
+
+* *A re-curation can be run from the repository alone* — **met.** The committed listing record
+  carries the fields curation uses plus the full payload's digest, so a price is checkable by
+  anyone without a re-fetch.
+* *It cannot spend by accident* — **met.** `--detect`, `--screen`, `--report` and `--packet`
+  are offline by construction; `live.py` remains the only place a paid call can originate, and
+  the skill states that `--live` needs the owner's explicit yes with the projection shown.
+* *The owner's reserved judgement is part of the workflow* — **met.** The verdict gate is
+  enforced in `curation_diff.apply_verdicts`; a test asserts no field a measurement could set
+  can promote an entry.
+* *No quality claim can drift ahead of the evidence* — **met.** `verified="measured"` is still
+  unset, and a test fails on purpose if it is set without the owner's reading.
+
+**Not in scope, deliberately:** a monthly spend ledger; automatic default switching;
+`cvtailor curate`. Each is recorded with its reasoning in ADR 0017.
 
 ### Item 6 close-out — the study ran, and the winner shipped (2026-10-26/27)
 

@@ -3,8 +3,160 @@
 **Last updated:** 2026-10-30
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `e48425e` — *docs: file D-16, the bare pdflatex name found while verifying D-13*
+**Latest commit:** `3a9adeb` — *skills: the curation procedure, so a re-curation is not re-derived each time*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## The curation skill is built — six commits, one per item (2026-10-30)
+
+The owner asked for this on 2026-10-27: *"a skill that re-runs this curation when new models
+arrive, so the set can be refreshed without repeating this session's manual research."* Ten
+clarifying questions were owed before any code; **the owner answered all ten in-conversation
+on 2026-10-30**, and every answer is recorded in [ADR 0017](DECISIONS/0017-curation-skill.md).
+
+| # | Item | Commit | Outcome |
+|---|---|---|---|
+| **1** | **Portable listing record** (Q10) | `0970c7e` | **Done.** `evaluation/listing.py` + a committed 267-model record; **two skips retired** |
+| **2** | **The screen** (Q1, Q3) | `56b8a4c` | **Done.** `--screen`: a slate plus every rejection, reasoned |
+| **3** | **Detection and the diff** (Q1, Q2, Q6) | `6016b5e` | **Done.** `--detect` reports; `--report` proposes and **writes nothing** |
+| **4** | **The reading packet** (Q7) | `78b436a` | **Done.** `--packet`: documents to read, plus a `VERDICTS.md` |
+| **5** | **The skill file** (Q9) | `3a9adeb` | **Done.** `.agents/skills/cv-model-curation/SKILL.md` — the procedure |
+| **6** | **Documentation and ADR 0017** | *(this commit)* | ADR 0017, PROJECT_STATE, TESTING, ROADMAP |
+
+**Test baseline moved 555/5 → 697 passed, 3 skipped** (~117 s), fully offline.
+**`master` untouched at `1416177`** throughout.
+**Spend for the whole session: $0.00.** One keyless read of OpenRouter's public listing, and
+no `--live` run — a live run is a separate authorisation the owner has not given.
+
+### The four decisions that were genuinely the owner's
+
+**Detection reports and cannot spend** (Q1). It is the one part of the workflow that *could*
+have been automatic, and that is why it is not: the catalogue moved twice in four days (467 →
+456 models) and four prices moved within a single day of the original study. An automatic
+trigger would let routine provider churn spend the owner's money. `--detect` and `--live` are
+separate commands so the separation is structural.
+
+**The proposal is inert** (Q2, Q6). `--report` emits the diff as **text** and never applies it.
+An automated replacement would mean an automated step deleting the only model production uses,
+on evidence measuring **none** of prose, rendering or layout. Applying it is a deliberate
+commit, as `e53ef8a` was.
+
+**The verdict gate is enforced in code, not documented** (Q7). `apply_verdicts` is the only
+route to eligibility; a blank verdict counts as absent so a placeholder cannot promote a
+candidate; and a test asserts `ProposalEntry` has no field a measurement could set to promote
+itself. **There is deliberately no code path from a measurement to a verdict.**
+
+**Per-run cap, $5, explicit yes each time** (Q4, Q5). No monthly ledger — that needs machinery
+nothing here keeps, and it was left out rather than bolted on. The skill never passes `--live`
+and never raises the cap.
+
+### Three real defects found by running the code, not by reading it
+
+**The screen's first two selections were both wrong, and each looked reasonable.** Taking the
+cheapest 8 produced a slate entirely inside the bottom 0.2% of the price range and reported
+`cost spread NO` — correctly — because the 266 survivors span **$0.00049 to $0.70605 per run**,
+a factor of ~1,450. A strict round-robin over the cost bands then fixed the spread and broke
+the slate, filling half of it with `*-pro` models at **$0.41–$0.71 per run**, roughly 200x the
+selected model. The shipped rule is a cheapest-first fill with **one** guard: if the dearest
+band is unrepresented, its cheapest member replaces the slate's dearest entry. Both wrong
+answers and their measurements are recorded in the code.
+
+**The reading packet attributed documents to the wrong models.** Taking the newest job folder
+per case produced **45 folders for 3 candidates** against the real sandbox store — which
+accumulates every job folder from every past run, six per case — and handed a model that
+**never ran** three folders of another model's documents. The packet looked complete and showed
+whichever run was written last. Attribution is now read from each folder's own
+`generation_result.json`. Against the real store it reproduces the historical record exactly:
+`gemini-3.8-flash` 2 of 3 cases, `deepseek-v4-flash` 1 of 3.
+
+**A 0/3 model reported the wrong disqualification.** `is_disqualified` checked the acceptance
+rate before the accepted-nothing case, so a model that accepted nothing reported "0%, below the
+floor" — and the distinct fact that it has no cost per accepted result at all, where a report
+must never print a flattering `0.0`, never surfaced. The order is now load-bearing.
+
+### What the screen says about the catalogue, measured 2026-10-30
+
+**267 models** in the committed record (456 read, minus routing variants and the recency
+floor). Of those, **193 passed every structural filter** and **8 are proposed**: seven economy
+candidates plus one frontier (`openai/gpt-5.2-pro`) so the comparison spans the range.
+**73 were dropped as routing variants** (`:batch`, `~latest`) — routes, not models, and a
+`:batch` route is often *cheaper* than its model, so it would win a cheapest-first cut for the
+wrong reason. This is a **shortlisting**, and 185 further viable candidates remain for a later
+run.
+
+### House rules this session confirmed again
+
+* **The Python subprocess cannot write most tracked paths**, but PowerShell and `edit` can.
+  Write to `.tmp/` and copy with
+  `[System.IO.File]::WriteAllText($dst, $txt, [System.Text.UTF8Encoding]::new($false))`.
+* **PowerShell's `>` and `Out-File -Encoding utf8` write a UTF-8 BOM**, which makes a JSON file
+  unparseable by strict readers. A test asserts the committed record has no BOM.
+* **`.git` is a *file* in this worktree**, so write commit messages to `$env:TEMP`.
+* **`git push` writes progress to stderr**, so PowerShell reports a spurious exit 1. Verify with
+  `git rev-list --left-right --count HEAD...origin/refactor/architecture-v2`.
+* **Do not run two pytest processes concurrently.** Doing so made 14 renderer tests fail with
+  `pdflatex compilation failed` — MiKTeX serialises on a shared font cache. Every failure
+  passed in isolation and the full suite was green run singly. Nothing was "fixed".
+* **A throwaway `git worktree` needs `TEMP`/`TMP` pointed inside the main worktree**, or pytest
+  dies with `No usable temporary directory`.
+* **ADRs are history.** Five still name `GeminiService` deliberately; do not "fix" them.
+
+### Two documentation defects found and fixed while writing item 6
+
+* **`docs/DECISIONS/README.md` had a corrupted sentence** — an orphaned duplicated fragment
+  ("regardless of reputation — and that **the curated set's quality") broke the 0014 paragraph.
+  Repaired.
+* **ADR 0016 was never listed in that table.** It was recorded on 2026-10-26 and omitted. Both
+  0016 and 0017 are now listed.
+
+### What is NOT done, deliberately
+
+* **No `--live` run.** Spend is $0.00 and a live run needs the owner's explicit yes with a
+  projection in front of them.
+* **No monthly spend ledger** (Q4). A separate design.
+* **`verified="measured"` is still not set**, and a test fails on purpose if it is. The owner's
+  writing/PDF/layout judgement is still outstanding — item 4's verdict gate is what will close
+  it, and it deliberately cannot be closed from a measurement.
+* **`LISTING_VERIFIED_ON` still reads `2026-10-26`.** That constant records the listing the set
+  was *selected from*, which remains true and is a different fact from the 2026-10-30 read.
+  Changing it is a curation decision.
+
+## Handoff for the next chat — the curation skill is built (2026-10-30)
+
+**Start state:** `refactor/architecture-v2`, working tree clean, pushed. Full suite
+**697 passed, 3 skipped** (~117 s); `master` untouched at `1416177`.
+
+**The next objective is distinct, and it is the skill's first real use: re-curate.** Whether
+that is worth doing now is answerable for free:
+
+```powershell
+# One keyless read, then diff it against the committed record. Spends nothing.
+$r = Invoke-WebRequest -Uri "https://openrouter.ai/api/v1/models" -UseBasicParsing -TimeoutSec 45
+[System.IO.File]::WriteAllText("$PWD\.tmp\listing_new.json", $r.Content, [System.Text.UTF8Encoding]::new($false))
+.\.venv\Scripts\python.exe -m evaluation --detect .tmp\listing_new.json
+```
+
+If nothing moved, that is a **successful re-curation** and the answer is to stop. If something
+did, `.agents/skills/cv-model-curation/SKILL.md` is the procedure — read it first, and note
+that it requires the owner's explicit yes before any `--live` call.
+
+### The quickest way to see what was built
+
+```powershell
+.\.venv\Scripts\python.exe -m evaluation --screen          # free: a slate and its rejections
+.\.venv\Scripts\python.exe -m evaluation --list-models     # free: what ships
+.\.venv\Scripts\python.exe -m pytest -q tests/test_screen.py tests/test_curation_diff.py tests/test_reading_packet.py tests/test_listing_record.py tests/test_curation_skill.py
+```
+
+### Blast radius for a re-curation
+
+| Area | Why it matters |
+|---|---|
+| `evaluation/curated_models.py` | The candidate list. Adding to it is the *use* of the skill, and two tests assert its current single-entry shape by hard-coded id |
+| `backend/services/pricing.py` | **A new id needs a priced row on the OpenRouter route** or `price_for` borrows the fallback and every model reports the same invented cost |
+| `evaluation/candidate_inputs.py` | A dialect or ceiling adaptation needs a **measured** rationale; the constructor refuses one without |
+| `evaluation/listing_*.json` | The committed record. Rebuild it when the catalogue is re-read, or `--detect` diffs against a stale baseline |
+| `tests/test_evaluation_suite.py` | Hard-codes `'openai/gpt-6-luna'` and `LISTING_VERIFIED_ON == '2026-10-26'`. Both are deliberate pins on a decision, not guards to relax |
+| `.tmp/evaluation-store` | **Clear it before a live run.** It accumulates every past run's job folders, and a stale one puts another slate's documents in the reading packet |
 
 ## Stage B is complete — accuracy and leanness before new features (2026-10-30)
 
@@ -83,17 +235,13 @@ commit**, since the split is what dropped it.
 * **ADRs are history.** Five still name `GeminiService` deliberately; do not "fix" them.
 * **Never verify against old code by stashing** — use a throwaway `git worktree`.
 
-## Handoff for the next chat — the curation skill (2026-10-30)
+## Handoff for the next chat — the curation skill (2026-10-30) — DISCHARGED
 
-**Start state:** `refactor/architecture-v2` at `e48425e`, working tree clean, **in sync
-with `origin`**. Full suite **555 passed, 5 skipped** (~112 s); `master` untouched at
-`1416177`.
-
-**The cleaning stage is done, so the next objective is distinct: the curation skill.**
-The owner asked for it on 2026-10-27 and **clarifying questions are owed before any
-code** — they are written out in the section below, ready to ask. Do not start building
-it from the conversation; the questions exist because several design choices are the
-owner's to make.
+**This handoff is spent.** Its starting state (`e48425e`, 555/5) and its request — that the
+clarifying questions be asked before any curation-skill code — were both acted on: the owner
+answered all ten questions on 2026-10-30, and every item is built and committed. **The current
+handoff is at the top of this file**; the questions below are kept only as the record of what
+was asked, and each answer is in [ADR 0017](DECISIONS/0017-curation-skill.md).
 
 ### What is already known about the curation skill, so it is not re-derived
 
@@ -123,10 +271,12 @@ and out of CI:
 the curated set spans cost tiers and nothing older than 2025-10; the acceptance bar is
 identical for every candidate — only the *asking* may vary.
 
-### The clarifying questions owed before any code
+### The clarifying questions owed before any code — ANSWERED 2026-10-30
 
-**Ask these in the chat; the owner has not answered them.** They are grouped by the
-decision they block, and each is a genuine fork rather than a detail.
+**All ten were put to the owner in-conversation and answered.** The answers are in
+[ADR 0017](DECISIONS/0017-curation-skill.md); the questions are kept verbatim below as the
+record of what was asked, and because a future re-curation may need to revisit one. **Do not
+ask them again as though they were open.**
 
 **Scope and trigger**
 

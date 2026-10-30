@@ -466,10 +466,33 @@ direct, both verified from the provider's own listing. The **§5 cost rows above
 200k threshold, so the figures are identical under the new accounting. Re-derived on
 2026-10-26: $0.01559 / $0.026482 / $0.048265 for best / typical / worst.
 
-**The evaluation suite exists and has not run (Phase 3, item 6).** `evaluation/` implements the
+**The evaluation suite exists and has run (Phase 3, item 6).** `evaluation/` implements the
 eight criteria ADR 0005 names, is offline by default, refuses an over-budget plan before the
-first call, and is not collected by pytest so CI cannot spend. It projects the whole curated
-run at **$1.68** against a **$5** budget. Until it runs, no model-quality ranking is claimed.
+first call, and is not collected by pytest so CI cannot spend. **It ran on 2026-10-26/27:**
+eight candidates were measured on three cases each, the owner selected `openai/gpt-6-luna`, and
+the switch shipped — the projection for that study was $1.65 against a $5 cap, and $1.91 was
+spent across the whole effort.
+
+**The curation workflow (2026-10-30) is four offline verbs plus one paid one**, and the split is
+the design rather than an implementation detail:
+
+| Verb | Offline? | What it does |
+|---|---|---|
+| `--detect` | yes | Diffs a fresh listing against the committed record. **Reports; cannot spend** — there is no path from it to `--live`, so routine catalogue churn cannot trigger a run |
+| `--screen` | yes | A listing record into a proposed slate, with every rejection's rule and failing value |
+| `--packet` | yes | One folder per model per case with the rendered documents, plus a `VERDICTS.md` |
+| `--report` | yes | A curation proposal: the ranked table, the disqualifications, and the diff it **would** make. Emits text and **writes nothing** |
+| `--live` | **no** | The only spending path, unchanged: needs an explicit cap and `authorised=True` |
+
+**`evaluation/listing.py` commits a screened record** (267 models, ~66 KB) alongside the digest
+of the full payload, so a recorded price is checkable by anyone. Previously only the digest was
+kept and the payload was gitignored, which is why two tests skipped in every fresh working copy.
+
+**The quality judgement is a human step, enforced in code.** `evaluation` records acceptance,
+cost and correction calls — and **no** prose, rendering or layout. A candidate is ineligible for
+curation until the owner records their own verdict, and `apply_verdicts` is the only route to
+eligibility. `verified="measured"` is therefore still unset, and a test fails on purpose if it is
+set without that reading.
 
 *Do not add async, concurrency or caching infrastructure before 1–5 are exhausted.*
 

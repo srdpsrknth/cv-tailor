@@ -1,16 +1,27 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **555 passed, 5 skipped**, 1 warning, ~120 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **524 passed, 5 skipped**, 31 deselected, ~16 s.
+**Current baseline:** **697 passed, 3 skipped**, 1 warning, ~118 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **666 passed, 3 skipped**, 31 deselected, ~16 s.
 
-> **The baseline is 555/5, and the five skips are environmental — do not read them as
-> regressions.** Two skip because the recorded OpenRouter listing
-> (`.tmp/openrouter_models_2026-10-26.json`, 467 models, gitignored) is not in this
-> working copy; one because there is no real profile to compare fixtures against; and
-> two are unconditionally `@pytest.mark.skip`'d A-1 guards whose reasons are in the file.
-> **A previous handoff recorded this as "540 passed, 3 skipped"** — the count drifted
-> when the listing fixture left the working copy. Verify against **555/5**.
+> **The baseline is 697/3.** It was 555/5 before the curation-skill items; **two skips were
+> retired** (see below) and 142 tests were added. Verify against **697/3**.
+>
+> **Do not run two pytest processes at once.** Doing so during the curation-skill work made 14
+> renderer tests fail with `pdflatex compilation failed`: MiKTeX serialises on a shared font
+> cache, and both processes compiled concurrently. Every one of those tests passed in isolation
+> and the full suite was green run singly. **That was an environment artifact, not a code
+> defect, and nothing was "fixed" to make it go away.**
+
+> **The two retired skips.** `test_no_curated_model_lacks_structured_output_support` and
+> `test_the_recorded_rates_match_the_listing` used to **skip** because they compared the curated
+> set against `.tmp/openrouter_models_2026-10-26.json` — a 467-model payload that is gitignored
+> and therefore absent from every fresh working copy. A guard that skips whenever its evidence is
+> missing is not a guard, and no price in this repository could be re-checked by anyone. They now
+> read the **committed** record `evaluation/listing_2026-10-30.json` (267 models, ~66 KB) and
+> **fail** rather than skip when it is absent, matching the house rule already applied to
+> `test_provider_interface.py`, `test_pricing.py` and `test_generation_cache.py`.
+> The remaining three skips are the documented environmental ones, unchanged.
 
 **The default is now `openai/gpt-6-luna` on OpenRouter** (2026-10-27), selected by the
 study and switched in `e53ef8a`. Two consequences for anyone running these tests:
@@ -43,6 +54,8 @@ study and switched in `e53ef8a`. Two consequences for anyone running these tests
 | Baseline after Phase 3 item 6, increment C (evaluation suite, curated set) | 436 passed, ~115 s |
 | Baseline after Phase 3 item 5 (validated-generation cache) | 480 passed, ~116 s |
 | **Baseline after the cache-bypass fix and the cost/curation increment (2026-10-26)** | **500 passed**, ~116 s |
+| Baseline after Stage B (accuracy and leanness, 2026-10-30) | 555 passed, 5 skipped, ~120 s |
+| **Baseline after the curation-skill items (2026-10-30)** | **697 passed, 3 skipped**, ~118 s |
 | Paid API calls | **none** |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
@@ -133,6 +146,11 @@ throwaway synthetic store once, for the whole suite.
 | `test_evaluation_suite.py` | **34** | **New in item 6, increment C; 5 added 2026-10-26.** The suite is offline by default and the default cap is the agreed $5; the whole curated run is projected **under** budget; a plan is refused **before** the first call, a missing cap is a refusal rather than "unlimited", and the cap is re-checked before every call rather than only at the start; a live run needs explicit authorisation and an over-budget one spends **nothing**; nothing under `evaluation/` is collected by pytest and CI does not invoke it; cases resolve only inside `tests/fixtures/`, a path that escapes is refused, and the suite never names the private store; the curated set is small, spans three cost tiers cheapest-first, and every entry is **UNMEASURED** with no invented quality claim; recorded rates and structured-output support **match the listing**; cost per **accepted** result is the headline metric and a model that accepts nothing reports `None`, never `0.0`. **Added 2026-10-26:** the suite **bypasses the generation cache**, asserted on the call it actually makes, because a cache hit reports zero usage and would score as an accepted case costing $0.00 — a fabricated best result; the bypass did not cost the run its routing; the set spans at least 5 distinct families; **every entry is created on or after 2025-10-01**; and every entry is priced on the route the run uses |
 | `test_generation_cache.py` | 44 | **New in Phase 3 item 5.** The key is the bytes the model was shown: identical inputs give an identical 64-character digest, and each of the 13 ingredients changes it on its own — including `model_cv` and `model_cl` **separately**, because item 6's routing lets two models serve one posting, and the schema digest, because the schema is request metadata and not in either prompt file. A **prompt-file edit is not served from cache** (asserted through the real pipeline: the model is shown the new prompt and a fresh draft is paid for). An identical repeat makes **0** LLM calls and produces byte-identical `content.json`; a hit reports **zero** usage rather than the original run's tokens, while the original figures survive as `original_usage`; a hit still writes a complete job folder with the restored raw responses as `drafts.json`; and a hit uses a new `job_id` rather than overwriting the first application. **Only a validated result is stored**: a failed draft, a CV that never fits, and a failed repeat all store nothing and leave any earlier entry untouched — asserted by counting entries *during* rendering, so a write that happened before the page-count gate would be caught. The store is **always safe to delete**: a deleted cache regenerates, and an empty, malformed, truncated, wrong-format-version, no-longer-validating or wrong-shape entry is a **miss** rather than a failure. `use_cache=False` re-drafts and still stores. The cache lives at `<store>/cache/<profile_id>/`, fails closed without a profile id, cannot be read across candidates, and refuses a key that is not a 64-character lowercase hex digest. Cold-cache call counts stay at **2/3/5**. **Two tests guard the repository boundary** — that a loose `--profile <path>` run (the branch `evaluation/live.py` takes) still caches in the store and leaves the repository root clean; both were verified to **fail** against the first implementation, which put the cache beside the outputs |
 | `test_generation_split.py` | **11** | **New in Stage B, 2026-10-30.** `services/generation.py` is a **facade** over six modules, and these pin the properties a behavioural test cannot see. Every public name the old module defined is still reachable from it; every re-export is the **same object** as its home rather than an equal copy, so the two cannot drift; the facade contains nothing but imports, a `logger` and `__all__` (asserted with `ast`, so a helper cannot quietly live there); each module stays under a **420-line ceiling**, because `generation.py` reached 1,465 lines by accumulating five concerns and nothing failed while it did; the **response-schema digests are unchanged** by the split (a cache-key ingredient, ADR 0015); and the prompt files still exist where `prompts.PROMPT_CV_PATH` says. **All 11 fail against `ac1c902`** — verified in a throwaway worktree, not by stashing |
+| `test_listing_record.py` | **25** | **New in the curation-skill items, 2026-10-30.** The committed listing record is the artefact that makes a price checkable by anyone. It is present and parses; every entry carries exactly the declared seven fields; the recorded digest is the **full payload's**, not the record's own (a test asserts it differs from the hash of the committed file, because a self-hash would only prove the file was not edited); a re-screen of the same payload reproduces the record, so a diff reports the catalogue changing rather than the script; the screen keeps a model below the owner's floor **out**, and a model with no usable date fails **closed** rather than being defaulted to today; prices are rounded so `0.09999999999999999` cannot appear in a file people read; a price disagreement is reported with both figures and float noise does not register as one; a malformed payload or record **raises** rather than returning an empty catalogue |
+| `test_screen.py` | **35** | **New in the curation-skill items, 2026-10-30.** The screen reduces a listing to a proposed slate. It is asserted **offline by arming every socket entry point** and screening the real record, not by reading the source; deterministic across two runs; every rejection carries its rule *and* the value that failed; a shortlisting is a distinct rule from a rejection and says so in words; the slate keeps one expensive candidate when the dearest band is otherwise unrepresented, and the guard is a no-op when it is already represented; cost spread is measured on the **run**, not the input rate; routing variants (`:batch`, `~latest`) are dropped as routes while an unrecognised colon suffix is left alone; each structural filter has a test; a dialect hint is `assumed` and **cannot pose as a measured rationale**; and the CLI refuses a missing record with a usable message |
+| `test_curation_diff.py` | **31** | **New in the curation-skill items, 2026-10-30.** Detection diffs two records and reports added/withdrawn/repriced, with **capability changes separated from price changes** because one moves the ranking and the other disqualifies; it is asserted offline the same way the screen is, and its report says it changed nothing and spent nothing. The proposal turns scores into a review artefact: **no measured entry is eligible without the owner's writing/PDF/layout verdict**; a blank verdict does not promote; a verdict cannot override a measured failure; the owner's three disqualifiers are pinned, with accepted-nothing checked **before** the rate; correction calls are recorded and **not** disqualifying; ranking puts the cheapest accepted first and failures last; "keep the current model" is reported as a real outcome. **Inertness is asserted by hashing `curated_models.py` and `candidate_inputs.py` around a real proposal run** |
+| `test_reading_packet.py` | **27** | **New in the curation-skill items, 2026-10-30.** The packet holds the rendered documents per model per case, PDFs before the DOCX, with the editable source kept beside them and the study's rank in the folder name. **Attribution is by each folder's own manifest, never by recency** — the first implementation took the newest folder per case and handed a model that never ran three folders of another model's documents, which is pinned here. A model with nothing to read gets no folder and is reported **inconclusive, not failed**; an unattributable folder is not given to anyone; a re-run prefers the newest of *one* model's own folders; a stale folder is cleaned. The verdict file asks the four questions the owner's own how-to-report settled on, says a disagreeing ranking **is the finding**, and yields **no verdicts when untouched** — including for an answered-inline line and a blank body |
+| `test_curation_skill.py` | **22** | **New in the curation-skill items, 2026-10-30.** The skill file is the *procedure*. These assert the content that could be **harmful if wrong** rather than the wording: valid frontmatter, the layout beside the other skills, the requirement of the owner's explicit yes in the conversation before `--live` with the projection shown first, that the cap is per-run and not to be raised unilaterally, that the default is **never switched autonomously**, that the report applies nothing, that the human verdict is required and the agent must not fill it in, that a dialect rationale must be a measured error (with the three family constraints carried forward), that the acceptance bar never varies, that no leaderboard may support a quality claim, and the operational traps — the price row, clearing the sandbox, and the byte-level BOM rule. Prohibitions are asserted **explicitly**, because an omission in a procedure file reads as permission |
 
 **Two test changes in Stage B, both recorded because a seam moved:**
 
@@ -280,7 +298,49 @@ artifacts and may need an unconfined delete.
 
 # Item 5: the validated-generation cache (~2 s, offline)
 .venv\Scripts\python.exe -m pytest -q tests/test_generation_cache.py
+
+# The curation skill's four offline halves (~1 s total, no network, no spend)
+.venv\Scripts\python.exe -m pytest -q tests/test_listing_record.py tests/test_screen.py tests/test_curation_diff.py tests/test_reading_packet.py tests/test_curation_skill.py
 ```
+
+### The curation workflow — four offline verbs, one paid one
+
+`.agents/skills/cv-model-curation/SKILL.md` is the **procedure**; `python -m evaluation` is the
+**tool**. Everything below is offline and free unless it says `--live`.
+
+```powershell
+# Report what changed in the catalogue. Free, and it will not fetch for you.
+.\.venv\Scripts\python.exe -m evaluation --detect .tmp\listing_new.json
+
+# Propose a candidate slate from a listing record, with every rejection reasoned.
+.\.venv\Scripts\python.exe -m evaluation --screen
+.\.venv\Scripts\python.exe -m evaluation --screen --cap-slate 4
+
+# Build a reading packet: documents to read, plus a VERDICTS.md to fill in.
+# ranking.json is {"ranking": ["vendor/model", ...], "notes": [...]}, best first.
+.\.venv\Scripts\python.exe -m evaluation --packet .tmp\ranking.json
+
+# Turn a finished run into a proposal. Emits the diff as TEXT and writes nothing.
+.\.venv\Scripts\python.exe -m evaluation --report .tmp\scores_with_verdicts.json
+```
+
+**`--detect` cannot spend and there is no path from it to `--live`.** That is deliberate: the
+catalogue moved twice in four days (467 → 456 models), so an automatic trigger would let routine
+provider churn spend money. `--report` likewise only describes — applying the diff is a separate
+deliberate commit.
+
+**Reading a new listing is a keyless network call the agent makes itself**, not one `--detect`
+makes for you:
+
+```powershell
+$r = Invoke-WebRequest -Uri "https://openrouter.ai/api/v1/models" -UseBasicParsing -TimeoutSec 45
+[System.IO.File]::WriteAllText("$PWD\.tmp\listing_new.json", $r.Content, [System.Text.UTF8Encoding]::new($false))
+```
+
+`WriteAllText` with `UTF8Encoding($false)`, not PowerShell's `>`: the redirect writes a **UTF-8
+BOM**, which makes a JSON file unparseable by strict readers. A test asserts the committed record
+has none.
+
 
 ### The generation cache — where it lives, and how to clear it
 
@@ -410,8 +470,7 @@ when no `pdflatex` can be resolved, so the suite still runs green on a machine w
 
 | File | Tests | Covers |
 |---|---|---|
-| `test_profile_loading.py` | 14 | Profile loading and validation: happy path, path forms, default-path resolution, missing file, `extra="forbid"`, missing required fields, malformed and unparseable YAML, empty file, the documented unvalidated-date gaps |
-| `test_tailoring_pipeline.py` | 84 | CV tailoring, cover-letter generation, LLM response parsing, factual validation, retry handling, error handling, token accounting, cross-profile isolation, **profile-scoped rules (A-1)**, shared helper behaviour (D-12), pricing-table invariants (D-5) |
+| `test_profile_loading.py` | 14 | Profile loading and validation: happy path, path forms, default-path resolution, missing file, `extra="forbid"`, missing required fields, malformed and unparseable YAML, empty file, the documented unvalidated-date gaps || `test_tailoring_pipeline.py` | 84 | CV tailoring, cover-letter generation, LLM response parsing, factual validation, retry handling, error handling, token accounting, cross-profile isolation, **profile-scoped rules (A-1)**, shared helper behaviour (D-12), pricing-table invariants (D-5) |
 | `test_renderers_documents.py` | 34 | **Real** LaTeX CV and DOCX cover letters: page geometry, required sections, verbatim bullets, clipping, orphan headings, LaTeX escaping, word counts, page-count gate |
 | `test_render_application_determinism.py` | 11 | `scripts/render_application.py` end to end as a subprocess: identical content → identical page count *and* identical text, in-place stability, manifest handling, residue cleanup, failure paths |
 | `test_cli.py` | 22 | **New in Phase 1.** Guided default, exit codes, `doctor` (including its refusal to verify the key unless asked), `profile show`, and every `render`/`generate` failure path — plus two LaTeX-gated tests: one rendering without an API key, one asserting the CLI's page count equals the existing script's |

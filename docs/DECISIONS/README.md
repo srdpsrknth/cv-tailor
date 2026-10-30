@@ -20,6 +20,8 @@ Only the owner can move a decision to **Approved**.
 | [0013](0013-provider-interface-and-routing.md) | Thin provider interface; Gemini default, OpenRouter second; model-per-task routing; optional budget cap | **Approved** — Phase 3 item 6 |
 | [0014](0014-evaluation-suite-and-curation.md) | The live evaluation suite stays opt-in and budget-capped; curation is a shortlist until measured | **Approved** — Phase 3 item 6 |
 | [0015](0015-generation-cache.md) | Cache validated generations, keyed by the bytes the model was shown; only a validated result is stored, and the store is always safe to delete | **Approved** — Phase 3 item 5 |
+| [0016](0016-per-candidate-inputs-and-one-winner.md) | One schema and prompt per candidate, judged on cost per accepted result; the study selects one model rather than shipping a menu | **Approved** — Phase 3 item 6, discharged 2026-10-27 |
+| [0017](0017-curation-skill.md) | Curation is a procedure with two human steps: detection reports and cannot spend, the proposal is inert, and a candidate is ineligible without the owner's own writing/PDF/layout verdict | **Approved** — curation-skill items, 2026-10-30 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1
@@ -45,7 +47,6 @@ provider as such; that there is **no** fallback between providers or models; and
 failure is not a `ValueError`, because the correction loop catches `ValueError`.
 [0014](0014-evaluation-suite-and-curation.md) records that the live evaluation stays opt-in,
 budget-capped and out of CI, and — the part that matters most — that **the curated set's quality
-regardless of reputation — and that **the curated set's quality
 ranking is unmeasured and is marked as such**, rather than inferred from price, reputation or a
 general leaderboard. Both were written during implementation because the alternatives are either
 unsafe (a silent provider fallback) or dishonest (a ranking presented as researched when it was
@@ -62,8 +63,18 @@ and that the store is **derived data whose deletion is always safe**, so every r
 miss rather than an error. `model` is two ingredients rather than one because item 6's
 per-task routing lets two models serve one posting.
 
-## Owner's stated preferences (recorded verbatim in intent)
+**Decisions recorded 2026-10-30 (the curation skill).** [0017](0017-curation-skill.md) answers
+the ten clarifying questions owed before any curation-skill code, and records four choices that
+are expensive to reverse: that **detection reports and cannot spend** (a provider's routine
+catalogue churn must not be able to trigger a run — the catalogue moved twice in four days);
+that the **proposal is inert**, because a measurement that covers none of prose, rendering or
+layout must not be able to replace the model production uses; that **a candidate is ineligible
+without the owner's own writing/PDF/layout verdict**, enforced in code rather than documented;
+and that the **screened listing record is committed** while the raw payload is not, so a price
+can be checked by anyone without a re-fetch. [0016](0016-per-candidate-inputs-and-one-winner.md)
+is listed above for the first time — it was recorded on 2026-10-26 and omitted from this table.
 
+## Owner's stated preferences (recorded verbatim in intent)
 - Profiles should be reachable **from any machine** where cv-tailor can be installed, given
   internet — satisfied by [0006](0006-remote-profile-access.md), not by committing data.
 - Storage: **start local**, add internet access later.
