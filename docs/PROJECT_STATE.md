@@ -3,15 +3,15 @@
 **Last updated:** 2026-10-30
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `9b8df51` — *docs: drop comments that narrate what the ADRs already record*
+**Latest commit:** `e48425e` — *docs: file D-16, the bare pdflatex name found while verifying D-13*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Stage B is complete — accuracy and leanness before new features (2026-10-30)
 
 The owner's stated order was: *"mechanical renames and cleaning scripts to be lean and
 concise without inaccuracies should come before we work on new features like curation
-skills."* All four cleaning items are now done, **one commit each**, followed by this
-documentation commit. Nothing was bundled.
+skills."* All four cleaning items are now done, **one commit each**, followed by the
+documentation commits. Nothing was bundled.
 
 | # | Item | Commit | Outcome |
 |---|---|---|---|
@@ -20,8 +20,12 @@ documentation commit. Nothing was bundled.
 | **3** | **Split `generation.py`** — was 1,465 lines | `bc2c3d9` | **Split** into six modules + a 118-line facade |
 | **4** | **Trim over-commenting** | `9b8df51` | **Trimmed** 87 lines, proven comment-only |
 
-**Test baseline moved 538 → 555 passed, 5 skipped** (~120 s), fully offline, no paid calls.
-**`master` untouched at `1416177`** throughout. Nothing has been pushed.
+**Test baseline moved 538 → 555 passed, 5 skipped** (~112 s), fully offline, no paid calls.
+**`master` untouched at `1416177`** throughout — verified on the remote too.
+**Pushed 2026-10-30**: the branch is at `e48425e` on `origin` and **in sync** (the owner
+approved the push in-conversation; `git push` writes progress to stderr, so verify with
+`git rev-list --left-right --count HEAD...origin/refactor/architecture-v2`, which reads
+`0 0`).
 
 ### The baseline is 538/5, not the 540/3 the previous handoff recorded
 
@@ -81,9 +85,9 @@ commit**, since the split is what dropped it.
 
 ## Handoff for the next chat — the curation skill (2026-10-30)
 
-**Start state:** `refactor/architecture-v2` at `9b8df51`, working tree clean, **not
-pushed** (remote is at `f7635ea`). Full suite **555 passed, 5 skipped** (~120 s);
-`master` untouched at `1416177`.
+**Start state:** `refactor/architecture-v2` at `e48425e`, working tree clean, **in sync
+with `origin`**. Full suite **555 passed, 5 skipped** (~112 s); `master` untouched at
+`1416177`.
 
 **The cleaning stage is done, so the next objective is distinct: the curation skill.**
 The owner asked for it on 2026-10-27 and **clarifying questions are owed before any
