@@ -81,6 +81,18 @@ def build_parser() -> argparse.ArgumentParser:
             "disqualifications, and the diff it WOULD make. Writes nothing."
         ),
     )
+    parser.add_argument(
+        "--packet", nargs="?", const="", default=None, metavar="RANKING_JSON",
+        help=(
+            "build a reading packet for the owner's writing/PDF/layout judgement: one "
+            "folder per model per case holding the rendered documents, plus a "
+            "VERDICTS.md to fill in. Offline; reads only a run's output tree."
+        ),
+    )
+    parser.add_argument(
+        "--packet-destination", default=None, metavar="DIR",
+        help="where --packet writes (default: .tmp/reading-packet)",
+    )
     return parser
 
 
@@ -281,6 +293,56 @@ def _run_report(argument: str) -> int:
     return 0
 
 
+def _run_packet(argument: str, destination: Optional[str]) -> int:
+    """Build a reading packet. Offline: reads a run's output tree and copies documents.
+
+    The ranking is supplied rather than derived, because it comes from the run's measured
+    cost per accepted result -- and this module deliberately does not re-derive it. Two
+    orderings of the same run would be a way for the folder numbers to disagree with the
+    table the recommendation rests on.
+    """
+    import json
+    from pathlib import Path
+
+    from evaluation.reading_packet import build_packet
+
+    if not argument:
+        raise SystemExit(
+            "Pass the run's ranking, best first:\n"
+            "  python -m evaluation --packet ranking.json\n"
+            '  where ranking.json is {"ranking": ["vendor/model", ...], "notes": [...]}\n'
+            "The ranking comes from the run; this command does not re-derive it."
+        )
+    path = Path(argument)
+    if not path.exists():
+        raise SystemExit(f"No such ranking file: {path}")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    ranking = tuple(payload.get("ranking") or ())
+    if not ranking:
+        raise SystemExit(f"{path} names no models in a 'ranking' list")
+
+    sandbox = (
+        Path(__file__).resolve().parents[1] / ".tmp" / "evaluation-store" / "outputs"
+    )
+    if not sandbox.is_dir():
+        raise SystemExit(
+            f"No evaluation output tree at {sandbox}.\n"
+            "A reading packet is built from a completed live run's documents; there is "
+            "nothing to read until one has been made.\n"
+            "Clear the sandbox and run one with --live --cap-usd N."
+        )
+
+    target = Path(destination) if destination else (
+        Path(__file__).resolve().parents[1] / ".tmp" / "reading-packet"
+    )
+    packet = build_packet(
+        sandbox, target, ranking=ranking, notes=tuple(payload.get("notes") or ())
+    )
+    print(packet.describe())
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -299,6 +361,9 @@ def main(argv=None) -> int:
 
     if args.report is not None:
         return _run_report(args.report)
+
+    if args.packet is not None:
+        return _run_packet(args.packet, args.packet_destination)
 
     models = _selected_models(args.models)
 
