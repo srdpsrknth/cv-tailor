@@ -170,40 +170,13 @@ def _document_response_schema(envelope_key: str, document):
     )
 
 def _to_strict_dialect(schema):
-    """Convert a Gemini-flavoured ``Schema`` into strict JSON Schema for the wire.
+    """``schema`` in the strict dialect, with the CV's free-form map respelled.
 
-    **Why the shipped contract is now strict.** The study of 2026-10-26/27 selected
-    ``openai/gpt-6-luna`` as the model (ADR 0016), and OpenAI's strict mode *requires*
-    ``additionalProperties: false`` on every object. Verified live: sending the previous
-    Gemini-shaped schema to that model returns
-
-        Invalid schema for response_format: In context=('properties', 'cv'),
-        'additionalProperties' is required to be supplied and to be false.
-
-    so switching the model without also switching the schema would have broken every
-    draft call immediately -- HTTP 400, no document.
-
-    Three transformations, each demanded by a measured error rather than assumed:
-
-    1. **Type names lowercased.** The SDK spells them ``"OBJECT"``; standard JSON Schema
-       requires ``"object"``. Uppercase made DeepInfra answer *"Grammar error: Invalid
-       type: OBJECT"* and Parasail *"Failed to compile json grammar"*.
-    2. **Every object marked ``required`` with ``additionalProperties: false``.** This
-       is what OpenAI demands, and it also satisfies Anthropic-behind-Vertex, whose
-       ceiling is on *optional* parameters (27 optional raised a 400; zero satisfies it).
-    3. **A free-form map becomes an array.** ``skills`` is a category-to-skills map, and
-       a map is *defined* by allowing arbitrary keys -- the exact opposite of
-       ``additionalProperties: false``. It is expressed as ``[{category, items}, ...]``,
-       which carries the same document; ``TailoredCV`` accepts both spellings.
-
-    ``nullable`` is translated to a ``"null"`` type rather than dropped, so an optional
-    field does not silently become required -- the compatibility fix must not change what
-    the schema means.
-
-    This is the **single** implementation of the conversion. It is exposed as
-    :func:`to_dialect` so the evaluation suite -- which additionally needs the Gemini
-    and Vertex renderings -- shares it rather than keeping a second copy that only
-    production exercises.
+    The conversion itself, and why the shipped contract is strict at all, live in
+    :func:`services.schema_dialect.to_dialect` and the module comment above. What is
+    specific to this call site is the **order**: the map is reshaped *before* the
+    conversion, because a strict dialect is what makes the map inexpressible in the
+    first place.
     """
     return to_dialect(reshape_free_form_maps(schema), DIALECT_STRICT)
 

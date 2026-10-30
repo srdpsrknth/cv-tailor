@@ -76,20 +76,13 @@ def build_context(
         f"BASE PROFILE (authoritative JSON):\n{profile_bytes}"
     )
 
-#: The editorial requirements that used to be a second, whole-CV pass.
+#: The editorial requirements that replaced a second, whole-CV pass (ASSESSMENT.md §5).
 #:
-#: Phase 3, increment 2 removed that pass and folded its requirements into the draft
-#: prompt instead. The pass re-sent the entire context *plus* the finished draft
-#: (~7,730 tokens) to ask for a complete revision -- one whole call and ~25% of total
-#: input tokens (ASSESSMENT.md §5) for instructions that were already implicit in the
-#: draft prompt's WRITING AND FACTUAL RULES. The revision it returned was also
-#: re-validated from scratch, so the pass bought a second draft, not a stronger gate.
-#:
-#: The text below is tested against the real validators before it is shipped
-#: (``tests/test_editorial_instructions.py``): every clause here is one the pipeline
-#: already enforces downstream, so stating it up front is what makes a single draft
-#: sufficient. It is injected by :func:`build_cv_prompt`, never as a suffix to the
-#: finished document.
+#: Every clause here is one the pipeline already enforces downstream, and that is what
+#: makes a single draft sufficient: stating the checks up front is what removes the need
+#: to re-read a finished document and revise it. The text is tested against the real
+#: validators (``tests/test_editorial_instructions.py``), and it is injected by
+#: :func:`build_cv_prompt`, never as a suffix to a finished document.
 EDITORIAL_REQUIREMENTS = (
     "\nEDITORIAL AND FACTUAL REQUIREMENTS (check the draft against these before returning it)\n"
     "- Remove invented outcomes, tools, claims of sole ownership, and any implication that "
@@ -121,12 +114,9 @@ def build_cv_prompt(prompt_text: str, context: str) -> str:
 def layout_correction_instruction(page_count: int, budget: int, rules: ProfileRules) -> str:
     """The shortening rules for one layout retry, without a heading.
 
-    The rules are byte-identical to what the whole-document instruction always said --
-    Phase 3, item 1 changed what the retry *sends* and what it *asks for*, not whether
-    these constraints still apply. The heading comes from
-    :func:`layout_retry_instruction`, which is the only caller: a retry is no longer a
-    ``LAYOUT CORRECTION`` (that string identified the old, whole-document contract), and
-    keeping it here would put two different labels on the same brief.
+    The heading comes from :func:`layout_retry_instruction`, which is the only caller:
+    a retry is no longer a whole-document ``LAYOUT CORRECTION``, and keeping that label
+    here would put two names on the same brief.
     """
     return (
         f"The current CV rendered to {page_count} pages. "
@@ -172,17 +162,14 @@ def cv_body_words(cv: TailoredCV) -> int:
 def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
     """The current CV's shape in one line: body length, summary and employer sizes.
 
-    The old brief told the model to hit "approximately 650 words" without ever saying
-    how long the document was -- the recorded fixtures are ~80-100 real words, so the
-    target described a document three to eight times the size of the one being
-    shortened. This line makes the target readable against reality, and it is measured
-    from the CV that was actually rendered.
+    Makes the word target readable against the document actually rendered, rather than a
+    bare "approximately 650 words" the model cannot check itself against.
 
     The attempt number is included so that a correction loop, which re-sends the same
     CV after an invalid retry, does not present a stale "shortening attempt 1" label.
 
     It deliberately does **not** quote the CV's text back: the model wrote it, and
-    echoing it would restore the repetition this increment removes.
+    echoing it would restore the repetition the retry exists to remove.
     """
     summary_words = sum(len(line.split()) for line in cv.summary)
     bullet_words = sum(len(bullet.split()) for exp in cv.experience for bullet in exp.bullets)
@@ -202,9 +189,8 @@ def layout_retry_instruction(
 ) -> str:
     """The targeted brief for one layout retry.
 
-    Replaces the old "here is the whole context again, return the complete shorter CV"
-    instruction. Everything the retry needs to know about the *document* is measured
-    here, and the response may be a delta instead of a copy:
+    Everything the retry needs to know about the *document* is measured here, and the
+    response may be a delta instead of a copy:
 
     * the response may be a delta object of replacement values, merged onto the CV
       that was just rendered (:func:`apply_cv_delta`);
@@ -212,10 +198,9 @@ def layout_retry_instruction(
       a failure -- it is simply as expensive as before.
 
     The context (profile, job description, prompt file) is deliberately absent: it was
-    sent on the draft call, and repeating it is what this increment removes.
+    sent on the draft call, and repeating it is what this brief removes.
 
-    The ``LAYOUT RETRY`` marker leads the brief so a retry is identifiable on its own,
-    and so a test can tell it apart from the old ``LAYOUT CORRECTION`` contract.
+    The ``LAYOUT RETRY`` marker leads the brief so a retry is identifiable on its own.
     """
     retry = layout_correction_instruction(page_count, budget, rules)
     if attempt:

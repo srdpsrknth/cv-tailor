@@ -220,13 +220,6 @@ def reshape_free_form_maps(schema):
 def to_dialect(schema, dialect: str):
     """``schema`` rendered for ``dialect`` -- the one implementation of the conversion.
 
-    **Why this is here and not duplicated.** Production and the evaluation suite both
-    need to render a schema for a provider family, and they used to do it in two separate
-    functions. Only production's was exercised end to end, so a drift between them would
-    have shown up as the evaluation measuring something the pipeline never sends -- or,
-    worse, as a schema the evaluation approves and a real call refuses. There is now one
-    conversion, and the evaluation calls it.
-
     The transformations are what the live errors demand, applied structurally so a schema
     edit cannot quietly stop satisfying a provider:
 

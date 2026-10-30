@@ -278,21 +278,14 @@ class DocumentGenerator:
     ):
         """One layout retry: shorten the *current* candidate with a tighter budget.
 
-        Until Phase 3 item 1 this re-sent ``cv_prompt`` -- prompt file, editorial
-        requirements, job description and the whole profile -- plus the complete CV, and
-        asked for a complete shorter CV. Measured on the recorded Nordwind run with a
-        real tokenizer, that retry sent more input (3,488 tokens) than the draft itself
-        (2,886) and asked for ~480 output tokens of JSON that were mostly a copy of the
-        previous response.
+        What is sent is the retry brief and the current CV, not the whole context again:
+        the context was already sent on the draft call, and a delta response can replace
+        only the units that need shortening. ``cv_prompt`` stays in the signature so
+        callers are unchanged, but it is deliberately no longer re-sent.
 
-        What is sent now is the retry brief and the current CV: the context was already
-        sent on the draft call, and a delta response can replace only the units that
-        actually need shortening. ``cv_prompt`` stays in the signature so callers are
-        unchanged, but it is deliberately no longer re-sent.
-
-        The gate is unchanged: see :meth:`generate`. ``extract_explanation`` is still
-        read first from the retry's own response, so a retry that returns its own
-        explanation supersedes the draft's.
+        The gate is unchanged: see :meth:`generate`. ``extract_explanation`` is read
+        first from the retry's own response, so a retry that returns its own explanation
+        supersedes the draft's.
         """
         self._status(f"CV is {page_count} pages; shortening content...")
         budget = layout_budget(attempt)
