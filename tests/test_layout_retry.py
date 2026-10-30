@@ -41,6 +41,7 @@ import pytest
 from models.tailored_output import TailoredCV
 from services import generation
 from services import tailor_service as service
+from services import validation
 
 
 def rich_cv(session) -> TailoredCV:
@@ -357,13 +358,17 @@ def test_a_merged_cv_still_goes_through_validate_cv(
     would hide a missing gate if only the result were checked.
     """
     seen = []
-    original = generation.validate_cv
+    original = validation.validate_cv
 
     def recording(cv, profile, rules):
         seen.append(cv)
         return original(cv, profile, rules)
 
-    monkeypatch.setattr(generation, 'validate_cv', recording)
+    # Patched on the module that *owns* the gate. `services.generation` re-exports the
+    # same function, but rebinding a name in the facade cannot affect what
+    # `services.pipeline` resolves at call time -- the facade is an alias, not a lookup
+    # path -- so the owner is where the seam lives.
+    monkeypatch.setattr(validation, 'validate_cv', recording)
     offline = offline_service(analyst_session.texts())
     stub_renderers([3, 2])
 
