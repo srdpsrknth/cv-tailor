@@ -6,6 +6,39 @@
 **Latest commit:** `40215e0` — *docs: the re-curation command needs two steps, and the re-curation found nothing*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
+## Phase 4 has started — the source research is done and awaits approval (2026-10-31)
+
+**Active task:** Phase 4, *job discovery and matching*. **Item 1 (ADR 0008 §1 source
+research) is complete and committed; the owner's approval of the source list is the
+blocker before any connector is written.**
+
+The owner answered ADR 0008 §5's scope question in chat on 2026-10-31: **broad coverage of
+the major public job APIs, Germany/DACH first, with the `Job` model designed so other
+markets can follow** — and confirmed the Phase 3 `measured` close-out is done and must not
+be reopened.
+
+The research is [docs/analysis/job-sources-research.md](analysis/job-sources-research.md),
+with every endpoint called for real and the probe committed as
+`tools/probe_job_sources.py`. **Three findings shaped the recommendation, and one
+contradicts the brief's premise:**
+
+* **softgarden publishes an official schema.org `DataFeed`** and is explicitly
+  crawler-friendly (*"All robots allowed"*). It is the best-fitting DACH source found and
+  was not on the original shortlist.
+* **`JobPosting` JSON-LD is NOT universal.** Greenhouse-hosted job pages contain **zero**
+  `ld+json` blocks; SmartRecruiters uses microdata. A JSON-LD-first plan would return
+  nothing for two major platforms. Lever is the positive control proving the extractor works.
+* **SmartRecruiters works and is still refused** — its API host `robots.txt` is
+  `Disallow: /`. ADR 0008 §3 requires respecting `robots.txt`, so a `200` is not permission.
+
+**Recommended:** softgarden, Personio, and one ATS family (Lever + Greenhouse + Ashby),
+plus Adzuna/Arbeitnow optionally. **Explicitly not built:** Bundesagentur für Arbeit (key
+refused with `403`), StepStone, Indeed, LinkedIn, SmartRecruiters, Workday, and **any HTML
+scraper** — so ADR 0008 §3's scraping allowance is not exercised. **Spend: $0.00.**
+
+**Next action:** the owner approves or amends the source list; then implement in
+independently testable increments, one commit per numbered item.
+
 ## Phase 3 is fully closed out — the owner's verdict is in (2026-10-31)
 
 The last outstanding item from Phase 3 is done. `verified="measured"` is now set on

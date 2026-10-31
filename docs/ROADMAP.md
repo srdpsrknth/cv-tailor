@@ -405,6 +405,10 @@ Live evaluation stays out of CI — optional, budget-capped and reproducible.
 
 ## Phase 4 — Job discovery and matching
 
+**Status: started 2026-10-31.** Item 1 (ADR 0008 §1 source research) is complete; the
+source list awaits the owner's approval before connectors are written. See
+[docs/analysis/job-sources-research.md](analysis/job-sources-research.md).
+
 - **Objective:** find and rank jobs instead of pasting descriptions.
 - **User value:** the largest workflow gain after multi-profile.
 - **Scope:** modular connectors over **ToS-compliant** sources (public APIs, RSS, official

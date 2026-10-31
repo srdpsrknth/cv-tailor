@@ -1,7 +1,20 @@
 # 0008 — Job sources: ToS-compliant APIs first, scraping only if justified
 
-**Status:** Approved in principle (2026-10-23) — scope to be determined at Phase 4
-**Related:** [ROADMAP.md](../ROADMAP.md) Phase 4
+**Status:** Approved in principle (2026-10-23) — **§5 scope re-confirmed by the owner
+2026-10-31; §1 research complete, source list awaiting approval**
+**Related:** [ROADMAP.md](../ROADMAP.md) Phase 4,
+[§1 research finding](../analysis/job-sources-research.md)
+
+> **§5 scope, answered by the owner on 2026-10-31:** broad coverage of the major public job
+> APIs; **Germany/DACH first**, with the `Job` model designed so other markets can follow;
+> and the Phase 3 `verified="measured"` close-out is done and must not be reopened.
+>
+> **§1 is discharged** by [docs/analysis/job-sources-research.md](../analysis/job-sources-research.md),
+> which records every candidate source against the ten fields §1 requires. Its findings
+> **amend one assumption in §2 below**: ATS-hosted `JobPosting` JSON-LD is *not* universal
+> (Greenhouse serves none; SmartRecruiters uses microdata), so JSON-LD is a useful pattern
+> rather than a portable one. §2's ordering still holds — the ATS *list feeds* sit above
+> scraping — but they are consumed as feeds, not by JSON-LD extraction alone.
 
 ## Context
 
