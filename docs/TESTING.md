@@ -310,7 +310,7 @@ artifacts and may need an unconfined delete.
 
 ```powershell
 # Report what changed in the catalogue. Free, and it will not fetch for you.
-.\.venv\Scripts\python.exe -m evaluation --detect .tmp\listing_new.json
+.\.venv\Scripts\python.exe -m evaluation --detect .tmp\listing_new_record.json
 
 # Propose a candidate slate from a listing record, with every rejection reasoned.
 .\.venv\Scripts\python.exe -m evaluation --screen
@@ -336,6 +336,31 @@ makes for you:
 $r = Invoke-WebRequest -Uri "https://openrouter.ai/api/v1/models" -UseBasicParsing -TimeoutSec 45
 [System.IO.File]::WriteAllText("$PWD\.tmp\listing_new.json", $r.Content, [System.Text.UTF8Encoding]::new($false))
 ```
+
+**That fetch gives the raw payload, and `--detect` cannot read it — screen it first.** The raw
+response is `{"data": [...]}`; a *record* is `{"models": [...]}`, reduced to the seven fields
+curation uses. Pointing `--detect` at the raw file fails with
+`ValueError: not a listing record: no 'models' key`, and the failure names the wrong file: the
+payload is fine, it is simply one step early. Reduction is a second, explicit step, so the
+committed record stays a reviewed artefact rather than whatever the network last returned:
+
+```powershell
+# Raw payload -> a record. read_on and source_sha256 are facts about the FETCH, so they are
+# supplied here; source_sha256 digests the WHOLE response, which is what ties a future read
+# to this record. Both must come from the fetch, not from the payload's contents.
+$env:PYTHONPATH = "$PWD"
+@'
+import json, pathlib
+from evaluation.listing import screen_payload, sha256_of_bytes
+raw = pathlib.Path(".tmp/listing_new.json").read_bytes()
+rec = screen_payload(json.loads(raw.decode("utf-8")), read_on="2026-10-31", source_sha256=sha256_of_bytes(raw))
+pathlib.Path(".tmp/listing_new_record.json").write_text(rec.to_json(), encoding="utf-8")
+'@ | Set-Content -Encoding ascii .tmp\make_record.py
+.\.venv\Scripts\python.exe .tmp\make_record.py
+```
+
+The screen is a **read**, not a decision: it applies only the structural filters and the owner's
+recency floor. Nothing in it promotes or rejects a model on merit.
 
 `WriteAllText` with `UTF8Encoding($false)`, not PowerShell's `>`: the redirect writes a **UTF-8
 BOM**, which makes a JSON file unparseable by strict readers. A test asserts the committed record

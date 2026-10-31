@@ -1,10 +1,23 @@
 # Project state
 
-**Last updated:** 2026-10-30
+**Last updated:** 2026-10-31
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `3a9adeb` — *skills: the curation procedure, so a re-curation is not re-derived each time*
+**Latest commit:** `1e2d4d5` — *docs: record the curation skill, its ten answers, and the corrected baseline*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## The skill has been used for real, and found nothing to curate (2026-10-31)
+
+The catalogue was re-read on 2026-10-31 and diffed against the committed record: **267 → 267
+models, nothing added, nothing withdrawn.** The 13 repricings and 3 capability changes touch no
+model this project prices or curates, and the slate `--screen` proposes is byte-identical. **A
+re-curation that finds nothing is a successful re-curation**, so the answer is to stop and
+spend nothing. **Spend: $0.00.** The full account, including the three checks that had to be
+run before "nothing moved" could be trusted, is in the handoff section below.
+
+No code changed in this session. The only defect found was in the **documentation**: both this
+file and `TESTING.md` showed `--detect` pointed at the raw payload, which cannot work. Both now
+carry the two-step form.
 
 ## The curation skill is built — six commits, one per item (2026-10-30)
 
@@ -120,24 +133,69 @@ run.
   was *selected from*, which remains true and is a different fact from the 2026-10-30 read.
   Changing it is a curation decision.
 
-## Handoff for the next chat — the curation skill is built (2026-10-30)
+## Handoff for the next chat — the curation skill's first real use: nothing to curate (2026-10-31)
 
 **Start state:** `refactor/architecture-v2`, working tree clean, pushed. Full suite
-**697 passed, 3 skipped** (~117 s); `master` untouched at `1416177`.
+**697 passed, 3 skipped** (~124 s); `master` untouched at `1416177`.
 
-**The next objective is distinct, and it is the skill's first real use: re-curate.** Whether
-that is worth doing now is answerable for free:
+**The skill has now been used for real, and the answer was to stop.** The catalogue was
+re-read on 2026-10-31 and diffed against the committed record: **267 → 267 models, nothing
+added, nothing withdrawn**. The 13 repricings and 3 capability changes are confined to models
+this project has never priced or curated. **Spend: $0.00.** See below for what was and was not
+checked — "nothing moved" is only a success if the three checks that could have hidden a
+change were run.
+
+**Re-running it later is still free, and this is the command** — note that reading the listing
+and *screening* it are two steps, because `--detect` reads a record, not a raw payload:
 
 ```powershell
-# One keyless read, then diff it against the committed record. Spends nothing.
+# 1. One keyless read of the catalogue. Spends nothing and returns the raw payload.
 $r = Invoke-WebRequest -Uri "https://openrouter.ai/api/v1/models" -UseBasicParsing -TimeoutSec 45
 [System.IO.File]::WriteAllText("$PWD\.tmp\listing_new.json", $r.Content, [System.Text.UTF8Encoding]::new($false))
-.\.venv\Scripts\python.exe -m evaluation --detect .tmp\listing_new.json
+
+# 2. Reduce that payload to a record. --detect CANNOT read the raw file: the payload is
+#    {"data": [...]}, a record is {"models": [...]}, and pointing --detect at the raw file
+#    fails with 'ValueError: not a listing record: no models key'. The payload is fine, it
+#    is one step early. Copy the snippet in docs/TESTING.md, "screen it first".
+.\.venv\Scripts\python.exe .tmp\make_record.py      # writes .tmp\listing_new_record.json
+
+# 3. Diff the record against the committed baseline.
+.\.venv\Scripts\python.exe -m evaluation --detect .tmp\listing_new_record.json
 ```
 
-If nothing moved, that is a **successful re-curation** and the answer is to stop. If something
-did, `.agents/skills/cv-model-curation/SKILL.md` is the procedure — read it first, and note
-that it requires the owner's explicit yes before any `--live` call.
+If nothing moved, that is a **successful re-curation** and the answer is to stop — do not run a
+study to confirm it. If something did, `.agents/skills/cv-model-curation/SKILL.md` is the
+procedure, and it requires the owner's explicit yes before any `--live` call.
+
+### What "nothing moved" was checked against, on 2026-10-31
+
+A model count that holds at 267 does **not** by itself mean no decision changed, so three
+checks were run rather than assumed. All three passed:
+
+| Check | Result |
+|---|---|
+| **Id sets** across both records | Identical — 267 vs 267, zero added, zero withdrawn |
+| The **slate** `--screen` proposes | **Byte-identical**: all 9 entries (1 control + 8 proposed), same prices, same order, `cost spread yes` |
+| `openai/gpt-6-luna` (shipped default) | Untouched — `$0.100/$0.500`, ceiling 128000, created 2026-09-22, same in both records |
+
+The screen output differs on exactly two lines and neither is a decision: the "…and 179 more"
+preview names different members of the 185-model `not-shortlisted` block
+(`google/gemma-4-26b-a4b-it` vs `inclusionai/ling-3.1-flash`). The count above it, **185**, is
+unchanged — the difference is a display truncation.
+
+**None of the 13 repriced ids reaches the pricing table.** `backend/` contains exactly one
+overlap, `("openrouter", "z-ai/glm-5.3-flash")` — a different model from the repriced
+`z-ai/glm-5.3`, and its price is identical in both records. So no `ModelPrice` row is stale.
+
+### The frustration this cost, recorded so it is not paid twice
+
+`PROJECT_STATE.md` and `TESTING.md` both used to show the fetch followed immediately by
+`--detect` on the *raw* file. That command cannot work, and it fails in a way that points at
+the wrong thing: the error says the listing is not a record, which reads as a corrupt or
+truncated download when in fact the download is perfect and is simply one reduction step early.
+Both documents now carry the two-step form. **This was a documentation defect, not a code
+defect** — `screen_payload` deliberately splits the reduction out so the committed record stays
+a reviewed artefact, and no code changed here.
 
 ### The quickest way to see what was built
 
