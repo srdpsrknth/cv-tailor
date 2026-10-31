@@ -20,15 +20,19 @@ filtered on two things that are *verified* rather than assumed:
 
 **What is NOT in it, and why that matters.** Quality is **not** measured here.
 Selecting these models' *ranking* is what the evaluation suite
-(:mod:`evaluation`) exists to do, and it has not run: choosing a winner from
-leaderboard position or general reputation is exactly the mistake ADR 0005 warns
-against, because the bar is task-specific — a two-page CV that passes the factual
-gate, keeps every employer and date, meets the 290–310-word letter budget, and
-returns schema-valid JSON. So each entry carries a :attr:`CuratedModel.verified`
-field, and every entry currently reads ``price+capability``, never ``measured``.
-The set is a **shortlist awaiting measurement**, and
-:func:`curated_models` is what makes that claim machine-checkable rather than a
-promise in a document.
+(:mod:`evaluation`) exists to do, and the bar is task-specific — a two-page CV that
+passes the factual gate, keeps every employer and date, meets the 290–310-word letter
+budget, and returns schema-valid JSON. So each entry carries a
+:attr:`CuratedModel.verified` field.
+
+**The one entry now reads ``measured``, and only because the owner judged the
+documents (2026-10-31).** The suite measures acceptance, cost and correction calls;
+it measures **no prose, no rendering and no layout**, so no measurement can license a
+quality claim. ``measured`` here rests on the owner reading the rendered CV and cover
+letter for all three cases and answering "send as-is". The distinction is enforced:
+:func:`unmeasured_entries` exists so the claim is machine-checkable, and
+``LISTING_VERIFIED_ON`` still records the listing the set was *selected from* rather
+than any later read.
 
 **Maintenance.** ADR 0005 records that a curated set is a maintenance obligation,
 because providers add, deprecate and reprice models constantly. The pinned rows were
@@ -99,7 +103,9 @@ class CuratedModel:
     #: silently refills with stale models. A test asserts every entry is at or after
     #: the floor, and that every entry's id is priced on the OpenRouter route.
     created: str = ""
-    #: ``price+capability`` today, for every entry. See the module docstring.
+    #: ``measured`` for the shipped entry, since the owner judged the rendered
+    #: documents on 2026-10-31; ``price+capability`` until that reading exists. The
+    #: marker licenses a quality claim, so nothing but the owner's verdict may set it.
     verified: str = VERIFIED_PRICE_AND_CAPABILITY
     #: Populated only by a completed evaluation run, never by hand.
     measured_notes: Optional[str] = None
@@ -233,6 +239,7 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
         input_per_1m=0.100,
         output_per_1m=0.500,
         created="2026-09-22",
+        verified=VERIFIED_MEASURED,
         accepted=3,
         attempted=3,
         cost_per_accepted=0.00281,
@@ -240,7 +247,11 @@ CURATED_MODELS: tuple[CuratedModel, ...] = (
             'SELECTED. 3/3 accepted with no correction calls in all three independent '
             'runs, at $0.00281 per accepted result against the previous default at '
             '$0.08607-$0.11384. Asked in the strict dialect, which the production path '
-            'now sends.'
+            'now sends. OWNER VERDICT 2026-10-31: read the rendered documents for all '
+            'three cases and answered "send as-is" -- 1-page CV, 1-page letter at 303 '
+            'words, no clipped text or orphan headings, and reads as written for the '
+            'posting rather than generically. That judgement is what licenses '
+            'verified="measured"; the suite measures none of it.'
         ),
     ),
 )

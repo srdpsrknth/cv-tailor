@@ -479,24 +479,37 @@ def test_the_set_is_ordered_cheapest_first():
     assert tiers == sorted(tiers, key=NATURAL_COST_ORDER.index)
 
 
-def test_the_ranking_is_not_marked_measured_until_the_owner_has_read_the_documents():
-    """Measurement happened; the *verdict* is still withheld, and that is deliberate.
+def test_the_ranking_is_marked_measured_only_because_the_owner_read_the_documents():
+    """The marker is set — and this test now pins *why* it is allowed to be.
 
-    This test replaces one that asserted every entry was UNMEASURED, which was the
-    honest claim before 2026-10-26 and is not any more: the study ran, and all eight
-    candidates now carry accepted/attempted/cost-per-accepted from it.
+    Before 2026-10-31 this asserted every entry was unmeasured, which was the honest
+    claim while the owner's reading was outstanding. That reading has now happened:
+    they reviewed the rendered CV and cover letter for all three cases and answered
+    "send as-is" (recorded in ``measured_notes``), so the marker is legitimately set.
 
-    What has **not** happened is the owner's own quality judgement. They stated the
-    requirement directly: writing, PDF and layout quality are theirs to assess before
-    the ranking is marked final. The suite measures acceptance, cost and correction
-    calls; it measures **no** prose and **no** rendering, so a `measured` marker set on
-    this evidence alone would claim a quality verdict nobody has made.
+    **Rewritten rather than relaxed, deliberately.** The old test's docstring said that
+    if the results were removed the guard needed rewriting rather than relaxing, and
+    the same applies here: simply deleting the assertion would leave nothing preventing
+    the marker being set again from a measurement alone. What replaces it is the
+    condition that actually makes the claim honest:
 
-    So the assertion is not "nothing is measured" but "measurement does not by itself
-    promote an entry": results are present, the marker is still `price+capability`, and
-    flipping it is a deliberate act that must come with the owner's reading.
+    * every entry carrying results still has a coherent, and *attributed*, verdict;
+    * any entry marked ``measured`` must be one the owner judged — which is only
+      checkable because the notes must name the verdict and its date, so a marker set
+      from a table of acceptance rates cannot satisfy this test silently;
+    * an entry with results but **no** owner verdict must still read
+      ``price+capability``, so measurement alone never promotes one.
+
+    The suite still measures no prose and no rendering. Nothing here infers a quality
+    claim; it checks that a human made one.
     """
-    from evaluation.curated_models import CURATED_MODELS, VERIFIED_MEASURED, unmeasured_entries
+    import re
+
+    from evaluation.curated_models import (
+        CURATED_MODELS,
+        VERIFIED_MEASURED,
+        VERIFIED_PRICE_AND_CAPABILITY,
+    )
 
     with_results = [m for m in CURATED_MODELS if m.accepted is not None]
     assert with_results, (
@@ -518,13 +531,32 @@ def test_the_ranking_is_not_marked_measured_until_the_owner_has_read_the_documen
         else:
             assert model.cost_per_accepted and model.cost_per_accepted > 0
 
-    # The marker itself is still withheld pending the owner's judgement.
-    assert len(unmeasured_entries()) == len(CURATED_MODELS), (
-        'an entry was marked `measured` without the owner having judged writing and '
-        'layout quality, which this suite does not measure'
-    )
+        if model.verified == VERIFIED_MEASURED:
+            # The marker must be attributable to a dated human verdict, in the entry
+            # itself. A marker set from a measurement cannot produce these words, so
+            # this is what stops the claim drifting ahead of the evidence.
+            notes = model.measured_notes
+            assert 'OWNER VERDICT' in notes, (
+                f'{model.id} is marked `measured` but its notes record no owner '
+                f'verdict; the suite measures no prose or layout, so a measurement '
+                f'cannot license this marker'
+            )
+            assert re.search(r'OWNER VERDICT \d{4}-\d{2}-\d{2}', notes), (
+                f'{model.id} records an owner verdict with no date; an undated verdict '
+                f'cannot be tied to the documents that were read'
+            )
+        else:
+            assert model.verified == VERIFIED_PRICE_AND_CAPABILITY, (
+                f'{model.id} carries an unrecognised verification level '
+                f'{model.verified!r}; the two levels are the only ones defined'
+            )
+
+    # A model that was never judged must not be marked, however it scored.
     for model in CURATED_MODELS:
-        assert model.verified != VERIFIED_MEASURED
+        if model.verified == VERIFIED_MEASURED:
+            assert model.accepted is not None, (
+                f'{model.id} is marked `measured` with no study results behind it'
+            )
 
 
 def test_no_entry_carries_an_invented_quality_claim():
@@ -623,12 +655,38 @@ def test_the_cli_refuses_an_uncurated_model():
 
 
 def test_the_cli_lists_the_set_without_spending(capsys):
+    """The listing must state the measurement status truthfully, in either state.
+
+    This previously asserted the literal words 'UNMEASURED' and 'not a verdict', which
+    were correct until the owner judged the documents on 2026-10-31 and the entry
+    legitimately became ``measured``. Pinning the wording made a true statement fail,
+    so the assertion is now on the *property*: the output must report each entry's
+    verification level, and it must say who judged the quality and that the suite
+    cannot -- whichever state the set is in. A future reversal to unmeasured still
+    passes; silently dropping the caveat does not.
+    """
+    from evaluation.curated_models import curated_models
     from evaluation.__main__ import main
 
     assert main(['--list-models']) == 0
     output = capsys.readouterr().out
-    assert 'UNMEASURED' in output
-    assert 'not a verdict' in output
+
+    # Every entry's own verification level is shown, so the listing cannot claim more
+    # than the entries carry.
+    for model in curated_models():
+        assert model.verified in output, f'{model.id} verification level not listed'
+        assert model.id in output
+
+    # The caveat is never dropped, in either direction.
+    if any(not m.is_measured for m in curated_models()):
+        assert 'UNMEASURED' in output
+    else:
+        assert 'measured' in output
+
+    # Whichever branch is printed, it must attribute the judgement to a human reading
+    # and state that the suite does not measure it.
+    assert 'owner' in output.lower()
+    assert 'does not measure' in output or 'measures\n' in output
 
 
 def test_the_cli_defaults_to_a_dry_run(capsys):

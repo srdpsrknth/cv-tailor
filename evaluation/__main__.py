@@ -116,7 +116,7 @@ def _selected_models(ids):
 
 
 def _print_models() -> None:
-    print("Curated OpenRouter models (a shortlist, not a verdict)")
+    print("Curated OpenRouter models")
     print(f"  read from {LISTING_VERIFIED_ON}; listing sha256 {LISTING_SHA256[:16]}...")
     print()
     header = f"  {'id':34} {'tier':>9} {'in$/1M':>8} {'out$/1M':>8}  verified"
@@ -129,12 +129,27 @@ def _print_models() -> None:
         )
     print()
     print(f"  cost spread across the set: {'yes' if has_cost_spread() else 'NO'}")
+    # Two different facts, and conflating them is how a measurement starts looking like
+    # a verdict: `measured` means the OWNER read the rendered documents and judged them;
+    # an unmeasured entry awaits that reading, not a run. The old wording promised a
+    # "budgeted live run" for every unmeasured entry, which stopped being true the
+    # moment the study ran -- the run had happened, the reading had not.
     pending = unmeasured_entries()
-    print(
-        f"  {len(pending)} of {len(curated_models())} entries are UNMEASURED: their "
-        "quality ranking\n  awaits a budgeted live run. Nothing here is a quality "
-        "verdict yet."
-    )
+    if pending:
+        names = ", ".join(model.id for model in pending)
+        print(
+            f"  {len(pending)} of {len(curated_models())} entries are UNMEASURED "
+            f"({names}):\n  no owner has judged their writing, PDF and layout quality, "
+            "which this suite\n  does not measure. Nothing there is a quality verdict "
+            "yet."
+        )
+    else:
+        print(
+            f"  all {len(curated_models())} entries are measured: the owner has read "
+            "the rendered\n  documents and judged their writing, PDF and layout "
+            "quality. The suite measures\n  none of that; the marker records a human "
+            "verdict, not a score."
+        )
 
 
 def _run_screen(argument: str, cap: int) -> int:

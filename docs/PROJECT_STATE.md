@@ -3,8 +3,32 @@
 **Last updated:** 2026-10-31
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `1e2d4d5` — *docs: record the curation skill, its ten answers, and the corrected baseline*
+**Latest commit:** `40215e0` — *docs: the re-curation command needs two steps, and the re-curation found nothing*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Phase 3 is fully closed out — the owner's verdict is in (2026-10-31)
+
+The last outstanding item from Phase 3 is done. `verified="measured"` is now set on
+`openai/gpt-6-luna`, and the test that failed on purpose while the verdict was missing has been
+**rewritten rather than deleted**: a marked entry must now carry a dated owner verdict in its own
+`measured_notes`, so a marker set from a table of acceptance rates still cannot pass silently.
+The new guard was verified to fail on sabotage, not merely to pass.
+
+**What the owner judged, and what they saw.** Rebuilt the reading packet from the run's own job
+folders (14 case folders, 42 documents, correctly attributed per folder) and rendered the winning
+model's actual output for the `analyst_lumen` case: a 1-page CV and a 1-page cover letter at 303
+words. The verdict was **"send as-is"**: no clipped text, no orphan headings, and it reads as
+written for the posting rather than generically. That judgement — not the acceptance table — is
+what licenses the marker; the suite measures no prose, no rendering and no layout.
+
+**`verified="measured"` is a quality claim, and it is now backed by one.** It was deliberately
+unset for five days because a measurement must never stand in for a reading. It is set now
+because a human read the documents.
+
+**Spend: $0.00.** The packet was rebuilt from stored artefacts; no paid call was made.
+
+`LISTING_VERIFIED_ON` still reads `2026-10-26` and stays that way: it records the listing the set
+was *selected from*, which is a different fact from any later read.
 
 ## The skill has been used for real, and found nothing to curate (2026-10-31)
 
@@ -15,9 +39,9 @@ re-curation that finds nothing is a successful re-curation**, so the answer is t
 spend nothing. **Spend: $0.00.** The full account, including the three checks that had to be
 run before "nothing moved" could be trusted, is in the handoff section below.
 
-No code changed in this session. The only defect found was in the **documentation**: both this
-file and `TESTING.md` showed `--detect` pointed at the raw payload, which cannot work. Both now
-carry the two-step form.
+The only defect found in the re-curation itself was in the **documentation**: both this file and
+`TESTING.md` showed `--detect` pointed at the raw payload, which cannot work. Both now carry the
+two-step form.
 
 ## The curation skill is built — six commits, one per item (2026-10-30)
 
@@ -126,9 +150,11 @@ run.
 * **No `--live` run.** Spend is $0.00 and a live run needs the owner's explicit yes with a
   projection in front of them.
 * **No monthly spend ledger** (Q4). A separate design.
-* **`verified="measured"` is still not set**, and a test fails on purpose if it is. The owner's
+* **`verified="measured"` is still not set** ~~and a test fails on purpose if it is~~. The owner's
   writing/PDF/layout judgement is still outstanding — item 4's verdict gate is what will close
-  it, and it deliberately cannot be closed from a measurement.
+  it, and it deliberately cannot be closed from a measurement. **CLOSED 2026-10-31** — the owner
+  read the documents and gave that verdict; see the close-out section at the top of this file.
+  The test was rewritten rather than deleted: a marked entry must now carry a dated owner verdict.
 * **`LISTING_VERIFIED_ON` still reads `2026-10-26`.** That constant records the listing the set
   was *selected from*, which remains true and is a different fact from the 2026-10-30 read.
   Changing it is a curation decision.
@@ -756,11 +782,14 @@ economy/balanced/frontier, each filtered on two **verified** properties rather t
 document. That filter is what excludes the Amazon Nova family — `nova-micro` at $0.035/$0.140 would
 otherwise be the cheapest entry in the set.
 
-**No quality ranking is claimed, because none was measured.** Every entry reads
-`verified="price+capability"`, and a test asserts that none says `measured`. Ordering these by
-reputation and presenting it as research would fabricate exactly the evidence ADR 0005 says must
-precede a model switch. The set is a **shortlist awaiting measurement**, and that claim is a value
-the code reports rather than a sentence in this document.
+**The quality ranking is now claimed, because it was measured AND read.** The shipped entry
+reads `verified="measured"` as of 2026-10-31. That marker rests on the owner reading the
+rendered CV and cover letter for all three evaluation cases and answering "send as-is" — not on
+the acceptance table, which measures no prose, rendering or layout. The verdict and its date are
+recorded in the entry's own `measured_notes`, and the test that previously asserted *nothing*
+was marked `measured` now asserts a marked entry must carry a dated owner verdict. Ordering
+these by reputation alone would fabricate exactly the evidence ADR 0005 says must precede a
+model switch.
 
 **The evaluation suite exists and has never run.** It is offline by default (`plan()` and
 `dry_run()` make no network call; the CLI defaults to `--dry-run`), spending requires `--live`

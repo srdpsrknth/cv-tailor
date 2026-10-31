@@ -243,8 +243,10 @@ superseded. And the refresh is a short, auditable procedure instead of a researc
 * *The owner's reserved judgement is part of the workflow* — **met.** The verdict gate is
   enforced in `curation_diff.apply_verdicts`; a test asserts no field a measurement could set
   can promote an entry.
-* *No quality claim can drift ahead of the evidence* — **met.** `verified="measured"` is still
-  unset, and a test fails on purpose if it is set without the owner's reading.
+* *No quality claim can drift ahead of the evidence* — **met, and since closed.** The marker was
+  withheld until 2026-10-31, when the owner read the rendered documents and answered "send as-is";
+  `verified="measured"` is now set on the shipped entry with the verdict dated in its notes, and
+  the guard asserts a marked entry must carry one.
 
 **Not in scope, deliberately:** a monthly spend ledger; automatic default switching;
 `cvtailor curate`. Each is recorded with its reasoning in ADR 0017.

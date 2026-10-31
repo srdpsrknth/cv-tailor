@@ -491,8 +491,11 @@ kept and the payload was gitignored, which is why two tests skipped in every fre
 **The quality judgement is a human step, enforced in code.** `evaluation` records acceptance,
 cost and correction calls — and **no** prose, rendering or layout. A candidate is ineligible for
 curation until the owner records their own verdict, and `apply_verdicts` is the only route to
-eligibility. `verified="measured"` is therefore still unset, and a test fails on purpose if it is
-set without that reading.
+eligibility. `verified="measured"` is set on the one shipped entry, and only because the owner
+read the rendered documents for all three cases and answered "send as-is" on 2026-10-31; the
+verdict is recorded, dated, in that entry's `measured_notes`. The guard was rewritten rather
+than dropped: an entry marked `measured` whose notes record no dated owner verdict now fails, so
+a marker set from a table of acceptance rates cannot pass silently.
 
 *Do not add async, concurrency or caching infrastructure before 1–5 are exhausted.*
 
