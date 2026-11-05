@@ -169,6 +169,9 @@ class MatchResult:
     blockers: list = field(default_factory=list)
     #: Facts the posting did not state, so a low score is not mistaken for a bad job.
     unknowns: list = field(default_factory=list)
+    #: Keywords the caller asked for that the posting does not contain. A non-match
+    #: rather than a gap in the data, and the basis for excluding the job.
+    unmatched_keywords: list = field(default_factory=list)
     #: Whether the caller's keyword filter was actually applied.
     matched_keywords: bool = True
 
@@ -184,14 +187,25 @@ class MatchResult:
         return len(self.evidence)
 
     @property
+    def matches_keywords(self) -> bool:
+        """True when every keyword the caller asked for is present.
+
+        Vacuously true when no keywords were given, so a caller that did not search
+        by keyword is never filtered by one.
+        """
+        return not self.unmatched_keywords
+
+    @property
     def is_visible(self) -> bool:
         """True unless a *known* constraint rules the job out.
 
-        Uncertain jobs remain visible on purpose: hiding them would discard
-        legitimate opportunities, and showing them silently would overstate what we
-        know.
+        Two things hide a job: a constraint we can prove (ineligible), and a
+        keyword the caller explicitly asked for that the posting lacks. Uncertain
+        jobs remain visible on purpose -- hiding them would discard legitimate
+        opportunities, and showing them silently would overstate what we know.
         """
-        return self.eligibility is not Eligibility.INELIGIBLE
+        return (self.eligibility is not Eligibility.INELIGIBLE
+                and self.matches_keywords)
 
     def explanation(self) -> list:
         """Human-readable lines explaining the result, for CLI output."""
@@ -207,6 +221,11 @@ class MatchResult:
             lines.append("no specific match reasons; shown without a preference score")
         for unknown in self.unknowns:
             lines.append(f"not stated by the source: {unknown}")
+        if self.unmatched_keywords:
+            lines.append(
+                "does not contain the requested keyword(s): "
+                + ", ".join(self.unmatched_keywords)
+            )
         return lines
 
     def as_dict(self) -> dict:
@@ -223,6 +242,8 @@ class MatchResult:
                 for blocker, detail in self.blockers
             ],
             "unknowns": list(self.unknowns),
+            "unmatched_keywords": list(self.unmatched_keywords),
+            "matches_keywords": self.matches_keywords,
             "explanation": self.explanation(),
         }
 
@@ -427,10 +448,18 @@ def score_job(job: Job, preferences: MatchPreferences,
     # SAME all-terms-must-match rule as the normaliser's keyword filter (AND), so
     # a caller that filters and then ranks gets one consistent meaning of
     # "keywords" rather than two subtly different ones.
+    #
+    # A keyword the user *asked for* and the posting does not contain is a
+    # NON-MATCH, not a gap in the data. It is reported in `unmatched_keywords`
+    # rather than `unknowns`, and `rank_jobs` excludes such jobs by default --
+    # otherwise a search for "data engineer" ranks a Major Account Executive and an
+    # Electrical Engineer, which is what a real run against the live sources did
+    # before this distinction existed.
+    unmatched: list = []
     if preferences.keywords:
+        distinct = _dedupe_terms(preferences.keywords)
         title_hits = _hits(title, preferences.keywords)
-        title_complete = len(title_hits) == len(_dedupe_terms(preferences.keywords))
-        if title_complete and title_hits:
+        if title_hits and len(title_hits) == len(distinct):
             evidence.append(MatchEvidence(
                 Reason.TITLE_KEYWORD,
                 f"title matches {', '.join(title_hits)}",
@@ -438,18 +467,15 @@ def score_job(job: Job, preferences: MatchPreferences,
             ))
         else:
             body_hits = _hits(haystack, preferences.keywords)
-            body_complete = len(body_hits) == len(_dedupe_terms(preferences.keywords))
-            if body_complete and body_hits:
+            if body_hits and len(body_hits) == len(distinct):
                 evidence.append(MatchEvidence(
                     Reason.TITLE_KEYWORD,
                     f"title and description together match {', '.join(body_hits)}",
                     tuple(body_hits),
                 ))
             else:
-                unknowns.append(
-                    f"the posting does not mention all of the keywords "
-                    f"{', '.join(preferences.keywords)}"
-                )
+                unmatched = [term for term in distinct
+                             if term.lower() not in {hit.lower() for hit in body_hits}]
 
     # Skills: in the title is stronger evidence than in the body, so they are
     # separate reasons rather than one combined count.
@@ -530,6 +556,7 @@ def score_job(job: Job, preferences: MatchPreferences,
         evidence=evidence,
         blockers=blockers,
         unknowns=unknowns,
+        unmatched_keywords=unmatched,
     )
 
 
@@ -541,8 +568,12 @@ def rank_jobs(jobs: Iterable[Job], preferences: MatchPreferences,
     final key tie-break matters: without it the order would depend on input order,
     and two runs over the same sources could present jobs differently.
 
-    Ineligible jobs are excluded by default. They are kept out of the *ranking*,
-    not out of the data, so a caller can still ask for them.
+    Excluded by default: jobs an eligibility constraint rules out, **and** jobs
+    that do not contain the keywords the caller searched for. The second exclusion
+    is what makes a keyword search mean anything -- without it a search for "data
+    engineer" ranks whatever else the sources happened to return. Both kinds are
+    kept out of the *ranking*, not out of the data, so a caller can still ask for
+    them with ``include_ineligible=True``.
     """
     results = [score_job(job, preferences, now=now) for job in jobs]
     if not include_ineligible:
@@ -568,6 +599,8 @@ def ranking_report(results: Iterable[MatchResult]) -> dict:
                           if result.eligibility is Eligibility.INELIGIBLE),
         "uncertain": sum(1 for result in results
                          if result.eligibility is Eligibility.UNCERTAIN),
+        "keyword_mismatch": sum(1 for result in results
+                                if not result.matches_keywords),
         "with_blockers": sum(1 for result in results if result.blockers),
         "scored_above_zero": sum(1 for result in results if result.score > 0),
     }

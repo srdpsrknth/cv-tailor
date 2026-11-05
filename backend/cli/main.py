@@ -34,6 +34,13 @@ cvtailor -- tailor a CV and cover letter from the terminal
     cvtailor render                     Re-render the last saved content
                                         (no API calls, no cost)
 
+  Discover jobs (Phase 4):
+
+    cvtailor jobs sources               Which job sources are available
+    cvtailor jobs search --keywords SQL
+                                        Find and rank matching postings
+                                        (free: no API key, no LLM call)
+
   Discover more:
 
     cvtailor --help                     All commands
@@ -113,6 +120,34 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--mirror-configured", action="store_true",
                         help="Also copy artifacts to OUTPUTS_DIR.")
 
+    # --- jobs (Phase 4) ---------------------------------------------------------------
+    jobs = subparsers.add_parser(
+        "jobs", help="Discover and rank postings. Free: no API key, no LLM call."
+    )
+    jobs_sub = jobs.add_subparsers(dest="jobs_action", metavar="<action>")
+    jobs_sub.add_parser("sources", help="List the job sources and what they can do.")
+
+    job_search = jobs_sub.add_parser("search", help="Search, deduplicate and rank jobs.")
+    job_search.add_argument("--keywords", help="Words to look for in title and description.")
+    job_search.add_argument("--country", help="Country code or name, e.g. DE or Germany.")
+    job_search.add_argument("--city", help="City to prefer and filter on.")
+    job_search.add_argument("--remote", action="store_true",
+                            help="Only jobs the source states are remote.")
+    job_search.add_argument("--limit", type=int, default=10,
+                            help="Maximum jobs to show (default 10).")
+    job_search.add_argument("--max-requests", type=int, default=60,
+                            help="Network request ceiling for this run (default 60).")
+    job_search.add_argument("--only", dest="only_source", action="append",
+                            metavar="<source>",
+                            help="Limit to one source (repeatable). See `jobs sources`.")
+    job_search.add_argument("--ats", action="append", metavar="platform:token[:Company]",
+                            help="An ATS board to read, replacing the samples. "
+                                 "Repeatable. Platforms: lever, greenhouse, ashby.")
+    job_search.add_argument("--softgarden-tenant", action="append", metavar="<tenant>",
+                            help="A softgarden tenant subdomain, replacing the sample.")
+    job_search.add_argument("--personio-tenant", action="append", metavar="<tenant>",
+                            help="A Personio tenant subdomain, replacing the sample.")
+
     return parser
 
 
@@ -131,6 +166,9 @@ def _dispatch(args, console: Console, config) -> int:
     if command == "render":
         from cli.commands import render
         return render.run(args, console, config)
+    if command == "jobs":
+        from cli.commands import jobs
+        return jobs.run(args, console, config)
     raise CliError(f"Unknown command: {command}", EXIT_USAGE)
 
 

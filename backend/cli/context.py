@@ -57,10 +57,20 @@ class Console:
             print(f"  fix: {hint}", file=sys.stderr)
 
     def json(self, payload) -> None:
-        """Print a JSON document, including any warnings collected so far."""
+        """Print a JSON document, including any warnings collected so far.
+
+        Written with ``ensure_ascii=True`` deliberately. Job postings routinely
+        contain emoji and typographic quotes, and a Windows console's default
+        ``charmap`` codepage cannot encode them -- a live ``--json`` search
+        crashed with "'charmap' codec can't encode character '\\U0001f44b'"
+        before this. Since ``--json`` exists for scripting, the safer default is
+        escaped ASCII: it is still valid JSON, it round-trips through any parser,
+        and it cannot fail on a codepage.
+        """
         if isinstance(payload, dict) and self.warnings:
             payload = {**payload, "warnings": self.warnings}
-        print(json.dumps(payload, indent=2, ensure_ascii=False, default=str), file=self.stream)
+        print(json.dumps(payload, indent=2, ensure_ascii=True, default=str),
+              file=self.stream)
 
     def table(self, rows, headers) -> None:
         """Print a simple aligned table, or a list of objects under --json."""

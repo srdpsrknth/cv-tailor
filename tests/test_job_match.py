@@ -123,6 +123,85 @@ def test_keywords_matching_only_the_description_still_score():
     assert "description" in result.evidence[0].detail
 
 
+# --- a keyword non-match is not a gap in the data ---------------------------------------
+
+def test_a_keyword_the_posting_lacks_is_reported_as_unmatched():
+    """Regression, found by running against the live sources.
+
+    A search for "data engineer" ranked a Major Account Executive and an
+    Electrical Engineer, because a keyword mismatch was recorded as an `unknown`
+    (a gap in the data, worth nothing) rather than as a non-match. A keyword the
+    user explicitly asked for and the posting does not contain is a non-match.
+    """
+    result = score_job(job(title="Major Account Executive", description="Sell software."),
+                       MatchPreferences(keywords=("data", "engineer")))
+    assert result.unmatched_keywords == ["data", "engineer"]
+    assert result.matches_keywords is False
+    assert result.is_visible is False
+
+
+def test_an_unknown_is_reserved_for_facts_the_source_did_not_state():
+    """The distinction that makes the two fields meaningful rather than synonyms."""
+    result = score_job(job(title="Major Account Executive", description="Sell."),
+                       MatchPreferences(keywords=("data",)))
+    # A non-match is about the posting's content, not about missing metadata.
+    assert result.unmatched_keywords
+    assert not any("keyword" in unknown for unknown in result.unknowns)
+
+
+def test_a_job_matching_the_keywords_stays_visible():
+    result = score_job(job(title="Data Engineer"), MatchPreferences(keywords=("data",)))
+    assert result.matches_keywords is True
+    assert result.is_visible is True
+
+
+def test_no_keywords_means_every_job_matches():
+    """A caller who did not search by keyword must not be filtered by one."""
+    result = score_job(job(title="Anything"), MatchPreferences())
+    assert result.matches_keywords is True
+    assert result.is_visible is True
+
+
+def test_ranking_excludes_keyword_mismatches_by_default():
+    relevant = job(title="Data Engineer", source_id="a", url="https://x.test/a")
+    irrelevant = job(title="Major Account Executive", source_id="b", url="https://x.test/b")
+    ranked = rank_jobs([relevant, irrelevant], MatchPreferences(keywords=("data",)))
+    assert [result.job.source_id for result in ranked] == ["a"]
+
+
+def test_ranking_can_include_keyword_mismatches_on_request():
+    irrelevant = job(title="Major Account Executive")
+    ranked = rank_jobs([irrelevant], MatchPreferences(keywords=("data",)),
+                       include_ineligible=True)
+    assert len(ranked) == 1
+    assert ranked[0].matches_keywords is False
+
+
+def test_the_explanation_says_which_keyword_was_missing():
+    result = score_job(job(title="Sales Manager"),
+                       MatchPreferences(keywords=("data",)))
+    assert any("does not contain the requested keyword" in line
+               for line in result.explanation())
+
+
+def test_the_report_counts_keyword_mismatches_separately_from_ineligibility():
+    results = [
+        score_job(job(title="Data Engineer"), MatchPreferences(keywords=("data",))),
+        score_job(job(title="Sales Manager"), MatchPreferences(keywords=("data",))),
+    ]
+    report = ranking_report(results)
+    assert report["keyword_mismatch"] == 1
+    assert report["ineligible"] == 0
+
+
+def test_a_keyword_mismatch_is_not_also_reported_as_ineligible():
+    """Two different exclusion reasons must stay distinguishable."""
+    result = score_job(job(title="Sales Manager", country="US"),
+                       MatchPreferences(keywords=("data",), eligible_countries=("DE",)))
+    assert result.eligibility is Eligibility.INELIGIBLE
+    assert result.matches_keywords is False
+
+
 def test_scoring_is_deterministic_across_repeated_calls():
     target = job(title="Data Engineer", description="dbt and Snowflake")
     prefs = MatchPreferences(keywords=("data",), skills=("dbt", "Snowflake"))
