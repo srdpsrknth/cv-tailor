@@ -405,9 +405,20 @@ Live evaluation stays out of CI — optional, budget-capped and reproducible.
 
 ## Phase 4 — Job discovery and matching
 
-**Status: started 2026-10-31.** Item 1 (ADR 0008 §1 source research) is complete; the
-source list awaits the owner's approval before connectors are written. See
+**Status: COMPLETE (2026-11-05).** Eight items, one commit each. The source list was
+researched against every candidate endpoint, approved by the owner, and implemented
+behind one connector interface; **no scraper was needed**, so ADR 0008 §3's scraping
+allowance was not exercised. See [ADR 0018](DECISIONS/0018-job-discovery.md) and
 [docs/analysis/job-sources-research.md](analysis/job-sources-research.md).
+
+**Delivered:** `Job` model with per-field provenance · connectors for softgarden,
+Personio, Lever/Greenhouse/Ashby and Arbeitnow · normalisation of six real payload
+shapes · dedupe that merges only on proof · observed expiry detection · deterministic
+matching with three-valued eligibility · `cvtailor jobs search`. Free: no API key, no
+LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
+
+**Not delivered, deliberately:** HTML scraping; Adzuna and the Bundesagentur für Arbeit
+(both need an owner decision); Workday, JOIN and the per-customer ATS platforms.
 
 - **Objective:** find and rank jobs instead of pasting descriptions.
 - **User value:** the largest workflow gain after multi-profile.

@@ -1,8 +1,30 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **697 passed, 3 skipped**, 1 warning, ~118 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **666 passed, 3 skipped**, 31 deselected, ~16 s.
+**Current baseline:** **1079 passed, 3 skipped**, 1 warning, ~119 s, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **1048 passed, 3 skipped**, 31 deselected, ~16 s.
+
+> **Phase 4 added 382 tests** (697/3 → 1079/3), all offline. The Phase 4 files are
+> `test_job_model.py`, `test_job_normalize.py`, `test_job_dedupe.py`,
+> `test_job_match.py`, `test_job_connectors.py` and `test_job_search.py`.
+>
+> **No test in the job-discovery suite makes a network call.**
+> `RecordingTransport` replays captured payloads and **raises** on an uncaptured URL,
+> so an accidental live fetch fails loudly instead of quietly depending on a source's
+> uptime. Fixtures are synthetic but reproduce the verified field names, nesting and
+> date formats — no real posting data is committed to this public repository.
+>
+> **The live checks are separate and explicitly run**, because the suite proves the
+> connectors work against *recorded* payloads and only these prove the recordings
+> still match what the sources serve:
+>
+> ```powershell
+> .venv\Scripts\python.exe tools\probe_job_sources.py        # status + shape of every source
+> .venv\Scripts\python.exe tools\smoke_job_connectors.py     # the real connectors, live
+> ```
+>
+> Both are read-only, make a handful of requests with an honest `User-Agent`, and
+> cost $0.00. Neither is part of the suite and neither should be.
 
 > **The baseline is 697/3.** It was 555/5 before the curation-skill items; **two skips were
 > retired** (see below) and 142 tests were added. Verify against **697/3**.
@@ -56,6 +78,7 @@ study and switched in `e53ef8a`. Two consequences for anyone running these tests
 | **Baseline after the cache-bypass fix and the cost/curation increment (2026-10-26)** | **500 passed**, ~116 s |
 | Baseline after Stage B (accuracy and leanness, 2026-10-30) | 555 passed, 5 skipped, ~120 s |
 | **Baseline after the curation-skill items (2026-10-30)** | **697 passed, 3 skipped**, ~118 s |
+| **Baseline after Phase 4 (job discovery and matching, 2026-11-05)** | **1079 passed, 3 skipped**, ~119 s |
 | Paid API calls | **none** |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 

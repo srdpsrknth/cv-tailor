@@ -1,16 +1,118 @@
 # Project state
 
-**Last updated:** 2026-10-31
+**Last updated:** 2026-11-05
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** `40215e0` — *docs: the re-curation command needs two steps, and the re-curation found nothing*
+**Latest commit:** *(item 8)* — *docs: Phase 4 is implemented, and ADR 0018 records how*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-## Phase 4 has started — the source research is done and awaits approval (2026-10-31)
+## Phase 4 is implemented — job discovery and matching (2026-11-05)
 
-**Active task:** Phase 4, *job discovery and matching*. **Item 1 (ADR 0008 §1 source
-research) is complete and committed; the owner's approval of the source list is the
-blocker before any connector is written.**
+**Active task:** Phase 4 is **complete through item 8**. Source research, the model,
+connectors, dedupe, expiry, matching and the CLI all shipped, one commit per item,
+with the suite at **1079 passed, 3 skipped**. `master` untouched at `1416177`.
+
+The owner approved the source list in conversation on 2026-11-05: exclude
+SmartRecruiters (its API host's `robots.txt` is `Disallow: /`), skip Adzuna and the
+Bundesagentur for now, and ship the ATS connector with a replaceable sample list.
+
+| # | Item | Commit | Outcome |
+|---|---|---|---|
+| **1** | ADR 0008 §1 source research | `51f9b98` | **Done.** Every candidate called for real; probe committed |
+| **2** | `Job` model + `JobSource` contract | `c28e586` | **Done.** Provenance on every source-dependent field |
+| **3** | Normalisation of all source shapes | `f347b9e` | **Done.** Six real payload shapes → one model |
+| **4** | Dedupe + expiry detection | `b657216` | **Done.** Merge only on proof; expiry observed |
+| **5** | Deterministic matching | `41f216c` | **Done.** Score is a count; three-valued eligibility |
+| **6** | Connectors + live smoke check | `819076f` | **Done.** softgarden, Personio, ATS family, Arbeitnow |
+| **7** | Search service + `cvtailor jobs` | `5667de8` | **Done.** Free: no key, no LLM call |
+| **8** | Documentation and ADR 0018 | *(this commit)* | ADR 0018, PROJECT_STATE, ROADMAP, TESTING |
+
+**Test baseline moved 697/3 → 1079 passed, 3 skipped** (~119 s), fully offline.
+**Spend for the whole phase: $0.00** — every approved source is free, and no `--live`
+LLM run was made.
+
+### What was built, and what was refused
+
+**Built:** softgarden (official schema.org `DataFeed`), Personio (official XML),
+one ATS family (Lever + Greenhouse + Ashby), and Arbeitnow.
+
+**Refused, with the reason recorded in code as well as in ADR 0018:** StepStone,
+Indeed and LinkedIn each disallow in their own `robots.txt` the exact paths a
+connector would need (Indeed disallows `/jobs/DE/`); **SmartRecruiters returns
+perfect data and its API host disallows every crawler**, so it is excluded on the
+operator's own terms — a `200` is not permission. The Bundesagentur für Arbeit
+refused the public key with `403` and remains the largest single coverage gain
+available, via a partner application.
+
+**ADR 0008 §3's scraping allowance is therefore not exercised. No HTML scraper was
+written.**
+
+### Three findings that contradicted the brief
+
+* **`JobPosting` JSON-LD is not portable across ATSs.** Greenhouse-hosted pages
+  carry **zero** `ld+json` blocks; SmartRecruiters uses microdata. ADR 0008 §2
+  ranked ATS JSON-LD near the top and that would have returned nothing for two
+  major platforms. Lever is kept as a positive control (1 block) so the Greenhouse
+  zeros mean *absent*, not *probe broken*. ADR 0008 §2 is amended in the ADR itself.
+* **The German federal API refused the well-known key** with `403` on both the
+  token and search endpoints, while `www.arbeitsagentur.de` returns `200` — the key
+  is refused, not the host.
+* **softgarden was not on the original shortlist** and is the best-fitting DACH
+  source found: officially published, unauthenticated, and its payload *is*
+  `JobPosting`, so one parser serves the feed and any embedded JSON-LD.
+
+### Six real defects, all found by running code rather than reading it
+
+* `inferred_fields()` raised `NameError` on every call (walrus scoping in a
+  comprehension).
+* `parse_iso_datetime()` promised UTC and returned the source's own offset, so one
+  instant published in two offsets did not compare equal — it would have corrupted
+  dedupe and expiry windows.
+* `normalise_country()` mapped every non-DACH country to `None`, making a posting
+  explicitly in the United States indistinguishable from one whose country was
+  never stated. DACH-first is now expressed by `is_dach`, not by discarding facts.
+* **A false merge collapsed two reqs from one source** sharing company, title, city
+  and country — "Data Engineer" ×3 at one employer is ordinary, and the merge hid a
+  vacancy silently. Dedupe now requires a *different source* to merge on content.
+* Personio's normaliser invented a url (`https://fixture.invalid/...`), which would
+  have surfaced as a legitimate-looking broken link in the user's output.
+* **A keyword search returned irrelevant jobs** live: a Major Account Executive and
+  an Electrical Engineer ranked for "data engineer", because the service never
+  passed the query's keywords to the matcher, and a keyword mismatch was recorded
+  as a data gap rather than a non-match.
+* `--json` crashed on a live search with `'charmap' codec can't encode character
+  '\U0001f44b'` — job postings contain emoji and a Windows console cannot encode
+  them. That fix touches every command, so the wider CLI was smoke-checked.
+
+### Verification
+
+* **Offline:** `python -m pytest -q` → 1079 passed, 3 skipped. **No test makes a
+  network call**; `RecordingTransport` raises on an uncaptured URL.
+* **Live:** `tools/smoke_job_connectors.py` (read-only, 4 requests, $0.00) and
+  `tools/probe_job_sources.py`. The suite proves the connectors work against
+  *recorded* payloads; only the smoke check proves the recordings still match what
+  the sources serve. All four connectors returned live jobs on 2026-11-05.
+
+### What is NOT done, deliberately
+
+* **No HTML scraper** (ADR 0008 §3 not exercised).
+* **Adzuna and the Bundesagentur** — deferred pending an owner decision; Adzuna
+  needs a free registration, the BA a partner application.
+* **Sample employer lists are placeholders.** `SAMPLE_ATS_BOARDS`,
+  `SAMPLE_SOFTGARDEN_TENANTS` and `SAMPLE_PERSONIO_TENANTS` are public example
+  boards so the connector works before configuration; the owner should replace them
+  with real target employers.
+* **Workday, JOIN, Umantis, Recruitee, d.vinci, onlyfy** — each needs a
+  reverse-engineered or per-customer integration.
+
+**Next action:** replace the sample employer lists with real targets, then decide
+whether a Bundesagentur partner application is worth pursuing. Phase 5 (application
+tracking) is the next unstarted phase and depends only on Phase 2.
+
+## The Phase 4 source research, kept for reference (2026-10-31)
+
+Superseded by the section above, which records what was actually built. Retained
+because the evidence is what justifies the refusals.
 
 The owner answered ADR 0008 §5's scope question in chat on 2026-10-31: **broad coverage of
 the major public job APIs, Germany/DACH first, with the `Job` model designed so other
@@ -19,25 +121,11 @@ be reopened.
 
 The research is [docs/analysis/job-sources-research.md](analysis/job-sources-research.md),
 with every endpoint called for real and the probe committed as
-`tools/probe_job_sources.py`. **Three findings shaped the recommendation, and one
-contradicts the brief's premise:**
+`tools/probe_job_sources.py`.
 
-* **softgarden publishes an official schema.org `DataFeed`** and is explicitly
-  crawler-friendly (*"All robots allowed"*). It is the best-fitting DACH source found and
-  was not on the original shortlist.
-* **`JobPosting` JSON-LD is NOT universal.** Greenhouse-hosted job pages contain **zero**
-  `ld+json` blocks; SmartRecruiters uses microdata. A JSON-LD-first plan would return
-  nothing for two major platforms. Lever is the positive control proving the extractor works.
-* **SmartRecruiters works and is still refused** — its API host `robots.txt` is
-  `Disallow: /`. ADR 0008 §3 requires respecting `robots.txt`, so a `200` is not permission.
-
-**Recommended:** softgarden, Personio, and one ATS family (Lever + Greenhouse + Ashby),
-plus Adzuna/Arbeitnow optionally. **Explicitly not built:** Bundesagentur für Arbeit (key
-refused with `403`), StepStone, Indeed, LinkedIn, SmartRecruiters, Workday, and **any HTML
-scraper** — so ADR 0008 §3's scraping allowance is not exercised. **Spend: $0.00.**
-
-**Next action:** the owner approves or amends the source list; then implement in
-independently testable increments, one commit per numbered item.
+**Approved 2026-11-05:** softgarden, Personio and one ATS family (Lever + Greenhouse +
+Ashby), plus Arbeitnow. SmartRecruiters excluded on its `robots.txt`; Adzuna and the
+Bundesagentur deferred pending a separate owner decision.
 
 ## Phase 3 is fully closed out — the owner's verdict is in (2026-10-31)
 

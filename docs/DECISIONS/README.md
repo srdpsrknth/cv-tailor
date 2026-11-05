@@ -12,7 +12,7 @@ Only the owner can move a decision to **Approved**.
 | [0005](0005-llm-provider-interface.md) | Thin provider interface; Gemini Flash default; benchmark first | **Approved** |
 | [0006](0006-remote-profile-access.md) | Local-first store, remote profile access later | **Approved in principle** — deferred |
 | [0007](0007-cli-framework.md) | CLI on `argparse` with a friendliness layer | **Approved** |
-| [0008](0008-job-sources.md) | Job sources: ToS-compliant APIs first, scraping last | **Approved in principle** — Phase 4 |
+| [0008](0008-job-sources.md) | Job sources: ToS-compliant APIs first, scraping last | **Approved in principle** — §5 scope re-confirmed 2026-10-31; §1 discharged by 0018 |
 | [0009](0009-interfaces-and-archive.md) | Keep FastAPI + Streamlit; `applications/` read-only until Phase 2 | **Approved** |
 | [0010](0010-config-object.md) | One explicit `Config` object; no import-time environment reads | **Approved** — implemented |
 | [0011](0011-private-store-location.md) | Private store is a sibling repo; untrack real data, do not rewrite history | **Approved** — Phase 2 |
@@ -22,6 +22,7 @@ Only the owner can move a decision to **Approved**.
 | [0015](0015-generation-cache.md) | Cache validated generations, keyed by the bytes the model was shown; only a validated result is stored, and the store is always safe to delete | **Approved** — Phase 3 item 5 |
 | [0016](0016-per-candidate-inputs-and-one-winner.md) | One schema and prompt per candidate, judged on cost per accepted result; the study selects one model rather than shipping a menu | **Approved** — Phase 3 item 6, discharged 2026-10-27 |
 | [0017](0017-curation-skill.md) | Curation is a procedure with two human steps: detection reports and cannot spend, the proposal is inert, and a candidate is ineligible without the owner's own writing/PDF/layout verdict | **Approved** — curation-skill items, 2026-10-30 |
+| [0018](0018-job-discovery.md) | Job discovery: verified sources behind one connector, provenance on every source-dependent field, dedupe only on proof, expiry observed not assumed, and a match score that is a count of named evidence with three-valued eligibility | **Approved** — Phase 4, 2026-11-05 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1
@@ -83,7 +84,10 @@ is listed above for the first time — it was recorded on 2026-10-26 and omitted
 - LLM: benchmark cost, performance and output quality before switching; **keep Gemini's
   latest Flash model as default**.
 - Job sources: research ToS-compliant APIs first; scraping may be necessary for coverage;
-  determine full scope at that phase.
+  determine full scope at that phase. **Answered 2026-10-31:** broad coverage of the major
+  public job APIs, **Germany/DACH first**, with the model designed so other markets can
+  follow. **Resolved 2026-11-05:** structured sources proved sufficient, so no scraper was
+  written — see [0018](0018-job-discovery.md).
 - `applications/`: migrate in Phase 2; keep read-only until then.
 
 Add a new record for every decision that is expensive to reverse. Keep each one short:

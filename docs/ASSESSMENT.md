@@ -733,6 +733,18 @@ cv_tailor/                    # importable package (replaces sys.path hacks)
 ```
 `backend/`, `ui/` and `scripts/` remain as thin adapters during migration.
 
+> **Phase 4 deviation from this sketch (2026-11-05).** The job-discovery modules
+> landed as `backend/models/job.py`, `backend/services/job_http.py`,
+> `job_connectors.py`, `job_normalize.py`, `job_dedupe.py`, `job_match.py`,
+> `job_search.py` and `backend/cli/commands/jobs.py`. The `cv_tailor/jobs/` split
+> above is the *target* layout; the existing `models/` + `services/` + `cli/`
+> structure was kept because the whole package has not yet been renamed, and
+> splitting one subsystem into a new top-level package would create two competing
+> conventions. Responsibilities match the sketch exactly — one module per concern,
+> connectors behind one interface — so the eventual rename is a move, not a rewrite.
+> The `Jobs` seam follows the same rule as `tailor_service`: interfaces (CLI today,
+> a UI in Phase 6) call the service and duplicate no business rules.
+
 ### Data flow (target)
 
 ```

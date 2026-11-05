@@ -1,13 +1,16 @@
 # Job sources — ADR 0008 §1 research finding
 
-**Status:** Research complete, awaiting the owner's approval of the source list
+**Status:** Research complete; **the source list was approved by the owner on
+2026-11-05 and is implemented** — see [ADR 0018](../DECISIONS/0018-job-discovery.md).
+This document remains the evidence behind those choices and behind the refusals.
 **Date researched:** 2026-10-31
-**Related:** [0008](0008-job-sources.md) (the decision this discharges),
+**Related:** [0008](../DECISIONS/0008-job-sources.md) (the decision this discharges),
+[0018](../DECISIONS/0018-job-discovery.md) (what was built from it),
 [ROADMAP.md](../ROADMAP.md) Phase 4
 
 This document discharges **ADR 0008 §1** (*"Research and document ToS-compliant access
-first, before writing any connector"*) and puts a proposed source list in front of the
-owner for approval, per **ADR 0008 §5**.
+first, before writing any connector"*). It put a proposed source list in front of the
+owner, who approved it on 2026-11-05 per **ADR 0008 §5**.
 
 **Method.** Every endpoint below was called for real on 2026-10-31 from this machine with
 an honest `User-Agent`; the status code and payload shape were recorded. Both positive
