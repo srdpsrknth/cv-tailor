@@ -3,7 +3,7 @@
 **Status:** Approved (2026-10-26) — implemented in Phase 3, item 6
 **Related:** [0005](0005-llm-provider-interface.md) (the deferral this discharges),
 [0012](0012-structured-output-scope.md) (the per-call contract this must preserve),
-[0010](0010-configuration-and-environment.md) (no import-time environment reads)
+[0010](0010-config-object.md) (no import-time environment reads)
 
 ## Context
 
