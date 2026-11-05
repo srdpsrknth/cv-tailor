@@ -155,13 +155,55 @@ class Remote(str, Enum):
     UNKNOWN = "unknown"
 
 
-#: Country names/aliases that map to an ISO 3166-1 alpha-2 code. Only the DACH
-#: markets Phase 4 implements, plus the common English/German spellings, because
-#: guessing beyond the validated markets is how wrong data gets in.
+#: Country names/aliases that map to an ISO 3166-1 alpha-2 code.
+#:
+#: Covers the DACH markets Phase 4 implements *and* the other countries that the
+#: verified sources actually publish (Lever and Greenhouse both emitted ``US`` and
+#: ``GB`` in the 2026-10-31 probes). Recognising a non-DACH country matters even
+#: though Phase 4 is DACH-first: if ``US`` normalised to ``None``, a posting the
+#: source explicitly placed in the United States would be indistinguishable from
+#: one whose country the source never stated. That would destroy the
+#: verified-versus-absent distinction the whole model rests on -- and would make
+#: ``is_dach`` correct only by accident. Scope is kept to well-known countries
+#: rather than guessing at every name, so an unrecognised string is still ``None``.
 _COUNTRY_ALIASES = {
+    # DACH -- the implemented and validated markets (Phase 4 scope, ADR 0008 §5).
     "de": "DE", "deu": "DE", "germany": "DE", "deutschland": "DE",
     "at": "AT", "aut": "AT", "austria": "AT", "österreich": "AT", "oesterreich": "AT",
     "ch": "CH", "che": "CH", "switzerland": "CH", "schweiz": "CH", "suisse": "CH",
+    # Other markets the verified sources publish. Recorded so a stated country is
+    # never confused with an absent one; the connectors and the matcher stay
+    # DACH-first through ``is_dach``, not by throwing information away here.
+    "us": "US", "usa": "US", "united states": "US", "united states of america": "US",
+    "gb": "GB", "uk": "GB", "united kingdom": "GB", "great britain": "GB",
+    "ie": "IE", "irl": "IE", "ireland": "IE",
+    "nl": "NL", "nld": "NL", "netherlands": "NL", "nederland": "NL",
+    "fr": "FR", "fra": "FR", "france": "FR", "frankreich": "FR",
+    "es": "ES", "esp": "ES", "spain": "ES", "spanien": "ES",
+    "it": "IT", "ita": "IT", "italy": "IT", "italien": "IT",
+    "pl": "PL", "pol": "PL", "poland": "PL", "polen": "PL",
+    "pt": "PT", "prt": "PT", "portugal": "PT",
+    "se": "SE", "swe": "SE", "sweden": "SE", "schweden": "SE",
+    "dk": "DK", "dnk": "DK", "denmark": "DK", "dänemark": "DK",
+    "fi": "FI", "fin": "FI", "finland": "FI", "finnland": "FI",
+    "no": "NO", "nor": "NO", "norway": "NO", "norwegen": "NO",
+    "be": "BE", "bel": "BE", "belgium": "BE", "belgien": "BE",
+    "ca": "CA", "can": "CA", "canada": "CA", "kanada": "CA",
+    "au": "AU", "aus": "AU", "australia": "AU", "australien": "AU",
+    "in": "IN", "ind": "IN", "india": "IN", "indien": "IN",
+    "sg": "SG", "sgp": "SG", "singapore": "SG", "singapur": "SG",
+    "cz": "CZ", "cze": "CZ", "czechia": "CZ", "czech republic": "CZ",
+    "hu": "HU", "hun": "HU", "hungary": "HU", "ungarn": "HU",
+    "ro": "RO", "rou": "RO", "romania": "RO", "rumänien": "RO",
+    "bg": "BG", "bgr": "BG", "bulgaria": "BG", "bulgarien": "BG",
+    "lu": "LU", "lux": "LU", "luxembourg": "LU", "luxemburg": "LU",
+    "gr": "GR", "grc": "GR", "greece": "GR", "griechenland": "GR",
+    "hr": "HR", "hrv": "HR", "croatia": "HR", "kroatien": "HR",
+    "sk": "SK", "svk": "SK", "slovakia": "SK", "slowakei": "SK",
+    "si": "SI", "svn": "SI", "slovenia": "SI", "slowenien": "SI",
+    "ee": "EE", "est": "EE", "estonia": "EE", "estland": "EE",
+    "lv": "LV", "lva": "LV", "latvia": "LV", "lettland": "LV",
+    "lt": "LT", "ltu": "LT", "lithuania": "LT", "litauen": "LT",
 }
 
 #: The markets Phase 4 is implemented and validated against. Other countries are

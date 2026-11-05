@@ -1,0 +1,242 @@
+{
+  "_comment": "Synthetic fixtures in the VERIFIED shape of each source's real payload, captured 2026-10-31 (see docs/analysis/job-sources-research.md and tools/probe_job_sources.py). Field names, nesting and value formats reproduce what the APIs actually return; every company, person and posting is invented. No real posting data is stored in this public repository.",
+  "softgarden_datafeed": {
+    "@context": "https://schema.org",
+    "@type": "DataFeed",
+    "name": "Fixture Tenant",
+    "dateModified": "2026-11-03T03:55:57.000Z",
+    "numberOfItems": 3,
+    "dataFeedElement": [
+      {
+        "@type": "DataFeedItem",
+        "dateModified": "2026-11-03T03:55:57.000Z",
+        "item": {
+          "@type": "JobPosting",
+          "title": "Senior Data Engineer (m/w/d)",
+          "url": "https://fixture-tenant.career.softgarden.de/jobs/62349294/Senior-Data-Engineer/",
+          "datePosted": "2026-09-23T10:37:06.121+02:00",
+          "identifier": {
+            "name": "Fixture Analytics GmbH",
+            "@type": "PropertyValue",
+            "value": 62349294
+          },
+          "description": "<b>Deine Rolle</b><ul><li>Du baust Pipelines.</li><li>Du pflegst Modelle.</li></ul>",
+          "employmentType": "FULL_TIME",
+          "hiringOrganization": {
+            "@id": "https://fixture-tenant.career.softgarden.de",
+            "url": "https://fixture-tenant.career.softgarden.de",
+            "name": "Fixture Analytics GmbH",
+            "@type": "Organization"
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "postalCode": "10789",
+              "addressRegion": "Berlin",
+              "streetAddress": "Beispielstrasse 1",
+              "addressCountry": "DE",
+              "addressLocality": "Berlin"
+            }
+          }
+        }
+      },
+      {
+        "@type": "DataFeedItem",
+        "dateModified": "2026-11-03T03:55:57.000Z",
+        "item": {
+          "@type": "JobPosting",
+          "title": "Analytics Engineer",
+          "url": "https://fixture-tenant.career.softgarden.de/jobs/62349295/Analytics-Engineer/",
+          "datePosted": "2026-10-01T09:00:00.000+02:00",
+          "identifier": {
+            "name": "Fixture Analytics GmbH",
+            "@type": "PropertyValue",
+            "value": 62349295
+          },
+          "description": "<p>Modelliere Daten fuer das Reporting.</p>",
+          "employmentType": "PART_TIME",
+          "hiringOrganization": {
+            "@type": "Organization",
+            "name": "Fixture Analytics GmbH"
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "postalCode": "1010",
+              "addressRegion": "Wien",
+              "addressCountry": "AT",
+              "addressLocality": "Wien"
+            }
+          }
+        }
+      },
+      {
+        "@type": "DataFeedItem",
+        "dateModified": "2026-11-03T03:55:57.000Z",
+        "item": {
+          "@type": "JobPosting",
+          "title": "Backend Developer",
+          "url": "https://fixture-tenant.career.softgarden.de/jobs/62349296/Backend-Developer/",
+          "datePosted": "2026-10-05T12:00:00.000+02:00",
+          "identifier": {
+            "name": "Fixture Software AG",
+            "@type": "PropertyValue",
+            "value": 62349296
+          },
+          "description": "<p>Baue Services.</p>",
+          "employmentType": "FULL_TIME",
+          "hiringOrganization": {
+            "@type": "Organization",
+            "name": "Fixture Software AG"
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "addressCountry": "CH",
+              "addressLocality": "Zuerich"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "personio_xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<workzag-jobs>\n  <position>\n    <id>2048817</id>\n    <subcompany>Fixture Holding</subcompany>\n    <office>Berlin</office>\n    <department>Data</department>\n    <recruitingCategory>Engineering</recruitingCategory>\n    <name>Werkstudent Data Analytics (m/w/d)</name>\n    <jobDescriptions>\n      <jobDescription>\n        <name>Deine Aufgaben</name>\n        <value><![CDATA[<p>Unterstuetzung im Reporting.</p>]]></value>\n      </jobDescription>\n    </jobDescriptions>\n    <employmentType>working_student</employmentType>\n    <seniority>entry-level</seniority>\n    <schedule>part-time</schedule>\n    <yearsOfExperience>0-1</yearsOfExperience>\n    <occupation>Data Analytics</occupation>\n    <occupationCategory>IT</occupationCategory>\n    <createdAt>2026-10-02T08:30:00+02:00</createdAt>\n  </position>\n  <position>\n    <id>30961</id>\n    <subcompany>Fixture Holding</subcompany>\n    <office>Muenchen</office>\n    <department>People</department>\n    <name>Initiativbewerbung</name>\n    <jobDescriptions/>\n    <employmentType>permanent</employmentType>\n    <seniority>experienced</seniority>\n    <schedule>full-time</schedule>\n    <createdAt>2026-09-15T10:00:00+02:00</createdAt>\n  </position>\n</workzag-jobs>\n",
+  "lever_postings": [
+    {
+      "id": "ad208490-4052-4f91-a57e-433f2d1e484b",
+      "text": "Data Engineer",
+      "categories": {
+        "commitment": "Regular Full Time (Salary)",
+        "department": "Data",
+        "location": "Berlin, Germany",
+        "team": "Data Team",
+        "allLocations": ["Berlin, Germany"]
+      },
+      "country": "DE",
+      "createdAt": 1788199939703,
+      "workplaceType": "hybrid",
+      "hostedUrl": "https://jobs.lever.co/fixtureco/ad208490-4052-4f91-a57e-433f2d1e484b",
+      "applyUrl": "https://jobs.lever.co/fixtureco/ad208490-4052-4f91-a57e-433f2d1e484b/apply",
+      "descriptionPlain": "Build and maintain batch pipelines.",
+      "salaryRange": {"min": 60000, "max": 80000, "currency": "EUR", "interval": "year"}
+    },
+    {
+      "id": "bb309481-5163-5fa2-b68f-544f3e2f595c",
+      "text": "Customer Success Manager",
+      "categories": {
+        "commitment": "Regular Full Time (Salary)",
+        "department": "Customer Success",
+        "location": "Atlanta, Georgia",
+        "team": "Customer Success Team",
+        "allLocations": ["Atlanta, Georgia"]
+      },
+      "country": "US",
+      "createdAt": 1788299939703,
+      "workplaceType": "on-site",
+      "hostedUrl": "https://jobs.lever.co/fixtureco/bb309481-5163-5fa2-b68f-544f3e2f595c",
+      "descriptionPlain": "Own customer relationships."
+    }
+  ],
+  "greenhouse_jobs": {
+    "jobs": [
+      {
+        "id": 8126988,
+        "internal_job_id": 4663001,
+        "title": "Senior Analytics Engineer",
+        "updated_at": "2026-10-20T14:22:11-04:00",
+        "first_published": "2026-09-30T09:00:00-04:00",
+        "requisition_id": "REQ-1042",
+        "location": {"name": "Berlin, Germany"},
+        "absolute_url": "https://boards.greenhouse.io/fixtureco/jobs/8126988",
+        "language": "en",
+        "company_name": "Fixture Co",
+        "metadata": []
+      },
+      {
+        "id": 8126989,
+        "internal_job_id": 4663002,
+        "title": "Product Designer",
+        "updated_at": "2026-10-21T10:00:00-04:00",
+        "first_published": "2026-10-01T09:00:00-04:00",
+        "location": {"name": "Remote - US"},
+        "absolute_url": "https://boards.greenhouse.io/fixtureco/jobs/8126989",
+        "company_name": "Fixture Co"
+      }
+    ],
+    "meta": {"total": 2}
+  },
+  "ashby_jobs": {
+    "apiVersion": "1",
+    "jobs": [
+      {
+        "id": "e4f1c2a3-1111-2222-3333-444455556666",
+        "title": "Enterprise Account Executive - DACH",
+        "department": "Sales",
+        "team": "EMEA",
+        "employmentType": "FullTime",
+        "location": "Germany",
+        "secondaryLocations": [],
+        "publishedAt": "2026-10-10T08:00:00.000Z",
+        "isListed": true,
+        "isRemote": false,
+        "workplaceType": "Hybrid",
+        "address": {
+          "postalAddress": {
+            "addressCountry": "DE",
+            "addressLocality": "Berlin",
+            "addressRegion": "Berlin"
+          }
+        },
+        "jobUrl": "https://jobs.ashbyhq.com/fixtureco/e4f1c2a3-1111-2222-3333-444455556666",
+        "applyUrl": "https://jobs.ashbyhq.com/fixtureco/e4f1c2a3-1111-2222-3333-444455556666/application",
+        "descriptionPlain": "Sell into the DACH market.",
+        "descriptionHtml": "<p>Sell into the DACH market.</p>"
+      },
+      {
+        "id": "f5a2d3b4-2222-3333-4444-555566667777",
+        "title": "Unlisted Internal Role",
+        "department": "Ops",
+        "employmentType": "FullTime",
+        "location": "Austin, TX",
+        "publishedAt": "2026-10-11T08:00:00.000Z",
+        "isListed": false,
+        "isRemote": true,
+        "jobUrl": "https://jobs.ashbyhq.com/fixtureco/f5a2d3b4-2222-3333-4444-555566667777",
+        "descriptionPlain": "Should not appear in a default search."
+      }
+    ]
+  },
+  "arbeitnow_feed": {
+    "data": [
+      {
+        "slug": "senior-data-engineer-berlin-161084",
+        "company_name": "Fixture Aviation GmbH",
+        "title": "Senior Data Engineer",
+        "description": "<p>Build data platforms.</p>",
+        "remote": false,
+        "url": "https://www.arbeitnow.com/jobs/companies/fixture-aviation/senior-data-engineer-berlin-161084",
+        "tags": ["Engineering", "Data"],
+        "job_types": ["Full Time"],
+        "location": "Munich HQ",
+        "created_at": 1793439622
+      },
+      {
+        "slug": "remote-analyst-161085",
+        "company_name": "Fixture Remote BV",
+        "title": "Remote Analyst",
+        "description": "<p>Analyse things from anywhere.</p>",
+        "remote": true,
+        "url": "https://www.arbeitnow.com/jobs/companies/fixture-remote/remote-analyst-161085",
+        "tags": ["Analytics"],
+        "job_types": ["Full Time"],
+        "location": "Anywhere",
+        "created_at": 1793539622
+      }
+    ],
+    "links": {"first": "https://www.arbeitnow.com/api/job-board-api?page=1", "next": "https://www.arbeitnow.com/api/job-board-api?page=2", "prev": null, "last": null},
+    "meta": {}
+  }
+}
