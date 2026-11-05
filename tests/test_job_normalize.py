@@ -83,6 +83,14 @@ def test_empty_description_is_an_empty_string(value):
     ("Vienna, Austria", "AT"),
     ("Zurich, Switzerland", "CH"),
     ("Remote - US", "US"),
+    # Regression: Arbeitnow really publishes this, and it names Germany plainly.
+    # Reading the publisher's own word is parsing, not inference, so leaving the
+    # country absent here would discard a fact the source actually gave us.
+    ("Germany (remote)", "DE"),
+    ("Germany", "DE"),
+    ("Remote (Germany)", "DE"),
+    ("Berlin (Germany)", "DE"),
+    ("Austria (remote)", "AT"),
 ])
 def test_country_is_parsed_from_a_display_location(display, expected):
     assert country_from_display_location(display) == expected
@@ -90,10 +98,26 @@ def test_country_is_parsed_from_a_display_location(display, expected):
 
 @pytest.mark.parametrize("display", [
     "Munich HQ", "Anywhere", "Remote", "", None, "Berlin",
+    # A city is not a country, even though it is in one.
+    "Munich", "Vienna", "Zurich",
 ])
 def test_no_country_is_invented_from_an_ambiguous_location(display):
-    """'Munich HQ' is the real Arbeitnow case and must not become DE."""
+    """'Munich HQ' is the real Arbeitnow case and must not become DE.
+
+    A city name is deliberately not resolved to its country: that would be an
+    inference presented as the publisher's statement.
+    """
     assert country_from_display_location(display) is None
+
+
+def test_a_multi_word_country_name_is_matched_whole():
+    assert country_from_display_location("Remote - United States") == "US"
+    assert country_from_display_location("London, United Kingdom") == "GB"
+
+
+def test_a_short_alias_does_not_match_inside_a_longer_word():
+    """'in' (India) must not match 'Berlin'."""
+    assert country_from_display_location("Berlin HQ") is None
 
 
 @pytest.mark.parametrize("display,expected", [
@@ -392,11 +416,23 @@ def test_arbeitnow_yields_every_record(payloads):
     assert len(list(iter_arbeitnow(payloads["arbeitnow_feed"]))) == 2
 
 
-def test_arbeitnow_country_is_absent_because_the_source_gives_free_text(payloads):
+def test_arbeitnow_country_is_absent_when_the_location_names_no_country(payloads):
     """'Munich HQ' is a German office, but the source never says 'Germany'."""
     job = next(iter_arbeitnow(payloads["arbeitnow_feed"]))
     assert job.country.value is None
     assert job.is_dach is False
+
+
+def test_arbeitnow_country_is_parsed_when_the_location_names_one():
+    """Regression: the live feed returns 'Germany (remote)', which names Germany."""
+    payload = {"data": [{"slug": "x", "company_name": "Co", "title": "Role",
+                         "description": "<p>d</p>", "remote": True,
+                         "url": "https://x.test/1", "location": "Germany (remote)",
+                         "created_at": 1793439622}]}
+    job = next(iter_arbeitnow(payload))
+    assert job.country.value == "DE"
+    assert job.country.source is FieldSource.PARSED
+    assert job.is_dach is True
 
 
 def test_arbeitnow_raw_location_is_preserved(payloads):
@@ -514,7 +550,18 @@ def test_every_source_produces_jobs_with_unique_keys(payloads, iterable_name):
     keys = [job.key for job in jobs]
     assert len(keys) == len(set(keys))
     for job in jobs:
-        assert job.title and job.source_id and job.url
+        # Every source must yield a title and an id; the url is required only where
+        # the source actually publishes one. Personio's feed carries no url at all,
+        # and a placeholder would surface as a broken link, so it stays empty.
+        assert job.title and job.source_id
+        assert job.url
+
+
+def test_personio_leaves_the_url_empty_rather_than_inventing_one(payloads):
+    """The feed has no url field. Filling it would fabricate a broken link."""
+    jobs = list(iter_personio(payloads["personio_xml"]))
+    assert jobs
+    assert all(job.url == "" for job in jobs)
 
 
 def test_every_source_serialises_to_a_dict(payloads):

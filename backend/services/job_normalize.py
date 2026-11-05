@@ -46,9 +46,29 @@ from models.job import (
     parse_iso_datetime,
 )
 
-#: Trailing country name in a display location, e.g. "Berlin, Germany" or
-#: "Munich, Deutschland". Only used where a source publishes no country field.
+#: Trailing country name in a display location, e.g. "Berlin, Germany".
 _TRAILING_COUNTRY_RE = re.compile(r"[,\u2013-]\s*([A-Za-z\u00c0-\u017f .]+)\s*$")
+
+#: Country names/aliases that a display location may contain *anywhere*, not only
+#: as a trailing segment. Arbeitnow publishes "Germany (remote)", which names the
+#: country the publisher itself stated -- reading it is parsing, not inference.
+#: Ordered longest-first so "united states" wins over "states". Multi-word aliases
+#: are matched first because the phrase is the publisher's own.
+_DISPLAY_COUNTRY_ALIASES = (
+    "united states of america", "united kingdom", "united states", "great britain",
+    "czech republic", "new zealand", "south africa",
+    "germany", "deutschland", "austria", "\u00f6sterreich", "oesterreich",
+    "switzerland", "schweiz", "suisse", "netherlands", "nederland", "belgium",
+    "belgien", "france", "frankreich", "spain", "spanien", "italy", "italien",
+    "poland", "polen", "portugal", "sweden", "schweden", "denmark",
+    "d\u00e4nemark", "finland", "finnland", "norway", "norwegen", "ireland",
+    "canada", "kanada", "australia", "australien", "india", "indien",
+    "singapore", "singapur", "hungary", "ungarn", "romania", "rum\u00e4nien",
+    "bulgaria", "bulgarien", "luxembourg", "luxemburg", "greece",
+    "griechenland", "croatia", "kroatien", "slovakia", "slowakei", "slovenia",
+    "slowenien", "estonia", "estland", "latvia", "lettland", "lithuania",
+    "litauen",
+)
 
 
 def html_to_text(value: Optional[str]) -> str:
@@ -82,17 +102,37 @@ def html_to_text(value: Optional[str]) -> str:
 def country_from_display_location(value: Optional[str]) -> Optional[str]:
     """Extract a country code from a display string like ``"Berlin, Germany"``.
 
-    Returns ``None`` when the trailing segment is not a recognised country, which
-    is the common case (``"Munich HQ"``, ``"Remote - US"`` is recognised, ``"Any"``
-    is not). Callers record the result as :attr:`FieldSource.PARSED`, never as an
-    inference, because the country name is the publisher's own word.
+    Recognises a country named anywhere in the string, not only as a trailing
+    segment: Arbeitnow publishes ``"Germany (remote)"``, which states the country
+    just as plainly. Returns ``None`` when no country is named, which is the common
+    case (``"Munich HQ"``, ``"Anywhere"``). Callers record the result as
+    :attr:`FieldSource.PARSED`, never as an inference, because the country name is
+    the publisher's own word.
     """
     if not value:
         return None
-    match = _TRAILING_COUNTRY_RE.search(str(value).strip())
-    if not match:
+    text = str(value).strip().lower()
+    if not text:
         return None
-    return normalise_country(match.group(1))
+    # A trailing segment is the most common shape, so try it first.
+    match = _TRAILING_COUNTRY_RE.search(text)
+    if match:
+        resolved = normalise_country(match.group(1))
+        if resolved:
+            return resolved
+    # Otherwise look for a country name anywhere in the string, longest alias
+    # first so a multi-word name is not shadowed by a shorter one inside it.
+    for alias in _DISPLAY_COUNTRY_ALIASES:
+        if _contains_word(text, alias):
+            resolved = normalise_country(alias)
+            if resolved:
+                return resolved
+    return None
+
+
+def _contains_word(haystack: str, needle: str) -> bool:
+    """True when ``needle`` appears in ``haystack`` as a whole phrase."""
+    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
 
 
 def city_from_display_location(value: Optional[str]) -> Optional[str]:
@@ -236,10 +276,15 @@ def iter_personio(xml_text: str, source_name: str = "personio") -> Iterator[Job]
         ]
         description = "\n\n".join(part for part in descriptions if part)
         # Personio names the role `name` and the company `subcompany`.
+        #
+        # The feed carries **no url**, so this is left empty rather than filled with
+        # a plausible-looking guess. The connector is what knows the tenant
+        # subdomain and can build a real link; a placeholder here would surface in
+        # the user's output as a broken link that looks legitimate.
         yield Job(
             source=source_name,
             source_id=source_id,
-            url=f"https://fixture.invalid/job/{source_id}",
+            url="",
             title=_text(position, "name") or "",
             company=_text(position, "subcompany") or "",
             description=description,
@@ -408,9 +453,11 @@ def iter_ashby(payload, source_name: str = "ashby", company: str = "",
 def iter_arbeitnow(payload, source_name: str = "arbeitnow") -> Iterator[Job]:
     """Yield jobs from Arbeitnow's ``data[]`` array.
 
-    Arbeitnow publishes a **free-text** ``location`` (``"Munich HQ"``) and no
-    country, so this is the clearest case where a country must not be invented.
-    The raw string is preserved and ``country`` stays absent.
+    Arbeitnow publishes a **free-text** ``location`` and no country field. Where that
+    string names a country -- ``"Germany (remote)"`` -- the country is *parsed* from
+    the publisher's own words. Where it does not -- ``"Munich HQ"`` -- the country
+    stays absent and the raw string is preserved, so a city is never promoted to a
+    country.
     """
     for record in (payload or {}).get("data") or []:
         if not isinstance(record, dict):
@@ -420,6 +467,8 @@ def iter_arbeitnow(payload, source_name: str = "arbeitnow") -> Iterator[Job]:
             continue
         remote = record.get("remote")
         job_types = record.get("job_types") or []
+        location = record.get("location")
+        country = country_from_display_location(location)
         yield Job(
             source=source_name,
             source_id=str(source_id),
@@ -427,9 +476,12 @@ def iter_arbeitnow(payload, source_name: str = "arbeitnow") -> Iterator[Job]:
             title=record.get("title") or "",
             company=record.get("company_name") or "",
             description=html_to_text(record.get("description")),
-            location_raw=record.get("location"),
-            country=JobField.absent(),
-            city=JobField.structured(record.get("location")),
+            location_raw=location,
+            country=(
+                JobField.parsed(country, note=f"parsed from location {location!r}")
+                if country else JobField.absent()
+            ),
+            city=JobField.structured(location),
             employment_type=JobField.structured(
                 ", ".join(str(t) for t in job_types) if job_types else None
             ),
