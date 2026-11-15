@@ -34,7 +34,7 @@ tests/fixtures/
 ## Why two profiles
 
 `ASSESSMENT.md` §4 lists *cross-profile contamination* as an untested gap and
-[ADR 0003](../../../docs/DECISIONS/0003-profile-identity.md) threads an explicit
+[ADR 0003](../../docs/DECISIONS/0003-profile-identity.md) threads an explicit
 `profile_id` through every layer. A second synthetic profile makes it possible to assert
 that generating for one profile cannot leak another profile's facts into prompts or output.
 

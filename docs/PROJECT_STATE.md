@@ -1763,12 +1763,12 @@ Re-confirm each decision when its phase begins.
 
 ## Blockers and unresolved issues
 
-1. **`GEMINI_API_KEY` is not set in this worktree's `.env`.** `cvtailor doctor` reports it as
-   the only real blocker. The owner must enter it directly — never paste it into a chat. Live
-   generation in this worktree is blocked until then; rendering, the CLI and all tests are not.
-   **Item 6 adds a second, related gate:** the evaluation suite's paid path needs
-   `OPENROUTER_API_KEY` (for an OpenRouter run) and explicit owner authorisation of the method
-   and budget. It is refused before the first call without both.
+1. ~~**`GEMINI_API_KEY` is not set in this worktree's `.env`.**~~ **RESOLVED — and the
+   framing was wrong.** Both keys are now set, and since Phase 3 the default provider is
+   OpenRouter with `openai/gpt-6-luna`, so `GEMINI_API_KEY` was never the blocker this
+   section described. Generation is verified working. The evaluation suite's paid path
+   still needs explicit owner authorisation of method and budget, and is refused before
+   the first call without it.
 2. **The already-published personal data is still public.** Untracking stopped *future*
    exposure; it did not un-publish anything. `storage/profile/profile.yaml` — name, email,
    mobile, city, immigration status, employment history — and the 64 application files remain
@@ -1792,6 +1792,19 @@ Re-confirm each decision when its phase begins.
 6. **`docx_renderer.py:304-307` mutates the caller's model** — verified real bug, still
    unfixed and **still untested** (deliberately: pinning it would bless it). Its practical
    impact is bounded by `test_docx_contains_every_body_paragraph`.
+6b. **The rebuilt UI has never been looked at by a human (2026-11-15).** It is verified
+   *behaviourally* — `AppTest` executes the script, all four routes serve HTTP 200, and the
+   picker/model/disabled-button states are asserted — but **no screenshot was obtained**.
+   Headless capture of a Streamlit app returns the skeleton loader even for a working app
+   (confirmed against a control page), and the browser-automation route hit the sandbox's
+   restriction on a Python subprocess launching another program. **Worth a human eye before
+   relying on it**; the CLI is unaffected and remains the supported path.
+6c. **`pip install` is pathologically slow in this environment (2026-11-15).** Measured:
+   PyPI is reachable (HTTP 200) and fast (19 MB in 11 s), metadata latency is under 300 ms
+   per package, yet `pip install <anything>` consumes minutes of CPU without progress.
+   `pip --version` and `pip list` alone take ~20 s. This is **why the NiceGUI trial failed**
+   — its dependency graph could not be resolved — and it is an environment fault, not a
+   finding about that framework. **Adding any dependency is currently expensive here.**
 7. ~~**`backend/main.py` has no tests, and it bypasses the store.**~~ **RESOLVED 2026-10-26**
    (`a0b431c`). It called `load_profile()` with no argument, which reads the pre-Phase-2 default
    `storage/profile/profile.yaml`. On this machine that stale duplicate still existed and was
