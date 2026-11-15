@@ -185,6 +185,7 @@ def test_the_country_selector_exists_and_warns_about_headquarters(app):
     selects = [s for s in at.selectbox if "Country" in str(s.label)]
     assert selects, "country selector missing"
     assert "headquarters" in str(selects[0].help).lower()
+    assert {"Germany", "Ireland", "Netherlands", "India"} <= set(selects[0].options)
 
 
 # --- no page can act without a candidate --------------------------------------------------

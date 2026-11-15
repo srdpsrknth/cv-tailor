@@ -461,7 +461,8 @@ remaining scope are open.** See [ADR 0020](DECISIONS/0020-streamlit-refactor.md)
 
 **Delivered:** `ui/services_bridge.py` (a framework-free service layer, so the UI
 contains no business rule) · four pages over it — Generate, Find jobs, Applications,
-Help · an explicit fail-closed profile picker · in-process generation with progress and
+Help · an explicit fail-closed profile picker · country selection including Germany,
+Ireland, Netherlands and India · in-process generation with progress and
 a cost breakdown from the shared pricing module · `streamlit.testing.v1.AppTest`
 coverage that genuinely executes the script. Baseline 1090/3 → **1142 passed, 3 skipped**.
 

@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-15
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this merge)* — *pull the rebuilt UI from GitHub and preserve the local CLI repair*
+**Latest commit:** *(this commit)* — *add India to the country picker and document LinkedIn MCP access*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Where the project stands (2026-11-15)
@@ -21,6 +21,32 @@
 **Ready to use for real applications today**, from either interface — see
 [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md). The command line is the supported path for
 anything that breaks.
+
+## Country selection and LinkedIn MCP review (2026-11-15)
+
+Added India beside Germany, Ireland and Netherlands in the Generate page's country
+picker. The other existing choices remain available. The bridge's selected-country
+regression check now covers all four named countries, and the UI check asserts they
+are offered. HOW_TO_GENERATE explains the prompt override, authorization wording,
+saved context and cache effects, separately from the Find jobs country filter.
+
+India currently follows the existing generic overseas authorization rule for a
+German EU Blue Card profile. The owner has been asked whether India should instead
+be treated as a country where their profile already has work rights without
+sponsorship; no citizenship or work-right fact was inferred or written. That answer
+is needed before changing the profile-specific authorization behaviour.
+
+Reviewed `stickerdaniel/linkedin-mcp-server` at `e9b47a4`: authenticated Chromium
+navigation, search returning job IDs, and per-posting text extraction. Findings and
+pinned sources are in [the review](analysis/linkedin-mcp-research.md). No install,
+account access or LinkedIn connector was performed. The review corrects a possible
+misreading of the Phase 4 exclusion: it reflects the shipped source policy, not
+technical impossibility. Phase 6 remains active; Phase 4 is not reopened by research.
+
+Verification: focused UI/service suite **29 passed**; full offline suite **1153
+passed, 3 skipped**, one existing Google SDK deprecation warning, ~67 s.
+**Next action:** continue remaining Phase 6 scope; resolve the profile's India
+authorization wording when the owner answers the pending question.
 
 ## GitHub updates merged on macOS (2026-11-15)
 

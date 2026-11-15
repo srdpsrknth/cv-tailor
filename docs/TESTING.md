@@ -1,12 +1,17 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **1150 passed, 3 skipped**, 1 warning, ~68 s on macOS, fully offline — no paid API calls.
+**Current baseline:** **1153 passed, 3 skipped**, 1 warning, ~67 s on macOS, fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
 
 The merged baseline includes the 1142-test upstream UI update and eight local CLI/
 correction-feedback regression cases. The full suite was verified after merging
 `eddcf35` with `b2a9130` on 2026-11-15.
+
+The India country-picker update extends the selected-country bridge regression
+check to Germany, Ireland, Netherlands and India (+3 cases), and the existing
+Streamlit UI check asserts all four choices are offered. Focused UI/service checks:
+**29 passed**; full offline suite: **1153 passed, 3 skipped** on 2026-11-15.
 
 > **Set `TEMP`/`TMP` inside the worktree before running the suite.** Without it, the
 > LaTeX tests can fail with `pdflatex compilation failed` **even with no other pytest

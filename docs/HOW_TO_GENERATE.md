@@ -148,6 +148,28 @@ For the saved Mac file, for example:
 
 The company and role flags prevent generic inferred names if the posting is ambiguous.
 
+**Country of employment** is the actual job location. The Generate page includes
+Germany, Ireland, Netherlands and India; the CLI accepts the same names through
+`--country`. An explicit selection overrides location inference from the posting.
+It changes the work-authorization instructions and validation, is saved with the
+application, and participates in the cache key. Changing country can therefore
+require a new paid draft. It does not change the document language, source profile,
+page/word limits, or the separate Find jobs country filter.
+
+For a profile holding a German EU Blue Card, the current rules behave as follows:
+
+| Selection | Current document behaviour |
+|---|---|
+| Germany | Preserve the profile's status in the CV; do not require an overseas sponsorship sentence |
+| Ireland | CV label: German EU Blue Card holder; final letter paragraph must mention the German card and employer support for a local employment permit, without claiming an Irish Blue Card |
+| Netherlands | Same CV label; final letter paragraph must mention the German card and employer support for appropriate work authorization |
+| India | Currently follows the generic overseas rule: same CV label and employer support for local work authorization |
+
+These are the application's writing rules, not a determination of legal eligibility.
+In particular, selecting India does not establish citizenship or existing Indian work
+rights. The current overseas rule must be adjusted for a candidate who already has
+those rights; adding a dropdown option alone does not make that distinction.
+
 Useful variations:
 
 ```powershell

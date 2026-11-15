@@ -214,7 +214,7 @@ def page_generate(config) -> None:
         role = st.text_input("Role title", key="role", placeholder="Analytical Engineer")
         work_country = st.selectbox(
             "Country of employment",
-            options=["", "Germany", "Ireland", "Netherlands", "United Kingdom",
+            options=["", "Germany", "Ireland", "Netherlands", "India", "United Kingdom",
                      "Austria", "Switzerland", "Other"],
             key="work_country",
             help=(

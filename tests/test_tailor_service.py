@@ -158,7 +158,8 @@ def test_selected_country_controls_prompt_header_and_saved_context(monkeypatch, 
     assert all(f'explicit user selection; overrides country inference): {country}' in call.args[0] for call in fake._call_provider.call_args_list)
 
 
-def test_the_ui_passes_the_selected_work_country(monkeypatch):
+@pytest.mark.parametrize('country', ['Germany', 'Ireland', 'Netherlands', 'India'])
+def test_the_ui_passes_the_selected_work_country(monkeypatch, country):
     """The country the user picks must reach the service (Phase 6 rewrite).
 
     This replaces a test that drove the old Streamlit UI over HTTP and asserted the
@@ -205,10 +206,10 @@ def test_the_ui_passes_the_selected_work_country(monkeypatch):
 
     outcome = services_bridge.run_generation(
         Config(), 'analyst_a', 'A detailed analytics engineering opening. ' * 3,
-        work_country='Netherlands',
+        work_country=country,
     )
 
-    assert captured.get('work_country') == 'Netherlands'
+    assert captured.get('work_country') == country
     assert captured.get('profile_id') == 'analyst_a'
     assert outcome.ok is False, 'the stub raises, so the outcome must report failure'
     assert 'stop here' in outcome.error
