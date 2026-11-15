@@ -100,6 +100,20 @@ plain text file. For example `job.txt`.
 Include the job URL and today's date at the top if you have them; it makes the saved
 record easier to trace later.
 
+On a Mac, save the clipboard **while it contains the posting**, then inspect the file:
+
+```bash
+pbpaste > ../cv-tailor-data/jobs/sreedeep/job.txt
+head -5 ../cv-tailor-data/jobs/sreedeep/job.txt
+```
+
+Use your actual private store and profile directory; create the directory first if
+needed. Check that the first lines name the role and employer. Copying the generation
+command replaces the clipboard, so `--job "$(pbpaste)"` can accidentally submit the
+command itself. A saved file makes the input inspectable and repeatable. The CLI
+rejects input starting with a CV Tailor invocation before any paid call and prints
+the posting's length and first line before generation.
+
 > **Tip:** if a website blocks copying, the posting is often also readable via the
 > page's "JobPosting" data. Ask an agent to fetch it, or paste it from the email
 > alert. Never guess at requirements you cannot read.
@@ -109,6 +123,16 @@ record easier to trace later.
 ```powershell
 .\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt
 ```
+
+For the saved Mac file, for example:
+
+```bash
+.venv/bin/python cvtailor.py --profile-id sreedeep generate \
+  --job-file ../cv-tailor-data/jobs/sreedeep/job.txt \
+  --company "Northwind Analytics" --role "Analytics Engineer" --country Germany
+```
+
+The company and role flags prevent generic inferred names if the posting is ambiguous.
 
 Useful variations:
 

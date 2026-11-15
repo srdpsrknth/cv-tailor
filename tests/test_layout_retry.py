@@ -412,6 +412,34 @@ def test_a_bullet_that_claims_a_banned_tool_is_rejected_on_the_delta_path(
 
 # --- the load-bearing constraints survive ---------------------------------------------
 
+def test_ongoing_tool_feedback_identifies_the_ambiguous_bullet(
+    analyst_profile, analyst_session, offline_service,
+):
+    """A correct status in bullet 2 cannot repair the ambiguous mention in bullet 1."""
+    current = draft_cv(analyst_session)
+    employer = current.experience[0]
+    employer.bullets = [
+        'Develop pipelines alongside MCP workflows.',
+        'Developing an MCP warehouse integration.',
+    ]
+    rules = generation.ProfileRules(special_employers={
+        employer.company.lower(): {'ongoing_tool': 'MCP'},
+    })
+    invalid = current.model_dump_json()
+    employer.bullets[0] = 'Develop pipelines alongside developing MCP workflows.'
+    offline = offline_service([invalid, current.model_dump_json()])
+    generator = generation.DocumentGenerator(offline, analyst_profile, rules=rules)
+
+    accepted, _ = generator.generate('Shorten this CV.', 'cv')
+
+    assert offline.call_count == 2
+    correction = offline.prompts[1].split('PREVIOUS RESPONSE:')[0]
+    assert 'bullet 1' in correction
+    assert 'Develop pipelines alongside MCP workflows.' in correction
+    assert 'same bullet' in correction and 'developing' in correction
+    assert accepted.experience[0].bullets[0] == employer.bullets[0]
+
+
 def test_an_ongoing_role_is_not_turned_into_completed_work_by_a_delta(
     isolated_service, analyst_profile, analyst_session,
 ):

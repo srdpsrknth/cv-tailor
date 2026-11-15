@@ -2,8 +2,8 @@
 
 **Last updated:** 2026-11-15
 **Branch:** `refactor/architecture-v2`
-**Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** *(this commit)* — *docs: the UI is the active task, and a how-to for generating documents*
+**Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
+**Latest commit:** *(this commit)* — *fix: reject copied commands as postings and pinpoint retry validation errors*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Where the project stands (2026-11-15)
@@ -20,6 +20,44 @@
 
 **Ready to use for real applications today, via the CLI** — see
 [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md). The web UI is the part that is behind.
+
+## CLI generation repair (2026-11-15)
+
+An interrupted CLI generation was diagnosed from its private saved posting, drafts
+and failure metadata. The saved posting was the invocation itself: copying the
+command had replaced the clipboard before `--job "$(pbpaste)"` read it. The model
+therefore drafted a generic application. Its three-page CV entered the layout retry;
+an attempted empty delta deletion failed, and subsequent attempts repeatedly fixed
+the wrong ongoing-tool bullet because the validation message named only the employer
+and tool.
+
+The CLI now rejects postings starting with a CV Tailor invocation before any paid
+call, and shows the input length and first line before generation. Ongoing-tool
+errors identify and quote the offending bullet and state the required wording in
+that same bullet. The layout brief explicitly forbids empty delta deletions and
+explains that optional project consolidation requires a complete CV response. The
+factual and page-count gates remain enforced. HOW_TO_GENERATE documents saving and
+inspecting a clipboard posting before using `--job-file`.
+
+Verification: pre-change baseline **1090 passed, 3 skipped**; focused CLI/layout/
+editorial tests **56 passed**; full post-change suite **1098 passed, 3 skipped**
+(one Google SDK deprecation warning). Re-running the original saved command text
+now exits with usage code 2 before generation. The original failed private
+application is preserved.
+
+The corrected private posting was also run live with explicit company, role and
+country: **success, CV 2 pages, cover letter 1 page**, 2 CV calls and 1 letter call,
+27,367 tokens, approximately **$0.0065** reported. The draft hit the ongoing-tool
+rule once and the model corrected the precise bullet identified by the new error;
+the accepted CV fitted two pages without a layout retry. This verifies the input
+and correction path live, not the revised layout prompt's effect on future model
+responses. The letter's MCP wording was clarified in editable content and rendered
+again without an API call (4 paragraphs, 309 words). Visual QA covered both CV
+pages, the letter PDF and a separate bundled-LibreOffice rendering of the DOCX.
+
+This is a CLI repair, not a reopening of Phase 3 or a change in roadmap priority.
+**Next action:** return to the Phase 6 UI decision below. No setup blocker was
+found by `doctor` on this Mac.
 
 ## The UI is the active task now — Phase 6, prioritised by the owner (2026-11-15)
 

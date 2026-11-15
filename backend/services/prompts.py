@@ -218,7 +218,11 @@ def layout_retry_instruction(
         + layout_inventory(cv, attempt + 1)
         + '\nReturn either the complete shorter CV JSON, or a delta object of only the '
         'units that change, e.g. {"summary": [...], "experience[0].bullets[1]": '
-        '"shorter text"}. Units not returned are kept unchanged.\nCURRENT CV:\n'
+        '"shorter text"}. Units not returned are kept unchanged. '
+        'Delta replacements must contain non-empty text; do not use [] or "" to delete '
+        'bullets or projects. To consolidate project content into role bullets and '
+        'remove optional projects, return the complete CV instead; preserve every '
+        'claim and the required project shape.\nCURRENT CV:\n'
     )
 
 def layout_budget(attempt: int) -> int:

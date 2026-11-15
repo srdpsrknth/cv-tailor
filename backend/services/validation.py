@@ -139,13 +139,16 @@ def _apply_employer_rules(exp, rules: ProfileRules) -> None:
                 )
         ongoing_tool = employer_rules.get("ongoing_tool")
         if ongoing_tool:
-            for bullet in exp.bullets:
+            for index, bullet in enumerate(exp.bullets, start=1):
                 if re.search(rf"\b{re.escape(ongoing_tool)}\b", bullet) and not re.search(
                     r"developing|development|working on", bullet, re.I
                 ):
                     raise ValueError(
                         f"Describe {exp.company} {ongoing_tool} integration as ongoing "
-                        "development, not shipped work."
+                        f"development, not shipped work. Fix bullet {index}: {bullet!r}. "
+                        "Every mention must include 'developing', 'development', or "
+                        "'working on' in the same bullet; correcting another bullet "
+                        "does not fix this one."
                     )
         ownership = employer_rules.get("ownership_pattern")
         if ownership and re.search(ownership, " ".join(exp.bullets), re.I):

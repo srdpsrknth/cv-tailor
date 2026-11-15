@@ -6,6 +6,7 @@ command that calls a paid API.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -20,6 +21,14 @@ from cli.context import (
 
 #: TailorRequest enforces this; check it first so the message is the CLI's own.
 MIN_JOB_DESCRIPTION = 50
+
+# Catch a copied invocation as the posting (not code examples later in a real JD).
+_COMMAND_START = re.compile(
+    r"^(?:(?:[^\s]*[/\\])?python(?:\d+(?:\.\d+)*)?(?:\.exe)?\s+"
+    r"(?:[^\s]*[/\\])?cvtailor\.py(?:\s|$)"
+    r"|cvtailor(?:\.py)?\s+(?:--\S+|generate\b))",
+    re.I,
+)
 
 
 def _load(path: Path):
@@ -82,6 +91,18 @@ def run(args, console: Console, config) -> int:
         raise CliError(f"Profile is invalid: {error}", EXIT_NOT_FOUND)
 
     job_description = read_job_description(args, console).strip()
+    first_line = next(
+        (line.strip() for line in job_description.splitlines()
+         if line.strip() and not line.strip().startswith('```')),
+        '',
+    )
+    if _COMMAND_START.match(first_line):
+        raise CliError(
+            "The job description starts with a CV Tailor command. "
+            "The clipboard may contain the command instead of the posting.",
+            EXIT_USAGE,
+            hint="Save the actual posting to a text file, inspect it, then use --job-file <path>.",
+        )
     if len(job_description) < MIN_JOB_DESCRIPTION:
         raise CliError(
             f"Job description is too short ({len(job_description)} characters).",
@@ -100,6 +121,7 @@ def run(args, console: Console, config) -> int:
         label = profile_id or str(profile_path)
         console.out(f"Profile:  {profile.identity.full_name}  [{label}]")
         console.out(f"Model:    {config.model}")
+        console.out(f"Posting:  {len(job_description):,} characters; {first_line[:120]}")
         if getattr(args, "company", None):
             console.out(f"Company:  {args.company}")
         if getattr(args, "role", None):

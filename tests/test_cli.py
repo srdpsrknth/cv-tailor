@@ -298,3 +298,42 @@ def test_generate_accepts_a_job_file_path(no_api_key, tmp_path, capsys):
 
     assert code != 0
     assert 'GEMINI_API_KEY' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('source', ['inline', 'file', 'stdin'])
+@pytest.mark.parametrize('command', [
+    '.venv/bin/python cvtailor.py \\\n  --profile-id analyst_a \\\n  generate --job "$(pbpaste)" --country Germany',
+    'cvtailor --profile-id analyst_a generate --job-file posting.txt',
+])
+def test_generate_rejects_a_command_as_the_posting(
+    no_api_key, monkeypatch, tmp_path, capsys, source, command,
+):
+    """A clipboard mistake must stop before the API-key check or any paid call."""
+    import io
+    from services import tailor_service
+
+    def unexpected_call(**kwargs):
+        pytest.fail('A shell command reached paid generation')
+
+    monkeypatch.setattr(tailor_service, 'tailor_documents', unexpected_call)
+    argv = ['generate']
+    if source == 'inline':
+        argv += ['--job', command]
+    elif source == 'file':
+        job = tmp_path / 'posting.txt'
+        job.write_text(command, encoding='utf-8')
+        argv += ['--job-file', str(job)]
+    else:
+        monkeypatch.setattr(sys, 'stdin', io.StringIO(command))
+
+    assert main(argv) == 2
+    error = capsys.readouterr().err
+    assert 'command' in error.lower() and 'clipboard' in error.lower()
+    assert 'GEMINI_API_KEY' not in error
+
+
+def test_a_posting_can_mention_the_cli_below_its_title(no_api_key, capsys):
+    posting = ('Python Engineer\nMaintain our internal application tooling.\n'
+               'Example: python cvtailor.py generate --job-file posting.txt')
+    assert main(['generate', '--job', posting]) == 3
+    assert 'GEMINI_API_KEY' in capsys.readouterr().err
