@@ -132,6 +132,7 @@ def rules_fingerprint(rules) -> str:
         "visa_label": getattr(rules, "visa_label", None),
         "home_countries": list(getattr(rules, "home_countries", ()) or ()),
         "local_permit_countries": list(getattr(rules, "local_permit_countries", ()) or ()),
+        "country_overrides": getattr(rules, "country_overrides", {}) or {},
     }, sort_keys=True, ensure_ascii=False))
 
 

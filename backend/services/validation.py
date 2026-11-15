@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from models.profile import Profile
+from models.job import normalise_country
 from models.tailored_output import TailoredCV, TailoredCoverLetter
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,13 @@ class ProfileRules:
     visa_label: Optional[str] = None
     home_countries: tuple = ("germany", "deutschland", "de")
     local_permit_countries: tuple = ("ireland", "denmark")
+    country_overrides: dict = field(default_factory=dict)
+
+    def country_override(self, country: Optional[str]) -> Optional[dict]:
+        if not country:
+            return None
+        key = normalise_country(country) or country.strip().casefold()
+        return self.country_overrides.get(key)
 
     @classmethod
     def from_profile(cls, profile: Profile) -> "ProfileRules":
@@ -65,6 +73,10 @@ class ProfileRules:
             visa_label=declared.visa_label,
             home_countries=tuple(declared.home_countries or ()),
             local_permit_countries=tuple(declared.local_permit_countries or ()),
+            country_overrides={
+                normalise_country(country) or country.strip().casefold(): rule.model_dump()
+                for country, rule in declared.country_overrides.items()
+            },
         )
 
 def _employer_rules_to_dict(rules) -> dict:

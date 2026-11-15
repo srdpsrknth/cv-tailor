@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-15
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this commit)* — *add India to the country picker and document LinkedIn MCP access*
+**Latest commit:** *(this commit)* — *honor profile-specific country work rights and tailoring guidance*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Where the project stands (2026-11-15)
@@ -22,6 +22,34 @@
 [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md). The command line is the supported path for
 anything that breaks.
 
+## Profile-specific country work rights and tailoring (2026-11-15)
+
+Added optional `rules.country_overrides` to the profile schema, resolved by country
+name or ISO code. Each override records a CV authorization label (empty suppresses
+the profile's default), whether employer support is needed, the confirmed basis,
+and optional tailoring guidance. Prompts give these rules priority over the generic
+overseas instructions. The generation validator rejects immigration/sponsorship
+wording when the profile confirms local work rights; the CV renderer already
+preserves an empty override, so it does not fall back to the German status.
+
+The owner explicitly selected `sreedeep`; its private profile is updated and
+validated, with a backup and all existing facts/rules preserved. Personal
+authorization facts and destination-specific writing preferences remain in the
+private store. No other candidate is assigned these rights. The country override
+and tailoring guidance participate in the cache identity; existing saved
+applications are unchanged. No paid model call was made.
+
+Regression checks cover country aliases, full model validation, suppression of the
+renderer fallback, correction of invalid sponsorship wording, candidate isolation,
+unchanged Germany/Ireland/Netherlands rules, prompt guidance and cache invalidation.
+Verification: final offline suite **1170 passed, 3 skipped**, one existing Google
+SDK deprecation warning, ~68 s. A separate no-model dry check against the selected
+private profile verified the India CV template label, letter gate, European-work
+guidance, and unchanged Ireland/Netherlands requirements. No paid generation or
+visual document review was performed; no existing document was edited.
+**Next action:** continue the remaining Phase 6 scope. The earlier pending profile
+and work-right questions below are resolved.
+
 ## Country selection and LinkedIn MCP review (2026-11-15)
 
 Added India beside Germany, Ireland and Netherlands in the Generate page's country
@@ -30,11 +58,10 @@ regression check now covers all four named countries, and the UI check asserts t
 are offered. HOW_TO_GENERATE explains the prompt override, authorization wording,
 saved context and cache effects, separately from the Find jobs country filter.
 
-India currently follows the existing generic overseas authorization rule for a
-German EU Blue Card profile. The owner has been asked whether India should instead
-be treated as a country where their profile already has work rights without
-sponsorship; no citizenship or work-right fact was inferred or written. That answer
-is needed before changing the profile-specific authorization behaviour.
+**Resolved by the follow-up above:** the owner confirmed local work rights and
+explicitly selected the private profile to update. India now uses that profile's
+country override rather than the generic overseas requirement. Other candidates
+retain their own rules.
 
 Reviewed `stickerdaniel/linkedin-mcp-server` at `e9b47a4`: authenticated Chromium
 navigation, search returning job IDs, and per-posting text extraction. Findings and
@@ -45,8 +72,8 @@ technical impossibility. Phase 6 remains active; Phase 4 is not reopened by rese
 
 Verification: focused UI/service suite **29 passed**; full offline suite **1153
 passed, 3 skipped**, one existing Google SDK deprecation warning, ~67 s.
-**Next action:** continue remaining Phase 6 scope; resolve the profile's India
-authorization wording when the owner answers the pending question.
+**Next action:** continue remaining Phase 6 scope; the India wording question is
+resolved by the follow-up above.
 
 ## GitHub updates merged on macOS (2026-11-15)
 

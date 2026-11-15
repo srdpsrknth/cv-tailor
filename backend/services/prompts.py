@@ -8,6 +8,7 @@ per call.
 from __future__ import annotations
 
 import re
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -68,6 +69,18 @@ def build_context(
         if work_country
         else "\nWORK COUNTRY: infer only from a clear actual job location; do not guess from company headquarters.\n"
     )
+    rules = ProfileRules.from_profile(profile)
+    if rules.country_overrides:
+        country_context += (
+            "\nCOUNTRY-SPECIFIC APPLICATION RULES (take precedence over generic visa instructions):\n"
+            + json.dumps(rules.country_overrides, ensure_ascii=False, sort_keys=True)
+            + "\nApply only the actual employment country's override (ISO country keys). "
+            "An empty work_authorization means suppress the CV immigration label, "
+            "not fall back to the profile status. If requires_employer_support is false, "
+            "omit Blue Card, visa, permit and sponsorship wording from both documents. "
+            "Follow tailoring_guidance using only profile-backed experience; do not invent "
+            "international clients, leadership, outcomes, or relocation availability.\n"
+        )
     return (
         f"\nCOMPANY: {company_name or 'Infer from job description'}\n"
         f"ROLE: {role_title or 'Infer from job description'}\n"

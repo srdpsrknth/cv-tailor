@@ -21,7 +21,13 @@ The template adds those separately.
 3. Connect relevant earlier roles, concrete outcomes, and projects to the opening.
 4. Close naturally with the contribution offered and an invitation to discuss fit.
 
-For a clearly identified role outside Germany, include one concise sentence in
+Country-specific application rules in the context take precedence over the generic
+work-authorization instructions below. If they confirm existing local work rights
+without employer support, omit immigration and sponsorship wording and use the
+country-specific tailoring guidance instead. Never infer those rights from nationality
+or previous work locations that the profile does not explicitly confirm.
+
+Otherwise, for a clearly identified role outside Germany, include one concise sentence in
 paragraph four: the candidate holds a valid German-issued EU Blue Card and will
 require employer support for the destination's appropriate work authorization.
 For a participating EU country, say "I hold a valid EU Blue Card issued by Germany

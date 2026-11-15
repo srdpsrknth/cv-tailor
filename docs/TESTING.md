@@ -1,7 +1,7 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **1153 passed, 3 skipped**, 1 warning, ~67 s on macOS, fully offline — no paid API calls.
+**Current baseline:** **1170 passed, 3 skipped**, 1 warning, ~68 s on macOS, fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
 
 The merged baseline includes the 1142-test upstream UI update and eight local CLI/
@@ -12,6 +12,12 @@ The India country-picker update extends the selected-country bridge regression
 check to Germany, Ireland, Netherlands and India (+3 cases), and the existing
 Streamlit UI check asserts all four choices are offered. Focused UI/service checks:
 **29 passed**; full offline suite: **1153 passed, 3 skipped** on 2026-11-15.
+
+Profile-specific country overrides add 17 checks in `test_country_overrides.py`:
+ISO/name aliases, empty CV labels through template preparation, full model gates,
+correction of inappropriate permit wording, candidate isolation, unchanged overseas
+requirements, evidence-based tailoring context, and rules-cache invalidation.
+The final offline suite on 2026-11-15: **1170 passed, 3 skipped**, ~68 s.
 
 > **Set `TEMP`/`TMP` inside the worktree before running the suite.** Without it, the
 > LaTeX tests can fail with `pdflatex compilation failed` **even with no other pytest

@@ -82,6 +82,17 @@ class EmployerRules(BaseModel):
     ownership_message: Optional[str] = None
 
 
+class CountryApplicationRules(BaseModel):
+    """Confirmed candidate-specific authorization and tailoring for one country."""
+    model_config = ConfigDict(extra="forbid")
+
+    # An empty label explicitly suppresses the profile's default immigration status.
+    work_authorization: str = ""
+    requires_employer_support: bool = True
+    authorization_basis: Optional[str] = None
+    tailoring_guidance: Optional[str] = None
+
+
 class ProfileRules(BaseModel):
     """Validation rules scoped to one candidate.
 
@@ -109,6 +120,7 @@ class ProfileRules(BaseModel):
     home_countries: List[str] = Field(default_factory=lambda: ["germany", "deutschland", "de"])
     #: Countries that issue their own permit, so an EU Blue Card must not be claimed.
     local_permit_countries: List[str] = Field(default_factory=lambda: ["ireland", "denmark"])
+    country_overrides: Dict[str, CountryApplicationRules] = Field(default_factory=dict)
 
 
 # -------------------------

@@ -188,6 +188,7 @@ class DocumentGenerator:
         if kind == "cv":
             model = TailoredCV.model_validate(data.get("cv", data))
             self._apply_visa_label(model, work_country)
+            self._check_country_override_wording(model.model_dump_json(), work_country)
             if re.search(r"sponsorship|employer support|work permit support",
                          model.model_dump_json(), re.I):
                 raise ValueError(
@@ -207,6 +208,10 @@ class DocumentGenerator:
 
     def _apply_visa_label(self, cv: TailoredCV, work_country: Optional[str]) -> None:
         """Keep immigration status separate from sponsorship wording."""
+        override = self.rules.country_override(work_country)
+        if override is not None:
+            cv.work_authorization = override["work_authorization"]
+            return
         visa = (self.profile.identity.visa_status or "").lower()
         if not work_country or "blue card" not in visa:
             return
@@ -215,8 +220,25 @@ class DocumentGenerator:
             else self.rules.visa_label
         )
 
+    def _check_country_override_wording(self, text: str, work_country: Optional[str]) -> None:
+        override = self.rules.country_override(work_country)
+        if override is not None and not override["requires_employer_support"] and re.search(
+            r"\b(?:Blue Card|sponsor\w*|(?:work|employment) (?:permit|visa)|"
+            r"visa (?:support|sponsorship|status|requirements?)|employer support)\b",
+            text, re.I,
+        ):
+            raise ValueError(
+                f"The profile confirms existing work rights in {work_country}. "
+                "Remove Blue Card, visa, permit and sponsorship wording; use the "
+                "country-specific tailoring guidance instead."
+            )
+
     def _check_sponsorship_sentence(self, cl: TailoredCoverLetter, work_country: Optional[str]) -> None:
         """Overseas letters must address permit support, without inventing a local card."""
+        override = self.rules.country_override(work_country)
+        if override is not None and not override["requires_employer_support"]:
+            self._check_country_override_wording(" ".join(cl.paragraphs), work_country)
+            return
         visa = (self.profile.identity.visa_status or "").lower()
         if not work_country or work_country.lower() in self.rules.home_countries:
             return

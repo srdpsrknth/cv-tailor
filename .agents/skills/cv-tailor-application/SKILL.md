@@ -37,6 +37,15 @@ Keep `source/content.json`, `source/job_description.txt`, and `source/generation
 
 ## Applications outside Germany
 
+First check the selected profile's `rules.country_overrides`. Confirmed local work
+rights take precedence over the generic overseas instructions below. If the actual
+employment country's override sets `requires_employer_support: false`, omit visa,
+Blue Card, permit and sponsorship wording from both documents. An empty
+`work_authorization` explicitly suppresses the CV immigration label (null would
+restore the profile's default label). Follow that country's `tailoring_guidance`
+using profile-backed examples; do not infer another candidate's rights or invent
+international clients, leadership or relocation availability.
+
 Streamlit has a Country of employment selector. Pass its explicit `work_country` to the backend; this overrides inference from the posting and is saved in source/content.json. In chat, pass the confirmed country when calling tailor_documents as well. For remote roles use the actual employment country. Keep this application context when revising saved content.
 
 The candidate holds a valid German-issued EU Blue Card and has stated that overseas applications require employer permit support. Establish the actual country of work from the posting or user, not employer HQ; ask if ambiguous. Verify current destination requirements from official government sources before naming a permit route or eligibility. A German Blue Card is not unrestricted EU-wide work authorization. Ireland and Denmark do not participate in the scheme. Do not assume mobility eligibility, automatic transfer, timelines, or a sponsorship exemption.

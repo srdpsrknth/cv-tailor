@@ -163,12 +163,20 @@ For a profile holding a German EU Blue Card, the current rules behave as follows
 | Germany | Preserve the profile's status in the CV; do not require an overseas sponsorship sentence |
 | Ireland | CV label: German EU Blue Card holder; final letter paragraph must mention the German card and employer support for a local employment permit, without claiming an Irish Blue Card |
 | Netherlands | Same CV label; final letter paragraph must mention the German card and employer support for appropriate work authorization |
-| India | Currently follows the generic overseas rule: same CV label and employer support for local work authorization |
+| India | Uses the selected profile's country override when configured; confirmed local work rights suppress immigration and sponsorship wording and allow country-specific tailoring emphasis |
 
 These are the application's writing rules, not a determination of legal eligibility.
 In particular, selecting India does not establish citizenship or existing Indian work
-rights. The current overseas rule must be adjusted for a candidate who already has
-those rights; adding a dropdown option alone does not make that distinction.
+rights. Confirmed exceptions belong in that candidate's private profile under
+`rules.country_overrides`, keyed by country name or ISO code. A rule declares
+`work_authorization` (empty suppresses the CV immigration label),
+`requires_employer_support`, optional `authorization_basis` recording the confirmed
+reason, and optional `tailoring_guidance`. For a profile with
+confirmed local work rights, the prompts and validation omit Blue Card, visa,
+permit and sponsorship wording and can emphasize relevant experience abroad.
+Other profiles retain their own rules; no citizenship is inferred from the country
+selection. Updating these rules changes the generation cache key. Existing saved
+applications are not rewritten automatically.
 
 Useful variations:
 

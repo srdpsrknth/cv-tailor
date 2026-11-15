@@ -28,6 +28,8 @@ JOB-SPECIFIC TAILORING (required for every application)
   requirements. Do not claim an ATS score or guaranteed screening outcome.
 
 WRITING AND FACTUAL RULES
+- Country-specific application rules in the context take precedence over the generic
+  work-authorization instructions below. Apply only the actual job country's rule.
 - Work authorization: the candidate holds a valid EU Blue Card issued by Germany
   and requires employer support for the appropriate work authorization when taking
   a role outside Germany. For clearly identified non-German job locations, set
