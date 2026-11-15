@@ -5,7 +5,7 @@ action, current blockers and the verified baseline. Then read the relevant part 
 `docs/ASSESSMENT.md` (current architecture) and `docs/ROADMAP.md`, and check `docs/DECISIONS/`
 for settled choices. Do not repeat the architecture assessment unless the system materially changed.
 
-On a new Mac, read `docs/MAC_SETUP.md` first and follow its initialization and validation workflow. Read `.agents/skills/cv-tailor-application/SKILL.md` before generating or revising applications. For setup, worktrees, ports and Git workflow, read `docs/DEVELOPMENT.md`; for the test baseline and its sandbox caveat, read `docs/TESTING.md`.
+On a new Mac, read `docs/MAC_SETUP.md` first and follow its initialization and validation workflow. Read `.agents/skills/cv-tailor-application/SKILL.md` before generating or revising applications. For setup, worktrees, ports and Git workflow, read `docs/DEVELOPMENT.md`; for the test baseline and its sandbox caveat, read `docs/TESTING.md`. **For the user-facing workflow — how to generate, revise and find jobs — read `docs/HOW_TO_GENERATE.md`.**
 
 Derive the project root from the clone. Use `.venv/bin/python` on macOS and `.venv/Scripts/python.exe` on Windows. Never assume this owner's Windows paths or copy an old virtual environment to a different OS. Do not print API keys or commit `.env`.
 

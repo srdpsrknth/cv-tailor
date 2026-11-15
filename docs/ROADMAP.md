@@ -456,12 +456,40 @@ LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
 
 ## Phase 6 — UI and deployment
 
+**Status: NOT STARTED — and the owner has prioritised it AHEAD of the remaining
+Phase 4 follow-ups (2026-11-15).** The Streamlit UI is **unrefactored**: it predates
+Phases 2–4 and was last touched 2026-10-26. It is the *only* significant part of the
+repository that has not been through the modular redesign, and it now contradicts
+settled decisions. See the assessment below.
+
 - **Objective:** decide the interface story.
 - **Scope:** assess keeping vs replacing Streamlit; multi-profile management; job search and
   application dashboards; document previews; authentication **only if** hosted.
 - **Dependencies:** Phases 3–5.
 - **Acceptance:** the UI reuses the same services as the CLI — no duplicated business rules.
 - **Effort:** Medium–High.
+
+### Why the UI is now the priority (evidence, 2026-11-15)
+
+`ui/app.py` is a single 407-line Streamlit file, last modified 2026-10-26, from
+before Phase 2. Measured against the decisions since taken:
+
+| Settled decision | UI today | Verdict |
+|---|---|---|
+| ADR 0003 — `profile_id` required, fails closed | The `/api/tailor` payload sends **no `profile_id`** (lines 135–140) | Broken. It works only by accident, because this machine's `.env` sets `CVTAILOR_PROFILE_ID=sreedeep`. A second candidate has no way to be selected, and on a machine without that variable the UI fails. |
+| Phase 2 — multi-profile | No concept of a profile at all | Absent |
+| Phase 3 — provider interface, model routing, cost | Reads `model_name`, defaults to a **hardcoded `gemini-2.5-flash`**; has its own pricing copy | Stale: names the superseded model and duplicates a table `services/pricing.py` now owns |
+| Phase 4 — job search | Nothing | Absent |
+| ROADMAP acceptance — "reuses the same services as the CLI" | Talks to FastAPI over HTTP with its own logic | Not met |
+
+The **backend API is fine** — `/api/tailor` and the three download routes resolve
+`profile_id` correctly. The gap is the UI layer only, which is why this is a
+self-contained piece of work rather than a re-architecture.
+
+**Consequence for ordering:** the job-search module is complete and committed, so
+parking its two remaining follow-ups (replacing the sample employer lists, and a
+Bundesagentur partner application) costs nothing. Nothing in Phase 4 regresses by
+waiting.
 
 ---
 

@@ -1,10 +1,68 @@
 # Project state
 
-**Last updated:** 2026-11-05
+**Last updated:** 2026-11-15
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** *(item 8)* — *docs: Phase 4 is implemented, and ADR 0018 records how*
+**Latest commit:** *(this commit)* — *docs: the UI is the active task, and a how-to for generating documents*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Where the project stands (2026-11-15)
+
+| Phase | State |
+|---|---|
+| 0 — Assessment and foundations | **Complete** |
+| 1 — Core refactoring and CLI | **Complete** (2026-10-23) |
+| 2 — Multi-profile architecture | **Complete** (2026-10-24) |
+| 3 — LLM and document generation | **Complete and closed out** (2026-10-31) |
+| 4 — Job discovery and matching | **Complete** (2026-11-05) — two optional follow-ups parked |
+| 5 — Application management | **Not started** |
+| 6 — **UI and deployment** | **ACTIVE** (started 2026-11-15) |
+
+**Ready to use for real applications today, via the CLI** — see
+[HOW_TO_GENERATE.md](HOW_TO_GENERATE.md). The web UI is the part that is behind.
+
+## The UI is the active task now — Phase 6, prioritised by the owner (2026-11-15)
+
+**Active task:** **Phase 6 (UI and deployment)**, chosen by the owner on 2026-11-15
+ahead of the remaining Phase 4 follow-ups. The owner's reasoning: the UI has not been
+refactored, so it is the largest remaining gap; job search is complete and can wait.
+
+**The finding, measured:** `ui/app.py` is one 407-line Streamlit file, last modified
+2026-10-26 — before Phase 2. Against the decisions since taken:
+
+* **It sends no `profile_id`.** The `/api/tailor` payload omits it entirely, so it
+  works only because this machine's `.env` sets `CVTAILOR_PROFILE_ID=sreedeep`. A
+  second candidate cannot be selected, and on a machine without that variable the UI
+  fails. **This is the ADR 0003 fail-closed rule being bypassed by accident, not by
+  design.**
+* **It names a superseded model.** `gemini-2.5-flash` is hardcoded as the display
+  default, and it keeps its own copy of the price table that `services/pricing.py`
+  now owns.
+* **No multi-profile support, no job search, no profile management.**
+
+**The backend API is fine** — `/api/tailor` and the three download routes resolve
+`profile_id` correctly. The gap is the UI layer only, so this is self-contained.
+
+**Acceptance (ROADMAP):** the UI reuses the same services as the CLI — no duplicated
+business rules. The Phase 4 `job_search` service is the template for how: a thin
+interface over a service that owns the rules.
+
+**Next action:** decide keep-vs-replace for Streamlit, then refactor the UI onto the
+existing services with `profile_id` explicit and fail-closed.
+
+## A user-facing how-to exists (2026-11-15)
+
+[docs/HOW_TO_GENERATE.md](HOW_TO_GENERATE.md) walks through generating a CV and cover
+letter for a real posting: setup checks, the generate command, where the documents
+land, how to revise them for free, how to search jobs, and a troubleshooting table.
+Every command in it was run and verified on 2026-11-15 — writing it caught one real
+documentation error (`--profile-id` is a *global* flag and must precede the
+subcommand).
+
+**The tool is ready to use today** for generating documents from a job description.
+Verified 2026-11-15: the free render path reproduced a real application end to end
+(CV 2 pages; cover letter 4 paragraphs / 294 words), and the full suite is
+**1079 passed, 3 skipped**.
 
 ## Phase 4 is implemented — job discovery and matching (2026-11-05)
 
