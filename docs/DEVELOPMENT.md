@@ -47,7 +47,7 @@ another machine:
 # Windows
 cd D:\coding\cv-tailor-next
 python scripts/setup.py            # creates .venv, installs requirements.lock.txt, copies .env.example
-# then edit .env and set GEMINI_API_KEY
+# then edit .env and set OPENROUTER_API_KEY (https://openrouter.ai/settings/keys)
 .venv\Scripts\python.exe scripts/check_setup.py
 .venv\Scripts\python.exe -m pytest -q
 ```
@@ -111,11 +111,19 @@ while pip was stuck.
 
 Runnable: `.venv` with all locked dependencies, `.env` created from `.env.example`, ports set
 to 8001/8502. `scripts/check_setup.py` reports profile/timezone/LaTeX/templates OK, and
-`python -m pytest -q` → **282 passed** (see [`TESTING.md`](TESTING.md) for the current baseline).
+`python -m pytest -q` → **1142 passed, 3 skipped** (see [`TESTING.md`](TESTING.md) for the
+current baseline).
 
-The only outstanding item is `GEMINI_API_KEY`, which the owner must enter into `.env` directly
-— never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too; without them
-every command that touches candidate data fails closed by design (ADR 0003).
+The only outstanding item is `OPENROUTER_API_KEY`, which the owner must enter into `.env`
+directly — never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too;
+without them every command that touches candidate data fails closed by design (ADR 0003).
+
+> **Run the suite with `TEMP`/`TMP` pointed inside the worktree**, or the LaTeX tests can
+> fail with a spurious `pdflatex compilation failed` even with nothing else running:
+>
+> ```powershell
+> $env:TEMP = "$PWD\.tmp"; $env:TMP = $env:TEMP
+> ```
 
 ### Running both versions at once
 
@@ -127,8 +135,10 @@ its own `.env`:
 | `cv-tailor` (master) | 8000 | 8501 |
 | `cv-tailor-next` (dev) | 8001 | 8502 |
 
-If you change `BACKEND_PORT`, set `BACKEND_URL` to match, because `ui/app.py` reads it
-separately.
+`BACKEND_URL` is still read by the API's own clients, but **since Phase 6 the UI no longer
+uses it**: `ui/app.py` calls the services in process rather than talking to the backend over
+HTTP, so the UI works whether or not uvicorn is running. Keep `BACKEND_URL` matching
+`BACKEND_PORT` for anything that does call the API.
 
 ### Portability rules
 

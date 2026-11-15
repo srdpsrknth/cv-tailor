@@ -212,35 +212,51 @@ def test_the_ui_does_not_carry_a_second_pricing_table():
     table. A behavioural test would pass while a copy silently drifted again -- which
     is exactly what happened: the UI's copy still priced a model Phase 1 retired, so
     the user could be shown a rate the backend disagreed with.
+
+    **Scans every module in ``ui/``, not just ``app.py`` (Phase 6).** The refactor moved
+    the pricing import out of the page code and into ``ui/services_bridge.py``, which
+    is the same single-source-of-truth arrangement in a better place -- the display
+    logic is now shared and testable. Narrowing this check to ``app.py`` would have
+    made it pass while no longer guarding the file that actually holds the code, so the
+    scan follows the code instead.
     """
     import ast
     from pathlib import Path
 
-    # Addressed relative to this test, so it works in any worktree.
-    ui_path = Path(__file__).resolve().parents[1] / 'ui' / 'app.py'
-    source = ui_path.read_text(encoding='utf-8')
-    tree = ast.parse(source)
+    ui_dir = Path(__file__).resolve().parents[1] / 'ui'
+    sources = {
+        path.name: path.read_text(encoding='utf-8')
+        for path in sorted(ui_dir.rglob('*.py'))
+        if '.venv' not in path.parts
+    }
+    assert sources, 'no UI sources found to check'
 
     # Any module-level or local dict literal keyed by model name is a second table.
     model_keyed_dicts = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Dict) and node.keys:
-            keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
-            if keys and all(isinstance(k, str) for k in keys):
-                if any('gemini' in k for k in keys):
-                    model_keyed_dicts.append(keys)
+    for name, source in sources.items():
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Dict) and node.keys:
+                keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
+                if keys and all(isinstance(k, str) for k in keys):
+                    if any('gemini' in k for k in keys):
+                        model_keyed_dicts.append((name, keys))
 
     assert not model_keyed_dicts, (
         f'a local model-keyed pricing table has grown back in the UI (D-4): '
         f'{model_keyed_dicts}'
     )
-    assert 'from services import pricing' in source, (
+
+    # Somewhere in the UI, pricing must come from the single source of truth.
+    assert any('from services import pricing' in source
+               for source in sources.values()), (
         'the UI must price through the single source of truth'
     )
+
     # The retired model must not be priced anywhere in the UI, including a fallback.
-    assert 'retired' not in source or 'gemini-1.5' not in source, (
-        'the UI is naming a retired model again'
-    )
+    for name, source in sources.items():
+        assert 'retired' not in source or 'gemini-1.5' not in source, (
+            f'{name} is naming a retired model again'
+        )
 
 
 def test_only_the_pricing_module_defines_the_table():

@@ -82,19 +82,24 @@ CVTAILOR_PROFILE_ID=<profile_id>
 
 Open http://localhost:8501 . The backend is at http://localhost:8000 and its interactive API docs at `/docs`. Keep the startup terminal open; Ctrl+C stops both services. Logs are in `.runtime/logs/`. Startup checks ports and will not kill unrelated applications. For changed backend ports, set `BACKEND_URL` in `.env` as well.
 
-### The CLI is the supported path today
+### Two interfaces, one store
 
-The Streamlit UI at :8501 is **unrefactored** — it predates multi-profile and does not
-send a `profile_id`, so it works only where `.env` happens to set one. **Prefer the
-CLI** until Phase 6 lands:
+Both the web UI and the CLI read the same private store, so an application generated
+in a terminal appears in the browser and vice versa.
 
 ```bash
-.venv/bin/python cvtailor.py doctor
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" generate --job-file job.txt
+.venv/bin/python scripts/start.py     # prints the UI and API URLs; open the UI one
+.venv/bin/python cvtailor.py doctor   # command line: the supported path for problems
 ```
 
-Day-to-day use is documented in [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md); every command
-there works on macOS with `.venv/bin/python` in place of `.venv\Scripts\python.exe`.
+> **The ports come from `.env`** (`UI_PORT`, `BACKEND_PORT`) and `start.py` prints
+> them, so read the printed URL rather than assuming 8501. A fresh clone's
+> `.env.example` uses 8501/8000; another machine may differ.
+
+**The UI requires you to choose a candidate explicitly**, even with one profile — the
+choice decides which folder the documents are filed under (ADR 0003). Day-to-day use of
+both is documented in [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md); every command there
+works on macOS with `.venv/bin/python` in place of `.venv\Scripts\python.exe`.
 
 ### Check the free paths before anything that costs money
 

@@ -456,11 +456,26 @@ LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
 
 ## Phase 6 — UI and deployment
 
-**Status: NOT STARTED — and the owner has prioritised it AHEAD of the remaining
-Phase 4 follow-ups (2026-11-15).** The Streamlit UI is **unrefactored**: it predates
-Phases 2–4 and was last touched 2026-10-26. It is the *only* significant part of the
-repository that has not been through the modular redesign, and it now contradicts
-settled decisions. See the assessment below.
+**Status: IN PROGRESS (2026-11-15) — the interface has been rebuilt; deployment and the
+remaining scope are open.** See [ADR 0020](DECISIONS/0020-streamlit-refactor.md).
+
+**Delivered:** `ui/services_bridge.py` (a framework-free service layer, so the UI
+contains no business rule) · four pages over it — Generate, Find jobs, Applications,
+Help · an explicit fail-closed profile picker · in-process generation with progress and
+a cost breakdown from the shared pricing module · `streamlit.testing.v1.AppTest`
+coverage that genuinely executes the script. Baseline 1090/3 → **1142 passed, 3 skipped**.
+
+**Fixed:** the old UI sent no `profile_id` (ADR 0003 bypassed by accident), hardcoded a
+superseded model, kept its own price table, and could not run unless the API was up.
+
+**Reversal worth recording:** the owner first chose to replace Streamlit with NiceGUI
+and then reversed to refactoring, after NiceGUI could not be installed in this
+environment. The framework was never rejected on its merits.
+
+**Still open:** the deployment story, authentication *if* hosted, and any decision about
+the FastAPI layer's long-term role. **No visual screenshot was obtained** — headless
+capture of Streamlit is unreliable (it shows the skeleton loader even for a working
+app), so the UI is verified behaviourally and deserves a human eye.
 
 - **Objective:** decide the interface story.
 - **Scope:** assess keeping vs replacing Streamlit; multi-profile management; job search and
@@ -469,22 +484,22 @@ settled decisions. See the assessment below.
 - **Acceptance:** the UI reuses the same services as the CLI — no duplicated business rules.
 - **Effort:** Medium–High.
 
-### Why the UI is now the priority (evidence, 2026-11-15)
+### The problem that was fixed (evidence, recorded 2026-11-15)
 
-`ui/app.py` is a single 407-line Streamlit file, last modified 2026-10-26, from
+The old `ui/app.py` was a single 407-line Streamlit file last modified 2026-10-26, from
 before Phase 2. Measured against the decisions since taken:
 
-| Settled decision | UI today | Verdict |
+| Settled decision | Old UI | Outcome |
 |---|---|---|
-| ADR 0003 — `profile_id` required, fails closed | The `/api/tailor` payload sends **no `profile_id`** (lines 135–140) | Broken. It works only by accident, because this machine's `.env` sets `CVTAILOR_PROFILE_ID=sreedeep`. A second candidate has no way to be selected, and on a machine without that variable the UI fails. |
-| Phase 2 — multi-profile | No concept of a profile at all | Absent |
-| Phase 3 — provider interface, model routing, cost | Reads `model_name`, defaults to a **hardcoded `gemini-2.5-flash`**; has its own pricing copy | Stale: names the superseded model and duplicates a table `services/pricing.py` now owns |
-| Phase 4 — job search | Nothing | Absent |
-| ROADMAP acceptance — "reuses the same services as the CLI" | Talks to FastAPI over HTTP with its own logic | Not met |
+| ADR 0003 — `profile_id` required, fails closed | Sent **no `profile_id`** at all | **Fixed.** Explicit fail-closed picker; works only by accident is no longer true |
+| Phase 2 — multi-profile | No concept of a profile | **Fixed.** Picker populated from the store |
+| Phase 3 — provider interface, cost | Hardcoded **`gemini-2.5-flash`**, own pricing copy | **Fixed.** Model from config; cost from `services.pricing` |
+| Phase 4 — job search | Nothing | **Fixed.** Find jobs page over `job_search` |
+| Acceptance — "reuses the same services as the CLI" | HTTP client with its own logic | **Met.** `ui/services_bridge.py`, asserted by a test that it imports no UI framework |
 
-The **backend API is fine** — `/api/tailor` and the three download routes resolve
-`profile_id` correctly. The gap is the UI layer only, which is why this is a
-self-contained piece of work rather than a re-architecture.
+The **backend API is unchanged and still fine** — `/api/tailor` and the download routes
+always resolved `profile_id` correctly. The gap was the UI layer only, which is why this
+was a self-contained piece of work rather than a re-architecture.
 
 **Consequence for ordering:** the job-search module is complete and committed, so
 parking its two remaining follow-ups (replacing the sample employer lists, and a

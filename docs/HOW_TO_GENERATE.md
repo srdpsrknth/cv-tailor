@@ -3,6 +3,19 @@
 A step-by-step guide for actually using CV Tailor. Written for the person doing the
 job application, not for a developer reading the code.
 
+**Two ways to use it, doing the same things:**
+
+| | Command line | Web interface |
+|---|---|---|
+| Start | `cvtailor ...` (below) | `python scripts/start.py` then open the URL it prints |
+| Best for | Anything that breaks; scripting; precision | Browsing applications, reading match explanations |
+| Requires | nothing extra | nothing extra |
+
+The web interface has four pages: **Generate**, **Find jobs**, **Applications** and
+**Help**. It reads the same store, so an application generated in a terminal appears
+in the browser and vice versa. **The command line is the supported path for anything
+that goes wrong** — it has clearer errors and no browser in the way.
+
 **This guide works on Windows and macOS.** The only difference is how you write the
 *interpreter path* — everything else, including every option, is identical:
 
@@ -35,7 +48,8 @@ file) ready to send.
 
 **What it costs:** roughly **$0.003 per application** on the default model
 (`openai/gpt-6-luna`) — about a third of a cent. A full application is one CV call
-plus one cover-letter call. Re-rendering an existing application is **free**.
+plus one cover-letter call. Re-rendering an existing application is **free**, and so
+is job search.
 
 ---
 
@@ -272,6 +286,46 @@ Arbeitnow. Some need configuration:
 .\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep jobs search `
     --ats lever:somecompany:"Some Company" --only ats
 ```
+
+---
+
+## Using the web interface
+
+```powershell
+# Windows
+.\.venv\Scripts\python.exe scripts\start.py
+```
+```bash
+# macOS
+.venv/bin/python scripts/start.py
+```
+
+It prints two addresses; open the **UI** one. Keep the terminal open — Ctrl+C stops
+the services. Logs go to `.runtime/logs/`.
+
+> **The port is whatever `UI_PORT` in `.env` says** — 8501 for a fresh clone, but this
+> machine uses 8502 (and `BACKEND_PORT=8001`). Read the URL `start.py` prints rather
+> than assuming; it is printed precisely because it varies.
+>
+> If a port is already in use, startup **refuses** rather than killing whatever is
+> there. Stop the other service, or change `UI_PORT` / `BACKEND_PORT` in `.env`.
+
+**First, choose a candidate** in the sidebar. The interface will not generate without
+one, and that is deliberate: the choice decides which folder the documents are filed
+under, so an unnoticed default is how the wrong person's CV gets sent. It insists even
+when only one profile exists.
+
+| Page | What it does |
+|---|---|
+| **Generate** | Paste a posting, add optional company/role/country, generate. Shows progress, the cost breakdown, and download buttons. |
+| **Find jobs** | Free search over public job boards, with a plain-language reason for each match. |
+| **Applications** | Everything generated for this candidate, with downloads — including anything produced from the command line. |
+| **Help** | The rules the tool will not break. |
+
+**Read both documents before sending them**, whichever way you produced them.
+
+If the interface misbehaves, use the command line — it is the supported path and gives
+clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 ---
 

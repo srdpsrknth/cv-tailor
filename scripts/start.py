@@ -1,4 +1,10 @@
-"""Start both local services; Ctrl+C stops them. Logs stay in .runtime/logs."""
+"""Start the local services; Ctrl+C stops them. Logs stay in .runtime/logs.
+
+Two processes are still started: the FastAPI backend (for the programmatic routes
+and `/docs`) and the Streamlit UI. The UI no longer *depends* on the backend — since
+Phase 6 it calls the services in process — but the API stays available because
+ADR 0009 keeps it and `/docs` is genuinely useful for inspecting a run.
+"""
 from pathlib import Path
 import os, socket, subprocess, sys, time
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +26,8 @@ try:
     for name,command in zip(['backend','streamlit'],commands):
         handle=(logs/f'{name}.log').open('a',encoding='utf-8');handles.append(handle)
         processes.append(subprocess.Popen(command,cwd=ROOT,stdout=handle,stderr=subprocess.STDOUT,creationflags=flags))
-    print(f'UI: http://localhost:{ports[1]} | API: http://localhost:{ports[0]}/docs', flush=True)
+    print(f'UI:  http://localhost:{ports[1]}', flush=True)
+    print(f'API: http://localhost:{ports[0]}/docs', flush=True)
     print('Keep this terminal open. Ctrl+C stops both services.', flush=True)
     while all(process.poll() is None for process in processes):time.sleep(1)
     raise SystemExit('A service stopped. Inspect .runtime/logs for the cause.')

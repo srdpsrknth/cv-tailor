@@ -1,8 +1,41 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **1079 passed, 3 skipped**, 1 warning, ~119 s, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` → **1048 passed, 3 skipped**, 31 deselected, ~16 s.
+**Current baseline:** **1150 passed, 3 skipped**, 1 warning, ~68 s on macOS, fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+
+The merged baseline includes the 1142-test upstream UI update and eight local CLI/
+correction-feedback regression cases. The full suite was verified after merging
+`eddcf35` with `b2a9130` on 2026-11-15.
+
+> **Set `TEMP`/`TMP` inside the worktree before running the suite.** Without it, the
+> LaTeX tests can fail with `pdflatex compilation failed` **even with no other pytest
+> running** — reproduced and confirmed as an environment artifact, not a code defect:
+>
+> ```powershell
+> $env:TEMP = "$PWD\.tmp"; $env:TMP = $env:TEMP
+> ```
+>
+> The same failure can leave a **usable PDF** behind, because pdflatex sometimes
+> crashes on exit (Windows `0xC0000409`) *after* writing the file. Check the output
+> before assuming the document is broken.
+
+> **Phase 6 added 52 tests** (1090/3 → 1142/3): `test_ui_services_bridge.py` (35) and
+> `test_ui_app.py` (16), plus a rewritten work-country guard.
+>
+> **UI tests use `streamlit.testing.v1.AppTest`, which actually executes
+> `ui/app.py`.** A screenshot cannot verify a Streamlit app: the page is drawn over a
+> websocket, so a headless capture shows the skeleton loader **even for a working
+> app** — verified against a control page. `AppTest` found a fatal `st.navigation`
+> bug immediately.
+>
+> Two traps for anyone adding UI tests here:
+>
+> * **`@st.cache_resource` caches per process, not per run.** Two tests initially
+>   "passed" while silently re-rendering the first test's store. The fixture sets
+>   `CVTAILOR_STORE` (the supported mechanism) and calls `st.cache_resource.clear()`.
+> * **Patching `ui.app.get_config` does not work.** `AppTest` re-executes the script
+>   as a fresh module, so the patch never reaches it. Use the environment.
 
 > **Phase 4 added 382 tests** (697/3 → 1079/3), all offline. The Phase 4 files are
 > `test_job_model.py`, `test_job_normalize.py`, `test_job_dedupe.py`,
@@ -79,6 +112,8 @@ study and switched in `e53ef8a`. Two consequences for anyone running these tests
 | Baseline after Stage B (accuracy and leanness, 2026-10-30) | 555 passed, 5 skipped, ~120 s |
 | **Baseline after the curation-skill items (2026-10-30)** | **697 passed, 3 skipped**, ~118 s |
 | **Baseline after Phase 4 (job discovery and matching, 2026-11-05)** | **1079 passed, 3 skipped**, ~119 s |
+| Baseline after the macOS portability work (2026-11-15) | 1090 passed, 3 skipped, ~128 s |
+| **Baseline after the UI rebuild (Phase 6, 2026-11-15)** | **1142 passed, 3 skipped**, ~130 s |
 | Paid API calls | **none** |
 | Requires | `pypdf`, `python-docx`; `pdflatex` for the document-level tests (they skip without it) |
 
