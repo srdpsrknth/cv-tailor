@@ -158,20 +158,98 @@ def test_selected_country_controls_prompt_header_and_saved_context(monkeypatch, 
     assert all(f'explicit user selection; overrides country inference): {country}' in call.args[0] for call in fake._call_provider.call_args_list)
 
 
-def test_streamlit_passes_selected_work_country(monkeypatch):
-    from streamlit.testing.v1 import AppTest
-    post = Mock(return_value=Mock(status_code=400, json=lambda: {'detail': 'Test response'}))
-    monkeypatch.setattr('requests.post', post)
-    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'ui/app.py')).run()
-    app.text_area(key='job_desc').input('A detailed analytics engineering opening. ' * 3)
-    app.selectbox(key='work_country_choice').select('Netherlands').run()
-    app.button[0].click().run()
-    assert not app.exception
-    assert post.call_args.kwargs['json']['work_country'] == 'Netherlands'
-    app.selectbox(key='work_country_choice').select('Other').run()
-    assert app.button[0].disabled
-    app.text_input(key='work_country_other').input('Sweden').run()
-    assert not app.button[0].disabled
+def test_the_ui_passes_the_selected_work_country(monkeypatch):
+    """The country the user picks must reach the service (Phase 6 rewrite).
+
+    This replaces a test that drove the old Streamlit UI over HTTP and asserted the
+    ``requests.post`` payload carried ``work_country``. The concern is unchanged and
+    still worth guarding — the work country decides the work-authorisation wording, so
+    a UI that dropped it would silently generate for the wrong country. What changed is
+    the route: the UI now calls ``services.tailor_service`` in process, so the assertion
+    follows the call the UI actually makes rather than an HTTP body that no longer
+    exists.
+
+    Patched at ``ui.services_bridge.tailor_documents`` — imported inside the bridge
+    function, so the patch target is the source module.
+    """
+    from ui import services_bridge
+
+    captured = {}
+
+    def fake_tailor(**kwargs):
+        captured.update(kwargs)
+        raise RuntimeError('stop here: the call is what this test asserts')
+
+    monkeypatch.setattr('services.tailor_service.tailor_documents', fake_tailor)
+
+    class Store:
+        root = Path('/tmp/does-not-matter')
+
+        def exists(self, profile_id):
+            return True
+
+        def unknown_message(self, profile_id):
+            return ''
+
+        def load(self, profile_id):
+            from services.profile_loader import load_profile
+            return load_profile(str(Path(__file__).parent / 'fixtures' / 'profiles'
+                                    / 'synthetic_analyst.yaml'))
+
+    class Config:
+        store = Store()
+        profile_id = 'analyst_a'
+        profile_store_dir = Path('/tmp/does-not-matter')
+        model = 'openai/gpt-6-luna'
+        provider = 'openrouter'
+
+    outcome = services_bridge.run_generation(
+        Config(), 'analyst_a', 'A detailed analytics engineering opening. ' * 3,
+        work_country='Netherlands',
+    )
+
+    assert captured.get('work_country') == 'Netherlands'
+    assert captured.get('profile_id') == 'analyst_a'
+    assert outcome.ok is False, 'the stub raises, so the outcome must report failure'
+    assert 'stop here' in outcome.error
+
+
+def test_the_ui_omits_the_work_country_when_none_is_chosen(monkeypatch):
+    """An unchosen country must be absent, not an empty string.
+
+    Passing ``''`` would look like a deliberate selection of nowhere, and the service
+    would record it. ``None`` is the honest representation of "the user did not say".
+    """
+    from ui import services_bridge
+
+    captured = {}
+
+    def fake_tailor(**kwargs):
+        captured.update(kwargs)
+        raise RuntimeError('stop')
+
+    monkeypatch.setattr('services.tailor_service.tailor_documents', fake_tailor)
+
+    class Store:
+        root = Path('/tmp/does-not-matter')
+
+        def exists(self, profile_id):
+            return True
+
+        def load(self, profile_id):
+            from services.profile_loader import load_profile
+            return load_profile(str(Path(__file__).parent / 'fixtures' / 'profiles'
+                                    / 'synthetic_analyst.yaml'))
+
+    class Config:
+        store = Store()
+        profile_id = 'analyst_a'
+        profile_store_dir = Path('/tmp/does-not-matter')
+
+    services_bridge.run_generation(
+        Config(), 'analyst_a', 'A posting. ' * 20, work_country='',
+    )
+    assert captured.get('work_country') is None
 
 
 def test_invented_tools_and_altered_job_dates_are_rejected(profile):

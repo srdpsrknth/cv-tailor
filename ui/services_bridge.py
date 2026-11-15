@@ -278,6 +278,38 @@ def run_generation(
     )
 
 
+def run_job_search(
+    config,
+    profile_id: str,
+    query,
+    *,
+    preferences=None,
+    sources=None,
+    include_ineligible: bool = False,
+):
+    """Search public job sources and rank the results. Free: no key, no LLM call.
+
+    Delegates entirely to :func:`services.job_search.search_jobs`, so the interface
+    cannot apply different ranking or deduplication rules from the CLI. The profile
+    is loaded here rather than passed in, because a search is *for* a candidate:
+    ranking uses their skills and languages, and the sweep record is filed under
+    their id (ADR 0003).
+    """
+    from services.job_connectors import build_default_sources
+    from services.job_search import search_jobs
+
+    profile = load_profile(config, profile_id)
+    return search_jobs(
+        sources if sources is not None else build_default_sources(),
+        profile,
+        query,
+        preferences=preferences,
+        store_root=config.profile_store_dir,
+        profile_id=profile_id,
+        include_ineligible=include_ineligible,
+    )
+
+
 def job_folder(config, profile_id: str, job_id: Optional[str]) -> Optional[Path]:
     """Where one application's documents live, or ``None`` when it cannot be known."""
     if not job_id:
