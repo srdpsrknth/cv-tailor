@@ -23,6 +23,7 @@ Only the owner can move a decision to **Approved**.
 | [0016](0016-per-candidate-inputs-and-one-winner.md) | One schema and prompt per candidate, judged on cost per accepted result; the study selects one model rather than shipping a menu | **Approved** — Phase 3 item 6, discharged 2026-10-27 |
 | [0017](0017-curation-skill.md) | Curation is a procedure with two human steps: detection reports and cannot spend, the proposal is inert, and a candidate is ineligible without the owner's own writing/PDF/layout verdict | **Approved** — curation-skill items, 2026-10-30 |
 | [0018](0018-job-discovery.md) | Job discovery: verified sources behind one connector, provenance on every source-dependent field, dedupe only on proof, expiry observed not assumed, and a match score that is a count of named evidence with three-valued eligibility | **Approved** — Phase 4, 2026-11-05 |
+| [0020](0020-streamlit-refactor.md) | Refactor the Streamlit UI onto a framework-free service layer, rather than replace the framework | **Approved** — Phase 6, 2026-11-15 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1

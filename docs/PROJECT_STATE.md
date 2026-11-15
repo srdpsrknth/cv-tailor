@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-15
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next`
-**Latest commit:** *(this commit)* — *docs: the UI is the active task, and a how-to for generating documents*
+**Latest commit:** *(this commit)* — *docs: the UI is rebuilt onto the services*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Where the project stands (2026-11-15)
@@ -16,16 +16,86 @@
 | 3 — LLM and document generation | **Complete and closed out** (2026-10-31) |
 | 4 — Job discovery and matching | **Complete** (2026-11-05) — two optional follow-ups parked |
 | 5 — Application management | **Not started** |
-| 6 — **UI and deployment** | **ACTIVE** (started 2026-11-15) |
+| 6 — **UI and deployment** | **ACTIVE** — the interface is rebuilt; deployment/scope remains |
 
-**Ready to use for real applications today, via the CLI** — see
-[HOW_TO_GENERATE.md](HOW_TO_GENERATE.md). The web UI is the part that is behind.
+**Ready to use for real applications today**, from either interface — see
+[HOW_TO_GENERATE.md](HOW_TO_GENERATE.md). The command line is the supported path for
+anything that breaks.
 
-## The UI is the active task now — Phase 6, prioritised by the owner (2026-11-15)
+## The UI is rebuilt — Phase 6's core work is done (2026-11-15)
 
-**Active task:** **Phase 6 (UI and deployment)**, chosen by the owner on 2026-11-15
-ahead of the remaining Phase 4 follow-ups. The owner's reasoning: the UI has not been
-refactored, so it is the largest remaining gap; job search is complete and can wait.
+**Active task:** Phase 6. The Streamlit interface was **rebuilt onto the services**,
+which was the phase's central objective. See [ADR 0020](DECISIONS/0020-streamlit-refactor.md).
+
+**The owner first chose to replace Streamlit with NiceGUI, then reversed that to
+refactoring in place** after NiceGUI could not be installed here — `pip` would not
+resolve its dependency graph in this environment. The reversal is recorded in ADR
+0020 because the reasoning matters: the framework was never rejected on its merits.
+
+| Item | Commit | Outcome |
+|---|---|---|
+| **A** | `ui/services_bridge.py` + 35 tests | **Done.** Framework-free service layer; caught two fail-closed bugs |
+| **B–D** | `ui/app.py` rebuilt, 4 pages, 16 AppTest tests | **Done.** Explicit profile picker, in-process generation, job search, application browser |
+| **E** | Documentation and ADR 0020 | *(this commit)* |
+
+**Test baseline 1090 → 1142 passed, 3 skipped** (~130 s).
+
+### What the old UI was doing wrong (measured, before the rewrite)
+
+* **It sent no `profile_id` at all.** It worked only because this machine's `.env`
+  happened to set one, so a second candidate was unselectable and a machine without
+  that variable failed — **ADR 0003's fail-closed rule bypassed by accident.**
+* It hardcoded `gemini-2.5-flash`, a model Phase 3 superseded, and kept **its own
+  copy** of the price table.
+* It was an HTTP client of the backend, so it could not run unless a second service
+  was up.
+* No job search, no profile management, no application browser.
+
+### The verification lesson worth keeping
+
+**A screenshot cannot verify a Streamlit app.** The page is rendered over a
+websocket, so a headless capture shows the skeleton loader **even for a working
+app** — confirmed against a control page rather than assumed. Verification therefore
+uses `streamlit.testing.v1.AppTest`, which genuinely executes the script. It
+immediately found a **fatal** `st.navigation` bug (lambda-named pages colliding on
+one URL path) that no screenshot could have revealed.
+
+Two further real defects were caught the same way:
+
+* Two new tests **passed for the wrong reason**: `@st.cache_resource` caches per
+  *process*, so the empty-store and corrupt-profile cases were silently re-rendering
+  the first test's populated store. Fixed by using `CVTAILOR_STORE` and clearing the
+  cache; those cases now exercise their real paths.
+* `require_profile_id` accepted a **well-formed but nonexistent** id. ADR 0003 has
+  two halves and only the format half was checked.
+
+**Two pre-existing guards were strengthened, not deleted:** the "no second pricing
+table" check now scans all of `ui/` (the code it guards moved), and the work-country
+guard asserts against the call the UI actually makes instead of a removed HTTP body.
+
+### Verified
+
+* Suite: **1142 passed, 3 skipped** (~130 s), fully offline.
+* The UI runs under AppTest against the **real configured store** with zero
+  exceptions: picker, model display, and a Generate button correctly disabled until a
+  posting is pasted.
+* Both services start via `scripts/start.py`; UI HTTP 200, API `{"status":"ok"}`.
+* **No paid call. Spend: $0.00.**
+
+### Not done
+
+* **No visual screenshot was obtained.** Headless capture of Streamlit is unreliable
+  here (see above) and the browser-automation route hit the sandbox's restriction on
+  a Python subprocess launching another program. The UI is verified behaviourally,
+  not visually — **so it is worth a human eye before relying on it.**
+* The remaining Phase 6 scope (deployment story, auth *if* hosted) is untouched.
+
+## The UI was the active task — Phase 6, prioritised by the owner (2026-11-15)
+
+**Active task:** **Phase 6 (UI and deployment)** — the interface has been rebuilt onto
+the services; see the section above. The owner's reasoning for prioritising it: the UI
+had not been refactored, so it was the largest remaining gap; job search is complete and
+can wait.
 
 **The finding, measured:** `ui/app.py` is one 407-line Streamlit file, last modified
 2026-10-26 — before Phase 2. Against the decisions since taken:
