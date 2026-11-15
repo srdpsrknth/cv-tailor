@@ -3,6 +3,32 @@
 A step-by-step guide for actually using CV Tailor. Written for the person doing the
 job application, not for a developer reading the code.
 
+**This guide works on Windows and macOS.** The only difference is how you write the
+*interpreter path* — everything else, including every option, is identical:
+
+| | Windows | macOS / Linux |
+|---|---|---|
+| Python | `.\.venv\Scripts\python.exe` | `.venv/bin/python` |
+| Line continuation | `` ` `` (backtick) | `\` (backslash) |
+| Store path example | `D:\coding\cv-tailor-data` | `~/cv-tailor-data` |
+
+Throughout this guide the Windows form is used. **On a Mac, substitute
+`.venv/bin/python`** for `.\.venv\Scripts\python.exe`, and use `\` instead of a
+backtick to continue a line. For example, the same command on each:
+
+```powershell
+# Windows
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt
+```
+```bash
+# macOS
+.venv/bin/python cvtailor.py --profile-id sreedeep generate --job-file job.txt
+```
+
+> **Setting up on a Mac for the first time?** Read
+> [MAC_SETUP.md](MAC_SETUP.md) first — it covers MacTeX, the private store and
+> credentials. This guide assumes the installation already works.
+
 **What this does:** you give it a job posting, it writes a CV and cover letter
 tailored to that posting using your saved profile, and produces a PDF (and Word
 file) ready to send.
@@ -25,10 +51,15 @@ You need three things. The `doctor` command checks all of them:
 |---|---|
 | `store` | Your private data folder exists, outside this repository |
 | `profile` | Your CV profile is loaded and has roles in it |
-| `pdflatex` | The PDF engine is installed |
+| `pdflatex` | The PDF engine is installed (MacTeX on a Mac, MiKTeX on Windows) |
 | `api key` | Your OpenRouter key is set and a model is chosen |
 
 If any line says `FAIL`, fix that before continuing — the message tells you how.
+
+> **On macOS, `pdflatex` is found even without PATH setup.** MacTeX installs to
+> `/Library/TeX/texbin` and adds it to PATH only for login shells. CV Tailor searches
+> that location explicitly, so a script or IDE terminal finds it anyway. If it still
+> fails, set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in `.env`.
 
 > **One `FAIL` is expected and harmless in this setup.** `doctor` reports
 > `outputs ... Permission denied` when it is run from inside the sandboxed agent
@@ -114,7 +145,9 @@ Expect a minute or two. You will see progress in the terminal.
 Everything lands in your private store, **not** in this repository:
 
 ```
-D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
+Windows:  D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
+macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
+
     2026_CV_<your_name>_<role>.pdf          <- the CV
     2026_cover_letter_<company>_<role>.pdf  <- the cover letter
     2026_cover_letter_<company>_<role>.docx <- Word version, if a form wants it
@@ -124,11 +157,17 @@ D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
         generation_result.json<- what was produced and whether it passed
 ```
 
-Find the newest folder by date:
+Not sure where your store is? `cvtailor doctor` prints it. Find the newest folder by
+date:
 
 ```powershell
+# Windows
 Get-ChildItem D:\coding\cv-tailor-data\outputs\sreedeep |
     Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name, LastWriteTime
+```
+```bash
+# macOS
+ls -lt ~/cv-tailor-data/outputs/"$CVTAILOR_PROFILE_ID" | head -4
 ```
 
 ### 5. Read them before you send them
@@ -219,10 +258,25 @@ Arbeitnow. Some need configuration:
 | `Which profile?` | You omitted `--profile-id`. Run `profile list` for the ids. |
 | `unrecognized arguments: --profile-id` | You put it **after** the command. Move it before: `cvtailor.py --profile-id <id> <command>`. |
 | `No profile 'x'` | Wrong id, or the profile is not in the store. Check `profile list`. |
-| `No API key` | Add your OpenRouter key to `.env`. Never commit that file. |
-| `pdflatex compilation failed` | Usually a **temp-directory** problem, not a broken document. Set `$env:TEMP` and `$env:TMP` to a folder inside the project, then retry. |
+| `No API key` | Add `OPENROUTER_API_KEY` to `.env`. Never commit that file. |
+| `pdflatex not found` **(macOS)** | MacTeX is not installed, or is somewhere unusual. Install MacTeX, or set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in `.env`. |
+| `pdflatex not found` (Windows) | Install MiKTeX, or set `LATEX_COMPILER` to the full path of `pdflatex.exe`. |
+| `pdflatex compilation failed` | Usually a **temp-directory** problem, not a broken document. See the note below. |
 | Cover letter word count off | Re-render after editing `content.json`; the count is re-checked every time. |
+| Word file looks different from the PDF | Expected — DOCX and LaTeX lay out differently. Check both. Aptos may be unavailable on macOS; LibreOffice/Word substitutes a font. |
 | It generated for the wrong person | Should be impossible — `profile_id` fails closed. If you believe otherwise, stop and report it. |
+
+> **About `pdflatex compilation failed`.** On Windows this is usually the temp
+> directory, not the document: MiKTeX and the test suite need `TEMP`/`TMP` pointed at
+> a writable folder, or concurrent LaTeX runs collide. Set them and retry:
+>
+> ```powershell
+> $env:TEMP = "D:\coding\cv-tailor-next\.tmp"; $env:TMP = $env:TEMP
+> ```
+>
+> The same failure can leave a *usable PDF* behind — pdflatex occasionally crashes on
+> exit after writing the file. Check whether the PDF exists and looks right before
+> assuming the content is broken.
 
 ---
 
@@ -239,6 +293,8 @@ Arbeitnow. Some need configuration:
 ---
 
 ## Quick reference
+
+Windows uses `.\.venv\Scripts\python.exe`; **on macOS use `.venv/bin/python`**.
 
 ```powershell
 # Setup
@@ -258,4 +314,23 @@ Arbeitnow. Some need configuration:
 # Help
 .\.venv\Scripts\python.exe cvtailor.py                  # guided menu
 .\.venv\Scripts\python.exe cvtailor.py <command> --help
+```
+
+The macOS equivalents differ only in the interpreter and the line-continuation
+character:
+
+```bash
+# Setup
+.venv/bin/python cvtailor.py doctor
+.venv/bin/python cvtailor.py profile list
+
+# Generate (costs ~$0.003)
+.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" generate --job-file job.txt
+
+# Find jobs (free)
+.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" jobs search --keywords "data engineer"
+
+# Revise (free)
+.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" render \
+    --content "$CVTAILOR_STORE/outputs/$CVTAILOR_PROFILE_ID/<job_id>/source/content.json"
 ```

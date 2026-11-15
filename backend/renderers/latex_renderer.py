@@ -45,10 +45,29 @@ class LaTeXRenderer:
         self.templates_dir = Path(templates_dir)
         self.outputs_dir = Path(outputs_dir)
 
-        # Remember a possible MiKTeX default path for pdflatex
+        # Candidate pdflatex locations, most specific first. An explicit
+        # LATEX_COMPILER always wins (see _resolve_pdflatex_path); these are the
+        # conventional install locations per platform, and the final fallback is
+        # PATH, so an unusual install still works if the binary is on PATH.
+        #
+        # macOS is listed explicitly because MacTeX does NOT put pdflatex on PATH by
+        # default: it installs to /Library/TeX/texbin, which the TeX installer adds to
+        # PATH only for login shells. A non-login shell -- which is what a script, an
+        # IDE or a CI runner gets -- therefore finds nothing, and the failure looks
+        # like "pdflatex not found" on a machine where LaTeX is correctly installed.
+        # Homebrew's TeX is at /opt/homebrew/bin (Apple Silicon) or /usr/local/bin
+        # (Intel); both are checked so neither architecture is assumed.
         local_app_data = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData/Local")))
         self._pdflatex_candidates = [
             "pdflatex",
+            # macOS -- MacTeX and the TeX Live installer both use this prefix.
+            "/Library/TeX/texbin/pdflatex",
+            "/usr/local/bin/pdflatex",
+            "/opt/homebrew/bin/pdflatex",
+            # Linux conventions.
+            "/usr/bin/pdflatex",
+            "/usr/local/texlive/bin/pdflatex",
+            # Windows -- MiKTeX and TeX Live.
             str(Path(os.getenv("ProgramFiles", "C:/Program Files")) / "MiKTeX/miktex/bin/x64/pdflatex.exe"),
             str(Path(os.getenv("ProgramFiles(x86)", "C:/Program Files (x86)")) / "MiKTeX/miktex/bin/x64/pdflatex.exe"),
             str(local_app_data / "Programs/MiKTeX/miktex/bin/x64/pdflatex.exe"),

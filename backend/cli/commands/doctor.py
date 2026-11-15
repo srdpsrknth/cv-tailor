@@ -52,9 +52,14 @@ def check_venv(root: Path) -> Check:
     inside = any(str(sys.prefix).startswith(str(p)) for p in existing)
     if inside:
         return Check("virtualenv", OK, str(existing[0]))
+    # The interpreter path differs by platform: .venv/bin/python on macOS and
+    # Linux, .venv\Scripts\python.exe on Windows. Naming only the Windows one told
+    # a Mac user to run a command that cannot exist there.
+    interpreter = (r".venv\Scripts\python.exe" if sys.platform == "win32"
+                   else ".venv/bin/python")
     return Check(
         "virtualenv", WARN, f"running outside {existing[0]}",
-        r"Use the project interpreter: .venv\Scripts\python.exe -m cvtailor ...",
+        f"Use the project interpreter: {interpreter} -m cvtailor ...",
     )
 
 
