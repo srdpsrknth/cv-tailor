@@ -578,6 +578,7 @@ def test_openrouter_sends_app_title_header(monkeypatch):
 
     provider.generate('prompt')
 
+    assert sent[-1]['headers']['HTTP-Referer'] == 'https://github.com/srdpsrknth/cv-tailor'
     assert sent[-1]['headers']['X-Title'] == 'CV Tailor'
 
 
