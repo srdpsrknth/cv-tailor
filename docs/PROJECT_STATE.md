@@ -3,8 +3,42 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *cover-letter business-letter layout, ATS PDF repair, prompt & validation fixes*
+**Latest commit:** *(this commit)* — *application quality audit and prioritized recommendations*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Full application quality audit (2026-11-17)
+
+**Active task:** audit generated CVs/cover letters and generation instructions for
+layout, content, voice, ATS parsing and AI screening — complete. Recommendations
+only; no templates, prompts, policy, profile or saved applications changed.
+
+Public findings and proposed acceptance checks:
+[APPLICATION_QUALITY_AUDIT.md](APPLICATION_QUALITY_AUDIT.md). Personal examples,
+extraction inventory, scripts and rendered page evidence remain privately under
+`<store>/reviews/<profile_id>/full-audit-2026-11-17/REPORT.md`.
+
+Verified concerns: primary CV prose is approximately 9pt despite the 10pt template;
+default pdfplumber extraction merges many words while pypdf and lower pdfplumber
+spacing tolerance recover them; several saved letters predate the new layout;
+three inspected Word CV companions render to three pages, including an education
+split. The current cover-letter design remains a good base. Content recommendations
+focus on evidence selection, material role gaps, less repetition and a shorter
+closing within the existing word policy. Two gpt-6-luna reviewers supported the audit.
+
+**Verification:** all 28 top-level PDFs inventoried across 13 folders (including
+historical/alternate artifacts); representative page images from five folders and
+all pages of three DOCX letter/CV pairs inspected. Full baseline **1209 passed,
+3 skipped**, one existing Google SDK deprecation warning, 148.17 seconds. No new
+paid calls, actual ATS upload, submission or AI-authorship detector used. LibreOffice
+pagination is not a Word desktop guarantee; extraction differences are not proof
+of rejection by a named ATS. No architecture or roadmap implementation changed.
+
+**Next recommended action:** implement artifact freshness and extraction checks,
+then trial a readable two-page CV in both intended upload formats. Keep the new
+letter layout. Existing word limits, approved project structure, immigration policy
+and manual application edits remain in force; proposed policy alternatives are not
+silently approved by this audit. No current blocker. Commit documentation together;
+no push requested and `master` untouched.
 
 ## Cover-letter rendering, layout, prompt and validation fixes (2026-11-17)
 
