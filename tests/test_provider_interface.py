@@ -925,6 +925,17 @@ def test_openrouter_reports_its_own_charge(monkeypatch):
     assert 'usage' not in (sent[0]['json'] or {})
 
 
+def test_provider_retains_reported_model_and_request_identifier(monkeypatch):
+    _record_openrouter_requests(monkeypatch, reply={
+        'id': 'gen-synthetic-123', 'model': 'served-model',
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 10, 'completion_tokens': 5},
+    })
+    response = OpenRouterProvider(api_key='k', default_model='requested-model').generate('prompt')
+    assert response.reported_model == 'served-model'
+    assert response.request_id == 'gen-synthetic-123'
+
+
 def test_an_absent_reported_cost_is_none_never_zero(monkeypatch):
     """A missing figure must not be read as "free".
 

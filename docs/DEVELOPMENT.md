@@ -60,6 +60,10 @@ the venv is later recreated under a Low-labelled checkout.
 
 ### Windows GUI shortcuts
 
+The review UI requires the added `streamlit-pdf==2.1.0` dependency for inline PDF
+previews. Existing environments should install `requirements.lock.txt` after pulling
+this update, then restart the GUI. Missing preview support does not remove downloads.
+
 After installing the environment, run from the checkout:
 
 ```powershell

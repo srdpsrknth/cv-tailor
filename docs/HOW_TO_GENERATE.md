@@ -11,8 +11,8 @@ job application, not for a developer reading the code.
 | Best for | Anything that breaks; scripting; precision | Browsing applications, reading match explanations |
 | Requires | nothing extra | nothing extra |
 
-The web interface has four pages: **Generate**, **Find jobs**, **Applications** and
-**Help**. It reads the same store, so an application generated in a terminal appears
+The web interface has four pages: **New application**, **Find jobs**, **Applications** and
+**Settings & help**. It reads the same store, so an application generated in a terminal appears
 in the browser and vice versa. **The command line is the supported path for anything
 that goes wrong** — it has clearer errors and no browser in the way.
 
@@ -324,10 +324,33 @@ when only one profile exists.
 
 | Page | What it does |
 |---|---|
-| **Generate** | Paste a posting, add optional company/role/country, generate. Shows progress, the cost breakdown, and download buttons. |
-| **Find jobs** | Free search over public job boards, with a plain-language reason for each match. |
-| **Applications** | Everything generated for this candidate, with downloads — including anything produced from the command line. |
-| **Help** | The rules the tool will not break. |
+| **New application** | Choose a candidate explicitly, paste a posting, check company/role/country and task models, then generate. Results remain available through reruns. |
+| **Find jobs** | Free search with matching signals, eligibility and source notes. **Use this posting** transfers known text to New application without making a model call. |
+| **Applications** | Search and filter saved applications by company/role, status or requested model, including CLI runs. Pages expose the whole library. |
+| **Settings & help** | Private-store location, read-only profile summary and local setup checks. Key presence is distinct from provider verification. |
+
+After generation, or after choosing an application in the library, use the review tabs:
+
+* **Documents:** preview the actual CV/letter PDFs and download PDF or Word files.
+* **What changed:** compare the saved profile snapshot against final CV text. Projects
+  with changed names appear as separate source/final entries; ambiguous matches are
+  flagged instead of guessed. This is a text comparison, not a quality score.
+* **Why these changes:** read the saved model explanation for summary wording,
+  bullets, skills, projects and overall strategy. Older runs may have no explanation.
+* **Run details:** requested task models, provider, tokens, attempts and cost. New
+  runs also save provider-reported model IDs/request IDs when returned, and explicit
+  fresh/cache and cost-source records. Older missing fields say **Not recorded**;
+  they are never inferred from today's settings. Cached runs keep original-generation
+  usage separate from this run. Viewing any tab does not call the model.
+
+The curated-model selector affects only new applications. The current catalogue
+contains one selected model; keeping configured routing also preserves any explicit
+per-task overrides. Switching candidates clears the previous candidate's draft and
+review state. Browser reloads start a new session; saved applications remain in the library.
+
+If generation fails before documents exist, raw responses and a failed-run record
+are saved when the store is writable. Review that attempt before paying for another
+draft. Missing or damaged historical source files still allow existing downloads.
 
 **Read both documents before sending them**, whichever way you produced them.
 

@@ -1,51 +1,17 @@
-"""``cvtailor ui`` -- the Streamlit interface.
+"""CV Tailor's Streamlit workspace; decisions and data access live in the bridge."""
 
-Rebuilt in Phase 6 onto :mod:`ui.services_bridge`, which owns every non-presentational
-decision. This module is therefore only about *presentation*: layout, wording and
-widget state. It contains no business rule, and it does not call an LLM, the
-filesystem or the provider directly — everything goes through the bridge, so the
-interface and the CLI cannot drift apart (the roadmap's acceptance criterion for
-Phase 6).
-
-Three things it fixes from the previous UI, each recorded because each was a real
-defect rather than a stylistic preference:
-
-**The candidate is chosen explicitly and fails closed** (ADR 0003). The old UI sent
-no ``profile_id`` at all and worked only because this machine's ``.env`` happened to
-set one, which meant a second candidate was unselectable and a machine without that
-variable failed. Here the picker is populated from the store and an explicit choice
-is required; a configured default is offered as a convenience, never relied upon.
-
-**Cost is read from the shared pricing module.** The old UI kept its own copy of the
-price table and it drifted — it still priced a model Phase 1 had retired and could
-show a figure the backend disagreed with.
-
-**Generation runs in-process**, not over HTTP. The API and the UI are both
-interfaces over ``services.tailor_service``; the old UI was an HTTP client of the
-backend, which added a failure mode (a second service that had to be running) and
-no capability.
-
-Run it with ``python scripts/start.py``, or directly:
-
-    streamlit run ui/app.py --server.port 8501
-"""
 from __future__ import annotations
-
 import sys
 from pathlib import Path
-
 import streamlit as st
 
-# The UI runs as a script, so the backend package is not importable by default.
-# This mirrors what cli/context.py and the scripts do, and is the only sys.path
-# manipulation in the file.
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT / "backend") not in sys.path:
-    sys.path.insert(0, str(ROOT / "backend"))
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from ui import services_bridge as bridge  # noqa: E402
+for path in (ROOT / "backend", ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+from ui import services_bridge as bridge
+from ui.review import render_application
+from ui.theme import CSS
 
 st.set_page_config(
     page_title="CV Tailor",
@@ -55,486 +21,528 @@ st.set_page_config(
 )
 
 
-# --- configuration and session state ------------------------------------------------------
-
 @st.cache_resource(show_spinner=False)
 def get_config():
-    """Load configuration once per server process.
-
-    ``Config.from_env`` is the only place the environment is read (ADR 0010), and it
-    is cached so a page interaction does not re-read ``.env`` on every rerun.
-    """
     from config import Config
 
     return Config.from_env(env_file=ROOT / ".env", overrides={"project_root": ROOT})
 
 
 def active_profile_id(config):
-    """The candidate this session is acting for, or ``None``.
-
-    Session state is the only source. It is deliberately **not** seeded from the
-    configured default: doing so would present a preset that a user could mistake
-    for a considered choice, and ADR 0003 exists precisely to stop a candidate being
-    selected without someone deciding. The picker offers the configured value as the
-    first option, so choosing it is one click and still an explicit act.
-    """
     return st.session_state.get("profile_id") or None
 
 
-def remember(result_key, value) -> None:
-    st.session_state[result_key] = value
+def clear_candidate_state():
+    """Sidebar callback runs before page widgets, so resets are safe."""
+    names = {
+        "active_application",
+        "generation_outcome",
+        "search_outcome",
+        "pending_handoff",
+        "posting_provenance",
+        "job_description",
+        "company",
+        "role",
+        "work_country",
+        "generation_model",
+        "fresh_draft",
+        "library_query",
+        "library_status",
+        "library_model",
+        "library_page",
+        "library_application",
+        "setup_report",
+    }
+    for key in list(st.session_state):
+        if key in names or str(key).startswith(("review_", "search_", "failed_")):
+            del st.session_state[key]
 
 
-# --- shared pieces ------------------------------------------------------------------------
+def retain_inputs():
+    """Detach saved values from widget cleanup when their page is not rendered."""
+    names = {
+        "job_description",
+        "company",
+        "role",
+        "work_country",
+        "generation_model",
+        "fresh_draft",
+        "library_query",
+        "library_status",
+        "library_model",
+        "library_page",
+        "library_application",
+    }
+    for key in list(st.session_state):
+        if key in names or str(key).startswith(("search_", "review_")):
+            st.session_state[key] = st.session_state[key]
 
-def render_header(config) -> None:
-    """A quiet status strip: what this install is pointed at, and nothing more."""
-    described = bridge.describe_configuration(config)
-    with st.container(border=True):
-        left, middle, right = st.columns([2, 2, 3])
-        with left:
-            st.caption("PROFILE STORE")
-            st.code(described["store"], language=None)
-        with middle:
-            st.caption("CANDIDATES")
-            st.markdown(f"**{described['usable_profiles']}** available")
-        with right:
-            st.caption("MODEL")
-            st.markdown(f"`{described['model'] or 'not configured'}`")
-            if described["provider"]:
-                st.caption(f"via {described['provider']}")
 
-
-def render_profile_picker(config, *, key: str = "profile_picker") -> str | None:
-    """Choose the candidate. Returns the id, or ``None`` when none can be chosen.
-
-    Fails closed: with no profiles, or none usable, this explains the situation and
-    returns ``None`` so the caller can stop, rather than proceeding without a
-    candidate.
-    """
+def render_profile_picker(config, *, key="profile_picker"):
     options = bridge.list_profiles(config)
     if not options:
         st.warning(
-            "No profiles in the store yet. Create one with "
-            "`cvtailor profile new <id>`, or import an existing `profile.yaml` with "
-            "`cvtailor profile import <path> --profile-id <id>`."
+            "No profiles in the store yet. Import a profile to get started; see Settings & help."
         )
         return None
-
-    usable = [option for option in options if option.is_usable]
     broken = [option for option in options if not option.is_usable]
     if broken:
-        with st.expander(f"⚠️ {len(broken)} profile(s) could not be read", expanded=False):
+        with st.expander(f"{len(broken)} profile(s) could not be read"):
             for option in broken:
-                st.error(f"**{option.profile_id}** — {option.problem}")
-
+                st.error(f"{option.profile_id} — {option.problem}")
+    usable = [option for option in options if option.is_usable]
     if not usable:
-        st.error("Every profile in the store is unusable. Fix the YAML above, then reload.")
+        st.error("Every profile is unusable. Fix the YAML, then reload.")
         return None
-
-    configured = getattr(config, "profile_id", None)
-    ids = [option.profile_id for option in usable]
-    default_index = ids.index(configured) if configured in ids else 0
-
-    labels = {option.profile_id: option.label() for option in usable}
+    labels = {
+        option.profile_id: f"{option.name} · {option.profile_id}" for option in usable
+    }
     chosen = st.selectbox(
-        "Which candidate are you generating for?",
-        options=ids,
-        index=default_index,
-        format_func=lambda value: labels.get(value, value),
+        "Candidate",
+        list(labels),
+        index=None,
+        placeholder="Choose a candidate",
+        format_func=labels.get,
         key=key,
-        help=(
-            "CV Tailor never picks a profile for you — the documents are filed under "
-            "this id, so an unnoticed default is how the wrong person's CV gets sent."
-        ),
+        on_change=clear_candidate_state,
+        help="Choose explicitly. Documents are saved under this candidate only.",
     )
-    if len(usable) == 1:
-        st.caption(
-            "You still have to choose even with one profile: the choice is what files "
-            "the documents, and a silent default is the failure this prevents."
-        )
+    st.caption(
+        f"Profile: {chosen}"
+        if chosen
+        else "You still have to choose a candidate, even when only one profile is available."
+    )
     return chosen
 
 
-# --- pages --------------------------------------------------------------------------------
-#
-# Defined before the navigation is built, because st.Page takes the callables and a
-# Streamlit script is executed top to bottom on every interaction. Each page takes the
-# cached config explicitly rather than closing over a module-level global, so the pages
-# stay importable and testable on their own.
-
-
-def require_profile(config, purpose: str):
-    """Load the active profile, or stop the page with an explanation.
-
-    Returns the profile, or ``None`` after rendering why it cannot proceed. Every
-    page calls this, so no page can accidentally act without a candidate.
-    """
-    profile_id = active_profile_id(config)
-    if not profile_id:
-        st.info(
-            f"Choose a candidate in the sidebar to {purpose}. "
-            "Every command that touches a candidate's data requires one (ADR 0003)."
-        )
+def require_profile(config, purpose):
+    candidate = active_profile_id(config)
+    if not candidate:
+        st.info(f"Choose a candidate in the sidebar to {purpose}.")
         return None
     try:
-        return bridge.load_profile(config, profile_id)
-    except Exception as error:  # noqa: BLE001 - shown, not raised
-        st.error(f"Could not load **{profile_id}**: {error}")
+        return bridge.load_profile(config, candidate)
+    except Exception as error:
+        st.error(f"Could not load {candidate}: {error}")
         return None
 
 
-def page_generate(config) -> None:
-    st.subheader("Generate documents for a posting")
+def render_header(config):
+    if not active_profile_id(config):
+        st.title("CV Tailor")
+    st.caption(
+        f"Your application workspace · configured model: {config.model} via {config.provider_name}"
+    )
+
+
+def page_generate(config):
+    st.header("New application")
     profile = require_profile(config, "generate documents")
     if profile is None:
         return
-
-    profile_id = active_profile_id(config)
-
+    candidate = active_profile_id(config)
+    actions = st.container()
+    handoff = st.session_state.pop("pending_handoff", None)
+    if handoff:
+        countries = {
+            "DE": "Germany",
+            "AT": "Austria",
+            "CH": "Switzerland",
+            "IE": "Ireland",
+            "NL": "Netherlands",
+            "GB": "United Kingdom",
+        }
+        for key in ("job_description", "company", "role"):
+            st.session_state[key] = handoff[key]
+        st.session_state["work_country"] = countries.get(handoff["work_country"], "")
+        st.session_state["posting_provenance"] = handoff["provenance"]
+        st.session_state.pop("generation_outcome", None)
+        st.session_state.pop("active_application", None)
     left, right = st.columns([3, 2], gap="large")
-
     with left:
-        job_description = st.text_area(
+        description = st.text_area(
             "Paste the full job description",
-            height=320,
-            placeholder=(
-                "Paste everything: responsibilities, requirements, the lot.\n\n"
-                "Include the job URL and today's date at the top if you have them — "
-                "it makes the saved record easier to trace later."
-            ),
+            height=250,
             key="job_description",
+            placeholder="Responsibilities, requirements and company context…",
         )
-
+        if description:
+            st.caption(
+                f"{len(description.split()):,} words · {len(description):,} characters"
+            )
+        if st.session_state.get("posting_provenance"):
+            provenance = st.session_state["posting_provenance"]
+            st.caption(f"Transferred from {provenance['source']} · {provenance['url']}")
+            st.caption(
+                "Check the full posting and country before generating. You can edit the text above."
+            )
     with right:
-        st.markdown("**Optional details**")
-        st.caption("Leave blank to let the posting decide. They mostly improve framing.")
-        company = st.text_input("Company", key="company",
-                                placeholder="Northwind Analytics GmbH")
-        role = st.text_input("Role title", key="role", placeholder="Analytical Engineer")
-        work_country = st.selectbox(
+        company = st.text_input("Company", key="company")
+        role = st.text_input("Role title", key="role")
+        country = st.selectbox(
             "Country of employment",
-            options=["", "Germany", "Ireland", "Netherlands", "United Kingdom",
-                     "Austria", "Switzerland", "Other"],
+            [
+                "",
+                "Germany",
+                "Ireland",
+                "Netherlands",
+                "United Kingdom",
+                "Austria",
+                "Switzerland",
+                "Other",
+            ],
             key="work_country",
-            help=(
-                "The country the job is actually in, not the employer's headquarters. "
-                "This decides the work-authorisation wording, so it is worth setting."
+            help="The job's actual country, not the employer's headquarters. Check work-authorisation wording yourself.",
+        )
+        catalogue = bridge.model_options(config)
+        labels = {m.id: m.label for m in catalogue}
+        selected = st.selectbox(
+            "Model for this new application",
+            ["", *labels],
+            key="generation_model",
+            format_func=lambda model: labels.get(model, "Use configured task routing"),
+            help="Only the curated catalogue is offered. Saved applications retain their historical model.",
+        )
+        if selected:
+            st.caption(next(m.guidance for m in catalogue if m.id == selected))
+        elif len(catalogue) == 1:
+            st.caption("The current curated catalogue contains one model.")
+        fresh = st.checkbox(
+            "Force a fresh draft",
+            key="fresh_draft",
+            help="An identical request normally reuses a validated result. A fresh draft makes paid calls.",
+        )
+    run_config = bridge.generation_config(config, selected)
+    checks = bridge.preflight(run_config)
+    with st.expander("Ready to generate? · configuration and task models"):
+        st.write("Candidate:", profile.identity.full_name)
+        st.write(
+            "API key:",
+            (
+                "Configured; not verified with the provider"
+                if checks["key_configured"]
+                else "Missing"
             ),
         )
-        use_cache = not st.checkbox(
-            "Force a fresh draft",
-            value=False,
-            help="By default an identical job and profile reuses the stored result and costs nothing.",
+        st.write(
+            "PDF engine:",
+            "Available" if checks["pdf_engine"] else "Missing — see Settings & help",
         )
-        words = len(job_description.split())
-        if job_description.strip():
-            st.caption(f"{words:,} words pasted")
-
-    generate = st.button(
-        "Generate CV and cover letter",
-        type="primary",
-        use_container_width=True,
-        disabled=not job_description.strip(),
-    )
-
-    if not generate:
-        return
-
-    # A generation run takes a minute or more and makes several network calls. It is
-    # the one operation here that costs money, so it reports progress and never runs
-    # silently.
-    progress_lines: list[str] = []
-    with st.status("Generating… this costs about $0.003", expanded=True) as status:
-        progress_box = st.empty()
-
-        def on_status(message: str) -> None:
-            progress_lines.append(message)
-            progress_box.caption(" → ".join(progress_lines[-3:]))
-
-        outcome = bridge.run_generation(
-            config,
-            profile_id,
-            job_description,
-            company=company or None,
-            role=role or None,
-            work_country=work_country or None,
-            use_cache=use_cache,
-            status=on_status,
+        st.table(
+            [
+                {"Task": task, "Requested model": model}
+                for task, model in checks["models"].items()
+            ]
         )
-
-        if outcome.ok:
-            status.update(label="Done", state="complete", expanded=False)
-        else:
-            status.update(label="Generation failed", state="error", expanded=True)
-
-    if not outcome.ok:
-        st.error(outcome.error)
-        st.info(
-            "The editable drafts are usually still saved even when validation failed. "
-            "Check the Applications page for the folder before regenerating — a retry "
-            "costs money."
+    with actions:
+        generate = st.button(
+            "Generate CV and cover letter",
+            type="primary",
+            use_container_width=True,
+            disabled=not description.strip()
+            or not checks["key_configured"]
+            or not checks["pdf_engine"],
         )
-        return
-
-    st.success(f"Generated **{outcome.job_id}**")
-    for line in outcome.summary:
-        st.write(f"- {line}")
-    st.session_state["last_job_id"] = outcome.job_id
-    st.session_state["last_job_folder"] = str(outcome.job_folder) if outcome.job_folder else None
-    st.toast("Documents ready", icon="✅")
-
-    render_result(config, profile_id, outcome.job_id, outcome.job_folder)
-
-
-def render_result(config, profile_id: str, job_id: str, folder) -> None:
-    """Downloads and a reminder to read the documents."""
-    artifacts = bridge.list_artifacts(folder)
-    st.divider()
-    st.subheader("📑 Your documents")
-
-    if not artifacts:
-        st.warning(f"No files found in {folder}. The generation may not have finished.")
-        return
-
-    pdfs = [a for a in artifacts if a["kind"] == "pdf"]
-    docs = [a for a in artifacts if a["kind"] == "docx"]
-
-    columns = st.columns(max(len(pdfs) + len(docs), 1))
-    for column, artifact in zip(columns, pdfs + docs):
-        with column:
-            with st.container(border=True):
-                st.markdown(f"**{artifact['name']}**")
-                st.caption(f"{artifact['size_kb']} KB · {artifact['kind'].upper()}")
-                try:
-                    st.download_button(
-                        "Download",
-                        data=Path(artifact["path"]).read_bytes(),
-                        file_name=artifact["name"],
-                        mime=artifact["mime"],
-                        key=f"dl_{job_id}_{artifact['name']}",
-                        use_container_width=True,
-                    )
-                except OSError as error:
-                    st.error(f"Could not read the file: {error}")
-
-    st.info(
-        "**Read both documents before sending them.** The tool checks page count and "
-        "word count, and the test suite checks for clipped text and orphan headings — "
-        "but nothing automated reads them the way a recruiter will. Check employer "
-        "names, dates, and that nothing is claimed you cannot back up in an interview."
-    )
-    st.caption(f"Saved in `{folder}`")
-
-
-def page_find_jobs(config) -> None:
-    """Search public job sources. Free: no API key, no LLM call."""
-    st.subheader("Find jobs")
-    st.caption(
-        "Searches public job sources and ranks what comes back. **Free** — no API key "
-        "and no AI call."
-    )
-
-    with st.form("job_search"):
-        row = st.columns([3, 1, 1, 1])
-        with row[0]:
-            keywords = st.text_input("Keywords", placeholder="data engineer")
-        with row[1]:
-            country = st.text_input("Country", placeholder="DE")
-        with row[2]:
-            city = st.text_input("City", placeholder="Berlin")
-        with row[3]:
-            limit = st.number_input("Max results", min_value=1, max_value=50, value=10)
-        remote_only = st.checkbox("Remote only")
-        submitted = st.form_submit_button("Search", type="primary")
-
-    if not submitted:
         st.caption(
-            "Sources are configured in `SAMPLE_*` constants in "
-            "`backend/services/job_connectors.py`; add your own employers there."
+            "Paid generation · identical validated requests may reuse the cache. Review documents before sending."
         )
+    if generate:
+        with st.status("Preparing your application…", expanded=True) as progress:
+            outcome = bridge.run_generation(
+                run_config,
+                candidate,
+                description,
+                company=company or None,
+                role=role or None,
+                work_country=country or None,
+                use_cache=not fresh,
+                status=lambda message: st.caption(message),
+            )
+            progress.update(
+                label="Documents ready" if outcome.ok else "Generation failed",
+                state="complete" if outcome.ok else "error",
+                expanded=not outcome.ok,
+            )
+        st.session_state["generation_outcome"] = outcome
+        if outcome.ok:
+            st.session_state["active_application"] = outcome.job_id
+            if st.session_state.get("posting_provenance"):
+                try:
+                    bridge.save_posting_provenance(
+                        config,
+                        candidate,
+                        outcome.job_id,
+                        st.session_state["posting_provenance"],
+                    )
+                except (OSError, ValueError):
+                    st.warning(
+                        "Documents were saved, but the posting-source metadata could not be saved."
+                    )
+    outcome = st.session_state.get("generation_outcome")
+    if outcome and not outcome.ok:
+        st.error(outcome.error)
+        if outcome.drafts_saved:
+            st.info(
+                "Draft responses were saved. Review the partial attempt before paying for another draft; a usable document may not exist yet."
+            )
+        for job_id in outcome.details.get("applications", []):
+            if st.button("Review saved attempt", key=f"failed_{candidate}_{job_id}"):
+                st.session_state["active_application"] = job_id
+    job_id = st.session_state.get("active_application")
+    if job_id:
+        st.divider()
+        render_application(config, candidate, job_id)
+
+
+def page_find_jobs(config, generate_target=None):
+    st.header("Find jobs")
+    st.caption("Free discovery and evidence-based matching. No model call.")
+    if require_profile(config, "find jobs for your profile") is None:
         return
-
-    from models.job import SearchQuery
-    from services.job_connectors import build_default_sources
-    from services.job_match import MatchPreferences
-
-    profile = require_profile(config, "rank jobs against your profile")
-    if profile is None:
-        return
-
-    profile_id = active_profile_id(config)
-    query = SearchQuery(
-        keywords=keywords or None,
-        country=country or None,
-        city=city or None,
-        remote=True if remote_only else None,
-        limit=int(limit),
-    )
-    preferences = MatchPreferences.from_profile(
-        profile, keywords=tuple(keywords.split()) if keywords else ()
-    )
-
-    with st.spinner("Searching…"):
-        outcome = bridge.run_job_search(
-            config, profile_id, query, preferences=preferences,
-            sources=build_default_sources(),
+    with st.form("job_search"):
+        columns = st.columns([3, 1, 1, 1])
+        keywords = columns[0].text_input(
+            "Keywords", key="search_keywords", placeholder="data engineer"
         )
-
+        country = columns[1].text_input(
+            "Country", key="search_country", placeholder="DE"
+        )
+        city = columns[2].text_input("City", key="search_city", placeholder="Berlin")
+        limit = columns[3].number_input(
+            "Max results",
+            min_value=1,
+            max_value=50,
+            value=None if "search_limit" in st.session_state else 10,
+            key="search_limit",
+        )
+        remote = st.checkbox("Remote only", key="search_remote")
+        submitted = st.form_submit_button("Search", type="primary")
+    with st.expander("Source coverage"):
+        for source in bridge.source_coverage():
+            st.text(source)
+        st.caption(
+            "Coverage is limited to configured sources and employer lists. This is not a search of every job board."
+        )
+    if submitted and limit is None:
+        st.error("Enter a maximum result count between 1 and 50.")
+    elif submitted:
+        try:
+            with st.spinner("Searching public sources…"):
+                st.session_state["search_outcome"] = bridge.search_from_fields(
+                    config,
+                    active_profile_id(config),
+                    keywords,
+                    country,
+                    city,
+                    remote,
+                    int(limit),
+                )
+        except Exception as error:
+            st.session_state.pop("search_outcome", None)
+            st.error(f"Search failed: {error}")
+    outcome = st.session_state.get("search_outcome")
+    if outcome is None:
+        return
     for note in outcome.notes:
-        st.caption(f"ℹ️ {note}")
+        st.caption(note)
     for name, message in outcome.failures.items():
-        st.warning(f"Source **{name}** failed: {message}")
-
+        st.warning(f"Source {name}: {message}")
     if not outcome.results:
-        st.info("No matching jobs. Try a broader keyword, or drop the country/city filter.")
+        st.info("No matching jobs. Try broader keywords or fewer location filters.")
         return
-
-    st.success(f"{len(outcome.results)} match(es) from {outcome.jobs_read} posting(s) read.")
-    for result in outcome.results:
+    st.caption(f"{len(outcome.results)} results · {outcome.jobs_read} postings read")
+    for index, result in enumerate(outcome.results):
         job = result.job
         with st.container(border=True):
-            head = st.columns([5, 1])
-            with head[0]:
-                st.markdown(f"**{job.title}**")
-                where = job.city.value or (job.country.value if job.country.is_verified else "")
-                meta = " · ".join(filter(None, [job.company, where, job.source]))
-                st.caption(meta)
-            with head[1]:
-                st.metric("Match", result.score)
+            title, signal = st.columns([4, 1])
+            title.subheader(job.title)
+            title.caption(
+                " · ".join(
+                    str(x) for x in [job.company, job.city.value, job.source] if x
+                )
+            )
+            signal.metric("Matching signals", result.score)
+            st.caption(
+                f'Eligibility: {result.eligibility.value} · Published: {job.posted_at.date() if job.posted_at else "not stated"}'
+            )
             for line in result.explanation():
-                st.caption(f"• {line}")
+                st.text(line)
+            controls = st.columns(2)
             if job.url:
-                st.link_button("Open posting", job.url)
+                controls[0].link_button("Open posting", job.url)
+            if controls[1].button("Use this posting", key=f"search_use_{index}"):
+                st.session_state["pending_handoff"] = bridge.posting_handoff(job)
+                if generate_target is not None:
+                    st.switch_page(generate_target)
+            if not job.description:
+                st.caption(
+                    "No full description was provided. Paste it on New application before generating."
+                )
 
 
-def page_applications(config) -> None:
-    """Everything already generated, for this candidate."""
-    st.subheader("Applications")
-    profile = require_profile(config, "see your applications")
-    if profile is None:
+def page_applications(config):
+    st.header("Applications")
+    if require_profile(config, "review saved applications") is None:
         return
-
-    profile_id = active_profile_id(config)
-    applications = bridge.list_applications(config, profile_id)
-
+    candidate = active_profile_id(config)
+    applications = bridge.application_library(config, candidate)
     if not applications:
         st.info(
-            "Nothing generated yet for this candidate. Use the **Generate** page, or "
-            "the CLI. Applications produced either way appear here — they share one store."
+            "No saved applications for this candidate yet. Create one on New application."
         )
         return
-
-    st.caption(f"{len(applications)} application(s) for **{profile_id}**")
-    for application in applications:
-        with st.expander(application["job_id"], expanded=False):
-            if not application["has_content"]:
-                st.warning(
-                    "No `source/content.json` — this folder has no editable text, so it "
-                    "cannot be re-rendered. It may be an older or partial run."
-                )
-            if not application["artifacts"]:
-                st.caption("No downloadable files in this folder.")
-                continue
-            columns = st.columns(len(application["artifacts"]))
-            for column, artifact in zip(columns, application["artifacts"]):
-                with column:
-                    st.caption(f"{artifact['name']} ({artifact['size_kb']} KB)")
-                    try:
-                        st.download_button(
-                            "Download",
-                            data=Path(artifact["path"]).read_bytes(),
-                            file_name=artifact["name"],
-                            mime=artifact["mime"],
-                            key=f"app_{application['job_id']}_{artifact['name']}",
-                        )
-                    except OSError as error:
-                        st.error(str(error))
-            st.caption(f"`{application['path']}`")
-
-
-def page_about() -> None:
-    st.subheader("How to use this")
-    st.markdown(
-        """
-        **Generate** — paste a posting, choose a candidate, generate. Costs roughly
-        **$0.003** on the default model: one CV call and one cover-letter call.
-
-        **Find jobs** — searches public job boards and ranks results against your
-        profile. Free.
-
-        **Applications** — everything already generated, with downloads. Re-rendering
-        an existing application after editing its `content.json` is free.
-
-        ### The rules this tool will not break
-
-        - **It never picks a profile for you.** No default, no "the only one".
-        - **Your data stays outside this repository.** Profiles, applications and
-          documents live in the private store shown at the top of every page.
-        - **It does not invent facts.** It tailors wording and emphasis from your real
-          profile; it will not add a skill or employer you do not have.
-        - **Default limits:** CV two pages, cover letter four paragraphs, 290–310 words.
-
-        ### Something wrong?
-
-        Run `cvtailor doctor` in a terminal — it checks Python, the store, the profile,
-        LaTeX and the API key, and tells you the fix. The command line is the
-        supported path for anything that breaks here.
-        """
+    search, status, model = st.columns([3, 1, 2])
+    query = search.text_input("Search company or role", key="library_query").casefold()
+    status_filter = status.selectbox(
+        "Status",
+        ["All", *sorted({a["status"] for a in applications})],
+        key="library_status",
     )
-
-
-# --- run ----------------------------------------------------------------------------------
-
-def main() -> None:
-    """Draw the shell and dispatch to the selected page."""
-    st.title("📄 CV Tailor")
-    st.caption(
-        "Tailor a CV and cover letter to a real posting, and find postings worth "
-        "applying to."
+    model_names = sorted(
+        {
+            str(m)
+            for a in applications
+            for m in (a["manifest"].get("models") or {}).values()
+        }
     )
+    model_filter = model.selectbox(
+        "Requested model", ["All", *model_names], key="library_model"
+    )
+    matches = [
+        a
+        for a in applications
+        if query in f"{a['company']} {a['title']} {a['job_id']}".casefold()
+        and (status_filter == "All" or a["status"] == status_filter)
+        and (
+            model_filter == "All"
+            or model_filter in (a["manifest"].get("models") or {}).values()
+        )
+    ]
+    st.caption(f"{len(matches)} of {len(applications)} saved applications")
+    if not matches:
+        st.info("No applications match these filters.")
+        return
+    pages = max(1, (len(matches) + 19) // 20)
+    if st.session_state.get("library_page", 1) > pages:
+        st.session_state["library_page"] = 1
+    page = (
+        st.selectbox("Page", list(range(1, pages + 1)), key="library_page")
+        if pages > 1
+        else 1
+    )
+    visible = matches[(page - 1) * 20 : page * 20]
+    labels = {
+        a[
+            "job_id"
+        ]: f"{a['company'] or 'Application'} · {a['title']} · {a['created_at'][:10]} · {a['status']}"
+        for a in visible
+    }
+    if st.session_state.get("library_application") not in labels:
+        st.session_state.pop("library_application", None)
+    chosen = st.selectbox(
+        "Review an application",
+        list(labels),
+        format_func=labels.get,
+        key="library_application",
+    )
+    if chosen:
+        render_application(config, candidate, chosen)
 
-    config = get_config()
-    render_header(config)
 
-    with st.sidebar:
-        st.header("Candidate")
-        picked = render_profile_picker(config)
-        if picked:
-            st.session_state["profile_id"] = picked
-        st.divider()
+def page_about(config=None):
+    config = config or get_config()
+    st.header("Settings & help")
+    st.subheader("Local setup")
+    described = bridge.describe_configuration(config)
+    st.markdown("**Profile store**")
+    st.code(described["store"], language=None)
+    st.write(f"{described['usable_profiles']} usable profile(s) available")
+    st.write("Configured model:", described["model"])
+    st.write("Provider:", described["provider"])
+    if st.button("Run local setup checks", key="setup_checks"):
+        st.session_state["setup_report"] = bridge.setup_checks(config)
+    for check in st.session_state.get("setup_report", []):
+        st.text(f"{check['status'].upper()} · {check['check']} · {check['detail']}")
+        if check["fix"] and check["status"] != "ok":
+            st.caption(check["fix"])
+    if active_profile_id(config):
+        profile = bridge.load_profile(config, active_profile_id(config))
+        with st.expander("Selected profile · read-only summary"):
+            st.write(profile.identity.full_name)
+            st.write("Experience entries:", len(profile.experience))
+            st.write("Skill groups:", ", ".join(profile.skills))
+            st.caption(
+                "Generation leaves your source profile unchanged. Maintain facts through the profile workflow."
+            )
+    st.markdown("""
+**New application** — choose a candidate, paste a full posting, review the model and generate.
+Generation may make paid calls. Cached generation and re-rendering existing text avoid new drafting calls.
+
+**Review** — Documents shows PDFs and downloads. What changed compares the saved profile
+with final CV text. Why these changes shows the model’s explanation. Run details keeps
+historical usage separate from your current settings.
+
+**Find jobs** — free public-source search. Matching signals count stated evidence; they are not a hiring probability.
+
+**Privacy** — profiles and outputs live in your private store. Generation sends the profile
+and posting to the configured model provider. Review saved files before sending them to an employer.
+
+**Limits** — CV two pages; letter four paragraphs, 290–310 words. Automated checks cannot establish every claim or visual detail.
+""")
+    with st.expander("Command-line setup and recovery"):
+        st.code(
+            "cvtailor doctor\ncvtailor profile list\ncvtailor profile new <id>\ncvtailor profile import <path> --profile-id <id>"
+        )
         st.caption(
-            "The command line does everything this interface does. "
-            "Run `cvtailor` with no arguments for a guided menu."
+            "Keys belong in your local .env, not in chat. Checks verify presence, not provider acceptance."
         )
 
-    st.divider()
 
+def main():
+    st.markdown(CSS, unsafe_allow_html=True)
     config = get_config()
+    with st.sidebar:
+        st.markdown("### cv tailor.")
+        picked = render_profile_picker(config)
+        st.session_state["profile_id"] = picked
+        st.caption("Local workspace · private profile store")
+    render_header(config)
+    retain_inputs()
 
-    # st.navigation derives a page's URL path from the callable's name, so passing
-    # lambdas makes every page collide on "<lambda>" and raises StreamlitAPIException.
-    # Named wrappers with an explicit url_path avoid that, and give readable URLs.
-    def generate_page() -> None:
+    def generate_page():
         page_generate(config)
 
-    def find_jobs_page() -> None:
-        page_find_jobs(config)
+    def find_jobs_page():
+        page_find_jobs(config, generate_target)
 
-    def applications_page() -> None:
+    def applications_page():
         page_applications(config)
 
+    def settings_page():
+        page_about(config)
+
+    generate_target = st.Page(
+        generate_page,
+        title="New application",
+        icon="✍️",
+        url_path="generate",
+        default=True,
+    )
     navigation = st.navigation(
         [
-            st.Page(generate_page, title="Generate", icon="✍️", url_path="generate",
-                    default=True),
+            generate_target,
             st.Page(find_jobs_page, title="Find jobs", icon="🔎", url_path="find-jobs"),
-            st.Page(applications_page, title="Applications", icon="🗂️",
-                    url_path="applications"),
-            st.Page(page_about, title="Help", icon="❓", url_path="help"),
+            st.Page(
+                applications_page,
+                title="Applications",
+                icon="🗂️",
+                url_path="applications",
+            ),
+            st.Page(settings_page, title="Settings & help", icon="⚙️", url_path="help"),
         ]
     )
     navigation.run()
 
 
-main()
+if __name__ == "__main__":
+    main()

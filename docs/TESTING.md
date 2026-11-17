@@ -1,8 +1,21 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **1150 passed, 3 skipped**, 1 warning, ~68 s on macOS / ~143 s on Windows, fully offline — no paid API calls.
+**Current baseline (2026-11-17):** **1175 passed, 3 skipped**, 1 existing Google SDK warning, ~124 s on Windows, fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+
+Application-review increment adds 25 cases: `test_application_review.py` (18),
+`test_ui_review.py` (6) and a provider-reply attribution case in
+`test_provider_interface.py`. These cover legacy/corrupt records, profile/path
+boundaries, identity-aligned comparisons, HTML escaping, more than 20 applications,
+failed raw drafts, requested/reported model records and repeated-cache provenance.
+AppTest exercises deliberate profile choice, persistent reviews, candidate switches,
+no-call viewing, retained search results and posting handoff. Existing UI tests now
+make an explicit profile selection before exercising the generation form.
+
+Browser QA covers all four pages, actual PDF rendering, saved explanations, text
+comparisons, input persistence across navigation, setup checks and a 390 x 844
+viewport. No paid provider call or live source search was made for this increment.
 
 Windows launcher smoke checks (2026-11-17): run `scripts/windows_gui.ps1 -NoBrowser`
 with Windows PowerShell 5.1, check `/_stcore/health`, launch again and assert the

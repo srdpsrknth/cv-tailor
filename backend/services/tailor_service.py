@@ -10,6 +10,7 @@ mirroring (A-3). Those responsibilities now live in:
 ``tailor_documents`` keeps its exact public signature and behaviour, so the API,
 the UI, the CLI and every existing test call it unchanged.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -71,6 +72,7 @@ __all__ = [
 # --- re-exported so existing imports keep working -------------------------------------
 # These preserve the public names, and the underscored names the existing test suite
 # calls. Each is a thin delegation to services.generation, not duplicated logic.
+
 
 def parse_json_response(text: str) -> dict:
     """Parse a model response into a document dict."""
@@ -156,7 +158,9 @@ def _schema_digest() -> str:
         except Exception:  # noqa: BLE001 -- a digest must never break generation
             described[kind] = repr(schema)
     return hashlib.sha256(
-        json.dumps(described, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+        json.dumps(described, sort_keys=True, ensure_ascii=False, default=str).encode(
+            "utf-8"
+        )
     ).hexdigest()
 
 
@@ -178,8 +182,12 @@ def _cache_root(config: Config) -> Path:
 
 
 def _cache_read(
-    cache: GenerationCache, key: str, generator: DocumentGenerator,
-    work_country: Optional[str], company_name: Optional[str], role_title: Optional[str],
+    cache: GenerationCache,
+    key: str,
+    generator: DocumentGenerator,
+    work_country: Optional[str],
+    company_name: Optional[str],
+    role_title: Optional[str],
 ):
     """The stored entry for ``key``, re-gated -- or ``None`` to generate instead.
 
@@ -200,35 +208,48 @@ def _cache_read(
     except (ValueError, TypeError) as error:
         logger.warning(
             "Stored generation %s no longer validates (%s); generating instead.",
-            key[:12], error,
+            key[:12],
+            error,
         )
         return None, None, None
     return cv, cl, entry
 
 
 def _cache_write(
-    cache: GenerationCache, key: str, cv, cl, explanation, drafts: list,
-    usage: dict, config: Config,
+    cache: GenerationCache,
+    key: str,
+    cv,
+    cl,
+    explanation,
+    drafts: list,
+    usage: dict,
+    config: Config,
+    calls: Optional[list] = None,
 ) -> None:
     """Store a validated generation. Best-effort: a failure here never fails the run."""
-    cache.put(key, CacheEntry(
-        key=key,
-        cv=cv.model_dump(),
-        cover_letter=cl.model_dump(),
-        tailoring_explanation=explanation,
-        drafts=list(drafts),
-        usage=usage,
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        provider=config.provider_name,
-        models={
-            "cv": config.model_for("cv"),
-            "cover_letter": config.model_for("cover_letter"),
-            "layout_retry": config.model_for("layout_retry"),
-        },
-    ))
+    cache.put(
+        key,
+        CacheEntry(
+            key=key,
+            cv=cv.model_dump(),
+            cover_letter=cl.model_dump(),
+            tailoring_explanation=explanation,
+            drafts=list(drafts),
+            usage=usage,
+            original_calls=calls if isinstance(calls, list) else None,
+            created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            provider=config.provider_name,
+            models={
+                "cv": config.model_for("cv"),
+                "cover_letter": config.model_for("cover_letter"),
+                "layout_retry": config.model_for("layout_retry"),
+            },
+        ),
+    )
 
 
 # --- orchestration --------------------------------------------------------------------
+
 
 def tailor_documents(
     job_description: str,
@@ -260,6 +281,9 @@ def tailor_documents(
     """
     if not job_description or not job_description.strip():
         raise ValueError("Job description is empty.")
+    from services.posting import validate_posting
+
+    job_description = validate_posting(job_description, min_length=0)
 
     # Resolved at call time (never at import), so the model, key and output path can
     # differ per invocation -- and one test can override another's environment.
@@ -272,7 +296,9 @@ def tailor_documents(
     # provider, routing and key are still resolved from ``config`` here.
     if service is None:
         if config is None:
-            config = Config.from_env(load_env_file=False, overrides={"project_root": PROJECT_ROOT})
+            config = Config.from_env(
+                load_env_file=False, overrides={"project_root": PROJECT_ROOT}
+            )
             # Constructed with no arguments so an injected double can stand in for it.
             service = LLMService()
         else:
@@ -326,7 +352,11 @@ def tailor_documents(
     cv_prompt_source = PROMPT_CV_PATH.read_text(encoding="utf-8")
     cl_prompt_source = PROMPT_CL_PATH.read_text(encoding="utf-8")
     context = build_context(
-        job_description, profile, company_name, role_title, work_country,
+        job_description,
+        profile,
+        company_name,
+        role_title,
+        work_country,
         profile_bytes=profile_bytes,
     )
     cv_prompt = build_cv_prompt(cv_prompt_source, context)
@@ -388,18 +418,88 @@ def tailor_documents(
         cv, cl, entry = _cache_read(
             cache, key, generator, work_country, company_name, role_title
         )
+
+    def failure_metadata():
+        records = getattr(service, "call_records", [])
+        records = records if isinstance(records, list) else []
+        token_usage = service.calculate_token_usage(
+            **generator.usage_kwargs()
+        ).model_dump()
+        if records:
+            # The cap can stop a received reply before the generator counts it.
+            for prefix, task in (("cv", "cv"), ("cl", "cover_letter")):
+                selected = [
+                    r
+                    for r in records
+                    if (r.get("task") == "cover_letter") == (task == "cover_letter")
+                ]
+                token_usage[prefix + "_input_tokens"] = sum(
+                    r.get("input_tokens", 0) for r in selected
+                )
+                token_usage[prefix + "_output_tokens"] = sum(
+                    r.get("output_tokens", 0) for r in selected
+                )
+                token_usage[prefix + "_attempts"] = len(selected)
+            token_usage["total_tokens"] = sum(
+                r.get("input_tokens", 0) + r.get("output_tokens", 0) for r in records
+            )
+        sources = {r.get("cost_source") for r in records}
+        return {
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "provider": config.provider_name,
+            "models": {
+                task: config.model_for(task)
+                for task in ("cv", "cover_letter", "layout_retry")
+            },
+            "calls": records,
+            "cache_hit": entry is not None,
+            "token_usage": token_usage,
+            "cost_source": (
+                "mixed" if len(sources) > 1 else next(iter(sources), "not recorded")
+            ),
+        }
+
     if entry is None:
-        cv, cl, explanation = generator.generate_pair(
-            cv_prompt, cl_prompt,
-            work_country=work_country, company_name=company_name, role_title=role_title,
-        )
+        try:
+            cv, cl, explanation = generator.generate_pair(
+                cv_prompt,
+                cl_prompt,
+                work_country=work_country,
+                company_name=company_name,
+                role_title=role_title,
+            )
+        except Exception as error:
+            # Validation/provider failures can happen before renderable content exists.
+            # Preserve raw drafts and received replies without claiming a usable CV.
+            failed_id = make_job_id(
+                company_name or "incomplete",
+                role_title or "application",
+                slugify,
+                profile_id=resolved_profile_id,
+            )
+            failed = ApplicationStore(
+                outputs_root=outputs_root,
+                job_id=failed_id,
+                profile_id=resolved_profile_id,
+            )
+            try:
+                failed.create(profile.model_dump(), job_description)
+                failed.save_drafts(generator.drafts)
+                failed.save_failure(str(error), [], **failure_metadata())
+            except (OSError, ValueError):
+                logger.warning(
+                    "Could not persist failed generation audit trail.", exc_info=True
+                )
+            raise
     else:
         explanation = entry.tailoring_explanation
         if status_callback:
             status_callback("Reusing a stored generation for this exact posting.")
 
     job_id = make_job_id(
-        company_name or cl.company_name, role_title or cl.role_title, slugify,
+        company_name or cl.company_name,
+        role_title or cl.role_title,
+        slugify,
         profile_id=resolved_profile_id,
     )
     applications = ApplicationStore(
@@ -419,11 +519,15 @@ def tailor_documents(
     history = []
 
     def save_content() -> None:
-        applications.save_content({
-            "company_name": cl.company_name, "role_title": position,
-            "work_country": work_country,
-            "cv": cv.model_dump(), "cover_letter": cl.model_dump(),
-        })
+        applications.save_content(
+            {
+                "company_name": cl.company_name,
+                "role_title": position,
+                "work_country": work_country,
+                "cv": cv.model_dump(),
+                "cover_letter": cl.model_dump(),
+            }
+        )
 
     try:
         for attempt in range(MAX_LAYOUT_ATTEMPTS):
@@ -440,20 +544,30 @@ def tailor_documents(
                     "was not marked successful."
                 )
             cv, explanation = generator.shorten_cv(
-                cv, page_count, attempt, cv_prompt,
-                work_country, company_name, role_title, explanation,
+                cv,
+                page_count,
+                attempt,
+                cv_prompt,
+                work_country,
+                company_name,
+                role_title,
+                explanation,
             )
-        cl_path, cl_pdf_path = docx.render_cover_letter(cl, profile, job_position=position)
+        cl_path, cl_pdf_path = docx.render_cover_letter(
+            cl, profile, job_position=position
+        )
         if not cl_pdf_path:
             raise ValueError("Cover-letter PDF rendering failed.")
         cl_pages = count_pdf_pages(Path(cl_pdf_path))
         if cl_pages != 1:
-            raise ValueError(f"Cover-letter PDF is {cl_pages} pages; expected one page.")
+            raise ValueError(
+                f"Cover-letter PDF is {cl_pages} pages; expected one page."
+            )
     except Exception as error:
         # Preserve everything editable, then mark the folder failed explicitly (D-14).
         save_content()
         applications.save_drafts(drafts)
-        applications.save_failure(str(error), history)
+        applications.save_failure(str(error), history, **failure_metadata())
         raise
 
     # Separate CV/letter usage and include every review and shortening attempt.
@@ -474,17 +588,63 @@ def tailor_documents(
     # that originally paid for it is preserved as ``original_usage`` in the same file.
     if entry is None:
         _cache_write(
-            cache, key, cv, cl, explanation_dict, generator.drafts,
-            usage.model_dump(), config,
+            cache,
+            key,
+            cv,
+            cl,
+            explanation_dict,
+            generator.drafts,
+            usage.model_dump(),
+            config,
+            calls=getattr(service, "call_records", None),
         )
     else:
         _cache_write(
-            cache, key, cv, cl, explanation_dict, entry.drafts, usage.model_dump(), config,
+            cache,
+            key,
+            cv,
+            cl,
+            explanation_dict,
+            entry.drafts,
+            entry.usage,
+            config,
+            calls=entry.original_calls,
         )
     result = TailorResponse(
-        job_id=job_id, cv_path=str(cv_path), cover_letter_path=str(cl_path),
-        cl_pdf_path=str(cl_pdf_path), token_usage=usage,
-        cv_page_count=page_count, cover_letter_page_count=cl_pages,
+        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        cache_hit=entry is not None,
+        original_usage=entry.usage if entry is not None else None,
+        original_calls=(entry.original_calls or []) if entry is not None else [],
+        calls=(
+            getattr(service, "call_records", [])
+            if isinstance(getattr(service, "call_records", []), list)
+            else []
+        ),
+        cost_source=(
+            "cache"
+            if entry is not None and not getattr(service, "calls_made", 0)
+            else (
+                "mixed"
+                if getattr(service, "reported_calls", 0)
+                and getattr(service, "estimated_calls", 0)
+                else (
+                    "reported"
+                    if getattr(service, "reported_calls", 0)
+                    else (
+                        "estimated"
+                        if getattr(service, "estimated_calls", 0)
+                        else "not recorded"
+                    )
+                )
+            )
+        ),
+        job_id=job_id,
+        cv_path=str(cv_path),
+        cover_letter_path=str(cl_path),
+        cl_pdf_path=str(cl_pdf_path),
+        token_usage=usage,
+        cv_page_count=page_count,
+        cover_letter_page_count=cl_pages,
         source_path=str(applications.source_folder / "content.json"),
         tailoring_explanation=explanation_dict,
         # Recorded on the **manifest**, not only in the cache entry, so a generated
@@ -511,6 +671,9 @@ def tailor_documents(
         applications.save_manifest_copy(mirror)
     logger.info(
         "Generated %s: %s CV pages; layout history %s; cache %s",
-        job_id, page_count, history, "hit" if entry is not None else "miss",
+        job_id,
+        page_count,
+        history,
+        "hit" if entry is not None else "miss",
     )
     return result

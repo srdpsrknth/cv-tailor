@@ -2,7 +2,10 @@
 
 Reviewed 2026-11-17 against the running Windows GUI, all four pages, `ui/app.py`,
 `ui/services_bridge.py`, generation persistence and provider response handling.
-This is a proposal, not approval to change frameworks or implement all features.
+**Implementation status (2026-11-17):** the owner approved this proposal and the
+review workflow has been implemented in Streamlit; see ADR 0021 and PROJECT_STATE.
+The material below preserves the findings and design rationale. Full Phase 5
+submission tracking and provider-catalogue expansion remain out of scope.
 
 ## Current experience
 

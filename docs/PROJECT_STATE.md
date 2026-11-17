@@ -3,16 +3,65 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *GUI review and interactive design proposal*
+**Latest commit:** *(this commit)* — *application review workspace and model/run attribution*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-## GUI review and design proposal (2026-11-17)
+## GUI implementation complete (2026-11-17)
+
+**Active task:** implement the approved GUI proposal — complete. Streamlit remains
+the UI, with the existing service bridge. The local server is running on port 8502;
+desktop open/stop shortcuts remain valid. `master` was not changed.
+
+Delivered:
+
+- Compact warm/teal workspace; deliberate empty candidate picker and cross-profile
+  state clearing; persistent form, review and search state across page reruns.
+- Shared application review after generation and in the library: **Documents** with
+  actual PDF previews and downloads; **What changed** using saved profile snapshots,
+  escaped word highlighting and identity-based alignment; **Why these changes**
+  showing stored model rationale; **Run details** with historical usage and routes.
+- Provider reply model/request IDs retained when returned, with per-reply tasks,
+  requested models, tokens and cost source. Fresh/cache records and original cached
+  usage stay distinct; repeated cache hits no longer overwrite original usage with
+  zero. Missing historical fields stay explicitly unrecorded.
+- Searchable/filterable application library with pagination beyond 20 entries;
+  known-posting handoff to generation without model calls; curated-model choice for
+  new runs (the existing catalogue has one option); GUI local setup checks and
+  read-only profile summary. Shared posting preflight rejects copied commands.
+- Failure audit records preserve raw drafts even before a renderable document exists.
+  Broken/legacy sources still permit existing downloads; loading review data fails
+  closed at candidate/application boundaries. Profiles and existing sources unchanged.
+
+Runtime: added and installed `streamlit-pdf==2.1.0`; requirements and lockfile updated.
+The minimum Streamlit requirement now matches the verified 1.53.1 runtime. New
+modules: `services/application_review.py`, `services/posting.py`, `ui/review.py` and
+`ui/theme.py`; details in [ADR 0021](DECISIONS/0021-application-review-and-provenance.md).
+
+**Verification:** full suite **1175 passed, 3 skipped**, one existing Google SDK
+deprecation warning, ~124 s (baseline 1150/3). Added 25 cases covering review,
+attribution, repeated cache hits, failed runs, profile isolation, actual Streamlit
+reruns and search handoff. `pip check`, `doctor`, formatting and diff checks pass.
+Browser inspected all pages, actual saved PDFs, explanations and comparisons,
+navigation persistence, setup checks, and 390-pixel layouts. The PDF preview uses
+the installed viewer, not a simulated text document. A restored-number-input
+warning found during browser QA was corrected. No paid API call or live job-source
+search was made; new provider metadata was verified with offline response fixtures,
+not a new live generation. Existing historical records are not backfilled.
+
+**Next action:** refresh the local GUI, explicitly choose a profile, and review a
+saved application. A future real generation will populate the new run metadata.
+Phase 5 submission tracking, hosted deployment/authentication and model re-curation
+remain separate work. Changes are committed locally, not pushed.
+
+## GUI review and design proposal (2026-11-17, historical)
+
+The proposal below was subsequently approved by the owner and implemented above.
 
 **Active task:** understand the current GUI and suggest visual/functional improvements
 — complete. Reviewed all four live pages and their backing services. Findings and
 priorities are in [GUI_REVIEW.md](GUI_REVIEW.md); the standalone interactive mockup
 is [design/gui-proposal.html](design/gui-proposal.html), using synthetic data only.
-No production GUI behaviour was changed and implementation is not yet approved.
+At the review stage no production GUI behaviour had been changed.
 
 Recommended first increment: a persistent application review view shared by Generate
 and Applications, exposing saved model usage and tailoring rationale; correct

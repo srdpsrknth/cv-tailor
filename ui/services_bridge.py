@@ -19,10 +19,12 @@ Three responsibilities, all of them lookups or translations:
 Nothing here performs a paid call. The one function that generates
 (:func:`run_generation`) delegates straight to ``services.tailor_service``.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Callable, List, Optional
 
 from services.profile_store import (
@@ -68,16 +70,22 @@ def list_profiles(config) -> List[ProfileOption]:
             from services.profile_loader import load_profile
 
             profile = load_profile(str(path))
-            options.append(ProfileOption(
-                profile_id=profile_id,
-                name=profile.identity.full_name,
-                roles=len(profile.experience),
-            ))
+            options.append(
+                ProfileOption(
+                    profile_id=profile_id,
+                    name=profile.identity.full_name,
+                    roles=len(profile.experience),
+                )
+            )
         except Exception as error:  # noqa: BLE001 - reported, not raised
-            options.append(ProfileOption(
-                profile_id=profile_id, name="", roles=0,
-                problem=f"{type(error).__name__}: {error}",
-            ))
+            options.append(
+                ProfileOption(
+                    profile_id=profile_id,
+                    name="",
+                    roles=0,
+                    problem=f"{type(error).__name__}: {error}",
+                )
+            )
     return options
 
 
@@ -103,7 +111,9 @@ def require_profile_id(config, explicit: Optional[str]) -> str:
     configured = str(getattr(config, "profile_id", None) or "").strip()
     candidate = explicit or configured
     if not candidate:
-        known = [option.profile_id for option in list_profiles(config) if option.is_usable]
+        known = [
+            option.profile_id for option in list_profiles(config) if option.is_usable
+        ]
         if known:
             raise InvalidProfileIdError(
                 "Choose a profile. CV Tailor never picks one for you, even when "
@@ -150,6 +160,7 @@ def describe_configuration(config) -> dict:
 
 # --- generation ---------------------------------------------------------------------------
 
+
 @dataclass
 class GenerationOutcome:
     """What a generation attempt produced, success or failure."""
@@ -164,6 +175,7 @@ class GenerationOutcome:
     error: str = ""
     #: Set on failure: whether the drafts were still saved (they usually are).
     drafts_saved: bool = False
+    details: dict = field(default_factory=dict)
 
 
 def format_cost_breakdown(usage) -> List[str]:
@@ -180,10 +192,12 @@ def format_cost_breakdown(usage) -> List[str]:
 
     model_name = getattr(usage, "model_name", None) or "unknown"
     provider = getattr(usage, "provider", None) or pricing.DEFAULT_PROVIDER
-    total_input = (getattr(usage, "cv_input_tokens", 0)
-                   + getattr(usage, "cl_input_tokens", 0))
-    total_output = (getattr(usage, "cv_output_tokens", 0)
-                    + getattr(usage, "cl_output_tokens", 0))
+    total_input = getattr(usage, "cv_input_tokens", 0) + getattr(
+        usage, "cl_input_tokens", 0
+    )
+    total_output = getattr(usage, "cv_output_tokens", 0) + getattr(
+        usage, "cl_output_tokens", 0
+    )
 
     lines = [
         f"Input tokens: {total_input:,}",
@@ -245,6 +259,14 @@ def run_generation(
             error="Paste the job description first — there is nothing to tailor to.",
         )
 
+    from services.posting import validate_posting
+
+    try:
+        job_description = validate_posting(job_description)
+    except ValueError as error:
+        return GenerationOutcome(ok=False, error=str(error))
+
+    before = {a["job_id"] for a in list_applications(config, profile_id, limit=None)}
     try:
         result = tailor_documents(
             job_description=job_description,
@@ -261,7 +283,21 @@ def run_generation(
         return GenerationOutcome(
             ok=False,
             error=f"{type(error).__name__}: {error}",
-            drafts_saved=True,
+            drafts_saved=bool(
+                [
+                    a
+                    for a in list_applications(config, profile_id, limit=None)
+                    if a["job_id"] not in before
+                    and (Path(a["path"]) / "source" / "drafts.json").is_file()
+                ]
+            ),
+            details={
+                "applications": [
+                    a["job_id"]
+                    for a in list_applications(config, profile_id, limit=None)
+                    if a["job_id"] not in before
+                ]
+            },
         )
 
     summary = []
@@ -338,19 +374,25 @@ def list_artifacts(folder: Optional[Path]) -> List[dict]:
     }
     artifacts = []
     for path in sorted(Path(folder).iterdir()):
-        if not path.is_file() or path.suffix.lower() not in kinds:
+        if (
+            not path.is_file()
+            or path.suffix.lower() not in kinds
+            or not path.resolve().is_relative_to(Path(folder).resolve())
+        ):
             continue
-        artifacts.append({
-            "name": path.name,
-            "path": str(path),
-            "size_kb": round(path.stat().st_size / 1024, 1),
-            "mime": kinds[path.suffix.lower()],
-            "kind": path.suffix.lower().lstrip("."),
-        })
+        artifacts.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "size_kb": round(path.stat().st_size / 1024, 1),
+                "mime": kinds[path.suffix.lower()],
+                "kind": path.suffix.lower().lstrip("."),
+            }
+        )
     return artifacts
 
 
-def list_applications(config, profile_id: str, limit: int = 20) -> List[dict]:
+def list_applications(config, profile_id: str, limit: Optional[int] = 20) -> List[dict]:
     """Recent applications for one candidate, newest first.
 
     Reads the real store, so a user can get back to documents produced by the CLI
@@ -362,7 +404,11 @@ def list_applications(config, profile_id: str, limit: int = 20) -> List[dict]:
     if not outputs.is_dir():
         return []
     folders = sorted(
-        (entry for entry in outputs.iterdir() if entry.is_dir()),
+        (
+            entry
+            for entry in outputs.iterdir()
+            if entry.is_dir() and entry.resolve().parent == outputs.resolve()
+        ),
         key=lambda entry: entry.stat().st_mtime,
         reverse=True,
     )
@@ -374,4 +420,168 @@ def list_applications(config, profile_id: str, limit: int = 20) -> List[dict]:
             "has_content": (folder / "source" / "content.json").is_file(),
         }
         for folder in folders[:limit]
+    ]
+
+
+def load_application(config, profile_id, job_id):
+    from services.application_review import load_review
+
+    detail = load_review(config, profile_id, job_id)
+    detail["artifacts"] = list_artifacts(Path(detail["path"]))
+    return detail
+
+
+def application_library(config, profile_id):
+    """All saved applications with human labels, including partial historical runs."""
+    records = []
+    for application in list_applications(config, profile_id, limit=None):
+        try:
+            detail = load_application(config, profile_id, application["job_id"])
+            records.append(detail)
+        except (OSError, ValueError):
+            continue
+    return records
+
+
+def model_options(config):
+    from evaluation.curated_models import curated_models
+
+    return (
+        [model for model in curated_models()]
+        if config.provider_name == "openrouter"
+        else []
+    )
+
+
+def generation_config(config, selected):
+    if not selected:
+        return config
+    if selected not in {m.id for m in model_options(config)}:
+        raise ValueError("Choose a model from the curated catalogue.")
+    return config.with_overrides(model=selected, task_models={})
+
+
+def preflight(config):
+    from cli.commands.doctor import check_pdflatex
+
+    return {
+        "key_configured": config.has_api_key,
+        "models": {
+            t: config.model_for(t) for t in ("cv", "cover_letter", "layout_retry")
+        },
+        "pdf_engine": check_pdflatex().status == "ok",
+    }
+
+
+def posting_handoff(job):
+    """Transfer only published text and metadata, without fetching or generating."""
+    known_country = job.country.value if job.country.is_verified else ""
+    return {
+        "job_description": job.description or "",
+        "company": job.company,
+        "role": job.title,
+        "work_country": known_country or "",
+        "provenance": {
+            "url": job.url,
+            "source": job.source,
+            "posted_at": job.posted_at.isoformat() if job.posted_at else None,
+            "transferred_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        },
+    }
+
+
+def document_label(name):
+    suffix = Path(name).suffix.lstrip(".").upper()
+    lower = name.lower()
+    kind = (
+        "Cover letter"
+        if "cover" in lower or "letter" in lower
+        else "CV" if "cv" in lower else Path(name).stem.replace("_", " ")
+    )
+    return f"{kind} · {suffix}"
+
+
+def read_artifact(config, profile_id, job_id, name):
+    from services.application_review import application_folder
+
+    folder = application_folder(config, profile_id, job_id)
+    if name not in {a["name"] for a in list_artifacts(folder)}:
+        raise ValueError("Document not found in this application.")
+    return (folder / name).read_bytes()
+
+
+def saved_posting(config, profile_id, job_id):
+    from services.application_review import application_folder
+
+    folder = application_folder(config, profile_id, job_id)
+    path = folder / "source" / "job_description.txt"
+    if path.is_file() and path.resolve().is_relative_to(folder):
+        return path.read_text(encoding="utf-8")
+    return "No posting was saved."
+
+
+def save_posting_provenance(config, profile_id, job_id, provenance):
+    """Persist known source metadata beside the accepted input, never in the profile."""
+    from services.application_review import application_folder
+    import json
+
+    folder = application_folder(config, profile_id, job_id)
+    allowed = {
+        key: value
+        for key, value in provenance.items()
+        if key in ("url", "source", "posted_at", "transferred_at")
+        and isinstance(value, (str, type(None)))
+    }
+    (folder / "source" / "posting_provenance.json").write_text(
+        json.dumps(allowed, indent=2), encoding="utf-8"
+    )
+
+
+def source_coverage():
+    from services.job_connectors import build_default_sources
+
+    return [
+        f"{source.name} · configured public-source connector"
+        for source in build_default_sources()
+    ]
+
+
+def search_from_fields(config, profile_id, keywords, country, city, remote, limit):
+    from models.job import SearchQuery
+    from services.job_match import MatchPreferences
+
+    profile = load_profile(config, profile_id)
+    query = SearchQuery(
+        keywords=keywords or None,
+        country=country or None,
+        city=city or None,
+        remote=True if remote else None,
+        limit=limit,
+    )
+    return run_job_search(
+        config,
+        profile_id,
+        query,
+        preferences=MatchPreferences.from_profile(
+            profile, keywords=tuple(keywords.split()) if keywords else ()
+        ),
+    )
+
+
+def setup_checks(config):
+    from cli.commands import doctor
+
+    return [
+        check.as_dict()
+        for check in (
+            doctor.check_python(),
+            doctor.check_venv(config.project_root),
+            doctor.check_store(config),
+            doctor.check_profile(config),
+            doctor.check_timezone(),
+            doctor.check_templates(config.project_root),
+            doctor.check_pdflatex(),
+            doctor.check_outputs(config),
+            doctor.check_api_key(config, verify=False),
+        )
     ]

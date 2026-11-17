@@ -185,6 +185,9 @@ def test_the_ui_passes_the_selected_work_country(monkeypatch):
     class Store:
         root = Path('/tmp/does-not-matter')
 
+        def outputs_dir(self, profile_id):
+            return self.root / 'outputs' / profile_id
+
         def exists(self, profile_id):
             return True
 
@@ -232,6 +235,9 @@ def test_the_ui_omits_the_work_country_when_none_is_chosen(monkeypatch):
 
     class Store:
         root = Path('/tmp/does-not-matter')
+
+        def outputs_dir(self, profile_id):
+            return self.root / 'outputs' / profile_id
 
         def exists(self, profile_id):
             return True

@@ -1,16 +1,22 @@
 """
 Request and response models for API endpoints.
 """
+
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
 class TailorRequest(BaseModel):
     """Request model for tailoring CV and cover letter."""
+
     job_description: str = Field(..., min_length=50, description="Job description text")
     company_name: Optional[str] = Field(None, description="Company name (optional)")
     role_title: Optional[str] = Field(None, description="Role title (optional)")
-    work_country: Optional[str] = Field(None, max_length=100, description="Actual country of employment, not company headquarters")
+    work_country: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Actual country of employment, not company headquarters",
+    )
     profile_id: Optional[str] = Field(
         None,
         description=(
@@ -31,6 +37,7 @@ class TailorRequest(BaseModel):
 
 class TokenUsage(BaseModel):
     """Token usage and cost tracking."""
+
     cv_input_tokens: int = 0
     cv_output_tokens: int = 0
     cl_input_tokens: int = 0
@@ -55,6 +62,7 @@ class TokenUsage(BaseModel):
 
 class TailorResponse(BaseModel):
     """Response model for tailoring endpoint."""
+
     job_id: str
     status: str = "success"
     cv_path: str
@@ -66,7 +74,8 @@ class TailorResponse(BaseModel):
     token_usage: TokenUsage
     tailoring_explanation: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
-    #: Which provider and models actually produced this document set.
+    #: Provider and requested model routes for this document set. Provider-reported
+    #: model identifiers, when available, are retained separately in ``calls``.
     #:
     #: Recorded because a generated CV is otherwise **unattributable**: the job folder
     #: is named after the case and a timestamp, so nothing on disk said which model
@@ -77,3 +86,9 @@ class TailorResponse(BaseModel):
     #: manifest did not, which is the kind of asymmetry only a comparison exposes.
     provider: Optional[str] = None
     models: Optional[Dict[str, str]] = None
+    created_at: Optional[str] = None
+    cache_hit: Optional[bool] = None
+    original_usage: Optional[Dict[str, Any]] = None
+    original_calls: list[Dict[str, Any]] = Field(default_factory=list)
+    calls: list[Dict[str, Any]] = Field(default_factory=list)
+    cost_source: Optional[str] = None

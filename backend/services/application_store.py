@@ -22,6 +22,7 @@ store is authoritative (ADR 0011)::
 ``profile_id`` is a required argument, not an optional one: a store that cannot
 name its candidate cannot isolate anything.
 """
+
 from __future__ import annotations
 
 import json
@@ -84,7 +85,9 @@ class ApplicationStore:
         """Create the job folder and write the inputs that must survive any failure."""
         self.source_folder.mkdir(parents=True)
         write_json(self.source_folder / "profile_snapshot.json", profile_dump)
-        (self.source_folder / "job_description.txt").write_text(job_description, encoding="utf-8")
+        (self.source_folder / "job_description.txt").write_text(
+            job_description, encoding="utf-8"
+        )
 
     # --- incremental writes -----------------------------------------------------------
 
@@ -102,15 +105,20 @@ class ApplicationStore:
             {**manifest, "cv_page_history": list(page_history)},
         )
 
-    def save_failure(self, error: str, page_history: list) -> None:
+    def save_failure(self, error: str, page_history: list, **metadata) -> None:
         """Record an explicit failure manifest (D-14).
 
         A partial folder without a manifest is ambiguous; this marks it failed.
         """
         write_json(
             self.source_folder / "generation_result.json",
-            {"job_id": self.job_id, "status": "failed", "error": error,
-             "cv_page_history": list(page_history)},
+            {
+                **metadata,
+                "job_id": self.job_id,
+                "status": "failed",
+                "error": error,
+                "cv_page_history": list(page_history),
+            },
         )
 
     def save_manifest_copy(self, destination: Path) -> None:
@@ -160,7 +168,9 @@ class ApplicationStore:
         return destination
 
 
-def make_job_id(company: str, role: str, slugify, profile_id: Optional[str] = None) -> str:
+def make_job_id(
+    company: str, role: str, slugify, profile_id: Optional[str] = None
+) -> str:
     """Build ``<year>_<company>_<role>_<ms>`` using the Berlin calendar year.
 
     The timestamp keeps concurrent applications to the same posting distinct. The
