@@ -81,10 +81,11 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 > that location explicitly, so a script or IDE terminal finds it anyway. If it still
 > fails, set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in `.env`.
 
-> **One `FAIL` is expected and harmless in this setup.** `doctor` reports
-> `outputs ... Permission denied` when it is run from inside the sandboxed agent
-> environment. PowerShell and the tool itself can write there; only the sandboxed
-> Python subprocess cannot. Real runs are unaffected.
+> **Do not ignore `outputs ... Permission denied`.** On this Windows checkout,
+> `.venv` inherited a Low integrity label, so its Python runs at Low integrity even
+> from a normal terminal and cannot write to the private store. PowerShell being
+> able to write there does not prove Python can. See the targeted repair in
+> [DEVELOPMENT.md](DEVELOPMENT.md#windows-python-output-permission-error).
 
 To see which profiles exist (`sreedeep` is this machine's):
 

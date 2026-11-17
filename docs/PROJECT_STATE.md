@@ -8,6 +8,26 @@
 
 ## Windows GUI setup (2026-11-17)
 
+### Follow-up: output writes blocked by Python integrity label
+
+**Active task:** repair Windows output access. The owner confirmed `doctor` also
+fails in their normal terminal, disproving the earlier agent-only assumption below.
+Both ordinary and dot-prefixed Python write probes fail; the probe does not already
+exist. Private-store ACLs grant Authenticated Users Modify, and Defender Controlled
+Folder Access is disabled. `whoami /groups` launched by the venv Python reports
+**Low Mandatory Level**, while PowerShell and `C:\Python314\python.exe` report
+**Medium Mandatory Level**. `icacls` shows the checkout and venv inherited Low
+integrity, including the executable. That label explains the persistent failure.
+
+Attempting to set the two venv Python executables to Medium was denied by Windows;
+administrator rights are required. No ACL change succeeded. The exact targeted
+commands are in DEVELOPMENT's Windows Python output permission section. **Next
+action:** owner runs those two commands in Administrator PowerShell, then runs
+`doctor` normally and restarts the GUI. Output access remains blocked until that
+verification passes. Do not recommend changing private-store ACLs or ignoring the
+doctor error. No application code changed; diagnostic checks ran, but the full
+suite was not repeated for this documentation-only follow-up (previous 1150/3).
+
 **Active task:** Windows setup and convenient GUI launch — complete. Fast-forwarded
 the development worktree from `eddcf35` to GitHub's `854d24c`, preserving the Mac CLI
 repair. The stable `master` worktree is untouched.

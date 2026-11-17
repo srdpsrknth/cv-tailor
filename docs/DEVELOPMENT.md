@@ -34,6 +34,30 @@ git worktree add -b refactor/architecture-v2 ../cv-tailor-next master
 
 ## Environment isolation
 
+### Windows Python output permission error
+
+If `doctor` cannot write outputs even from a normal terminal, inspect the Python
+executable with `icacls .venv\Scripts\python.exe`. This checkout inherited a
+**Low Mandatory Level** label from an earlier agent sandbox. Windows therefore
+starts the venv Python at Low integrity, which cannot write to the normal private
+store even though its ordinary directory ACL grants Modify. This persists outside
+the agent; it is not a harmless doctor failure.
+
+The targeted repair restores the two Python launcher executables to Medium
+integrity. Run these in **PowerShell as Administrator**, adjusting the checkout
+path if needed:
+
+```powershell
+icacls "D:\coding\cv-tailor-next\.venv\Scripts\python.exe" /setintegritylevel M
+icacls "D:\coding\cv-tailor-next\.venv\Scripts\pythonw.exe" /setintegritylevel M
+```
+
+Then run `doctor` from a **normal**, non-administrator terminal. Both commands must
+report success; the repair has not been verified until doctor passes. Restart the
+GUI with the stop/open shortcuts so it uses a fresh Python process. No change to
+the private store's ACL, security software or profile data is needed. Recheck if
+the venv is later recreated under a Low-labelled checkout.
+
 ### Windows GUI shortcuts
 
 After installing the environment, run from the checkout:
