@@ -1,8 +1,19 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17):** **1201 passed, 3 skipped**, 1 existing Google SDK warning, ~144 s on Windows (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 33 LaTeX tests.
+**Current baseline (2026-11-17):** **1209 passed, 3 skipped**, 1 existing Google SDK warning (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 34 LaTeX tests.
+
+Cover-letter business-letter and validation regressions add 8 cases across two files:
+`tests/test_renderers_documents.py` (`test_cover_letter_docx_and_pdf_follow_standard_business_letter_contract`
+testing `synthetic_analyst` and `synthetic_marketer` across DOCX and PDF for closing line,
+signature, top sender contact block, empty DOCX headers/footers, no ligature/PUA chars,
+non-fused date/company/role, metadata, 290–310 words, and 1 page; plus
+`test_cover_letter_renderer_does_not_mutate_paragraphs` for A-7, and `test_docx_font_is_applied`
+updated from `Aptos` to `Calibri`), and `tests/test_tailoring_pipeline.py` (rejecting
+`Dear <Company>`/`Warm regards` in body paragraphs, prose colons/semicolons, banned tools
+and wrong ownership in cover letters, and visa/Blue Card/sponsorship wording in
+home-country letters).
 
 ATS text-layer and autofill CV regressions add 10 tests across four files:
 `tests/test_upload_cv.py` (6 tests covering sequential DOCX/TXT content, acronym

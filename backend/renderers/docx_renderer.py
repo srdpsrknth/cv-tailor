@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import date
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -13,7 +14,9 @@ from pathlib import Path
 from typing import Optional
 
 from docxtpl import DocxTemplate
-from docx import Document  # post-process font
+from docx import Document  # post-process font & properties
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 from models.profile import Profile
 from models.tailored_output import TailoredCoverLetter
@@ -29,7 +32,7 @@ class DocxRendererError(Exception):
 
 
 class DocxRenderer:
-    """Render tailored cover letters to DOCX."""
+    """Render tailored cover letters to DOCX and PDF."""
 
     def __init__(
         self,
@@ -54,7 +57,7 @@ class DocxRenderer:
         profile: Profile,
         job_position: Optional[str] = None,
     ) -> tuple[str, Optional[str]]:
-        """Render a tailored cover letter to DOCX and optionally PDF.
+        """Render a tailored cover letter to DOCX and PDF.
 
         Args:
             tailored_cl: Tailored cover letter content
@@ -82,23 +85,22 @@ class DocxRenderer:
         except Exception as e:  # pragma: no cover - render/save issues
             raise DocxRendererError(f"Failed to render DOCX: {e}")
 
-        # Enforce Aptos font across the document
+        # Enforce standard Calibri font, document properties, and clean paragraphs.
         try:
-            self._apply_aptos_font(output_path)
-        except Exception:
-            # Non-fatal; keep the rendered file even if font post-processing fails
-            pass
-
-        # Tidy signature block: ensure no empty lines between name, phone, email
-        try:
-            self._tidy_signature_block(
-                docx_path=output_path,
-                name=context.get("candidate_name", ""),
-                phone=context.get("candidate_phone", ""),
-                email=context.get("candidate_email", ""),
+            self._apply_standard_font(
+                output_path,
+                font_name="Calibri",
+                candidate_name=context.get("candidate_name", ""),
+                role_title=context.get("role_title", ""),
+                company_name=context.get("company_name", ""),
             )
-        except Exception:
-            pass
+        except Exception as e:  # pragma: no cover - non-fatal post-process guard
+            logger.warning(f"Failed to apply DOCX font/metadata post-processing: {e}")
+
+        try:
+            self._tidy_signature_block(docx_path=output_path)
+        except Exception as e:  # pragma: no cover - non-fatal post-process guard
+            logger.warning(f"Failed to tidy DOCX paragraphs: {e}")
 
         # Generate PDF version using LaTeX (required)
         pdf_path: Optional[str] = None
@@ -112,19 +114,80 @@ class DocxRenderer:
 
         return str(output_path), pdf_path
 
+    @staticmethod
+    def _format_render_date() -> str:
+        """Return today's date for the letter header.
+
+        Render-time ``date.today()`` is intentional: generating or re-rendering an
+        application on the day of submission stamps that submission date into both the
+        DOCX and the PDF (e.g. ``17 November 2026``). Re-rendering an older folder on a
+        later date updates the letter date accordingly.
+        """
+        today = date.today()
+        return f"{today.day} {today:%B %Y}"
+
+    @staticmethod
+    def _format_sender_contact_line(profile: Profile) -> str:
+        """Build a plain-text single-line contact header from non-empty profile fields."""
+        identity = profile.identity
+        parts = []
+        for value in (identity.location, identity.phone, identity.email):
+            cleaned = (value or "").strip()
+            if cleaned:
+                parts.append(cleaned)
+        linkedin = (identity.linkedin or "").strip()
+        if linkedin:
+            clean_linkedin = re.sub(r"^https?://(?:www\.)?", "", linkedin).rstrip("/")
+            if clean_linkedin:
+                parts.append(clean_linkedin)
+        return " | ".join(parts)
+
+    @staticmethod
+    def _extract_salutation_and_paragraphs(
+        tailored_cl: TailoredCoverLetter,
+    ) -> tuple[str, list[str]]:
+        """Derive the salutation and body paragraphs without mutating ``tailored_cl``."""
+        company_name = (tailored_cl.company_name or "").strip()
+        salutation = (
+            f"Dear {company_name} Hiring Team," if company_name else "Dear Hiring Team,"
+        )
+        body_paras = [p for p in (tailored_cl.paragraphs or [])]
+        if body_paras and body_paras[0].lstrip().startswith("Dear"):
+            lines = body_paras[0].lstrip().split("\n", 1)
+            salutation = lines[0].strip()
+            if len(lines) > 1 and lines[1].strip():
+                body_paras[0] = lines[1].strip()
+            else:
+                body_paras = body_paras[1:]
+        return salutation, body_paras
+
     def _build_context(self, tailored_cl: TailoredCoverLetter, profile: Profile) -> dict:
-        paragraphs = tailored_cl.paragraphs or []
+        salutation, paragraphs = self._extract_salutation_and_paragraphs(tailored_cl)
+        company_name = (tailored_cl.company_name or "").strip()
+        role_title = (tailored_cl.role_title or "").strip()
+        candidate_name = (
+            tailored_cl.signature_name or profile.identity.full_name or "Applicant"
+        ).strip()
+        closing_line = (tailored_cl.closing_line or "Warm regards,").strip()
+        closing_para = (
+            "\n\n".join(paragraphs[3:])
+            if len(paragraphs) > 4
+            else (paragraphs[3] if len(paragraphs) > 3 else "")
+        )
         return {
-            "company_name": tailored_cl.company_name,
-            "role_title": tailored_cl.role_title,
-            "current_date": date.today().strftime("%B %d, %Y"),
-            "hiring_manager": "Hiring Manager",
+            "company_name": company_name,
+            "role_title": role_title,
+            "current_date": self._format_render_date(),
+            "recipient_line": "Hiring Team",
+            "salutation_line": salutation,
+            "hiring_manager": f"{company_name} Hiring Team" if company_name else "Hiring Team",
+            "sender_contact_line": self._format_sender_contact_line(profile),
             "opening_paragraph": paragraphs[0] if len(paragraphs) > 0 else "",
             "body_paragraph_1": paragraphs[1] if len(paragraphs) > 1 else "",
             "body_paragraph_2": paragraphs[2] if len(paragraphs) > 2 else "",
-            "closing_paragraph": paragraphs[3] if len(paragraphs) > 3 else "",
-            "closing_line": tailored_cl.closing_line or "Sincerely,",
-            "candidate_name": (tailored_cl.signature_name or profile.identity.full_name or "Applicant"),
+            "closing_paragraph": closing_para,
+            "closing_line": closing_line,
+            "candidate_name": candidate_name,
             "candidate_phone": profile.identity.phone or "",
             "candidate_email": profile.identity.email or "",
         }
@@ -144,106 +207,103 @@ class DocxRenderer:
         """Escape LaTeX special characters in text."""
         return escape_latex(text)
 
-    def _apply_aptos_font(self, docx_path: Path) -> None:
-        """Set Aptos font for all paragraphs and the Normal style."""
+    @staticmethod
+    def _set_run_font_family(element, font_name: str) -> None:
+        rpr = element.get_or_add_rPr()
+        rfonts = rpr.find(qn("w:rFonts"))
+        if rfonts is None:
+            rfonts = OxmlElement("w:rFonts")
+            rpr.insert(0, rfonts)
+        for attr in ("w:ascii", "w:hAnsi", "w:cs", "w:eastAsia"):
+            rfonts.set(qn(attr), font_name)
+
+    def _apply_standard_font(
+        self,
+        docx_path: Path,
+        font_name: str = "Calibri",
+        *,
+        candidate_name: str = "",
+        role_title: str = "",
+        company_name: str = "",
+    ) -> None:
+        """Set a standard sans-serif font across the document and populate metadata."""
         docx = Document(str(docx_path))
-        # Update Normal style
         try:
             normal = docx.styles["Normal"]
-            font = normal.font
-            font.name = "Aptos"
-            # Optional: set size if desired; leaving as template default
-            # font.size = Pt(12)
+            normal.font.name = font_name
+            self._set_run_font_family(normal.element, font_name)
         except Exception:
             pass
 
-        # Update all runs
         for para in docx.paragraphs:
             for run in para.runs:
-                run.font.name = "Aptos"
+                run.font.name = font_name
+                self._set_run_font_family(run._element, font_name)
 
-        # Also update table text if present
         for table in docx.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for para in cell.paragraphs:
                         for run in para.runs:
-                            run.font.name = "Aptos"
+                            run.font.name = font_name
+                            self._set_run_font_family(run._element, font_name)
+
+        props = docx.core_properties
+        if candidate_name:
+            props.author = candidate_name
+        title_parts = [p for p in (candidate_name, "Cover Letter", role_title, company_name) if p]
+        if title_parts:
+            props.title = " - ".join(title_parts)
+        if role_title or company_name:
+            subject_bits = [b for b in (role_title, f"at {company_name}" if company_name else "") if b]
+            props.subject = f"Cover letter for {' '.join(subject_bits)}"
 
         docx.save(str(docx_path))
 
-    def _tidy_signature_block(self, docx_path: Path, name: str, phone: str, email: str) -> None:
-        """Remove blank paragraphs between name, phone, and email at the end."""
+    def _apply_aptos_font(self, docx_path: Path) -> None:
+        """Backwards-compatible alias for applying the standard DOCX font."""
+        self._apply_standard_font(docx_path, font_name="Calibri")
+
+    def _tidy_signature_block(
+        self,
+        docx_path: Path,
+        name: str = "",
+        phone: str = "",
+        email: str = "",
+    ) -> None:
+        """Remove empty paragraphs left by optional fields and clean trailing blanks."""
         docx = Document(str(docx_path))
 
-        # Helper: delete paragraph by element
-        def _delete_paragraph(paragraph):
-            p = paragraph._element
-            p.getparent().remove(p)
-
-        # Locate indices of signature lines (first match for each)
-        indices = {}
-        targets = {"name": name.strip(), "phone": phone.strip(), "email": email.strip()}
-        for key, text in targets.items():
-            if not text:
-                continue
-            for i, para in enumerate(docx.paragraphs):
-                if para.text.strip() == text:
-                    indices[key] = i
-                    break
-
-        ordered_keys = [k for k in ["name", "phone", "email"] if k in indices]
-        if len(ordered_keys) >= 2:
-            # Remove empty paragraphs between consecutive signature lines
-            for a_key, b_key in zip(ordered_keys[:-1], ordered_keys[1:]):
-                a_idx, b_idx = indices[a_key], indices[b_key]
-                if b_idx > a_idx:
-                    # Collect empties between
-                    to_remove = []
-                    for j in range(a_idx + 1, b_idx):
-                        if docx.paragraphs[j].text.strip() == "":
-                            to_remove.append(docx.paragraphs[j])
-                    for para in to_remove:
-                        _delete_paragraph(para)
-
-        # Remove trailing empty paragraphs at the end of document
-        changed = True
-        while changed and len(docx.paragraphs) > 0:
-            last = docx.paragraphs[-1]
-            if last.text.strip() == "":
-                _delete_paragraph(last)
-            else:
-                changed = False
+        for para in list(docx.paragraphs):
+            if para.text.strip() == "":
+                p = para._element
+                parent = p.getparent()
+                if parent is not None:
+                    parent.remove(p)
 
         docx.save(str(docx_path))
 
-    def _generate_pdf_via_latex(self, docx_path: Path, tailored_cl: TailoredCoverLetter, profile: Profile) -> Path:
-        """
-        Generate PDF from cover letter using professional LaTeX template.
-        Uses structured data from TailoredCoverLetter for accurate, complete rendering.
+    def _generate_pdf_via_latex(
+        self,
+        docx_path: Path,
+        tailored_cl: TailoredCoverLetter,
+        profile: Profile,
+    ) -> Path:
+        """Generate a standard business-letter PDF via LaTeX matching the DOCX layout."""
+        candidate_name = (
+            tailored_cl.signature_name or profile.identity.full_name or "Applicant"
+        ).strip()
+        role_title = (tailored_cl.role_title or "").strip()
+        company_name = (tailored_cl.company_name or "").strip()
+        contact_line = self._format_sender_contact_line(profile)
+        current_date = self._format_render_date()
+        closing_line = (tailored_cl.closing_line or "Warm regards,").strip()
+        salutation, body_paras = self._extract_salutation_and_paragraphs(tailored_cl)
 
-        Args:
-            docx_path: Path to DOCX file (used for output naming only)
-            tailored_cl: Tailored cover letter data with all paragraphs
-            profile: Base profile for contact information
-
-        Returns:
-            Path to generated PDF file
-
-        Raises:
-            Exception: If LaTeX generation fails
-        """
-        import shutil
-
-        # Extract structured data from TailoredCoverLetter and Profile
-        candidate_name = profile.identity.full_name or "Applicant"
-        role_title = tailored_cl.role_title or ""
-        company_name = tailored_cl.company_name or "Hiring Manager"
-        phone = profile.identity.phone or "+1 (555) 000-0000"
-        email = profile.identity.email or "applicant@example.com"
-
-        # Use all paragraphs from the tailored cover letter (not limited to 3)
-        body_paras = tailored_cl.paragraphs or []
+        title_parts = [p for p in (candidate_name, "Cover Letter", role_title, company_name) if p]
+        pdf_title = " - ".join(title_parts)
+        subject_bits = [b for b in (role_title, f"at {company_name}" if company_name else "") if b]
+        pdf_subject = f"Cover letter for {' '.join(subject_bits)}".strip()
 
         # Scratch space for the pdflatex run, deliberately **outside** the deliverable
         # folder: `docx_path.parent` is the folder handed to an employer, so building
@@ -257,7 +317,6 @@ class DocxRenderer:
         setup_dir.mkdir(exist_ok=True)
 
         try:
-            # Copy template files
             if (template_root / "setup" / "preamble.tex").exists():
                 shutil.copy(template_root / "setup" / "preamble.tex", setup_dir / "preamble.tex")
             if (template_root / "setup" / "macros.tex").exists():
@@ -265,57 +324,39 @@ class DocxRenderer:
         except Exception as e:
             logger.warning(f"Failed to copy template files: {e}. Will attempt inline compilation.")
 
-        # Create LaTeX content using the template structure
-        latex_content = r"""\input{setup/preamble.tex}
-\input{setup/macros.tex}
-
-\begin{document}
-
-    """
-
-        # Add title with job role @ company as subtitle
-        escaped_role = self._escape_latex(role_title)
+        escaped_name = self._escape_latex(candidate_name)
+        escaped_contact = self._escape_latex(contact_line)
+        escaped_date = self._escape_latex(current_date)
         escaped_company = self._escape_latex(company_name)
-        subtitle = f"{escaped_role} @ {escaped_company}"
-        latex_content += f"\\name{{Cover Letter}}{{{subtitle}}}\n\n"
-
-        # Extract salutation (first line if it starts with "Dear")
-        salutation = "Dear Hiring Manager,"
-        first_para = body_paras[0] if body_paras else ""
-        if first_para.startswith("Dear"):
-            # Split on first newline or use whole paragraph if no newline
-            lines = first_para.split('\n', 1)
-            salutation = lines[0]
-            # If there's content after salutation, replace first para with it
-            if len(lines) > 1:
-                body_paras[0] = lines[1]
-            else:
-                # Entire first paragraph is just salutation, remove it
-                body_paras = body_paras[1:]
-
-        # Add salutation
+        escaped_role = self._escape_latex(role_title)
         escaped_salutation = self._escape_latex(salutation)
-        latex_content += f"\\para{{{escaped_salutation}}}\n\n"
-
-        # Add all body paragraphs
-        for para in body_paras:
-            # Escape LaTeX special characters
-            escaped_para = self._escape_latex(para)
-            latex_content += f"\\para{{{escaped_para}}}\n"
-
-        # Add closing signature using the signature macro
-        closing_line = tailored_cl.closing_line or "Best regards,"
-        signature_name = tailored_cl.signature_name or candidate_name
         escaped_closing = self._escape_latex(closing_line)
-        escaped_signature = self._escape_latex(signature_name)
-        latex_content += f"\n\\signature{{{escaped_closing}}}{{{escaped_signature}}}\n"
+        escaped_title = self._escape_latex(pdf_title)
+        escaped_subject = self._escape_latex(pdf_subject)
 
-        # Add footer with contact info - NO LOCATION (empty string for first param)
-        escaped_email = self._escape_latex(email)
-        latex_content += f"\n\\bottom{{}}{{{phone}}}{{{escaped_email}}}\n"
-        latex_content += r"""\end{document}"""
+        lines = [
+            r"\input{setup/preamble.tex}",
+            r"\input{setup/macros.tex}",
+            r"\hypersetup{",
+            f"  pdftitle={{{escaped_title}}},",
+            f"  pdfauthor={{{escaped_name}}},",
+            f"  pdfsubject={{{escaped_subject}}},",
+            r"  hidelinks",
+            r"}",
+            "",
+            r"\begin{document}",
+            f"\\senderblock{{{escaped_name}}}{{{escaped_contact}}}",
+            f"\\letterdate{{{escaped_date}}}",
+            f"\\recipientblock{{{escaped_company}}}{{Hiring Team}}",
+            f"\\subjectline{{Application for {escaped_role}}}" if role_title else r"\subjectline{Application}",
+            f"\\salutation{{{escaped_salutation}}}",
+        ]
+        for para in body_paras:
+            lines.append(f"\\para{{{self._escape_latex(para)}}}")
+        lines.append(f"\\signature{{{escaped_closing}}}{{{escaped_name}}}")
+        lines.append(r"\end{document}")
+        latex_content = "\n".join(lines)
 
-        # Write LaTeX file to working directory
         tex_path = work_dir / "main.tex"
 
         try:
@@ -332,6 +373,8 @@ class DocxRenderer:
         try:
             from renderers.latex_renderer import LaTeXRenderer
             compiler = LaTeXRenderer()._resolve_pdflatex_path()
+            env = os.environ.copy()
+            env["PATH"] = os.pathsep.join([str(Path(compiler).parent), env.get("PATH", "")])
             result = subprocess.run(
                 [
                     compiler,
@@ -342,7 +385,8 @@ class DocxRenderer:
                 capture_output=True,
                 text=True,
                 timeout=30,
-                cwd=str(work_dir)
+                cwd=str(work_dir),
+                env=env,
             )
 
             pdf_src = work_dir / "main.pdf"
@@ -357,9 +401,8 @@ class DocxRenderer:
             if not pdf_src.exists():
                 raise Exception("PDF not generated by pdflatex")
 
-            # Copy PDF to outputs directory
             shutil.copy(pdf_src, pdf_dst)
-            logger.info(f"Generated professional template PDF: {pdf_dst}")
+            logger.info(f"Generated cover letter PDF: {pdf_dst}")
 
             return pdf_dst
 

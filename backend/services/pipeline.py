@@ -197,7 +197,7 @@ class DocumentGenerator:
             validation.validate_cv(model, self.profile, self.rules)
         else:
             model = TailoredCoverLetter.model_validate(data.get("cover_letter", data))
-            validation.validate_cover_letter(model, self.profile)
+            validation.validate_cover_letter(model, self.profile, self.rules)
             self._check_sponsorship_sentence(model, work_country)
             if company_name:
                 model.company_name = company_name
@@ -216,9 +216,21 @@ class DocumentGenerator:
         )
 
     def _check_sponsorship_sentence(self, cl: TailoredCoverLetter, work_country: Optional[str]) -> None:
-        """Overseas letters must address permit support, without inventing a local card."""
+        """Overseas letters must address permit support; home-country letters must not leak visa wording."""
         visa = (self.profile.identity.visa_status or "").lower()
-        if not work_country or work_country.lower() in self.rules.home_countries:
+        if not work_country:
+            return
+        if work_country.lower() in self.rules.home_countries:
+            body_text = " ".join(cl.paragraphs)
+            if re.search(
+                r"\b(Blue Card|work permit|work authorization|sponsorship|employer support for)\b",
+                body_text,
+                re.I,
+            ):
+                raise ValueError(
+                    "Do not include visa, Blue Card, or sponsorship wording in a cover "
+                    "letter for a role in the candidate's home country."
+                )
             return
         if "blue card" not in visa:
             return

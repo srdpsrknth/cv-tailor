@@ -3,8 +3,29 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *fix ATS CV PDF text layer and add autofill CV companions*
+**Latest commit:** *(this commit)* — *cover-letter business-letter layout, ATS PDF repair, prompt & validation fixes*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Cover-letter rendering, layout, prompt and validation fixes (2026-11-17)
+
+**Active task:** fix cover-letter rendering, business-letter layout, generation prompt, and validation — complete. Scope strictly limited to cover letter; CV templates and CV renderers untouched.
+
+Root causes confirmed and resolved:
+
+- **Missing closing line in DOCX:** `templates/cover_letter/cover_letter.docx` had no placeholder for `closing_line` while `DocxRenderer._build_context` passed it (silently ignored by `docxtpl`). The LaTeX PDF path emitted `\signature{<closing_line>}{<signature_name>}`, so `"Warm regards,"` appeared in PDFs only.
+- **Triple footer and missing letter header in LaTeX PDF:** `\bottom` in `cover_letter_latex_template/setup/macros.tex` passed `phone · email` to `\fancyfoot{...}` without a `[L/C/R]` selector, causing `fancyhdr` to emit the footer three times (`phone·emailphone·emailphone·email`), while the body rendered `"Cover Letter"` + `<Role> @ <Company>` with no sender header, date, recipient, subject, or PDF metadata.
+
+Delivered across [templates/cover_letter/cover_letter.docx](templates/cover_letter/cover_letter.docx), [backend/renderers/docx_renderer.py](backend/renderers/docx_renderer.py), [cover_letter_latex_template/setup/preamble.tex](cover_letter_latex_template/setup/preamble.tex), [cover_letter_latex_template/setup/macros.tex](cover_letter_latex_template/setup/macros.tex), [backend/prompts/tailor_cl_prompt.md](backend/prompts/tailor_cl_prompt.md), [backend/services/validation.py](backend/services/validation.py), and [backend/services/pipeline.py](backend/services/pipeline.py):
+
+- **Matching single-column business-letter layout & visual polish (DOCX + PDF):** Both renderers emit the same CV-matched hierarchy (`NavyBlue` `#00004D` 22pt candidate name, muted `#4A5568` 9.5pt contact line `location | phone | email | linkedin.com/in/...`, 1.5pt `NavyBlue` horizontal accent rule, render-time `date.today()`, bold `#2E2E2E` `<Company>` / muted `Hiring Team`, bold `NavyBlue` `Application for <role_title>`, `Dear <Company> Hiring Team,`, 1.12 line-spaced `#222222` body paragraphs, `closing_line`, and bold `NavyBlue` signature name). No headers/footers, tables, text boxes, or icons.
+- **Fonts, metadata, and ATS text layer:** DOCX uses `Calibri` (`_apply_standard_font`, replacing `Aptos`) and sets core properties (`author`, `title`, `subject`); updated `test_docx_font_is_applied` accordingly. LaTeX PDF uses `Carlito` (with `Lato` fallback; `Archivo` stripped curly double quotes and `Lato`/`Helvetica` split `Hiring Team`/`NeoTaste` across kerning spaces), `\input{glyphtounicode}`, `\pdfgentounicode=1`, `\DisableLigatures[f]{encoding = *, family = *}`, and `\hypersetup` metadata (`pdftitle`, `pdfauthor`, `pdfsubject`). Fixed A-7 (`_extract_salutation_and_paragraphs` no longer mutates `tailored_cl.paragraphs`).
+- **Prompt, private voice, and validation:** Updated `tailor_cl_prompt.md` and private `writing_style.json` (guided by the 2024 tone references) to open warmly, transition smoothly (`"In my current role at..."`, `"In my earlier roles at..."`, `"Throughout these projects..."`), forbid colons/semicolons/em-dashes in body paragraphs, map top priorities to at most two concrete examples without abrupt declarations or restating strengths, close naturally with `, and`, and default `"closing_line"` to `"Warm regards,"`. `validate_cover_letter` enforces no prose colons/semicolons (`(?<!\d)[:;](?!\d)`), `banned_tools`, employer ongoing-work/ownership rules, and broadened salutation/sign-off checks; `_check_sponsorship_sentence` rejects visa/Blue Card/sponsorship wording in home-country (`Germany`) letters.
+
+**Open decisions / documented defaults:**
+- **Render-time date (`date.today()`):** Intentional default — generating or re-rendering stamps the current submission date into both DOCX and PDF (documented in `DocxRenderer._format_render_date` and `docs/HOW_TO_GENERATE.md`).
+- **German CV visa tagline (out of scope here, flagged):** `LaTeXRenderer._prepare_template_data` and `upload_cv.py` still fall back to `identity.visa_status` (`"Valid EU Blue Card Visa"`) when `cv.work_authorization` is `None`. Address in a separate CV increment if German CVs should suppress `identity.visa_status`.
+
+**Verification:** Re-rendered `rabot_energy` with smoothed 302-word prose (4 paragraphs, 1 page) and verified both LaTeX PDF and LibreOffice-converted DOCX visually (1 page each, matching palette/layout/reading order, zero colons/semicolons/ligatures); full suite **1209 passed, 3 skipped** (run outside the Windows sandbox for MiKTeX registry access and `TestClient` loopback sockets).
 
 ## ATS PDF text-layer repair and autofill CV companion (2026-11-17)
 
@@ -61,16 +82,18 @@ committed and pushed on `refactor/architecture-v2`; `master` untouched.
 ## OpenRouter app attribution header (2026-11-17)
 
 **Active task:** identify CV Tailor requests on the OpenRouter activity dashboard — complete.
-`OpenRouterProvider.generate` in `backend/services/provider.py` now sets
-`OPENROUTER_APP_TITLE = "CV Tailor"` and sends `"X-Title": OPENROUTER_APP_TITLE` in the
-chat-completions request headers so OpenRouter attributes calls to `CV Tailor` instead of
-`Unknown`.
+`OpenRouterProvider.generate` in `backend/services/provider.py` sets
+`OPENROUTER_APP_TITLE = "CV Tailor"` (`"X-Title"`) and
+`OPENROUTER_APP_URL = "https://github.com/srdpsrknth/cv-tailor"` (`"HTTP-Referer"`) in the
+chat-completions request headers so OpenRouter resolves both the App ID and display title
+instead of `Unknown` (OpenRouter requires `HTTP-Referer` alongside `X-Title`).
 
-Added `test_openrouter_sends_app_title_header` in `tests/test_provider_interface.py`.
-Focused provider verification: `tests/test_provider_interface.py` — **63 passed**, one
-existing Google SDK deprecation warning, ~8.86 s (offline recorded transport; no live API
-call made). Full suite was not re-run because unrelated uncommitted WIP files remain in
-the working tree and were left unstaged.
+`test_openrouter_sends_app_title_header` in `tests/test_provider_interface.py` verifies
+both headers. Focused provider verification: `tests/test_provider_interface.py` — **63
+passed**, one existing Google SDK deprecation warning, ~9.03 s (offline recorded transport;
+no live API call made). Note: the local GUI server must be restarted after code changes so
+Streamlit reloads `services.provider`. Full suite was not re-run because unrelated
+uncommitted WIP files remain in the working tree and were left unstaged.
 
 ## Preview/download rerun repair (2026-11-17)
 

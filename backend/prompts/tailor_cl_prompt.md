@@ -3,90 +3,113 @@ The base profile is authoritative for candidate facts; the opening is authoritat
 only for employer context and role requirements.
 
 PURPOSE
-Help the reader understand why this particular work interests the candidate, how
-they approach a relevant problem, and what colleagues or users gain from their work.
-Add context and judgment beyond the CV. The job description guides the choice of
-evidence; it is not a checklist to paraphrase or a vocabulary list to echo.
-Use one or two strong, profile-backed examples. Explain the problem, the candidate's
-actual contribution or decision, and the supported result or practical use. A result
-can be useful reporting, clearer decisions or a concrete deliverable; it need not
-be a percentage. Never invent a result, an anecdote, a conversation or a motivation.
-Mention tools only when needed to understand an example. Do not catalogue the stack,
-summarise every employer, copy CV bullets, or force in each requirement.
+Help the reader understand how this candidate approaches the actual problems in the
+posting, using concrete, profile-backed evidence and practical outcomes for users,
+colleagues, or customers. Add context and judgment beyond the CV.
+Use the posting to choose the highest-priority requirements and terminology where the
+profile truthfully supports them; omit requirements the profile cannot support rather
+than inventing tools, metrics, or ownership.
+Use at most two concrete, explained examples from the profile. Explain the problem, the
+candidate's actual contribution or decision, and the supported result or practical use. A
+result can be useful reporting, clearer decisions, fewer manual hours, or a concrete
+deliverable; it need not be a percentage. Never invent a result, an anecdote, a
+conversation, or a personal motivation.
+Do not turn the letter into a tool catalogue, summarise every employer, copy CV bullets,
+or force in unsupported keywords. Mention the posting's stack only where supported by the
+profile and relevant to the role or example.
 
 Return exactly four body paragraphs totaling 290-310 whitespace-separated words.
 Aim near 300 words. Allocate space to the argument and evidence, not padding.
-Do not include salutation, sign-off, candidate name, phone, or email in paragraphs.
-The template adds those separately.
+Do not include salutation, sign-off, candidate name, phone, email, or contact details in
+paragraphs. The template adds the sender block, date, recipient, subject, salutation,
+closing line, and signature separately.
 
-1. Introduce the role with one specific, credible reason for interest in the actual
-   work, connected to relevant experience. Avoid opening with a compressed skills
-   summary or empty company praise. Do not invent admiration for a mission, culture,
-   product use or a long-standing ambition. If personal motivation is not supplied,
-   ground the connection in the work itself and the candidate's demonstrated experience.
-2. Develop the strongest relevant example, showing what the candidate did and why
-   it mattered to the people using the work. Prefer a coherent explanation over a
-   list of current responsibilities. Preserve scope, collaboration and ongoing status.
-3. Add a complementary example or evidence of how the candidate works with others,
-   makes decisions or handles a different relevant problem. Earlier roles are useful
-   when they strengthen the argument; do not tour the whole employment history.
-4. Close with the specific contribution offered, a courteous thank-you if natural,
-   and one simple invitation to talk. Do not repeat the opening, list the stack again,
-   or end on a catalogue of missing skills. A necessary career-transition explanation
-   should be brief and honest, framed through the supported experience it builds on.
+1. Open warmly and naturally using the posting's own language for the role's core
+   purpose and naming the posting's relevant stack where the profile supports it
+   (for example, "I am excited to apply for the <Role> role at <Company>." followed by
+   connecting your background in dbt, BigQuery, or warehouse modeling to turning
+   business logic into tested models rather than ad-hoc reports). Connect naturally
+   without using a colon. Avoid compressed skills summaries or invented company praise.
+2. Transition smoothly (such as "In my current role at <Company>...") and develop the
+   strongest example mapped to the posting's top priority (such as layered SQL modeling,
+   automated quality tests, safe releases, attribution, or forecasting). Choose the
+   profile evidence that fits this specific role rather than defaulting to the same
+   project for every application. Preserve exact scope, collaboration, and ongoing
+   status; never upgrade a contribution into sole ownership.
+3. Transition naturally to a second complementary example from the profile (such as
+   "In my earlier roles at...") covering another priority of the posting (for example,
+   building a BigQuery and dbt pipeline from scratch, moving logic out of spreadsheets,
+   or enabling stakeholder self-service). Omit unsupported requirements.
+4. Connect one remaining practical priority (such as "Throughout these projects..." for
+   documentation habits or collaborating across Data Engineering, BI, and business teams),
+   add the overseas work-authorization sentence below if and only if required, and close
+   with a natural thank-you and invitation to talk using a period or ", and" (such as
+   "Thank you for considering my application, and I look forward to speaking with you.").
+   Never use a semicolon in the closing. Do not restate strengths ("I would bring this
+   combination of..."), repeat the opening, or end on a list of missing tools. A
+   necessary career-transition explanation should be brief and honest, framed through
+   supported experience.
 
-For a clearly identified role outside Germany, include one concise sentence in
-paragraph four: the candidate holds a valid German-issued EU Blue Card and will
-require employer support for the destination's appropriate work authorization.
-For a participating EU country, say "I hold a valid EU Blue Card issued by Germany
-and would require employer support for the appropriate work authorization in [country]."
+WORK AUTHORIZATION (country rules)
+For a clearly identified role outside Germany, include one concise sentence in paragraph
+four: the candidate holds a valid German-issued EU Blue Card and will require employer
+support for the destination's appropriate work authorization.
+For a participating EU country, say "I hold a valid EU Blue Card issued by Germany and
+would require employer support for the appropriate work authorization in [country]."
 Do not claim automatic transfer, confirmed eligibility, or existing local work rights.
 Ireland and Denmark do not participate in the EU Blue Card scheme: use "employment
-permit" rather than a local Blue Card. For Ireland, use "I hold a valid German EU
-Blue Card and would require employer support for an Irish employment permit."
+permit" rather than a local Blue Card. For Ireland, use "I hold a valid German EU Blue
+Card and would require employer support for an Irish employment permit."
 Do not assert Critical Skills eligibility without checking the actual job and current
 official requirements. For other countries, use neutral "local work authorization"
-wording unless a specific route has been verified. For Germany or an ambiguous
-destination, do not invent an overseas sponsorship requirement. Infer the work
-country from job location, not employer headquarters. Include this sentence within
-the four-paragraph, 290-310-word budget rather than appending an extra paragraph.
+wording unless a specific route has been verified.
+For Germany or an ambiguous/unspecified work country, NEVER mention a visa label,
+EU Blue Card, work permit, or sponsorship requirement in the cover letter. Infer the
+work country from job location, not employer headquarters. Include the overseas sentence
+within the four-paragraph, 290-310-word budget rather than appending an extra paragraph.
 
 VOICE AND EDITORIAL CHECK
-Use first-person prose that sounds like a capable colleague talking about their work:
-warm, interested, modestly confident and specific. Natural contractions are welcome
-when consistent with supplied voice preferences; do not force either formality or slang.
+Use first-person prose that sounds like a capable colleague talking naturally about their
+work: warm, interested, modestly confident, and smooth to read aloud.
+NEVER use colons (:), semicolons (;), or em-dashes (—) inside cover-letter body
+paragraphs. Connect clauses smoothly using conjunctions (and, so, where, while, which)
+or clean sentence breaks with periods.
+Use connected, flowing paragraph and sentence transitions ("In my current role at...",
+"In my earlier roles at...", "Throughout these projects...") instead of abrupt, robotic
+5-7 word declarations ("I also know BigQuery and dbt well.", "Documentation matters to
+me as much as the models.") or clipped mid-sentence appositives (", which I led,").
+Natural contractions are fine when they fit the sentence; do not force formality or slang.
 Vary sentence lengths and avoid long chains of abstract nouns or qualifications.
 Explain unfamiliar technical details in ordinary language; short employer names are enough.
-Express enthusiasm through the particular work and its relevance, not repeated adjectives.
-Avoid stock constructions such as "aligns perfectly", "uniquely positioned", "ideal
-candidate", "proven track record", "leveraging data to drive actionable insights",
-"dynamic team", "resonates deeply", "robust and scalable", "Crucially" or "Furthermore".
-Do not simply swap these for equally generic synonyms. Avoid ritual repetition of
-"This experience aligns with your needs" after every example. A straightforward
-"I would welcome the opportunity to discuss..." is fine once, not in several forms.
-Before returning, check: could the company name be swapped without changing the
-argument? Does each paragraph add something? Is there an example with practical
-meaning beyond keywords? Could the candidate comfortably say these sentences aloud?
+Avoid stock constructions such as "aligns closely", "aligns perfectly", "this experience
+equips me", "uniquely positioned", "ideal candidate", "proven track record", "leveraging
+data to drive actionable insights", "dynamic team", "resonates deeply", "robust and
+scalable", "Crucially", or "Furthermore". Do not swap these for equally generic synonyms
+or end examples with ritual fit statements.
+Before returning, check: could the company name be swapped without changing the argument?
+Does each paragraph add concrete evidence? Could the candidate say these sentences aloud?
 These are editorial checks, not a claim that text can pass an AI detector.
 Do not fabricate tools, metrics, stakeholder teams, architecture ownership, financial
-industry credentials, or achieved outcomes from ongoing work. Aklamio does not use
-dbt; earlier roles do. The candidate contributes to the approximately 80-table DQ
-framework, owns funnel/sales-channel checks, and is developing MCP/dashboarding.
+industry credentials, or achieved outcomes from ongoing work. Aklamio does not use dbt;
+earlier roles do. The candidate contributes to the approximately 80-table DQ framework,
+owns funnel/sales-channel checks, and is developing MCP/dashboarding.
 Use externally understandable attribution terminology rather than "Entrypoints v2".
-Do not claim Fivetran, AWS, DealCloud, or other tools solely because the opening
-mentions them. State transferable experience without pretending to have an exact stack.
-For a finance-oriented role, use the profile's investor analytics, financial reporting,
-payment automation and data-platform work; do not invent private equity experience.
+Do not claim Fivetran, Databricks, Tableau, ThoughtSpot, DealCloud, Cortex, AWS, or other
+tools solely because the opening mentions them. State transferable experience without
+pretending to have an exact stack. For a finance-oriented role, use the profile's investor
+analytics, financial reporting, payment automation, and data-platform work; do not invent
+private equity experience.
 
 Return valid JSON only, with standard escaping. Apostrophes are valid inside JSON
-strings and should not be removed from grammatical prose.
+strings and should not be removed from grammatical prose. Use the sign_off from
+CANDIDATE WRITING VOICE if supplied; otherwise default to "Warm regards,".
 {
   "cover_letter": {
     "role_title": "Exact requested role",
     "company_name": "Employer",
-    "paragraphs": ["Opening", "Current experience", "Earlier evidence", "Closing"],
-    "closing_line": "Sincerely,",
+    "paragraphs": ["Opening", "Priority example 1", "Priority example 2", "Closing"],
+    "closing_line": "Warm regards,",
     "signature_name": "Exact profile full name"
   }
 }
-Count body words before returning; do not place sign-off lines in the final paragraph.
+Count body words before returning; do not place salutation or sign-off lines in the paragraphs.

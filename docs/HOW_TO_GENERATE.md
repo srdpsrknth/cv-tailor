@@ -250,7 +250,8 @@ Narrow it to one document if you only changed one:
 ```
 
 **Re-render re-checks the page count**, so if your edit pushes the CV onto a third
-page it will tell you.
+page it will tell you. Re-rendering a cover letter stamps today's date (`date.today()`)
+into both the DOCX and PDF headers so the document carries the current submission date.
 
 ---
 
@@ -411,7 +412,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 | `pdflatex not found` (Windows) | Install MiKTeX, or set `LATEX_COMPILER` to the full path of `pdflatex.exe`. |
 | `pdflatex compilation failed` | Usually a **temp-directory** problem, not a broken document. See the note below. |
 | Cover letter word count off | Re-render after editing `content.json`; the count is re-checked every time. |
-| Word file looks different from the PDF | Expected — DOCX and LaTeX lay out differently. Check both. Aptos may be unavailable on macOS; LibreOffice/Word substitutes a font. |
+| Word file looks different from the PDF | Minor spacing differences are expected between Word/LibreOffice (`Calibri`) and LaTeX (`Carlito`), though both follow the same single-column business-letter layout and stamp today's date (`date.today()`) at render time. Check both. |
 | It generated for the wrong person | Should be impossible — `profile_id` fails closed. If you believe otherwise, stop and report it. |
 
 > **About `pdflatex compilation failed`.** On Windows this is usually the temp
