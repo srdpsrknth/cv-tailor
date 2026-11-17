@@ -572,6 +572,15 @@ def test_openrouter_sends_a_bearer_token_and_never_logs_it(monkeypatch):
     assert sent[-1]['headers']['Authorization'] == 'Bearer secret-key-value'
 
 
+def test_openrouter_sends_app_title_header(monkeypatch):
+    sent = _record_openrouter_requests(monkeypatch)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    provider.generate('prompt')
+
+    assert sent[-1]['headers']['X-Title'] == 'CV Tailor'
+
+
 def test_openrouter_honours_a_per_call_model_override(monkeypatch):
     """This is the hook model-per-task routing uses."""
     sent = _record_openrouter_requests(monkeypatch)

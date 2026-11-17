@@ -68,6 +68,9 @@ MAX_RETRY_DELAY_SECONDS = 30
 #: OpenRouter's OpenAI-compatible endpoint.
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+#: Application title sent to OpenRouter so requests are attributed in the dashboard.
+OPENROUTER_APP_TITLE = "CV Tailor"
+
 
 class ProviderError(Exception):
     """A provider call failed after its retries.
@@ -339,6 +342,7 @@ class OpenRouterProvider(Provider):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
+            "X-Title": OPENROUTER_APP_TITLE,
         }
 
         last_error: Optional[Exception] = None

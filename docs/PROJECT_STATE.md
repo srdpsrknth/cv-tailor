@@ -3,8 +3,22 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *fix preview reruns assigning button state*
+**Latest commit:** *(this commit)* — *send X-Title header on OpenRouter requests*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## OpenRouter app attribution header (2026-11-17)
+
+**Active task:** identify CV Tailor requests on the OpenRouter activity dashboard — complete.
+`OpenRouterProvider.generate` in `backend/services/provider.py` now sets
+`OPENROUTER_APP_TITLE = "CV Tailor"` and sends `"X-Title": OPENROUTER_APP_TITLE` in the
+chat-completions request headers so OpenRouter attributes calls to `CV Tailor` instead of
+`Unknown`.
+
+Added `test_openrouter_sends_app_title_header` in `tests/test_provider_interface.py`.
+Focused provider verification: `tests/test_provider_interface.py` — **63 passed**, one
+existing Google SDK deprecation warning, ~8.86 s (offline recorded transport; no live API
+call made). Full suite was not re-run because unrelated uncommitted WIP files remain in
+the working tree and were left unstaged.
 
 ## Preview/download rerun repair (2026-11-17)
 
