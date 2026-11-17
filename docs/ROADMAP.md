@@ -1,5 +1,12 @@
 # Roadmap
 
+**Application quality follow-up (2026-11-17):** implemented the approved audit's
+readable CV layouts, explicit PDF word spacing, per-artifact freshness metadata,
+two-engine extraction diagnostics and opt-in Word pagination checks in the existing
+review workflow. Prompt guidance now emphasizes selected evidence and concise,
+natural closing paragraphs while preserving existing factual and length policies.
+See [ADR 0024](DECISIONS/0024-document-quality-and-artifact-freshness.md).
+
 **Status:** Direction **approved 2026-10-23** ([decisions](DECISIONS/README.md)). Phase 0 is
 complete, Milestone 1.1 is complete, **Phase 1 is complete**, **Phase 2 is complete and closed
 out**, and **Phase 3 is complete**. Increments 4, 2, 1 and 3 are done, item 5 is done, and

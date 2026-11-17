@@ -68,26 +68,38 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
         style = doc.styles[name]
         style.font.name = 'Arial'
         style.font.color.rgb = RGBColor(0, 0, 0)
-        style.font.size = Pt(11 if name in ('Normal', 'List Bullet') else 12)
-        style.paragraph_format.space_after = Pt(3)
-    doc.styles['Title'].font.size = Pt(18)
+        style.font.size = Pt(10.5 if name in ('Normal', 'List Bullet') else 11)
+        style.paragraph_format.space_after = Pt(2)
+        style.paragraph_format.space_before = Pt(0)
+    for name in ('Heading 1', 'Heading 2'):
+        doc.styles[name].font.color.rgb = RGBColor.from_string('00004D')
+        doc.styles[name].font.bold = True
+        doc.styles[name].paragraph_format.space_before = Pt(5 if name == 'Heading 1' else 3)
+    doc.styles['Title'].font.size = Pt(21)
+    doc.styles['Title'].font.bold = True
+    doc.styles['Title'].font.color.rgb = RGBColor.from_string('00004D')
     doc.styles['Normal'].paragraph_format.line_spacing = 1.0
+    # Built-in Title can inherit a decorative bottom border from the Word theme.
+    for style in (doc.styles['Title'],):
+        ppr = style.element.find(qn('w:pPr'))
+        if ppr is not None:
+            border = ppr.find(qn('w:pBdr'))
+            if border is not None:
+                ppr.remove(border)
 
-    def add(value, style=None):
+    def add(value, style=None, keep=False):
         if value:
             paragraph = doc.add_paragraph(value, style)
             paragraph.paragraph_format.widow_control = True
+            paragraph.paragraph_format.keep_with_next = keep
+            return paragraph
 
     add(identity.full_name, 'Title')
     add(cv.title or identity.tagline)
-    add(identity.location)
-    add(f'Email: {identity.email}')
-    if identity.phone:
-        add(f'Phone: {identity.phone}')
-    if identity.linkedin:
-        add(f'LinkedIn: {identity.linkedin}')
-    if identity.github:
-        add(f'GitHub: {identity.github}')
+    contact = [identity.location, identity.phone, identity.email]
+    add(' | '.join(value for value in contact if value))
+    links = [identity.linkedin, identity.github]
+    add(' | '.join(value for value in links if value))
     authorization = cv.work_authorization if cv.work_authorization is not None else identity.visa_status
     if authorization:
         add(f'Work authorization: {authorization}')
@@ -97,9 +109,7 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
     if cv.experience:
         add('Work Experience', 'Heading 1')
     for exp in cv.experience:
-        add(exp.role, 'Heading 2')
-        company = doc.add_paragraph(exp.company)
-        company.paragraph_format.keep_with_next = True
+        add(exp.role, 'Heading 2', keep=True)
         # Exact identity avoids borrowing location/tools from another role at
         # the same employer. Ambiguous matches contribute no inferred metadata.
         matches = [row for row in profile.experience if
@@ -110,14 +120,13 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
             matches = company_matches if len(company_matches) == 1 else []
         original = matches[0] if len(matches) == 1 else None
         dates = ' - '.join(readable_date(d) for d in (exp.start_date, exp.end_date) if d)
-        p = doc.add_paragraph(dates)
+        metadata = [exp.company, dates, original.location if original else None]
+        p = doc.add_paragraph(' | '.join(value for value in metadata if value))
         p.paragraph_format.keep_with_next = bool(exp.bullets or exp.projects or (original and original.location))
-        if original:
-            add(original.location)
         for bullet in exp.bullets:
             add(bullet, 'List Bullet')
         for project in exp.projects:
-            add(f'Project: {project.name}', 'Heading 2')
+            add(f'Project: {project.name} ({exp.company})', 'Heading 2', keep=True)
             for bullet in project.bullets:
                 add(bullet, 'List Bullet')
         if original and original.technologies:
@@ -125,10 +134,10 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
     if cv.include_education and profile.education:
         add('Education', 'Heading 1')
         for edu in profile.education:
-            add(edu.degree, 'Heading 2')
-            add(edu.institution)
-            add(f'{edu.start_year} - {edu.end_year}')
-            add(edu.location)
+            add(edu.degree, 'Heading 2', keep=True)
+            add(' | '.join(value for value in (
+                edu.institution, f'{edu.start_year} - {edu.end_year}', edu.location
+            ) if value))
     if cv.include_certifications and profile.certifications:
         add('Certifications', 'Heading 1')
         for cert in profile.certifications:

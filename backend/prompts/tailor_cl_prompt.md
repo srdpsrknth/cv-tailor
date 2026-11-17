@@ -19,32 +19,33 @@ or force in unsupported keywords. Mention the posting's stack only where support
 profile and relevant to the role or example.
 
 Return exactly four body paragraphs totaling 290-310 whitespace-separated words.
-Aim near 300 words. Allocate space to the argument and evidence, not padding.
+This is a fixed application format requirement. Aim near 300 words and allocate space
+to the argument and evidence, not padding or repeated claims.
 Do not include salutation, sign-off, candidate name, phone, email, or contact details in
 paragraphs. The template adds the sender block, date, recipient, subject, salutation,
 closing line, and signature separately.
 
 1. Open warmly and naturally using the posting's own language for the role's core
-   purpose and naming the posting's relevant stack where the profile supports it
+   purpose. Name a relevant part of the stack only when it is supported by the profile
+   and adds meaning to the opening
    (for example, "I am excited to apply for the <Role> role at <Company>." followed by
    connecting your background in dbt, BigQuery, or warehouse modeling to turning
    business logic into tested models rather than ad-hoc reports). Connect naturally
    without using a colon. Avoid compressed skills summaries or invented company praise.
-2. Transition smoothly (such as "In my current role at <Company>...") and develop the
-   strongest example mapped to the posting's top priority (such as layered SQL modeling,
+2. Develop the strongest example mapped to the posting's top priority (such as layered SQL modeling,
    automated quality tests, safe releases, attribution, or forecasting). Choose the
    profile evidence that fits this specific role rather than defaulting to the same
    project for every application. Preserve exact scope, collaboration, and ongoing
    status; never upgrade a contribution into sole ownership.
-3. Transition naturally to a second complementary example from the profile (such as
-   "In my earlier roles at...") covering another priority of the posting (for example,
+3. Develop a second complementary example from the profile, where useful, covering
+   another priority of the posting (for example,
    building a BigQuery and dbt pipeline from scratch, moving logic out of spreadsheets,
    or enabling stakeholder self-service). Omit unsupported requirements.
-4. Connect one remaining practical priority (such as "Throughout these projects..." for
-   documentation habits or collaborating across Data Engineering, BI, and business teams),
+4. Connect one remaining practical priority, such as documentation habits or
+   collaboration across technical and business teams,
    add the overseas work-authorization sentence below if and only if required, and close
-   with a natural thank-you and invitation to talk using a period or ", and" (such as
-   "Thank you for considering my application, and I look forward to speaking with you.").
+   with a brief, natural thank-you or invitation to talk. Avoid repeating the opening,
+   strengths already explained, or generic claims of fit.
    Never use a semicolon in the closing. Do not restate strengths ("I would bring this
    combination of..."), repeat the opening, or end on a list of missing tools. A
    necessary career-transition explanation should be brief and honest, framed through
@@ -74,10 +75,10 @@ work: warm, interested, modestly confident, and smooth to read aloud.
 NEVER use colons (:), semicolons (;), or em-dashes (—) inside cover-letter body
 paragraphs. Connect clauses smoothly using conjunctions (and, so, where, while, which)
 or clean sentence breaks with periods.
-Use connected, flowing paragraph and sentence transitions ("In my current role at...",
-"In my earlier roles at...", "Throughout these projects...") instead of abrupt, robotic
-5-7 word declarations ("I also know BigQuery and dbt well.", "Documentation matters to
-me as much as the models.") or clipped mid-sentence appositives (", which I led,").
+Use natural transitions where they help the reader follow the argument. Examples such
+as "In my current role at..." may help, but vary the wording and do not force a repeated
+transition pattern. Short direct sentences are fine when they sound natural; avoid
+clipped fragments and unsupported mid-sentence claims (", which I led,").
 Natural contractions are fine when they fit the sentence; do not force formality or slang.
 Vary sentence lengths and avoid long chains of abstract nouns or qualifications.
 Explain unfamiliar technical details in ordinary language; short employer names are enough.
@@ -89,6 +90,11 @@ or end examples with ritual fit statements.
 Before returning, check: could the company name be swapped without changing the argument?
 Does each paragraph add concrete evidence? Could the candidate say these sentences aloud?
 These are editorial checks, not a claim that text can pass an AI detector.
+Select evidence that directly demonstrates the posting's highest-priority requirements.
+Make the requirement-to-example connection clear, explain the candidate's own action
+and the practical result, and leave unsupported or materially unmatched requirements
+out rather than filling space with a tool list. Do not invent a gap explanation unless
+it is useful and supported by the profile.
 Do not fabricate tools, metrics, stakeholder teams, architecture ownership, financial
 industry credentials, or achieved outcomes from ongoing work. Aklamio does not use dbt;
 earlier roles do. The candidate contributes to the approximately 80-table DQ framework,

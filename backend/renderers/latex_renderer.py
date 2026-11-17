@@ -185,18 +185,17 @@ class LaTeXRenderer:
 
             experiences.append(exp_data)
 
-        # Build tagline with visa status
+        # Keep the professional headline separate from factual authorization.
         tagline_base = tailored_cv.title or identity.tagline or ""
         # If there's a visa status and it's not already in the tagline, append it
         visa_status = tailored_cv.work_authorization if tailored_cv.work_authorization is not None else identity.visa_status
-        if visa_status and visa_status not in tagline_base:
-            tagline = f"{tagline_base} | {visa_status}" if tagline_base else visa_status
-        else:
-            tagline = tagline_base
+        tagline = tagline_base
 
         return {
             "name": self._escape_latex(identity.full_name),
             "tagline": self._escape_latex(tagline),
+            "location": self._escape_latex(identity.location or ""),
+            "work_authorization": self._escape_latex(visa_status or ""),
             "email": identity.email,
             "phone": identity.phone or "",
             "linkedin": identity.linkedin or "",

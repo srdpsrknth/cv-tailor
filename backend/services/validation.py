@@ -279,6 +279,16 @@ def validate_cover_letter(
         raise ValueError(
             "Do not use colons or semicolons in cover-letter paragraphs; write smooth, natural sentences."
         )
+    if any("—" in paragraph for paragraph in cl.paragraphs):
+        raise ValueError(
+            "Do not use em dashes in cover-letter paragraphs; use a conjunction or a full stop."
+        )
+    closing_line = (cl.closing_line or "").strip()
+    if closing_line and any(
+        re.search(r"(?:^|\n)\s*" + re.escape(closing_line), paragraph, re.I)
+        for paragraph in cl.paragraphs
+    ):
+        raise ValueError("Do not repeat the configured closing line in the body paragraphs.")
     active_rules = rules or ProfileRules.from_profile(profile)
     _check_banned_tools_in_text(" ".join(cl.paragraphs), profile, active_rules)
     _validate_employer_prose_rules(cl.paragraphs, active_rules)

@@ -1,205 +1,99 @@
-\documentclass[10pt,a4paper,ragged2e]{altacv}
-
-% Page layout - ATS-friendly margins
-% Optimized for 2-page maximum with good spacing
-\geometry{left=1.5cm,right=1.5cm,marginparwidth=6.8cm,marginparsep=1.2cm,top=1.25cm,bottom=1.25cm}
-
-% Section integrity - prevent splitting across pages
-\usepackage{needspace}
-
-% Font configuration for ATS compatibility
-\ifxetexorluatex
-  \setmainfont{Carlito}
-\else
-  \usepackage[utf8]{inputenc}
-  \usepackage[T1]{fontenc}
-  \usepackage[default]{lato}
-  \input{glyphtounicode}
-  \pdfgentounicode=1
-  \usepackage[protrusion=false,expansion=false]{microtype}
-  \DisableLigatures[f]{encoding = *, family = *}
-\fi
-
-\usepackage{multicol}
-\usepackage{hyperref}
-
-% Spacing optimization for 2-page limit
-\setlength{\parskip}{0.3ex}
-\setlength{\parsep}{0pt}
-
-% Color scheme
-\definecolor{NavyBlue}{HTML}{00004d}
-\definecolor{SlateGrey}{HTML}{2E2E2E}
-\definecolor{LightGrey}{HTML}{666666}
-\colorlet{heading}{NavyBlue}
-\colorlet{accent}{NavyBlue}
-\colorlet{emphasis}{SlateGrey}
-\colorlet{body}{LightGrey}
-
-% Typography settings for better ATS parsing
-\tolerance=1
-\emergencystretch=\maxdimen
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{carlito.sty}{\usepackage[sfdefault]{carlito}}{\usepackage[default]{lato}}
+\input{glyphtounicode}
+\pdfgentounicode=1
+% Actual space glyphs keep word boundaries stable across extraction engines.
+\ifdefined\pdfinterwordspaceon\pdfinterwordspaceon\fi
+\usepackage[protrusion=false,expansion=false]{microtype}
+\DisableLigatures[f]{encoding = *, family = *}
+\usepackage[a4paper,left=1.5cm,right=1.5cm,top=1.5cm,bottom=1.5cm]{geometry}
+\usepackage{xcolor,enumitem,needspace,hyperref}
+\definecolor{accent}{HTML}{00004D}
+\definecolor{bodytext}{HTML}{222222}
+\definecolor{muted}{HTML}{4A5568}
+\hypersetup{hidelinks,pdfauthor={{ '{' }}{{ name }}{{ '}' }},pdftitle={{ '{' }}{{ name }} - CV{{ '}' }}}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\raggedright
 \hyphenpenalty=10000
-\hbadness=10000
-
-\usepackage{paracol}
-
-% Bullet markers
-\renewcommand{\itemmarker}{{ '{' }}{\small\textbullet}{{ '}' }}
-\renewcommand{\ratingmarker}{\faCircle}
-
+\emergencystretch=2em
+\renewcommand{\normalsize}{\fontsize{10.5}{12}\selectfont}
+\newcommand{\metadata}{\fontsize{9.5}{11}\selectfont}
+\setlist[itemize]{leftmargin=1.2em,label=\textbullet,itemsep=1pt,topsep=2pt,parsep=0pt,partopsep=0pt}
+{% raw %}
+\newcommand{\cvsection}[1]{\needspace{3\baselineskip}\par\vspace{7pt}{\large\bfseries\color{accent}\MakeUppercase{#1}\par}\vspace{1pt}{\color{accent}\hrule height 0.6pt}\vspace{4pt}}
+\newcommand{\projectheading}[1]{\needspace{3\baselineskip}\vspace{2pt}{\bfseries #1\par}\nopagebreak}
+{% endraw %}
 \begin{document}
-
-% Header with personal information
-\name{{ '{' }}{{ name }}{{ '}' }}
-\tagline{{ '{' }}{{ tagline }}{{ '}' }}
-
-\personalinfo{{ '{' }}%
-  {% set pinfo = namespace(prev=false) %}%
-  {% if email -%}
-  \email{\href{mailto:{{ email }}}{{ '{' }}{{ email }}{{ '}' }}}%
-  {% set pinfo.prev = true %}%
-  {%- endif %}%
-  {% if phone -%}
-  {% if pinfo.prev %}\atssep{ | }{% endif %}%
-  \phone{\href{tel:{{ phone|replace(' ', '') }}}{{ '{' }}{{ phone }}{{ '}' }}}%
-  {% set pinfo.prev = true %}%
-  {%- endif %}%
-  {% if linkedin -%}
-  {% if pinfo.prev %}\atssep{ | }{% endif %}%
-  \linkedin{\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}}%
-  {% set pinfo.prev = true %}%
-  {%- endif %}%
-  {% if github -%}
-  {% if pinfo.prev %}\atssep{ | }{% endif %}%
-  \github{\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}}%
-  {%- endif %}%
-{{ '}' }}
-
-\makecvheader
-
-% Professional Summary
+\normalsize\color{bodytext}
+{\fontsize{22}{25}\selectfont\bfseries\color{accent}\MakeUppercase{{ "{" }}{{ name }}{{ "}" }}\par}
+\vspace{3pt}
+{\bfseries {{ tagline }}\par}
+\vspace{3pt}
+{\metadata
+{{ location }}{% if phone %} | {{ phone }}{% endif %}{% if email %} | {{ email }}{% endif %}\par
+{% if linkedin %}\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}{% endif %}{% if github %}{% if linkedin %} | {% endif %}\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}{% endif %}\par
+{% if work_authorization %}Work authorization: {{ work_authorization }}\par{% endif %}
+}
 {% if summary %}
-\vspace{2mm}
-\small {{ summary|join(' ') }}
-\vspace{2mm}
+\vspace{6pt}
+{{ summary|join(' ') }}\par
 {% endif %}
-
-\AtBeginEnvironment{itemize}{\small}
-
-% PROFESSIONAL EXPERIENCE
 \cvsection{Professional Experience}
-
 {% for exp in experience %}
-% Prevent page break within a role
-\needspace{3.5cm}
+\needspace{4\baselineskip}
 \begin{samepage}
-\cveventsmall{{ '{' }}{{ exp.company }}{{ '}' }}{{ '{' }}{{ exp.role }}{{ '}' }}{{ '{' }} 
-  {%- if exp.start_date -%}
-    {{ exp.start_date }}
-  {%- endif -%}
-  {%- if exp.end_date -%}
-     -- {{ exp.end_date }}
-  {%- endif -%}
-{{ '}' }}{{ '{' }}{{ exp.location }}{{ '}' }}
-
+{\bfseries {{ exp.role }} | {{ exp.company }}\par}\nopagebreak
+{\metadata\color{muted}{{ exp.start_date }} -- {{ exp.end_date }}{% if exp.location %} | {{ exp.location }}{% endif %}\par}\nopagebreak
 {% if exp.bullets %}
 \begin{itemize}
-{% for bullet in exp.bullets %}
-\item {{ bullet }}
+{% for bullet in exp.bullets %}\item {{ bullet }}
 {% endfor %}
 \end{itemize}
 {% endif %}
-
-{% if exp.projects %}
-% Selected Projects - new structure (each project has own bullets)
-\needspace{1.8cm}
-\vspace{1mm}
-{\small\textbf{\textcolor{accent}{Selected Projects:}}}
-\vspace{0.5mm}
-
-{% for project in exp.projects %}
-\needspace{1.2cm}
-{\small\textit{{ '{' }}{{ project.name }}{{ '}' }}}
-\begin{itemize}[topsep=1pt,itemsep=1pt]
-{% for bullet in project.bullets %}
-\item {{ bullet }}
-{% endfor %}
-\end{itemize}
-{% if not loop.last %}\vspace{1mm}{% endif %}
-{% endfor %}
-{% endif %}
-
-{% if exp.technologies %}
-\vspace{1mm}
-{\small\textbf{Technologies: }{{ exp.technologies|join(', ') }}}
-\vspace{1mm}
-{% endif %}
-
 \end{samepage}
-
-{% if not loop.last %}
-\divider
-\vspace{-1mm}
-{% endif %}
-
+{% if exp.projects %}
+{% for project in exp.projects %}
+\begin{samepage}
+\projectheading{Selected Projects: {{ project.name }} ({{ exp.company }})}
+\begin{itemize}
+{% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}
-
-% EDUCATION
+\end{itemize}
+\end{samepage}
+{% endfor %}
+{% endif %}
+{% if exp.technologies %}
+{\metadata\textbf{Technologies: }{{ exp.technologies|join(', ') }}\par}
+{% endif %}
+{% if not loop.last %}\vspace{6pt}{% endif %}
+{% endfor %}
 {% if education %}
-% Ensure education section doesn't split
-\needspace{4cm}
 \cvsection{Education}
 {% for edu in education %}
-\cveventsmall{{ '{' }}{{ edu.degree }}{{ '}' }}{{ '{' }}{{ edu.institution }}{{ '}' }}{{ '{' }} 
-  {%- if edu.start_year -%}{{ edu.start_year }}{%- endif -%}
-  {%- if edu.end_year %} -- {{ edu.end_year }}{% endif -%}
-{{ '}' }}{{ '{' }}{{ edu.location }}{{ '}' }}
-{% if not loop.last %}
-\vspace{-2mm}
-\divider
-{% else %}
-\vspace{-2mm}
-{% endif %}
+\needspace{3\baselineskip}
+{\bfseries {{ edu.degree }}\par}\nopagebreak
+{\metadata {{ edu.institution }} | {{ edu.start_year }} -- {{ edu.end_year }}{% if edu.location %} | {{ edu.location }}{% endif %}\par}
+{% if not loop.last %}\vspace{4pt}{% endif %}
 {% endfor %}
 {% endif %}
-
-% CERTIFICATIONS
 {% if certifications %}
-\needspace{3cm}
-\divider
-\cveventsmall{Certifications:}{}{}{}
-\vspace{-4mm}
-{% for cert in certifications %}
-\cvtag{{ '{' }}{{ cert }}{{ '}' }}{% if not loop.last %}\atssep{, } {% endif %}
-{% endfor %}
-\vspace{1mm}
+\cvsection{Certifications}
+{\metadata {{ certifications|join('; ') }}\par}
 {% endif %}
-
-% SKILLS
 {% if skills %}
-\needspace{5cm}
 \cvsection{Skills}
-
 {% for category, skill_list in skills.items() %}
-{\small\textbf{{ '{' }}{{ category ~ ":" }}{{ '}' }}}
-\vspace{0.5mm}
-{% for skill in skill_list %}
-\cvtag{{ '{' }}{{ skill }}{{ '}' }}{% if not loop.last %}\atssep{, } {% endif %}
-{% endfor %}
-\vspace{1.5mm}
-
+\needspace{2\baselineskip}
+\textbf{{ '{' }}{{ category }}:{{ '}' }} {{ skill_list|join(', ') }}\par
+{% if not loop.last %}\vspace{2pt}{% endif %}
 {% endfor %}
 {% endif %}
-
-% LANGUAGES
 {% if languages %}
-\needspace{2cm}
 \cvsection{Languages}
-{% for lang in languages %}
-\cvtag{{ '{' }}{{ lang.name ~ ": " ~ lang.proficiency }}{{ '}' }}{% if not loop.last %}\atssep{, } {% endif %}
-{% endfor %}
-\vspace{1mm}
+{% for lang in languages %}{{ lang.name }}: {{ lang.proficiency }}{% if not loop.last %} | {% endif %}{% endfor %}\par
 {% endif %}
-
 \end{document}

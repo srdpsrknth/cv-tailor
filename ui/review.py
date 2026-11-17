@@ -32,7 +32,9 @@ def highlighted(before, after):
 
 def render_application(config, profile_id, job_id):
     try:
-        detail = bridge.load_application(config, profile_id, job_id)
+        detail = bridge.load_application(
+            config, profile_id, job_id, include_quality=True
+        )
     except (OSError, ValueError) as error:
         st.error(str(error))
         return
@@ -75,7 +77,9 @@ def render_application(config, profile_id, job_id):
                 if exporter is None:
                     from services.upload_cv import export_saved_upload_cv as exporter
                 exporter(config, profile_id, job_id)
-                detail["artifacts"] = bridge.list_artifacts(detail["path"])
+                detail = bridge.load_application(
+                    config, profile_id, job_id, include_quality=True
+                )
                 st.success("Autofill DOCX and text created from saved content. No model call.")
             except (ValueError, OSError) as error:
                 st.error(str(error))
@@ -84,8 +88,91 @@ def render_application(config, profile_id, job_id):
             "The text copy helps with manual corrections. Follow the portal’s file rules "
             "and check all extracted fields. Word pagination can differ from the PDF."
         )
+        if st.button("Check Word pagination", key=f"{prefix}_check_word_layout"):
+            try:
+                reports = bridge.check_word_layout(config, profile_id, job_id)
+                detail = bridge.load_application(
+                    config, profile_id, job_id, include_quality=True
+                )
+                st.success(
+                    "Word pagination check finished for "
+                    f"{len(reports)} DOCX file(s). This uses LibreOffice when available."
+                )
+            except (OSError, ValueError) as error:
+                st.warning(str(error))
+        for name, check in detail.get("word_layout", {}).items():
+            if check.get("status") == "current":
+                report = check.get("report", {})
+                if isinstance(report.get("page_count"), int):
+                    st.caption(
+                        f"{name}: {report['page_count']} page(s) · "
+                        f"{report.get('engine') or 'pagination estimate'}"
+                    )
+                for warning in report.get("warnings", []):
+                    st.caption(warning)
+            elif check.get("status") == "stale":
+                st.warning(f"{name}: saved Word pagination is stale; run the check again.")
+            else:
+                st.info(f"{name}: Word pagination has not been checked.")
         left, right = st.columns([3, 1])
         artifacts = detail["artifacts"]
+        stale_artifacts = [
+            name
+            for name, freshness in detail.get("artifact_freshness", {}).items()
+            if freshness.get("status") == "stale"
+        ]
+        unknown_artifacts = [
+            name
+            for name, freshness in detail.get("artifact_freshness", {}).items()
+            if freshness.get("status") == "unknown"
+        ]
+        if stale_artifacts:
+            st.warning(
+                "Some saved documents may not match the current editable content or "
+                "rendering files: " + ", ".join(stale_artifacts) + ". Downloads remain available."
+            )
+        if unknown_artifacts:
+            st.info(
+                "Freshness is unknown for older documents without provenance: "
+                + ", ".join(unknown_artifacts)
+                + ". Downloads remain available."
+            )
+        quality_reports = detail.get("document_quality", {})
+        if quality_reports:
+            with st.expander("PDF text extraction checks · advisory", expanded=False):
+                st.caption(
+                    "Two local PDF parsers compare extracted text with the saved source. "
+                    "Word retention is a text comparison, not an ATS score or screening guarantee."
+                )
+                for name, report in quality_reports.items():
+                    st.markdown(f"**{name}**")
+                    if report.get("page_count") is not None:
+                        st.caption(f"PDF pages: {report['page_count']}")
+                    for engine, result in report.get("engines", {}).items():
+                        retention = result.get("word_retention")
+                        retention_label = (
+                            f"{retention:.0%} source-word retention"
+                            if isinstance(retention, (int, float))
+                            else "Source-word retention unavailable"
+                        )
+                        status = result.get("status", "unknown")
+                        st.write(
+                            f"{engine}: {status} · {retention_label}"
+                            + (
+                                f" · {len(result['missing_fields'])} expected field(s) missing"
+                                if result.get("missing_fields")
+                                else ""
+                            )
+                        )
+                        for warning in result.get("warnings", []):
+                            st.caption(warning)
+                    for warning in report.get("warnings", []):
+                        if warning not in {
+                            message
+                            for result in report.get("engines", {}).values()
+                            for message in result.get("warnings", [])
+                        }:
+                            st.caption(warning)
         with right:
             st.markdown("**Your documents**")
             for artifact in artifacts:

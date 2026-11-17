@@ -4,6 +4,12 @@ Date: 2026-11-17. Scope: generated CVs and cover letters, their templates,
 prompts, validation and generation instructions. This is a recommendation record;
 it does not change generation policy, templates or existing applications.
 
+**Implementation follow-up:** the owner approved implementation after this audit.
+Readable layouts, explicit spaces, freshness records, extraction checks and Word
+pagination are implemented in [ADR 0024](DECISIONS/0024-document-quality-and-artifact-freshness.md).
+The observations below describe the pre-change artifacts. Current verification
+and remaining limits are recorded at the top of [PROJECT_STATE.md](PROJECT_STATE.md).
+
 ## Conclusion
 
 The current cover-letter design is a good base: single-column business-letter

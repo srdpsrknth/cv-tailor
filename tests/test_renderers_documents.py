@@ -254,7 +254,7 @@ def test_work_authorization_overrides_the_profile_tagline(tmp_path, content):
 
 
 @needs_latex
-def test_cv_pdf_text_layer_is_ats_clean(rendered_cv, analyst_profile):
+def test_cv_pdf_text_layer_preserves_separate_fields(rendered_cv, analyst_profile):
     """The raw PDF text layer must be free of icon/ligature noise and fuse no fields."""
     from pypdf import PdfReader
 
@@ -264,18 +264,19 @@ def test_cv_pdf_text_layer_is_ats_clean(rendered_cv, analyst_profile):
     for garbled in ('/ne', 'Ὄ', '\ufb00', '\ufb01', '\ufb02', '\ufb03', '\ufb04', '/♀nedn', '/gtb'):
         assert garbled not in raw_text, f'garbled glyph/ligature {garbled!r} in PDF text layer'
 
-    assert f'{analyst_profile.identity.email} | {analyst_profile.identity.phone}' in flat_raw
+    assert f'{analyst_profile.identity.phone} | {analyst_profile.identity.email}' in flat_raw
     assert 'linkedin.com/in/example-alex-sample | github.com/example-alex-sample' in flat_raw
-    assert 'Analytical Engineer | Apr 2023' in flat_raw
+    assert f'Analytical Engineer | {analyst_profile.experience[0].company}' in flat_raw
+    assert 'Apr 2023' in flat_raw
     assert 'present | Sampletown, Germany' in flat_raw
     assert '2018 – 2020 | Sampletown, Germany' in flat_raw
 
-    # Skill and certification tags must have comma delimiters in the extracted text layer.
+    # Skills and certifications use visible delimiters in the extracted text layer.
     assert 'Snowflake' in flat_raw and 'dbt' in flat_raw
     snowflake_to_dbt = flat_raw[flat_raw.index('Snowflake'):flat_raw.index('dbt') + 3]
     assert ',' in snowflake_to_dbt
     cert_line = flat_raw[flat_raw.index('Synthetic Analytics Certificate'):flat_raw.index('Synthetic Reporting Qualification')]
-    assert ',' in cert_line
+    assert ';' in cert_line
 
 
 @needs_latex

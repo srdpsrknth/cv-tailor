@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 import json
 import re
+import hashlib
 
+from services.artifact_provenance import artifact_freshness
 from services.profile_store import validate_profile_id
 
 
@@ -144,7 +146,190 @@ def compare_cv(snapshot, cv):
     return changes
 
 
-def load_review(config, profile_id, job_id):
+def _expected_cv_text(content):
+    cv = content.get("cv") if isinstance(content.get("cv"), dict) else {}
+    summary = cv.get("summary")
+    paragraphs = [item for item in summary if isinstance(item, str)] if isinstance(summary, list) else []
+    fields = {}
+    if isinstance(cv.get("title"), str) and cv["title"].strip():
+        fields["CV title"] = cv["title"]
+    experiences = cv.get("experience")
+    for experience in experiences if isinstance(experiences, list) else []:
+        if not isinstance(experience, dict):
+            continue
+        for key in ("role", "company"):
+            value = experience.get(key)
+            if isinstance(value, str) and value.strip():
+                fields[f"{key.title()} {len(fields) + 1}"] = value
+        for date_key in ("start_date", "end_date"):
+            value = experience.get(date_key)
+            if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}", value):
+                try:
+                    value = datetime.strptime(value, "%Y-%m").strftime("%b %Y")
+                except ValueError:
+                    continue
+                fields[f"Employment date {len(fields) + 1}"] = value
+        bullets = experience.get("bullets")
+        for bullet in bullets if isinstance(bullets, list) else []:
+            if isinstance(bullet, str):
+                paragraphs.append(bullet)
+        projects = experience.get("projects")
+        for project in projects if isinstance(projects, list) else []:
+            if isinstance(project, dict):
+                if isinstance(project.get("name"), str):
+                    paragraphs.append(project["name"])
+                project_bullets = project.get("bullets")
+                if isinstance(project_bullets, list):
+                    paragraphs.extend(
+                        bullet for bullet in project_bullets if isinstance(bullet, str)
+                    )
+    skill_map = cv.get("skills")
+    for skills in skill_map.values() if isinstance(skill_map, dict) else []:
+        for skill in skills if isinstance(skills, list) else []:
+            if isinstance(skill, str) and skill.strip():
+                fields[f"Skill {len(fields) + 1}"] = skill
+    snapshot = content.get("_profile_snapshot")
+    if isinstance(snapshot, dict) and cv.get("include_education") is not False:
+        education_rows = snapshot.get("education")
+        for education in education_rows if isinstance(education_rows, list) else []:
+            if not isinstance(education, dict):
+                continue
+            for key in ("degree", "institution"):
+                value = education.get(key)
+                if isinstance(value, str) and value.strip():
+                    fields[f"Education {len(fields) + 1}"] = value
+    if isinstance(snapshot, dict) and cv.get("include_certifications") is not False:
+        certifications = snapshot.get("certifications")
+        for certification in certifications if isinstance(certifications, list) else []:
+            if isinstance(certification, str) and certification.strip():
+                fields[f"Certification {len(fields) + 1}"] = certification
+    return paragraphs, fields
+
+
+def _expected_letter_text(content):
+    letter = (
+        content.get("cover_letter")
+        if isinstance(content.get("cover_letter"), dict)
+        else {}
+    )
+    letter_paragraphs = letter.get("paragraphs")
+    paragraphs = (
+        [item for item in letter_paragraphs if isinstance(item, str)]
+        if isinstance(letter_paragraphs, list)
+        else []
+    )
+    fields = {}
+    for label, value in (
+        ("Candidate name", letter.get("signature_name")),
+        ("Job title", letter.get("role_title") or content.get("role_title")),
+        ("Company", letter.get("company_name") or content.get("company_name")),
+    ):
+        if isinstance(value, str) and value.strip():
+            fields[label] = value
+    return paragraphs, fields
+
+
+def inspect_application_pdfs(folder, content, snapshot, manifest):
+    """Run local advisory extraction checks on saved PDFs, without invoking Office."""
+    from services.document_quality import inspect_document
+
+    identity = snapshot.get("identity") if isinstance(snapshot, dict) else {}
+    identity = identity if isinstance(identity, dict) else {}
+    pdfs = [path for path in Path(folder).iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
+    key_scopes = {
+        "cv_path": "cv",
+        "cl_pdf_path": "cover_letter",
+    }
+    manifest_paths = {
+        Path(manifest[key]).resolve(): scope
+        for key, scope in key_scopes.items()
+        if isinstance(manifest.get(key), str) and manifest[key].strip()
+    }
+    reports = {}
+    for path in pdfs:
+        scope = manifest_paths.get(path.resolve())
+        if scope is None:
+            scope = "cover_letter" if "cover_letter" in path.stem.lower() else "cv"
+        if scope == "cover_letter":
+            paragraphs, fields = _expected_letter_text(content)
+        else:
+            content_with_snapshot = dict(content)
+            content_with_snapshot["_profile_snapshot"] = snapshot
+            paragraphs, fields = _expected_cv_text(content_with_snapshot)
+        for label in ("Candidate name", "Email"):
+            value = identity.get("full_name" if label == "Candidate name" else "email")
+            if isinstance(value, str) and value.strip():
+                fields[label] = value
+        report = inspect_document(
+            path, expected_paragraphs=paragraphs, expected_fields=fields
+        )
+        limit = 1 if scope == "cover_letter" else 2
+        if isinstance(report.get("page_count"), int) and report["page_count"] > limit:
+            report["warnings"].append(
+                f"This {scope.replace('_', ' ')} PDF has {report['page_count']} pages; the target is {limit}."
+            )
+        reports[path.name] = report
+    return reports
+
+
+def _word_layout_freshness(folder, manifest):
+    saved = manifest.get("word_layout")
+    saved = saved if isinstance(saved, dict) else {}
+    result = {}
+    for path in Path(folder).iterdir():
+        if not path.is_file() or path.suffix.lower() != ".docx":
+            continue
+        row = saved.get(path.name)
+        if not isinstance(row, dict) or not isinstance(row.get("artifact_sha256"), str):
+            result[path.name] = {"status": "unknown", "report": row or {}}
+            continue
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            result[path.name] = {"status": "unknown", "report": row}
+            continue
+        result[path.name] = {
+            "status": "current" if digest == row["artifact_sha256"] else "stale",
+            "report": row,
+        }
+    return result
+
+
+def check_saved_word_layout(config, profile_id, job_id):
+    """Run opt-in Word pagination checks and merge them into the run manifest."""
+    from services.word_layout import inspect_word_layout
+
+    folder = application_folder(config, profile_id, job_id)
+    manifest_path = folder / "source" / "generation_result.json"
+    manifest = {}
+    if manifest_path.exists():
+        try:
+            value = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise ValueError("Cannot save Word pagination because the application manifest is unreadable.") from error
+        if not isinstance(value, dict):
+            raise ValueError("Cannot save Word pagination because the application manifest is not an object.")
+        manifest = value
+    saved = manifest.get("word_layout")
+    if not isinstance(saved, dict):
+        saved = {}
+    report_by_name = {}
+    cover_letter_path = manifest.get("cover_letter_path")
+    cover_letter_name = Path(cover_letter_path).name if isinstance(cover_letter_path, str) else None
+    for path in sorted(folder.iterdir(), key=lambda item: item.name.casefold()):
+        if not path.is_file() or path.suffix.lower() != ".docx":
+            continue
+        is_letter = path.name == cover_letter_name or "cover_letter" in path.stem.casefold()
+        report = inspect_word_layout(path, page_limit=1 if is_letter else 2)
+        saved[path.name] = report
+        report_by_name[path.name] = report
+    manifest["word_layout"] = saved
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report_by_name
+
+
+def load_review(config, profile_id, job_id, *, include_quality=False):
     folder = application_folder(config, profile_id, job_id)
     warnings = []
     manifest = read_json(folder, "generation_result.json", warnings)
@@ -157,6 +342,24 @@ def load_review(config, profile_id, job_id):
     content = read_json(folder, "content.json", warnings)
     snapshot = read_json(folder, "profile_snapshot.json", warnings)
     provenance = read_json(folder, "posting_provenance.json", warnings)
+    saved_artifact_provenance = manifest.get("artifact_provenance")
+    saved_artifact_provenance = (
+        saved_artifact_provenance
+        if isinstance(saved_artifact_provenance, dict)
+        else {}
+    )
+    renderable_files = [
+        path
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in {".pdf", ".docx", ".txt"}
+    ]
+    freshness = artifact_freshness(
+        config.project_root,
+        content,
+        renderable_files,
+        saved_artifact_provenance,
+        profile_snapshot=snapshot or None,
+    )
     cv = content.get("cv") if isinstance(content.get("cv"), dict) else {}
     letter = (
         content.get("cover_letter")
@@ -183,6 +386,13 @@ def load_review(config, profile_id, job_id):
         "content": content,
         "snapshot": snapshot,
         "posting_provenance": provenance,
+        "artifact_freshness": freshness,
+        "word_layout": _word_layout_freshness(folder, manifest),
+        "document_quality": (
+            inspect_application_pdfs(folder, content, snapshot, manifest)
+            if include_quality
+            else {}
+        ),
         "explanation": explanation,
         "warnings": warnings,
         "title": text(content.get("role_title"))

@@ -53,7 +53,10 @@ def test_saved_export_uses_snapshot_and_leaves_sources_unchanged(tmp_path, analy
     from services.upload_cv import export_saved_upload_cv
     from config import Config
 
-    config = Config.from_env(load_env_file=False)
+    config = Config.from_env(
+        load_env_file=False,
+        overrides={"project_root": tmp_path, "profile_store_dir": tmp_path},
+    )
     folder = config.store.outputs_dir('analyst_a') / 'upload_test'
     source = folder / 'source'
     source.mkdir(parents=True)
@@ -62,10 +65,31 @@ def test_saved_export_uses_snapshot_and_leaves_sources_unchanged(tmp_path, analy
     content = read_json('content', 'valid_content.json')
     for name, value in [('content', content), ('profile_snapshot', snapshot)]:
         (source / f'{name}.json').write_text(json.dumps(value), encoding='utf-8')
-    originals = {p.name: p.read_bytes() for p in source.iterdir()}
+    (source / 'generation_result.json').write_text(
+        json.dumps({'status': 'success', 'provider': 'historical',
+                    'artifact_provenance': {'old.pdf': {'artifact_sha256': 'preserve'}}}),
+        encoding='utf-8',
+    )
+    originals = {
+        name: (source / f'{name}.json').read_bytes()
+        for name in ('content', 'profile_snapshot')
+    }
     paths = export_saved_upload_cv(config, 'analyst_a', folder.name)
     assert 'Historical Candidate' in Path(paths['cv_upload_text_path']).read_text(encoding='utf-8')
-    assert originals == {p.name: p.read_bytes() for p in source.iterdir()}
+    assert originals == {
+        name: (source / f'{name}.json').read_bytes()
+        for name in ('content', 'profile_snapshot')
+    }
+    manifest = json.loads((source / 'generation_result.json').read_text(encoding='utf-8'))
+    assert manifest['provider'] == 'historical'
+    assert manifest['artifact_provenance']['old.pdf']['artifact_sha256'] == 'preserve'
+    assert set(Path(paths[key]).name for key in paths) <= set(manifest['artifact_provenance'])
+    from services.application_review import load_review
+    detail = load_review(config, 'analyst_a', folder.name)
+    assert all(
+        detail['artifact_freshness'][Path(path).name]['status'] == 'current'
+        for path in paths.values()
+    )
     with pytest.raises(ValueError):
         export_saved_upload_cv(config, 'marketer_b', folder.name)
     (source / 'profile_snapshot.json').unlink()

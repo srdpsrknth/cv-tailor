@@ -193,7 +193,7 @@ Everything lands in your private store, **not** in this repository:
 Windows:  D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
 macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
 
-    2026_CV_<your_name>_<role>.pdf          <- the formatted CV (ATS-clean text layer)
+    2026_CV_<your_name>_<role>.pdf          <- formatted CV with searchable text; parser behavior varies
     2026_CV_<your_name>_<role>_upload.docx  <- plain single-column Word CV for portal autofill
     2026_CV_<your_name>_<role>_upload.txt   <- plain-text copy for manual portal paste
     2026_cover_letter_<company>_<role>.pdf  <- the cover letter
@@ -226,6 +226,34 @@ automated check reads your documents the way a recruiter will.
 Look for: correct employer names and dates · no orphaned section headings · nothing
 running off the page · the cover letter naming the right company and role · nothing
 invented that you cannot back up in an interview.
+
+The CV uses one column, 10.5pt dark body text, visible skill separators and a compact
+contact block. Work authorization is separate from the professional headline.
+Do not shrink the font to force two pages; remove repeated or less relevant wording
+while preserving your facts and approved project structure.
+
+The Documents tab flags stale files when saved content, profile context, rendering
+files or artifact bytes have changed. Older files without a render record show
+unknown freshness. Existing downloads remain available. Open **PDF text extraction
+checks · advisory** to compare two local parsers with the saved text. These are
+extraction diagnostics, not ATS or AI-authorship scores.
+
+Click **Check Word pagination** to estimate DOCX page counts with LibreOffice if
+installed. This checks each Word file independently and records a hash so an old
+count is not reused after edits. It makes no model call and keeps no extra PDF.
+Missing LibreOffice means unchecked, not passed. Still inspect the actual file in
+the application you will use to submit it.
+
+For a scripted render, add `--check-word-layout` to `scripts/render_application.py`.
+Use `--cv-only` or `--cover-letter-only` when changing just one document. Manual
+wording and filenames remain authoritative; a template refresh does not rewrite prose.
+
+For quantified achievements, keep optional supporting notes privately beside the
+profile, for example `evidence_notes.json`. Record the profile claim it supports,
+the measurement period, baseline/definition, your contribution, and a private
+reference. Leave unknown details explicitly unverified; do not invent a baseline
+or upgrade an approximate result. These notes are for your interview/review use;
+the generator does not load them automatically or treat them as new profile facts.
 
 ---
 
@@ -369,8 +397,10 @@ draft. Missing or damaged historical source files still allow existing downloads
 
 Letters should explain why the particular work is relevant and develop one or two
 examples of what you did and why it mattered, rather than paraphrasing the CV or
-listing the posting's keywords. The existing four paragraphs / 290–310 body words /
-one-page limits still apply. A count passing is not proof that the prose is good.
+listing the posting's keywords. The four-paragraph / 290–310 body-word / one-page
+format is a fixed application requirement. A count passing is not proof that the prose
+is good. The ATS-readable PDF has a searchable text layer, but parser behavior varies;
+neither that nor the plain autofill companion guarantees a screening result.
 
 Optional personal preferences live privately at
 `<store>/profiles/<profile_id>/writing_style.json`:
@@ -437,7 +467,9 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 * **It does not invent facts.** It tailors wording and emphasis from your real
   profile; it will not add a skill or employer you do not have.
 * **Sponsorship and permit wording goes only in cover letters, never the CV.**
-* **Default limits:** CV two pages, cover letter four paragraphs / 290–310 words.
+* **Default limits:** CV two pages, cover letter four paragraphs / 290–310 words. The
+  cover-letter format and word range are fixed application requirements; they do not
+  certify prose quality or ATS compatibility.
 
 ---
 

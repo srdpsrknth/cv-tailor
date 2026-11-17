@@ -3,8 +3,60 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *application quality audit and prioritized recommendations*
+**Latest commit:** *(this commit)* — *readable CVs, extraction checks, artifact freshness and writing guidance*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Application quality audit implementation (2026-11-17)
+
+**Active task:** implement the owner's approved audit recommendations — complete.
+Single-column primary CV now has a 10.5pt dark body, 9.5pt metadata, visible skill
+separators, current location and a separate work-authorization line. Role headers
+and main bullets, and individual projects, stay together in the PDF. Word CV has
+compact contacts/metadata and grouped education. Both PDF templates now emit
+explicit word-space glyphs. The existing business-letter layout remains.
+
+Shared prompts and private voice guidance now favour selected role-specific evidence,
+varied optional transitions and a brief close; colon/semicolon/em-dash and effective
+sign-off validation align with the voice rules. Default closing line is Warm regards.
+Four paragraphs/290–310 body words, factual ownership/status, exact historical titles,
+approved project structure and overseas-support policy are preserved. Existing
+saved prose was not rewritten. Repo and installed application skills are aligned.
+The changed effective voice brief will invalidate the paired generation cache for
+a future request; no paid generation or model comparison was run here.
+
+`artifact_provenance` records scoped content, rendering context/profile, dependencies,
+artifact hashes, schema version and UTC time. Generation, CLI, render script and
+saved autofill export update only rendered artifacts' records. Legacy files stay
+unknown; stale files warn without blocking downloads. Saved review compares PDF
+extraction with pypdf and pdfplumber and offers explicit Word pagination checks.
+The script supports `--check-word-layout`; missing LibreOffice remains unchecked.
+Word counts are tied to the actual DOCX hash. See [ADR 0024](DECISIONS/0024-document-quality-and-artifact-freshness.md).
+
+**Private outputs:** backed up and refreshed all 12 current applications with valid
+editable sources, mirrored configured deliverables and preserved manual alternate
+files. All CV PDFs and Word CVs are 2 pages; all cover-letter PDFs and Word letters
+are 1 page. All 12 `content.json` files and `profile.yaml` remain byte-identical.
+Historical application without editable source was preserved. Initial backup and
+evidence: `<store>/reviews/<profile_id>/layout-implementation-2026-11-17/`
+(`before-refresh-203248/`, `refresh-results.json`, `refresh-cv-results.json`,
+`extraction-current.json`, final page sheets and Word QA). Private writing-style
+and installed-skill backups are kept there too; no candidate artifacts committed.
+
+**Verification:** baseline 1209 passed/3 skipped; final full suite **1245 passed,
+3 skipped**, one existing Google SDK warning, 87.75 seconds. Follow-up voice/upload/
+readability checks: 14 passed. `pip check` and diff whitespace checks pass. All 24
+current PDFs retain 100% of compared normalized source words with zero missing
+checked fields, correct checked reading order and no suspicious glyphs in both
+engines. All 24 DOCX artifacts counted via LibreOffice; all final PDF pages and
+three final Word pairs visually inspected. Live browser check confirmed the saved
+review controls, 2/1-page Word counts and two-engine diagnostics; GUI restarted on
+8502 and health returned 200. No real ATS upload, submission, detector test, new
+live prose or Microsoft Word desktop pagination verification is claimed.
+
+**Next action:** refresh the GUI and use the updated saved deliverables. On the next
+new application, read the fresh prose for voice and inspect actual portal autofill
+before submitting. No blocker. Development changes committed locally; no push
+requested, `master` untouched. The earlier audit remains as pre-change evidence.
 
 ## Full application quality audit (2026-11-17)
 

@@ -204,6 +204,29 @@ def test_render_rejects_malformed_content(tmp_path, capsys):
     assert code != 0
 
 
+def test_render_manifest_merge_preserves_provenance_for_untouched_artifacts(tmp_path):
+    from cli.commands.render import _update_manifest
+
+    path = tmp_path / "source" / "generation_result.json"
+    path.parent.mkdir()
+    path.write_text(
+        json.dumps({"provider": "historical", "artifact_provenance": {"letter.pdf": {"artifact_sha256": "letter"}}}),
+        encoding="utf-8",
+    )
+    _update_manifest(
+        path,
+        {"cv_path": "cv.pdf"},
+        tmp_path,
+        artifact_provenance={"cv.pdf": {"artifact_sha256": "cv"}},
+    )
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    assert manifest["provider"] == "historical"
+    assert manifest["artifact_provenance"] == {
+        "letter.pdf": {"artifact_sha256": "letter"},
+        "cv.pdf": {"artifact_sha256": "cv"},
+    }
+
+
 @pytest.mark.requires_latex
 def test_render_produces_the_documents_without_an_api_key(tmp_path, capsys, no_api_key):
     """The whole point of the render path: real output, zero LLM calls."""

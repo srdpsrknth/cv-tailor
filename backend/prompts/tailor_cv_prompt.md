@@ -66,13 +66,15 @@ WRITING AND FACTUAL RULES
 STRUCTURE AND LENGTH
 - The renderer uses 10pt A4 and includes education, certifications, technologies,
   skills, and languages. Target two readable pages; do not demand a minimum length.
-- Aim for 18-24 responsibility/project bullets combined, roughly 650-750 words
-  across summary, responsibilities and projects. Bullets should be concise,
-  usually one or two lines, without arbitrary character-count restrictions.
+- Use enough relevant responsibility and project bullets to show the candidate's
+  strongest evidence within the page budget. The 18-24 bullet / 650-750 word range is
+  a guide, not a quota; relevance and readable layout take priority. Bullets should be
+  concise, usually one or two lines, without arbitrary character-count restrictions.
 - Do not include every source project as a separate heading. Select or consolidate
   useful evidence. Never repeat the same achievement in both a role and a project.
-- Aklamio: about 5-6 regular bullets on pipelines, orchestration, quality,
-  documentation, and developing MCP/dashboarding. Exactly one selected project:
+- Aklamio: target about 5-6 regular bullets on pipelines, orchestration, quality,
+  documentation, and developing MCP/dashboarding when the job relevance and page budget
+  support them. Exactly one selected project:
   "Traffic Source & Customer Journey Attribution", with exactly three bullets:
   implementation, safe rollout, and customer adoption/impact. Use the source's
   72 brands and all customer success managers where relevant.
@@ -80,9 +82,10 @@ STRUCTURE AND LENGTH
   No years, dates, "in progress", or release labels in project headings.
 - Use external vocabulary: traffic sources, customer journeys, business logic,
   customer success managers. Avoid "Entrypoints v2", internal table names and la/int/dl.
-- Give NeoTaste, ecoligo, and heycar meaningful relevant detail. Default about
-  2-3 regular bullets per role and 1-2 brief relevant projects; project bullets can
-  be one or two, except Aklamio's three. Do not fabricate responsibilities for
+- Give NeoTaste, ecoligo, and heycar meaningful relevant detail. About 2-3 regular
+  bullets per role and 1-2 brief relevant projects are guides; select fewer when the
+  evidence is less relevant and do not add projects just to reach a count. Project
+  bullets can be one or two, except Aklamio's exactly three. Do not fabricate responsibilities for
   ORMIT or Unilever, whose profile bullets are empty.
 - Keep education and certifications. Use 3-4 compact skill categories with the
   most relevant EXISTING skills, not every available skill or target-job tool.

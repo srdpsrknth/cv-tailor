@@ -95,5 +95,5 @@ class TailoredCoverLetter(BaseModel):
     role_title: str
     company_name: str
     paragraphs: List[str] = Field(default_factory=list)
-    closing_line: str = "Sincerely,"
+    closing_line: str = "Warm regards,"
     signature_name: str = ""

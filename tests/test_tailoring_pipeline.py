@@ -678,6 +678,25 @@ def test_cover_letter_rejects_colons_and_semicolons_in_paragraphs(
         service._validate_cover_letter(TailoredCoverLetter.model_validate(payload), analyst_profile)
 
 
+def test_cover_letter_rejects_em_dash_in_body(analyst_profile, analyst_session):
+    payload = analyst_session.step_payload('cover_letter')['cover_letter']
+    payload['paragraphs'][0] = payload['paragraphs'][0].replace(
+        '.', ' — a useful detail.', 1
+    )
+    with pytest.raises(ValueError, match='em dash'):
+        service._validate_cover_letter(TailoredCoverLetter.model_validate(payload), analyst_profile)
+
+
+def test_cover_letter_rejects_effective_closing_line_repeated_in_body(
+    analyst_profile, analyst_session,
+):
+    payload = analyst_session.step_payload('cover_letter')['cover_letter']
+    payload['closing_line'] = 'All the best,'
+    payload['paragraphs'][0] = 'All the best, ' + payload['paragraphs'][0]
+    with pytest.raises(ValueError, match='closing line'):
+        service._validate_cover_letter(TailoredCoverLetter.model_validate(payload), analyst_profile)
+
+
 def test_home_country_cover_letter_rejects_visa_or_sponsorship_wording(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):

@@ -6,6 +6,15 @@
 **Status:** Assessment complete. **Decisions approved 2026-10-23** (§11). Phase 1 implemented
 and complete; this document is retained as the Phase 0 record of what was found.
 
+> **Application quality follow-up (2026-11-17):** `services/artifact_provenance.py`
+> records render inputs/dependencies and artifact hashes in optional manifest fields;
+> `services/document_quality.py` compares PDF extraction with two independent engines;
+> `services/word_layout.py` estimates Word pagination on explicit request only.
+> The existing saved-review service/UI expose these advisory checks. The primary CV
+> now uses a plain article template with 10.5pt body text and visible separators;
+> Word CV export remains sequential with compact grouped metadata. No orchestration,
+> framework or storage replacement. See [ADR 0024](DECISIONS/0024-document-quality-and-artifact-freshness.md).
+
 > **Implemented update (2026-11-17):** the Streamlit UI now has a shared saved-application
 > review view (`ui/review.py`), with framework-free read/compare logic in
 > `services/application_review.py`, reached through `ui/services_bridge.py`. Optional

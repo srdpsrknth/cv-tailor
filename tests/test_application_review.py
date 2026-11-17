@@ -64,6 +64,133 @@ def test_legacy_and_corrupt_files_remain_viewable(review_config):
     assert detail["explanation"] == {}
     assert detail["warnings"]
     assert detail["status"] == "Legacy / incomplete"
+    assert detail["artifact_freshness"]["cv.pdf"]["status"] == "unknown"
+
+
+def test_review_marks_edited_content_stale_but_keeps_artifact_downloadable(review_config):
+    from services.artifact_provenance import record_artifact_provenance
+
+    folder = save_application(
+        review_config,
+        content={"cv": {"summary": ["Original"]}, "cover_letter": {}},
+    )
+    artifact = folder / "cv.pdf"
+    artifact.write_bytes(b"saved PDF")
+    content = {"cv": {"summary": ["Original"]}, "cover_letter": {}}
+    manifest_path = folder / "source/generation_result.json"
+    manifest = {
+        "status": "success",
+        "artifact_provenance": record_artifact_provenance(
+            review_config.project_root, content, [(artifact, "cv")]
+        ),
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (folder / "source/content.json").write_text(
+        json.dumps({"cv": {"summary": ["Manual edit"]}, "cover_letter": {}}),
+        encoding="utf-8",
+    )
+
+    detail = bridge.load_application(review_config, "analyst_a", "northwind")
+
+    assert detail["artifact_freshness"]["cv.pdf"]["status"] == "stale"
+    assert "cv.pdf" in {item["name"] for item in detail["artifacts"]}
+
+
+def test_word_pagination_check_is_explicit_and_manifest_merge_preserves_sources(
+    review_config, monkeypatch
+):
+    import hashlib
+    from services.application_review import check_saved_word_layout
+
+    folder = save_application(
+        review_config,
+        content={"company_name": "Northwind", "role_title": "Analyst"},
+        generation_result={"status": "success", "provider": "historical"},
+    )
+    (folder / "cover_letter.docx").write_bytes(b"letter bytes")
+    source_content = (folder / "source/content.json").read_bytes()
+
+    def inspect(path, *, page_limit):
+        return {
+            "status": "checked",
+            "page_count": 1,
+            "page_limit": page_limit,
+            "engine": "LibreOffice",
+            "artifact_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "warnings": [],
+        }
+
+    monkeypatch.setattr("services.word_layout.inspect_word_layout", inspect)
+    reports = check_saved_word_layout(review_config, "analyst_a", "northwind")
+
+    assert reports["cover_letter.docx"]["page_limit"] == 1
+    assert (folder / "source/content.json").read_bytes() == source_content
+    detail = bridge.load_application(review_config, "analyst_a", "northwind")
+    assert detail["manifest"]["provider"] == "historical"
+    assert detail["word_layout"]["cover_letter.docx"]["status"] == "current"
+
+    (folder / "cover_letter.docx").write_bytes(b"edited")
+    detail = bridge.load_application(review_config, "analyst_a", "northwind")
+    assert detail["word_layout"]["cover_letter.docx"]["status"] == "stale"
+
+
+def test_saved_pdf_quality_review_uses_expected_source_and_snapshot(review_config, monkeypatch):
+    from services.application_review import load_review
+
+    profile_snapshot = {"identity": {"full_name": "Candidate", "email": "c@example.invalid"}}
+    content = {
+        "role_title": "Analyst",
+        "company_name": "Northwind",
+        "cv": {"summary": ["CV summary"], "experience": []},
+        "cover_letter": {
+            "role_title": "Analyst",
+            "company_name": "Northwind",
+            "paragraphs": ["Letter body"],
+            "signature_name": "Candidate",
+        },
+    }
+    folder = save_application(
+        review_config,
+        content=content,
+        profile_snapshot=profile_snapshot,
+        generation_result={"cv_path": str(review_config.store.outputs_dir("analyst_a") / "northwind" / "cv.pdf")},
+    )
+    (folder / "cv.pdf").write_bytes(b"PDF")
+    (folder / "cover_letter.pdf").write_bytes(b"PDF")
+    seen = []
+
+    def inspect(path, *, expected_paragraphs, expected_fields):
+        seen.append((path.name, expected_paragraphs, expected_fields))
+        return {"page_count": 3 if path.name == "cv.pdf" else 1,
+                "engines": {}, "warnings": []}
+
+    monkeypatch.setattr("services.document_quality.inspect_document", inspect)
+    detail = load_review(review_config, "analyst_a", "northwind", include_quality=True)
+
+    assert len(seen) == 2
+    expected_by_file = {name: paragraphs for name, paragraphs, _fields in seen}
+    assert "CV summary" in expected_by_file["cv.pdf"]
+    assert "Letter body" in expected_by_file["cover_letter.pdf"]
+    assert detail["document_quality"]["cv.pdf"]["warnings"]
+    assert not detail["document_quality"]["cover_letter.pdf"]["warnings"]
+
+
+def test_pdf_quality_review_tolerates_invalid_optional_source_shapes(review_config, monkeypatch):
+    from services.application_review import load_review
+
+    folder = save_application(
+        review_config,
+        content={"cv": {"summary": None, "experience": [None], "skills": None},
+                 "cover_letter": {"paragraphs": None}},
+        profile_snapshot={"identity": None, "education": None},
+    )
+    (folder / "cv.pdf").write_bytes(b"PDF")
+    monkeypatch.setattr(
+        "services.document_quality.inspect_document",
+        lambda path, **kwargs: {"page_count": None, "engines": {}, "warnings": []},
+    )
+    detail = load_review(review_config, "analyst_a", "northwind", include_quality=True)
+    assert detail["document_quality"]["cv.pdf"]
 
 
 @pytest.mark.parametrize(
@@ -176,6 +303,10 @@ def test_cache_manifest_distinguishes_current_from_original_usage(
     )
     assert manifest["cache_hit"] is True
     assert manifest["created_at"]
+    provenance = manifest["artifact_provenance"]
+    assert Path(second.cv_path).name in provenance
+    assert provenance[Path(second.cv_path).name]["schema_version"] == 1
+    assert provenance[Path(second.cv_path).name]["profile_sha256"]
     third = tailor_documents(analyst_session.job_description_text, analyst_profile)
     assert third.original_usage["total_tokens"] == second.original_usage["total_tokens"]
 
