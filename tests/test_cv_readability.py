@@ -2,6 +2,7 @@
 
 from collections import Counter
 from pathlib import Path
+import re
 
 import pytest
 from docx import Document
@@ -60,6 +61,47 @@ def test_letter_preserves_spaces_with_default_extraction(tmp_path, analyst_profi
         text = " ".join(" ".join(p.extract_text().split()) for p in pdf.pages)
     for paragraph in cl.paragraphs:
         assert " ".join(paragraph.split()) in text
+
+
+@pytest.mark.requires_latex
+@pytest.mark.skipif(not latex_available(), reason="LaTeX unavailable")
+@pytest.mark.parametrize(
+    "headline",
+    [
+        "Analytical Engineer",
+        "Senior Data Analyst | Business Intelligence & Growth Analytics",
+    ],
+)
+def test_contact_block_is_top_right_and_all_fields_remain_extractable(
+    tmp_path, analyst_profile, headline
+):
+    import pdfplumber
+    from pypdf import PdfReader
+
+    cv = TailoredCV.model_validate(read_json("content", "valid_content.json")["cv"])
+    cv.title = headline
+    path = LaTeXRenderer(outputs_dir=tmp_path).render_cv(cv, analyst_profile)
+    with pdfplumber.open(path) as pdf:
+        first = pdf.pages[0]
+        email = first.search(re.escape(analyst_profile.identity.email))[0]
+        name = first.search(analyst_profile.identity.full_name.upper())[0]
+        assert email["x0"] > first.width / 2
+        assert email["top"] < name["top"] + 25, "Contact block belongs beside the name"
+        text = " ".join(page.extract_text() or "" for page in pdf.pages)
+    texts = [text, " ".join(page.extract_text() for page in PdfReader(path).pages)]
+    identity = analyst_profile.identity
+    for extracted in texts:
+        normalized = " ".join(extracted.split())
+        assert headline in normalized, "Headline must not interleave with contact lines"
+        for value in (
+            identity.location,
+            identity.phone,
+            identity.email,
+            "linkedin.com/in/example-alex-sample",
+            "github.com/example-alex-sample",
+            identity.visa_status,
+        ):
+            assert value in normalized
 
 
 def test_word_cv_groups_education_and_uses_compact_contacts(tmp_path, analyst_profile):

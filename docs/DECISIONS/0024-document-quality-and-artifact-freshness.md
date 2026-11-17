@@ -18,6 +18,15 @@ aligned date/location text, subtle employer dividers and lighter project labels.
 The visual treatment is reversible template styling; it does not justify a smaller
 body font, columns, hidden separators or changes to approved application wording.
 
+**Owner-requested compact top block, 2026-11-17:** the PDF may pair the name on the
+left with right-aligned contact and work-authorization text on the right. This is
+ordinary body content, not a page header/footer or text box; the main sections stay
+single-column. Put the professional headline on its own full-width line below to
+prevent contact lines interleaving with a wrapped title in coordinate extraction.
+Keep the Word companion's stacked contact paragraphs. This limited top arrangement
+supersedes the blanket no-columns wording above only for this requested design;
+passing local extraction checks does not certify every ATS parser.
+
 Saved manifests may contain `artifact_provenance` keyed by filename, with schema
 version, UTC recording time and SHA-256 hashes of relevant content, render context,
 actual profile snapshot, rendering dependencies and artifact bytes. Scoped renders

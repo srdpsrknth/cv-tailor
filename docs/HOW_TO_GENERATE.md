@@ -227,11 +227,16 @@ Look for: correct employer names and dates · no orphaned section headings · no
 running off the page · the cover letter naming the right company and role · nothing
 invented that you cannot back up in an interview.
 
-The CV uses one column, 10.5pt dark body text, visible skill separators and a compact
-contact block. Work authorization is separate from the professional headline.
+The CV body uses one column, 10.5pt dark body text and visible skill separators.
+At the top, your name is on the left and contact/work-authorization details are
+right-aligned beside it, in ordinary document-body text. The professional headline
+starts on its own full-width line below this block so long titles do not interleave
+with the contact details in text extraction. This compact top arrangement is a
+design tradeoff, not a universal ATS guarantee. The Word autofill companion keeps
+its simple stacked contact paragraphs for portals that need a more conservative format.
 The refined PDF design uses a charcoal name, navy role headings, separate company
 labels, aligned date/location text, subtle employer dividers and lighter project
-labels. It keeps one sequential text column; no sidebar, skill graphics or hidden
+labels. The main sections keep one sequential text column; no sidebar, skill graphics or hidden
 text is needed for the visual hierarchy.
 Do not shrink the font to force two pages; remove repeated or less relevant wording
 while preserving your facts and approved project structure.

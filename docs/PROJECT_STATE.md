@@ -3,8 +3,42 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *refine CV hierarchy while preserving readable text and extraction*
+**Latest commit:** *(this commit)* — *compact right-aligned PDF contact block with extraction checks*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Compact top-right CV contacts (2026-11-17)
+
+**Active task:** put location, phone, email, LinkedIn, GitHub and authorization at
+the top right to save space, with explicit parser checks — complete. Primary PDF
+now pairs the name on the left with 9.5pt right-aligned contact text in the document
+body. The professional headline is full-width below this block. Main content stays
+single-column. The Word autofill companion keeps its stacked paragraphs.
+
+An initial trial kept the headline beside contacts, but pdfplumber interleaved a
+wrapped Artsy headline with contact lines. That trial was rejected. Separate
+full-width headline placement fixes this in both tested extractors, including a
+long-title synthetic regression. The accepted version saves 15.5–15.7pt (about
+5.5mm) before Professional Experience in all 12 current CVs. Body and metadata sizes
+are unchanged; all remain two pages. Contact text is not in a page header/footer,
+table, text box or image, but the paired top arrangement is still a parser tradeoff,
+not universal ATS certification. See ADR 0024's requested exception.
+
+**Verification:** focused real-render checks 45 passed; final full suite **1247
+passed, 3 skipped**, one existing Google SDK warning, 92.23 seconds. All 12 actual
+PDFs passed two-engine source-word/field/order checks and explicit candidate name,
+location, phone, email, LinkedIn, GitHub and authorization checks. All pages visually
+inspected, glyph bounds/languages/freshness/mirrors verified, Word companions still
+two pages via LibreOffice. One initial baseline hit an intermittent space-glyph
+extraction mismatch; it was not reproduced in targeted reruns or the subsequent
+full runs. No retention assertion was relaxed to hide it.
+
+Saved CVs refreshed after private backup; content.json, profile facts and cover-letter
+files remain byte-identical. Evidence and screenshots:
+`<store>/reviews/<profile_id>/cv-header-refinement-2026-11-17/`.
+No paid generation, real ATS upload or Word desktop test. Guide and installed
+application skill aligned. **Next action:** refresh the PDF preview; use the stacked
+Word companion if a portal's autofill struggles. No blocker. Local development
+commit only; no push requested and master untouched.
 
 ## CV visual refinement (2026-11-17)
 

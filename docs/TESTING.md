@@ -1,8 +1,16 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17):** **1245 passed, 3 skipped**, 1 existing Google SDK warning, 91.72 seconds (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
+**Current baseline (2026-11-17):** **1247 passed, 3 skipped**, 1 existing Google SDK warning, 92.23 seconds (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes tests that require LaTeX.
+
+Compact PDF contact-block regressions in `test_cv_readability.py` assert actual
+top-right placement and intact contact fields/headline in both extractors for short
+and long titles. A trial that wrapped the headline beside contact rows failed a
+real application field check; the accepted layout gives the title a full-width row.
+During this work an initial full run showed a space-glyph extraction mismatch in
+an existing readability check; focused reruns and subsequent full runs passed.
+Retain exact word/field checks if investigating a recurrence.
 
 Application-quality follow-up adds real-render typography and default word-boundary
 checks in `test_cv_readability.py`, independent PDF diagnostics in

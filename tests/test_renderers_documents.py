@@ -264,8 +264,9 @@ def test_cv_pdf_text_layer_preserves_separate_fields(rendered_cv, analyst_profil
     for garbled in ('/ne', 'Ὄ', '\ufb00', '\ufb01', '\ufb02', '\ufb03', '\ufb04', '/♀nedn', '/gtb'):
         assert garbled not in raw_text, f'garbled glyph/ligature {garbled!r} in PDF text layer'
 
-    assert f'{analyst_profile.identity.phone} | {analyst_profile.identity.email}' in flat_raw
-    assert 'linkedin.com/in/example-alex-sample | github.com/example-alex-sample' in flat_raw
+    for contact in (analyst_profile.identity.phone, analyst_profile.identity.email,
+                    'linkedin.com/in/example-alex-sample', 'github.com/example-alex-sample'):
+        assert contact in flat_raw
     assert analyst_profile.experience[0].company in flat_raw
     assert 'Analytical Engineer' in flat_raw
     assert 'Apr 2023' in flat_raw

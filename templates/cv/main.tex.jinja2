@@ -30,15 +30,23 @@
 {% endraw %}
 \begin{document}
 \normalsize\color{bodytext}
+% The compact top block stays in the document body, never a page header/footer.
+% Offset the initial minipage baseline to retain the previous top text position.
+\vspace*{-22pt}
+\noindent\begin{minipage}[t]{0.485\linewidth}
+\vspace{0pt}
 {\fontsize{26}{29}\selectfont\bfseries\color{bodytext}\MakeUppercase{{ "{" }}{{ name }}{{ "}" }}\par}
-\vspace{3pt}
-{\fontsize{11}{13}\selectfont\bfseries\color{accent}{{ tagline }}\par}
-\vspace{3pt}
-{\metadata\color{muted}
-{{ location }}{% if phone %} | {{ phone }}{% endif %}{% if email %} | {{ email }}{% endif %}\par
-{% if linkedin %}\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}{% endif %}{% if github %}{% if linkedin %} | {% endif %}\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}{% endif %}\par
-{% if work_authorization %}Work authorization: {{ work_authorization }}\par{% endif %}
-}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.495\linewidth}
+\vspace{0pt}
+\raggedleft\metadata\color{muted}
+{{ location }}{% if phone %} | {{ phone }}{% endif %}{% if email %} | \href{{ '{' }}mailto:{{ email }}{{ '}' }}{{ '{' }}{{ email }}{{ '}' }}{% endif %}\par
+
+{% if linkedin %}\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}\par{}{% endif %}
+{% if github %}\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}\par{}{% endif %}
+{% if work_authorization %}Work authorization: {{ work_authorization }}\par{}{% endif %}
+\end{minipage}\par
+\vspace{4pt}{\fontsize{11}{13}\selectfont\bfseries\color{accent}{{ tagline }}\par}
 {% if summary %}
 \vspace{8pt}
 {{ summary|join(' ') }}\par
