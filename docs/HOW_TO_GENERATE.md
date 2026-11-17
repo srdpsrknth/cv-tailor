@@ -16,6 +16,12 @@ The web interface has four pages: **Generate**, **Find jobs**, **Applications** 
 in the browser and vice versa. **The command line is the supported path for anything
 that goes wrong** — it has clearer errors and no browser in the way.
 
+**Windows shortcut:** double-click **CV Tailor** on the desktop or find it in the
+Start menu. It starts the GUI and opens your browser automatically. Choose your
+profile in the sidebar, then use Generate or Find jobs. Closing the browser leaves
+the app running; **Stop CV Tailor** shuts it down. To install these shortcuts, see
+[DEVELOPMENT.md](DEVELOPMENT.md#windows-gui-shortcuts).
+
 **This guide works on Windows and macOS.** The only difference is how you write the
 *interpreter path* — everything else, including every option, is identical:
 

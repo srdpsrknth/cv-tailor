@@ -34,6 +34,35 @@ git worktree add -b refactor/architecture-v2 ../cv-tailor-next master
 
 ## Environment isolation
 
+### Windows GUI shortcuts
+
+After installing the environment, run from the checkout:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install_windows_shortcuts.ps1
+```
+
+This installs **CV Tailor** and **Stop CV Tailor** on the current user's desktop
+and under **CV Tailor** in the Start menu. No administrator rights are needed.
+Double-click **CV Tailor** to start Streamlit in the background and open the browser
+after its health endpoint is ready. Reopening reuses the running GUI. Closing the
+browser leaves it running; use **Stop CV Tailor** to release the port.
+
+The launcher derives the checkout path, uses its `.venv`, reads `UI_PORT` from its
+`.env`, and binds to `127.0.0.1` only. It starts the GUI alone: generation runs in
+process, so FastAPI is optional. The explicit profile picker remains required.
+It refuses to reuse or stop another program occupying the port. Startup failures
+appear in a dialog; logs are `.runtime/logs/gui.stdout.log` and `gui.stderr.log`.
+Run the installer again after moving the checkout. The shortcuts contain local
+paths; they are installed on the machine, never committed.
+
+For terminal diagnostics without opening the browser:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows_gui.ps1 -NoBrowser
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows_gui.ps1 -Stop -NoBrowser
+```
+
 Each worktree needs **its own** `.venv`, `.env`, logs and ports.
 
 Generated documents do **not** live in either worktree: since ADR 0011 they are written to the

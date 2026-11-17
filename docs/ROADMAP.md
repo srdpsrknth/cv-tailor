@@ -456,6 +456,11 @@ LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
 
 ## Phase 6 — UI and deployment
 
+**Windows local launch (2026-11-17):** desktop and Start-menu open/stop shortcuts
+installable with `scripts/install_windows_shortcuts.ps1`. The launcher starts only
+the GUI, waits for readiness, reuses this checkout's running instance, and keeps
+the service on loopback. Hosted deployment and authentication remain open.
+
 **Status: IN PROGRESS (2026-11-15) — the interface has been rebuilt; deployment and the
 remaining scope are open.** See [ADR 0020](DECISIONS/0020-streamlit-refactor.md).
 

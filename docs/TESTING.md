@@ -1,8 +1,15 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **1150 passed, 3 skipped**, 1 warning, ~68 s on macOS, fully offline — no paid API calls.
+**Current baseline:** **1150 passed, 3 skipped**, 1 warning, ~68 s on macOS / ~143 s on Windows, fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+
+Windows launcher smoke checks (2026-11-17): run `scripts/windows_gui.ps1 -NoBrowser`
+with Windows PowerShell 5.1, check `/_stcore/health`, launch again and assert the
+listener PID is unchanged, then use `-Stop -NoBrowser` and confirm port release.
+Restart and verify shortcut targets. An unrelated listener on an overridden
+`UI_PORT` must be refused, including by stop. These checks passed. Real-store
+AppTest also completed with zero exceptions; no paid generation was run.
 
 The merged baseline includes the 1142-test upstream UI update and eight local CLI/
 correction-feedback regression cases. The full suite was verified after merging

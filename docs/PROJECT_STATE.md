@@ -1,10 +1,41 @@
 # Project state
 
-**Last updated:** 2026-11-15
+**Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
-**Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this merge)* — *pull the rebuilt UI from GitHub and preserve the local CLI repair*
+**Worktree:** `D:\coding\cv-tailor-next` (Windows)
+**Latest commit:** *(this commit)* — *Windows GUI launcher and desktop shortcuts*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Windows GUI setup (2026-11-17)
+
+**Active task:** Windows setup and convenient GUI launch — complete. Fast-forwarded
+the development worktree from `eddcf35` to GitHub's `854d24c`, preserving the Mac CLI
+repair. The stable `master` worktree is untouched.
+
+Added `scripts/windows_gui.ps1` and `scripts/install_windows_shortcuts.ps1`.
+**CV Tailor** / **Stop CV Tailor** shortcuts are installed on this machine's desktop
+and Start menu. The open shortcut starts Streamlit only, hidden and on loopback,
+waits for health, then opens the browser. Reopening reuses this checkout's process;
+stop verifies the listener's command line. Ports come from `.env`; the profile
+picker remains explicit. Logs stay under `.runtime/logs/`.
+
+Verified on Windows PowerShell 5.1: start, health HTTP 200, repeat launch with the
+same PID, stop/restart, refusal to stop an unrelated listener, shortcut targets and
+arguments, and browser-open launcher path. Real-store AppTest: zero exceptions.
+`pip check` passes. Baseline and final suite: **1150 passed, 3 skipped**, one
+existing Google SDK deprecation warning.
+
+**Remaining verification limit:** `doctor` passes Python, venv, store/profile,
+timezone, templates, MiKTeX and key-presence checks, but Python's output write probe
+is denied in this agent session. PowerShell can write/delete a disposable probe in
+the same output directory. The documented agent-environment caveat still applies;
+this session does not prove a desktop generation can write there. No permissions
+were broadened, no private data changed, and no paid generation/key verification
+was run. Confirm `doctor` from a normal Windows terminal before first generation.
+
+**Next action:** use the desktop GUI, explicitly select a profile, and confirm a
+normal-terminal `doctor` run. Then resume remaining Phase 6 deployment scope;
+hosted authentication and Phase 5 application management remain open.
 
 ## Where the project stands (2026-11-15)
 
