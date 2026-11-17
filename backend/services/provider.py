@@ -32,6 +32,7 @@ Provider facts verified from the providers' own documentation on 2026-10-26:
   therefore also sends ``provider.require_parameters: true``, so the request is not
   routed to an endpoint that would ignore the schema entirely.
 """
+
 from __future__ import annotations
 
 import json
@@ -67,6 +68,10 @@ MAX_RETRY_DELAY_SECONDS = 30
 #: OpenRouter's OpenAI-compatible endpoint.
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+#: Application title and site URL sent to OpenRouter so requests are attributed in the dashboard.
+OPENROUTER_APP_TITLE = "CV Tailor"
+OPENROUTER_APP_URL = "https://github.com/srdpsrknth/cv-tailor"
+
 
 class ProviderError(Exception):
     """A provider call failed after its retries.
@@ -99,6 +104,9 @@ class ProviderResponse:
     output_tokens: int
     #: The provider's own charge for this call in USD, when it reports one.
     reported_cost_usd: Optional[float] = None
+    #: The provider's returned identifier, never inferred from our request.
+    reported_model: Optional[str] = None
+    request_id: Optional[str] = None
 
 
 class Provider:
@@ -145,8 +153,13 @@ class GeminiProvider(Provider):
     #: Models given the low thinking level, to protect the document budget.
     LOW_THINKING_MODELS = ("gemini-3.8-flash",)
 
-    def __init__(self, api_key: str, temperature: float = 0.3, max_output_tokens: int = 8000,
-                 default_model: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: str,
+        temperature: float = 0.3,
+        max_output_tokens: int = 8000,
+        default_model: Optional[str] = None,
+    ):
         self.client = genai.Client(api_key=api_key)
         self.temperature = temperature
         self.max_output_tokens = max_output_tokens
@@ -175,7 +188,9 @@ class GeminiProvider(Provider):
                     config.response_schema = schema
 
                 response = self.client.models.generate_content(
-                    model=resolved_model, contents=prompt, config=config,
+                    model=resolved_model,
+                    contents=prompt,
+                    config=config,
                 )
 
                 # A non-STOP finish reason is the truncation signal; log it rather
@@ -196,8 +211,12 @@ class GeminiProvider(Provider):
                 # (LOW_THINKING_MODELS), so reading only ``candidates_token_count``
                 # under-reported output tokens -- and therefore the cost -- on exactly
                 # the model this project ships. Summing the two is the billed figure.
-                candidates = (getattr(usage, "candidates_token_count", 0) or 0) if usage else 0
-                thoughts = (getattr(usage, "thoughts_token_count", 0) or 0) if usage else 0
+                candidates = (
+                    (getattr(usage, "candidates_token_count", 0) or 0) if usage else 0
+                )
+                thoughts = (
+                    (getattr(usage, "thoughts_token_count", 0) or 0) if usage else 0
+                )
                 return ProviderResponse(
                     text=response.text,
                     input_tokens=(usage.prompt_token_count if usage else 0) or 0,
@@ -206,12 +225,16 @@ class GeminiProvider(Provider):
                     # ``usage_metadata`` (verified against ai.google.dev, 2026-10-26),
                     # so this stays None and the caller prices it from the table.
                     reported_cost_usd=None,
+                    reported_model=getattr(response, "model_version", None),
+                    request_id=getattr(response, "response_id", None),
                 )
             except Exception as error:  # noqa: BLE001 -- re-raised as ProviderError
                 last_error = error
                 if attempt < MAX_REQUEST_ATTEMPTS - 1:
-                    wait_time = 2 ** attempt
-                    print(f"Gemini API error (attempt {attempt + 1}/{MAX_REQUEST_ATTEMPTS}): {error}")
+                    wait_time = 2**attempt
+                    print(
+                        f"Gemini API error (attempt {attempt + 1}/{MAX_REQUEST_ATTEMPTS}): {error}"
+                    )
                     print(f"Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
 
@@ -230,8 +253,14 @@ class OpenRouterProvider(Provider):
 
     name = "openrouter"
 
-    def __init__(self, api_key: str, temperature: float = 0.3, max_output_tokens: int = 8000,
-                 default_model: Optional[str] = None, timeout: int = 120):
+    def __init__(
+        self,
+        api_key: str,
+        temperature: float = 0.3,
+        max_output_tokens: int = 8000,
+        default_model: Optional[str] = None,
+        timeout: int = 120,
+    ):
         if not api_key:
             raise ProviderError(
                 "An OpenRouter API key is required. Set OPENROUTER_API_KEY in .env "
@@ -282,7 +311,9 @@ class OpenRouterProvider(Provider):
             "model": resolved_model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": self.temperature,
-            "max_tokens": max_tokens if max_tokens is not None else self.max_output_tokens,
+            "max_tokens": (
+                max_tokens if max_tokens is not None else self.max_output_tokens
+            ),
         }
         if schema is not None:
             payload["response_format"] = self._response_format(schema)
@@ -312,13 +343,18 @@ class OpenRouterProvider(Provider):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
+            "HTTP-Referer": OPENROUTER_APP_URL,
+            "X-Title": OPENROUTER_APP_TITLE,
         }
 
         last_error: Optional[Exception] = None
         for attempt in range(MAX_REQUEST_ATTEMPTS):
             try:
                 response = requests.post(
-                    OPENROUTER_CHAT_URL, headers=headers, json=payload, timeout=self.timeout,
+                    OPENROUTER_CHAT_URL,
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout,
                 )
                 # ``require_parameters`` can leave a model with no eligible endpoint at
                 # all, which OpenRouter reports as a **404** rather than a 400. That is
@@ -327,23 +363,27 @@ class OpenRouterProvider(Provider):
                 # request -- which would spend three attempts failing the same way.
                 # Measured 2026-10-26 on claude-haiku-5.5, gpt-6-luna and
                 # claude-sonnet-5, where the same request without this field succeeds.
-                if (
-                    response.status_code == 404
-                    and (payload.get("provider") or {}).get("require_parameters")
+                if response.status_code == 404 and (payload.get("provider") or {}).get(
+                    "require_parameters"
                 ):
                     logger.warning(
                         "OpenRouter found no endpoint for %s that satisfies "
-                        "require_parameters; retrying without it.", resolved_model,
+                        "require_parameters; retrying without it.",
+                        resolved_model,
                     )
                     payload["provider"] = {"require_parameters": False}
                     response = requests.post(
-                        OPENROUTER_CHAT_URL, headers=headers, json=payload,
+                        OPENROUTER_CHAT_URL,
+                        headers=headers,
+                        json=payload,
                         timeout=self.timeout,
                     )
                 response.raise_for_status()
                 data = response.json()
                 if "error" in data and "choices" not in data:
-                    raise ProviderError(f"OpenRouter returned an error: {data['error']}")
+                    raise ProviderError(
+                        f"OpenRouter returned an error: {data['error']}"
+                    )
                 choices = data.get("choices") or []
                 if not choices:
                     raise ProviderError("OpenRouter returned no choices.")
@@ -351,6 +391,14 @@ class OpenRouterProvider(Provider):
                 usage = data.get("usage") or {}
                 return ProviderResponse(
                     text=text,
+                    reported_model=(
+                        data.get("model")
+                        if isinstance(data.get("model"), str)
+                        else None
+                    ),
+                    request_id=(
+                        data.get("id") if isinstance(data.get("id"), str) else None
+                    ),
                     input_tokens=usage.get("prompt_tokens", 0) or 0,
                     output_tokens=usage.get("completion_tokens", 0) or 0,
                     # OpenRouter's own figure for what this call was charged, in USD.
@@ -394,7 +442,9 @@ class OpenRouterProvider(Provider):
                     # provider that is down for minutes fails rather than hanging a paid
                     # run indefinitely.
                     wait_time = _retry_delay(attempt, error)
-                    print(f"OpenRouter error (attempt {attempt + 1}/{MAX_REQUEST_ATTEMPTS}): {error}")
+                    print(
+                        f"OpenRouter error (attempt {attempt + 1}/{MAX_REQUEST_ATTEMPTS}): {error}"
+                    )
                     print(f"Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
 
@@ -419,8 +469,10 @@ def _retry_delay(attempt: int, error: Exception) -> int:
     text = str(error).lower()
     rate_limited = "429" in text or "too many requests" in text
     if rate_limited:
-        return min(RATE_LIMIT_BASE_DELAY_SECONDS * (2 ** attempt), MAX_RETRY_DELAY_SECONDS)
-    return 2 ** attempt
+        return min(
+            RATE_LIMIT_BASE_DELAY_SECONDS * (2**attempt), MAX_RETRY_DELAY_SECONDS
+        )
+    return 2**attempt
 
 
 def build_provider(config, api_key: Optional[str] = None) -> Provider:
@@ -449,7 +501,9 @@ def build_provider(config, api_key: Optional[str] = None) -> Provider:
         "max_output_tokens": getattr(config, "max_output_tokens", 8000),
         "default_model": getattr(config, "model", None),
     }
-    return (GeminiProvider if provider_name == "gemini" else OpenRouterProvider)(**options)
+    return (GeminiProvider if provider_name == "gemini" else OpenRouterProvider)(
+        **options
+    )
 
 
 def _require_key(config, provider_name: str) -> str:
@@ -458,7 +512,9 @@ def _require_key(config, provider_name: str) -> str:
     key = getattr(config, field, None)
     if key:
         return key
-    env_var = "OPENROUTER_API_KEY" if provider_name == "openrouter" else "GEMINI_API_KEY"
+    env_var = (
+        "OPENROUTER_API_KEY" if provider_name == "openrouter" else "GEMINI_API_KEY"
+    )
     raise ProviderError(
         f"{env_var} is not set for the {provider_name} provider. Add it to .env or "
         "pass --api-key. Run `cvtailor doctor` to check your setup."
@@ -587,9 +643,11 @@ def _reported_cost(usage: dict) -> Optional[float]:
     details = usage.get("cost_details")
     candidates = [
         _positive_float(usage.get("cost")),
-        _positive_float(details.get("upstream_inference_cost"))
-        if isinstance(details, dict)
-        else None,
+        (
+            _positive_float(details.get("upstream_inference_cost"))
+            if isinstance(details, dict)
+            else None
+        ),
     ]
     usable = [value for value in candidates if value is not None]
     if not usable:

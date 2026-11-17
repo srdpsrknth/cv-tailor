@@ -1,10 +1,319 @@
 # Project state
 
-**Last updated:** 2026-11-15
+**Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this commit)* — *honor profile-specific country work rights and tailoring guidance*
+**Latest commit:** *(this commit)* — *merge latest refactor GUI and preserve country-specific rules*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Mac refactor branch synchronization (2026-11-17)
+
+**Active task:** restore the refactor GUI after temporarily checking out stable
+`master`. Merged `origin/refactor/architecture-v2` at `1110569` with the two local
+commits through `8b2a4bc`; both histories are preserved. Resolved overlapping prompt,
+validation, cache, GUI country selector and documentation edits by retaining the
+incoming GUI/letter improvements and local country-specific work-right rules.
+Private-store files and `.env` are unchanged. Installed the incoming GUI's missing
+`streamlit-pdf==2.1.0` dependency; `pip check` passes. Final offline suite:
+**1229 passed, 3 skipped**, one existing Google SDK warning, ~78 s. The refactor
+GUI and API are running on ports 8501/8000; both health endpoints pass. Browser
+verification shows the redesigned New application workspace, active profile,
+application library and settings navigation. No paid generation was performed.
+**Next action:** use the refactor GUI or continue remaining Phase 6 scope.
+`master` remains at `1416177`; no remote push was performed.
+
+## Cover-letter rendering, layout, prompt and validation fixes (2026-11-17)
+
+**Active task:** fix cover-letter rendering, business-letter layout, generation prompt, and validation — complete. Scope strictly limited to cover letter; CV templates and CV renderers untouched.
+
+Root causes confirmed and resolved:
+
+- **Missing closing line in DOCX:** `templates/cover_letter/cover_letter.docx` had no placeholder for `closing_line` while `DocxRenderer._build_context` passed it (silently ignored by `docxtpl`). The LaTeX PDF path emitted `\signature{<closing_line>}{<signature_name>}`, so `"Warm regards,"` appeared in PDFs only.
+- **Triple footer and missing letter header in LaTeX PDF:** `\bottom` in `cover_letter_latex_template/setup/macros.tex` passed `phone · email` to `\fancyfoot{...}` without a `[L/C/R]` selector, causing `fancyhdr` to emit the footer three times (`phone·emailphone·emailphone·email`), while the body rendered `"Cover Letter"` + `<Role> @ <Company>` with no sender header, date, recipient, subject, or PDF metadata.
+
+Delivered across [templates/cover_letter/cover_letter.docx](templates/cover_letter/cover_letter.docx), [backend/renderers/docx_renderer.py](backend/renderers/docx_renderer.py), [cover_letter_latex_template/setup/preamble.tex](cover_letter_latex_template/setup/preamble.tex), [cover_letter_latex_template/setup/macros.tex](cover_letter_latex_template/setup/macros.tex), [backend/prompts/tailor_cl_prompt.md](backend/prompts/tailor_cl_prompt.md), [backend/services/validation.py](backend/services/validation.py), and [backend/services/pipeline.py](backend/services/pipeline.py):
+
+- **Matching single-column business-letter layout & visual polish (DOCX + PDF):** Both renderers emit the same CV-matched hierarchy (`NavyBlue` `#00004D` 22pt candidate name, muted `#4A5568` 9.5pt contact line `location | phone | email | linkedin.com/in/...`, 1.5pt `NavyBlue` horizontal accent rule, render-time `date.today()`, bold `#2E2E2E` `<Company>` / muted `Hiring Team`, bold `NavyBlue` `Application for <role_title>`, `Dear <Company> Hiring Team,`, 1.12 line-spaced `#222222` body paragraphs, `closing_line`, and bold `NavyBlue` signature name). No headers/footers, tables, text boxes, or icons.
+- **Fonts, metadata, and ATS text layer:** DOCX uses `Calibri` (`_apply_standard_font`, replacing `Aptos`) and sets core properties (`author`, `title`, `subject`); updated `test_docx_font_is_applied` accordingly. LaTeX PDF uses `Carlito` (with `Lato` fallback; `Archivo` stripped curly double quotes and `Lato`/`Helvetica` split `Hiring Team`/`NeoTaste` across kerning spaces), `\input{glyphtounicode}`, `\pdfgentounicode=1`, `\DisableLigatures[f]{encoding = *, family = *}`, and `\hypersetup` metadata (`pdftitle`, `pdfauthor`, `pdfsubject`). Fixed A-7 (`_extract_salutation_and_paragraphs` no longer mutates `tailored_cl.paragraphs`).
+- **Prompt, private voice, and validation:** Updated `tailor_cl_prompt.md` and private `writing_style.json` (guided by the 2024 tone references) to open warmly, transition smoothly (`"In my current role at..."`, `"In my earlier roles at..."`, `"Throughout these projects..."`), forbid colons/semicolons/em-dashes in body paragraphs, map top priorities to at most two concrete examples without abrupt declarations or restating strengths, close naturally with `, and`, and default `"closing_line"` to `"Warm regards,"`. `validate_cover_letter` enforces no prose colons/semicolons (`(?<!\d)[:;](?!\d)`), `banned_tools`, employer ongoing-work/ownership rules, and broadened salutation/sign-off checks; `_check_sponsorship_sentence` rejects visa/Blue Card/sponsorship wording in home-country (`Germany`) letters.
+
+**Open decisions / documented defaults:**
+- **Render-time date (`date.today()`):** Intentional default — generating or re-rendering stamps the current submission date into both DOCX and PDF (documented in `DocxRenderer._format_render_date` and `docs/HOW_TO_GENERATE.md`).
+- **German CV visa tagline (out of scope here, flagged):** `LaTeXRenderer._prepare_template_data` and `upload_cv.py` still fall back to `identity.visa_status` (`"Valid EU Blue Card Visa"`) when `cv.work_authorization` is `None`. Address in a separate CV increment if German CVs should suppress `identity.visa_status`.
+
+**Verification:** Re-rendered `rabot_energy` with smoothed 302-word prose (4 paragraphs, 1 page) and verified both LaTeX PDF and LibreOffice-converted DOCX visually (1 page each, matching palette/layout/reading order, zero colons/semicolons/ligatures); full suite **1209 passed, 3 skipped** (run outside the Windows sandbox for MiKTeX registry access and `TestClient` loopback sockets).
+
+## ATS PDF text-layer repair and autofill CV companion (2026-11-17)
+
+**Active task:** fix ATS/Workday auto-extraction on the primary LaTeX CV PDF and complete
+the companion Word/text autofill CV (`_upload.docx` / `_upload.txt`) — complete.
+
+Root causes identified in the primary PDF text stream and resolved in
+`templates/cv/altacv.cls`, `templates/cv/main.tex.jinja2`, and
+`backend/renderers/latex_renderer.py`:
+
+- Replaced FontAwesome Type 1 icons with pure TikZ vector icons (`\emailsymbol`,
+  `\phonesymbol`, `\locationsymbol`, `\linkedinsymbol`, `\githubsymbol`,
+  `\calendarsymbol`) so icon fonts no longer decode as `/ne`, `Ὄ`, `/♀nedn`, or
+  `/gtb` in PDF text extraction.
+- Added `\input{glyphtounicode}`, `\pdfgentounicode=1`, and
+  `microtype` (`\DisableLigatures[f]{encoding = *, family = *}`) to eliminate `ﬁ`/`ﬂ`
+  precomposed ligatures while keeping page widths and breaks stable.
+- Added zero-width text-layer delimiters (`\atssep{ | }` and `\atssep{, }`) between
+  contact header items, role/date/location blocks in `\cveventsmall`, and `\cvtag`
+  badges (`Certifications`, `Skills`, `Languages`), plus full `linkedin.com/in/...` and
+  `github.com/...` display text and `\needspace{1.2cm}` before individual project
+  headings.
+- Added `format_skill_category` in `backend/utils/text.py` (used by both the LaTeX
+  renderer and `upload_cv`) so uppercase acronyms (`AI`, `BI`, `SQL`, `ETL`, etc.) are
+  not lowercased to `Ai` / `Bi`.
+
+Completed the sequential autofill CV companion (`backend/renderers/upload_cv.py`,
+`backend/services/upload_cv.py`, `backend/cli/commands/render.py`,
+`backend/services/tailor_service.py`, `backend/services/application_store.py`,
+`scripts/render_application.py`, `ui/app.py`, `ui/review.py`, `ui/services_bridge.py`):
+
+- Generates `{year}_CV_{name}_{role}_upload.docx` and `_upload.txt` with one-column
+  headings, full month-year dates, plain URLs, Unicode `\u2022` bullets in `Arial`,
+  and document core properties; available both during generation/re-rendering and via
+  the GUI **Create / refresh CV for autofill** button (zero model calls).
+- Hardened `ui/review.py` and `ui/app.py` against stale cached `ui.services_bridge` /
+  `tailor_service` modules across Streamlit hot-reloads, and restarted the local GUI
+  server on port 8502 (`/_stcore/health` HTTP 200).
+- Fixed `/api/download/cover-letter/{job_id}` in `backend/main.py` to exclude
+  `*_upload.docx`, and excluded `*_upload.*` from `evaluation/reading_packet.py`.
+
+**Verification:** full suite **1201 passed, 3 skipped**, 1 existing Google SDK
+deprecation warning (run outside the Windows sandbox for `pdflatex` MiKTeX
+registry access and `TestClient` loopback sockets). Added 10 regression tests across
+`tests/test_renderers_documents.py`, `tests/test_upload_cv.py`, `tests/test_api.py`,
+and `tests/test_reading_packet.py`. Re-rendered four saved applications
+(`rabot_energy`, `flink`, `holy`, `pergolux`, zero LLM calls): all remain 2 pages with
+clean extracted text and generated `_upload.docx`/`_upload.txt` companions.
+
+**Next action:** refresh the running GUI tab in your browser and use the updated PDFs
+and `_upload.docx` files on your next portal application (such as Workday). Changes
+committed and pushed on `refactor/architecture-v2`; `master` untouched.
+
+## OpenRouter app attribution header (2026-11-17)
+
+**Active task:** identify CV Tailor requests on the OpenRouter activity dashboard — complete.
+`OpenRouterProvider.generate` in `backend/services/provider.py` sets
+`OPENROUTER_APP_TITLE = "CV Tailor"` (`"X-Title"`) and
+`OPENROUTER_APP_URL = "https://github.com/srdpsrknth/cv-tailor"` (`"HTTP-Referer"`) in the
+chat-completions request headers so OpenRouter resolves both the App ID and display title
+instead of `Unknown` (OpenRouter requires `HTTP-Referer` alongside `X-Title`).
+
+`test_openrouter_sends_app_title_header` in `tests/test_provider_interface.py` verifies
+both headers. Focused provider verification: `tests/test_provider_interface.py` — **63
+passed**, one existing Google SDK deprecation warning, ~9.03 s (offline recorded transport;
+no live API call made). Note: the local GUI server must be restarted after code changes so
+Streamlit reloads `services.provider`. Full suite was not re-run because unrelated
+uncommitted WIP files remain in the working tree and were left unstaged.
+
+## Preview/download rerun repair (2026-11-17)
+
+**Active task:** fix the owner's cover-letter preview exception — complete.
+`retain_inputs` was assigning every key
+starting with `review_` or `search_`, including download/action buttons and PDF
+component state. Streamlit forbids those assignments, so selecting a different
+preview could fail before the viewer rendered.
+
+Retention now uses named input keys plus a dedicated `preview_document_` namespace
+for preview selectors. Buttons and PDF components keep framework-owned state;
+downloads use `on_click='ignore'` to avoid unnecessary reruns. Candidate-switch
+cleanup includes the new selector namespace. Documents and application sources
+are unchanged, and no generation is needed to repair the preview.
+
+Three regressions added: repeated CV/letter switching with real download widgets,
+a search-action rerun, and explicit protection of client download/component state.
+The old code failed the button-state tests; focused UI suites now pass **26 tests**.
+AppTest does not replay all download-client states, so the explicit guard complements
+the actual widget test. Live browser verification confirmed the owner's saved
+Ostrom cover-letter PDF renders with all download controls present after selection.
+No paid call or regeneration was performed. Full final suite: **1190 passed,
+3 skipped**, one existing Google SDK warning, ~122 s. Formatting and diff checks
+pass. Changes committed locally on `refactor/architecture-v2`; master untouched.
+
+**Next action:** refresh the existing GUI tab and reopen the saved application from
+Applications. The running server already serves the fix; it was not restarted to
+avoid interrupting the owner's other GUI work. No push was performed.
+
+## Profile convenience and cover-letter review (2026-11-17)
+
+**Active task:** both owner requests complete: GUI profile convenience and a
+cover-letter tone/content assessment with improved future drafting guidance.
+
+GUI now restores the last usable selection from `<store>/preferences/gui.json`, or
+selects the only usable profile. With multiple profiles and no valid memory it
+requires a choice. The full active name/id is visible at the top. Candidate switches
+still clear prior candidate state. This explicitly supersedes the GUI-only empty
+picker requirement; CLI/API/services remain fail-closed (ADR 0022, AGENTS updated).
+
+Verification for the profile increment: **1182 passed, 3 skipped**, existing Google
+SDK warning, ~122 s. Six preference tests plus a new-session AppTest were added;
+existing picker tests now assert the owner's new behaviour. No paid call.
+
+The owner nominated a private 2024 application directory as the voice reference.
+Reviewed 15 DOCX letters plus one PDF-only letter there, two current DOCX outputs,
+eight archived sources and the current prompt/validation path. Private evidence
+and assessment are at `<store>/reviews/<profile_id>/cover-letter-tone-2026-11-17/`.
+No source letters, old applications or factual profile data were overwritten.
+
+Assessment: the recent letters mostly meet the mechanical limits, but often
+compress CV responsibilities and tools into prose, repeat fit in the closing and
+under-explain why the work matters. The latest letter is 298 body words/four
+paragraphs; a January legacy letter is 288/four. The nominated references are
+warmer and more collaborative, but contain generic repetitions that should be
+edited rather than copied. No AI-detection score or guarantee was claimed.
+
+The shared brief now centres specific interest, one or two explained examples,
+practical meaning for users and a short closing. Optional per-profile
+`writing_style.json` lives outside the repository and is now configured for the
+owner from the nominated references. Only distilled tone/preferences/sign-off
+are included in the letter prompt; reference paths and old facts are not sent.
+Their exact effective context feeds the existing cache key. Changing voice causes
+a cache miss; other candidates and loose profile files do not inherit this voice.
+Malformed existing guidance fails before paid work. See ADR 0023.
+
+**Final verification:** **1187 passed, 3 skipped**, one existing Google SDK warning,
+~124 s. Five synthetic tests added for optional voice, isolation, invalid guidance,
+reference-path exclusion and cache invalidation. Private guidance loads correctly;
+formatting and dependency checks pass. Browser confirmed sole-profile startup
+selection and the full active name/id banner. No paid model call was made, so the
+quality of new live prose remains to be judged on the next actual application.
+Four paragraphs, 290–310 words, one page and all factual/country rules remain.
+
+**Next action:** refresh the running GUI and use the next real application to judge
+the revised voice. The private assessment includes concrete examples and proposed
+excerpts, not a replacement letter. Further tuning can update the private style
+preferences without changing facts or old documents. Changes committed locally;
+no push, merge to master or paid generation was performed.
+
+## GUI implementation complete (2026-11-17)
+
+**Active task:** implement the approved GUI proposal — complete. Streamlit remains
+the UI, with the existing service bridge. The local server is running on port 8502;
+desktop open/stop shortcuts remain valid. `master` was not changed.
+
+Delivered:
+
+- Compact warm/teal workspace; deliberate empty candidate picker and cross-profile
+  state clearing; persistent form, review and search state across page reruns.
+- Shared application review after generation and in the library: **Documents** with
+  actual PDF previews and downloads; **What changed** using saved profile snapshots,
+  escaped word highlighting and identity-based alignment; **Why these changes**
+  showing stored model rationale; **Run details** with historical usage and routes.
+- Provider reply model/request IDs retained when returned, with per-reply tasks,
+  requested models, tokens and cost source. Fresh/cache records and original cached
+  usage stay distinct; repeated cache hits no longer overwrite original usage with
+  zero. Missing historical fields stay explicitly unrecorded.
+- Searchable/filterable application library with pagination beyond 20 entries;
+  known-posting handoff to generation without model calls; curated-model choice for
+  new runs (the existing catalogue has one option); GUI local setup checks and
+  read-only profile summary. Shared posting preflight rejects copied commands.
+- Failure audit records preserve raw drafts even before a renderable document exists.
+  Broken/legacy sources still permit existing downloads; loading review data fails
+  closed at candidate/application boundaries. Profiles and existing sources unchanged.
+
+Runtime: added and installed `streamlit-pdf==2.1.0`; requirements and lockfile updated.
+The minimum Streamlit requirement now matches the verified 1.53.1 runtime. New
+modules: `services/application_review.py`, `services/posting.py`, `ui/review.py` and
+`ui/theme.py`; details in [ADR 0021](DECISIONS/0021-application-review-and-provenance.md).
+
+**Verification:** full suite **1175 passed, 3 skipped**, one existing Google SDK
+deprecation warning, ~124 s (baseline 1150/3). Added 25 cases covering review,
+attribution, repeated cache hits, failed runs, profile isolation, actual Streamlit
+reruns and search handoff. `pip check`, `doctor`, formatting and diff checks pass.
+Browser inspected all pages, actual saved PDFs, explanations and comparisons,
+navigation persistence, setup checks, and 390-pixel layouts. The PDF preview uses
+the installed viewer, not a simulated text document. A restored-number-input
+warning found during browser QA was corrected. No paid API call or live job-source
+search was made; new provider metadata was verified with offline response fixtures,
+not a new live generation. Existing historical records are not backfilled.
+
+**Next action:** refresh the local GUI, explicitly choose a profile, and review a
+saved application. A future real generation will populate the new run metadata.
+Phase 5 submission tracking, hosted deployment/authentication and model re-curation
+remain separate work. Changes are committed locally, not pushed.
+
+## GUI review and design proposal (2026-11-17, historical)
+
+The proposal below was subsequently approved by the owner and implemented above.
+
+**Active task:** understand the current GUI and suggest visual/functional improvements
+— complete. Reviewed all four live pages and their backing services. Findings and
+priorities are in [GUI_REVIEW.md](GUI_REVIEW.md); the standalone interactive mockup
+is [design/gui-proposal.html](design/gui-proposal.html), using synthetic data only.
+At the review stage no production GUI behaviour had been changed.
+
+Recommended first increment: a persistent application review view shared by Generate
+and Applications, exposing saved model usage and tailoring rationale; correct
+deliberate profile selection and state across reruns. Follow with actual PDF preview,
+snapshot-to-output comparison and provider/cache/cost provenance. Keep Streamlit
+and service reuse (ADR 0020). Broader library/search/settings proposals are sequenced
+in the review; a full application tracker remains Phase 5 scope.
+
+Verified findings: picker currently preselects configured/first profile despite its
+explicit-choice wording; Generate writes last-result keys but does not restore them;
+Applications exposes downloads without saved explanations. Requested model routes
+are persisted, but provider response model/request IDs are not retained. Existing
+legacy applications may lack editable content and must remain readable without
+invented history. No model calls were made for this review.
+
+Verification: full suite **1150 passed, 3 skipped**, one existing Google SDK warning,
+~125 s. Live browser inspection succeeded (unlike the earlier headless attempt).
+Mockup checked visually at desktop width; all four tabs and arrow-key navigation
+worked. Narrow-screen CSS exists but was not visually verified. **Next action:**
+review the proposal and select the implementation scope; no framework migration
+or hard-to-reverse decision was made. Windows setup remains operational.
+
+## Windows GUI setup (2026-11-17)
+
+### Follow-up: Python integrity label repaired — verified by owner
+
+The owner confirmed `doctor` also
+fails in their normal terminal, disproving the earlier agent-only assumption below.
+Both ordinary and dot-prefixed Python write probes fail; the probe does not already
+exist. Private-store ACLs grant Authenticated Users Modify, and Defender Controlled
+Folder Access is disabled. `whoami /groups` launched by the venv Python reports
+**Low Mandatory Level**, while PowerShell and `C:\Python314\python.exe` report
+**Medium Mandatory Level**. `icacls` shows the checkout and venv inherited Low
+integrity, including the executable. That label explains the persistent failure.
+
+The agent's attempt to restore the two venv Python executables to Medium required
+administrator rights. The owner applied the targeted repair and supplied a normal
+terminal `doctor` result with **every check passing**, including the private-store
+output write probe (2026-11-17). Output access is resolved. The repair commands are
+in DEVELOPMENT's Windows Python output permission section. Restart the GUI so its
+Python process receives the repaired integrity level. No application code changed;
+the full suite was not repeated for this documentation-only confirmation (previous
+1150 passed, 3 skipped). API key presence is verified; paid generation is not.
+
+**Active task:** Windows setup and convenient GUI launch — complete. Fast-forwarded
+the development worktree from `eddcf35` to GitHub's `854d24c`, preserving the Mac CLI
+repair. The stable `master` worktree is untouched.
+
+Added `scripts/windows_gui.ps1` and `scripts/install_windows_shortcuts.ps1`.
+**CV Tailor** / **Stop CV Tailor** shortcuts are installed on this machine's desktop
+and Start menu. The open shortcut starts Streamlit only, hidden and on loopback,
+waits for health, then opens the browser. Reopening reuses this checkout's process;
+stop verifies the listener's command line. Ports come from `.env`; the profile
+picker remains explicit. Logs stay under `.runtime/logs/`.
+
+Verified on Windows PowerShell 5.1: start, health HTTP 200, repeat launch with the
+same PID, stop/restart, refusal to stop an unrelated listener, shortcut targets and
+arguments, and browser-open launcher path. Real-store AppTest: zero exceptions.
+`pip check` passes. Baseline and final suite: **1150 passed, 3 skipped**, one
+existing Google SDK deprecation warning.
+
+**Setup verification:** all doctor checks pass in the owner's normal terminal after
+the integrity-label repair above. No private-store permissions were broadened, no
+profile data changed, and no paid generation/key verification was run.
+
+**Next action:** restart with Stop CV Tailor / CV Tailor, then explicitly select a
+profile and use the GUI. Resume remaining Phase 6 deployment scope when requested;
+hosted authentication and Phase 5 application management remain open.
 
 ## Where the project stands (2026-11-15)
 

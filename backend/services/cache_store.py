@@ -28,6 +28,7 @@ promised:
 ``profile_id`` is a required argument and is validated, so two candidates can never
 read each other's entries (ADR 0003).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -125,15 +126,25 @@ def rules_fingerprint(rules) -> str:
     (A-1): two candidate profiles legitimately declare different rules, and the
     cache has to notice when one candidate's rules change.
     """
-    return _digest(json.dumps({
-        "special_employers": getattr(rules, "special_employers", {}) or {},
-        "banned_tools": list(getattr(rules, "banned_tools", ()) or ()),
-        "summary_forbidden_verbs": getattr(rules, "summary_forbidden_verbs", None),
-        "visa_label": getattr(rules, "visa_label", None),
-        "home_countries": list(getattr(rules, "home_countries", ()) or ()),
-        "local_permit_countries": list(getattr(rules, "local_permit_countries", ()) or ()),
-        "country_overrides": getattr(rules, "country_overrides", {}) or {},
-    }, sort_keys=True, ensure_ascii=False))
+    return _digest(
+        json.dumps(
+            {
+                "special_employers": getattr(rules, "special_employers", {}) or {},
+                "banned_tools": list(getattr(rules, "banned_tools", ()) or ()),
+                "summary_forbidden_verbs": getattr(
+                    rules, "summary_forbidden_verbs", None
+                ),
+                "visa_label": getattr(rules, "visa_label", None),
+                "home_countries": list(getattr(rules, "home_countries", ()) or ()),
+                "country_overrides": getattr(rules, "country_overrides", {}) or {},
+                "local_permit_countries": list(
+                    getattr(rules, "local_permit_countries", ()) or ()
+                ),
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -152,6 +163,7 @@ class CacheEntry:
     created_at: str
     provider: str
     models: dict
+    original_calls: Optional[list] = None
 
     @property
     def token_usage(self) -> dict:
@@ -182,6 +194,7 @@ class CacheEntry:
             "tailoring_explanation": self.tailoring_explanation,
             "drafts": self.drafts,
             "original_usage": self.usage,
+            "original_calls": self.original_calls,
         }
 
     @classmethod
@@ -215,6 +228,11 @@ class CacheEntry:
             created_at=payload.get("created_at") or "",
             provider=payload.get("provider") or "",
             models=payload.get("models") or {},
+            original_calls=(
+                payload.get("original_calls")
+                if isinstance(payload.get("original_calls"), list)
+                else None
+            ),
         )
 
 
@@ -277,7 +295,9 @@ class GenerationCache:
             payload = json.loads(path.read_text(encoding="utf-8"))
             return CacheEntry.from_json(payload)
         except (OSError, ValueError) as error:
-            logger.warning("Ignoring an unreadable cache entry %s: %s", path.name, error)
+            logger.warning(
+                "Ignoring an unreadable cache entry %s: %s", path.name, error
+            )
             return None
 
     # --- writing ----------------------------------------------------------------------
@@ -293,7 +313,8 @@ class GenerationCache:
             path.parent.mkdir(parents=True, exist_ok=True)
             temporary = path.with_suffix(".json.tmp")
             temporary.write_text(
-                json.dumps(entry.to_json(), ensure_ascii=False, indent=2), encoding="utf-8"
+                json.dumps(entry.to_json(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
             )
             temporary.replace(path)
             return path

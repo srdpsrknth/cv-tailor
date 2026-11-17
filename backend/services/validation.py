@@ -126,6 +126,40 @@ def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     _validate_summary(cv, rules)
     _validate_no_banned_tools(cv, profile, rules)
 
+def _validate_employer_prose_rules(
+    paragraphs: list[str],
+    rules: ProfileRules,
+    *,
+    company_filter: Optional[str] = None,
+) -> None:
+    """Enforce ongoing-work and ownership rules against CV bullets or cover-letter prose."""
+    joined = " ".join(paragraphs)
+    for needle, employer_rules in rules.special_employers.items():
+        if company_filter is not None:
+            if needle not in company_filter.lower():
+                continue
+        elif needle not in joined.lower():
+            continue
+        ongoing_tool = employer_rules.get("ongoing_tool")
+        if ongoing_tool:
+            for index, text in enumerate(paragraphs, start=1):
+                if re.search(rf"\b{re.escape(ongoing_tool)}\b", text) and not re.search(
+                    r"developing|development|working on", text, re.I
+                ):
+                    target = company_filter or needle.capitalize()
+                    unit = "bullet" if company_filter is not None else "paragraph"
+                    raise ValueError(
+                        f"Describe {target} {ongoing_tool} integration as ongoing "
+                        f"development, not shipped work. Fix {unit} {index}: {text!r}. "
+                        "Every mention must include 'developing', 'development', or "
+                        f"'working on' in the same {unit}; correcting another {unit} "
+                        "does not fix this one."
+                    )
+        ownership = employer_rules.get("ownership_pattern")
+        if ownership and re.search(ownership, joined, re.I):
+            raise ValueError(employer_rules.get("ownership_message", "Ownership is limited."))
+
+
 def _apply_employer_rules(exp, rules: ProfileRules) -> None:
     """Apply any bespoke rule set configured for this employer."""
     for needle, employer_rules in rules.special_employers.items():
@@ -149,22 +183,7 @@ def _apply_employer_rules(exp, rules: ProfileRules) -> None:
                     "Use a clear external attribution project name without dates or "
                     "status labels."
                 )
-        ongoing_tool = employer_rules.get("ongoing_tool")
-        if ongoing_tool:
-            for index, bullet in enumerate(exp.bullets, start=1):
-                if re.search(rf"\b{re.escape(ongoing_tool)}\b", bullet) and not re.search(
-                    r"developing|development|working on", bullet, re.I
-                ):
-                    raise ValueError(
-                        f"Describe {exp.company} {ongoing_tool} integration as ongoing "
-                        f"development, not shipped work. Fix bullet {index}: {bullet!r}. "
-                        "Every mention must include 'developing', 'development', or "
-                        "'working on' in the same bullet; correcting another bullet "
-                        "does not fix this one."
-                    )
-        ownership = employer_rules.get("ownership_pattern")
-        if ownership and re.search(ownership, " ".join(exp.bullets), re.I):
-            raise ValueError(employer_rules.get("ownership_message", "Ownership is limited."))
+    _validate_employer_prose_rules(exp.bullets, rules, company_filter=exp.company)
 
 def _validate_summary(cv: TailoredCV, rules: ProfileRules) -> None:
     summary = " ".join(cv.summary)
@@ -229,17 +248,28 @@ def profile_facts_json(profile: Profile) -> str:
         logger.debug("Could not cache profile facts on %r; recomputing.", type(profile))
     return facts
 
-def _validate_no_banned_tools(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
+def _check_banned_tools_in_text(text: str, profile: Profile, rules: ProfileRules) -> None:
     """Catch keyword stuffing for technologies absent from this profile."""
     source = profile_facts_json(profile).lower()
-    text = cv.model_dump_json().lower()
+    lowered = text.lower()
     for tool in rules.banned_tools:
-        if re.search(r"\b" + re.escape(tool.lower()) + r"\b", text) and not re.search(
+        if re.search(r"\b" + re.escape(tool.lower()) + r"\b", lowered) and not re.search(
             r"\b" + re.escape(tool.lower()) + r"\b", source
         ):
             raise ValueError(f"Do not claim {tool} experience: it is not in the profile.")
 
-def validate_cover_letter(cl: TailoredCoverLetter, profile: Profile) -> None:
+
+def _validate_no_banned_tools(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
+    """Catch keyword stuffing for technologies absent from this profile."""
+    _check_banned_tools_in_text(cv.model_dump_json(), profile, rules)
+
+
+def validate_cover_letter(
+    cl: TailoredCoverLetter,
+    profile: Profile,
+    rules: Optional[ProfileRules] = None,
+) -> None:
+    """Validate cover-letter structure, grounded claims, and employer prose rules."""
     words = sum(len(paragraph.split()) for paragraph in cl.paragraphs)
     if len(cl.paragraphs) != 4 or not 290 <= words <= 310:
         raise ValueError(
@@ -249,7 +279,18 @@ def validate_cover_letter(cl: TailoredCoverLetter, profile: Profile) -> None:
     if cl.signature_name != profile.identity.full_name:
         raise ValueError("Use the exact candidate name from the profile.")
     if any(
-        re.search(r"(?:^|\n)\s*(Dear Hiring|Sincerely|Best regards|Kind regards)", paragraph, re.I)
+        re.search(
+            r"(?:^|\n)\s*(Dear\s+\S|Sincerely|Best regards|Kind regards|Warm regards)",
+            paragraph,
+            re.I,
+        )
         for paragraph in cl.paragraphs
     ):
         raise ValueError("Body paragraphs must not contain a salutation or signature.")
+    if any(re.search(r"(?<!\d)[:;](?!\d)", paragraph) for paragraph in cl.paragraphs):
+        raise ValueError(
+            "Do not use colons or semicolons in cover-letter paragraphs; write smooth, natural sentences."
+        )
+    active_rules = rules or ProfileRules.from_profile(profile)
+    _check_banned_tools_in_text(" ".join(cl.paragraphs), profile, active_rules)
+    _validate_employer_prose_rules(cl.paragraphs, active_rules)

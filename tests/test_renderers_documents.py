@@ -253,6 +253,52 @@ def test_work_authorization_overrides_the_profile_tagline(tmp_path, content):
     assert profile.identity.visa_status not in text
 
 
+@needs_latex
+def test_cv_pdf_text_layer_is_ats_clean(rendered_cv, analyst_profile):
+    """The raw PDF text layer must be free of icon/ligature noise and fuse no fields."""
+    from pypdf import PdfReader
+
+    raw_text = '\n'.join(page.extract_text() or '' for page in PdfReader(str(rendered_cv)).pages)
+    flat_raw = ' '.join(raw_text.split())
+
+    for garbled in ('/ne', 'Ὄ', '\ufb00', '\ufb01', '\ufb02', '\ufb03', '\ufb04', '/♀nedn', '/gtb'):
+        assert garbled not in raw_text, f'garbled glyph/ligature {garbled!r} in PDF text layer'
+
+    assert f'{analyst_profile.identity.email} | {analyst_profile.identity.phone}' in flat_raw
+    assert 'linkedin.com/in/example-alex-sample | github.com/example-alex-sample' in flat_raw
+    assert 'Analytical Engineer | Apr 2023' in flat_raw
+    assert 'present | Sampletown, Germany' in flat_raw
+    assert '2018 – 2020 | Sampletown, Germany' in flat_raw
+
+    # Skill and certification tags must have comma delimiters in the extracted text layer.
+    assert 'Snowflake' in flat_raw and 'dbt' in flat_raw
+    snowflake_to_dbt = flat_raw[flat_raw.index('Snowflake'):flat_raw.index('dbt') + 3]
+    assert ',' in snowflake_to_dbt
+    cert_line = flat_raw[flat_raw.index('Synthetic Analytics Certificate'):flat_raw.index('Synthetic Reporting Qualification')]
+    assert ',' in cert_line
+
+
+@needs_latex
+def test_cv_preserves_skill_category_acronyms(tmp_path, content):
+    """Acronyms like BI and AI in skill headings must not be lowercased to Bi/Ai."""
+    profile = load_profile('synthetic_analyst')
+    payload = json.loads(json.dumps(content['cv']))
+    payload['skills'] = {
+        'BI_and_AI_platforms': ['Looker', 'Claude'],
+        'sql_and_etl': ['Snowflake', 'Airflow'],
+    }
+    cv = TailoredCV.model_validate(payload)
+
+    renderer = create_latex_renderer(outputs_dir=str(tmp_path))
+    pdf = Path(renderer.render_cv(cv, profile, job_position='Analytical Engineer'))
+    text = normalise(pdf_text(pdf))
+
+    assert 'BI And AI Platforms:' in text
+    assert 'SQL And ETL:' in text
+    assert 'Bi And' not in text
+    assert 'Ai Platforms:' not in text
+
+
 # --- DOCX cover letter ----------------------------------------------------------------
 
 @pytest.fixture
@@ -344,14 +390,145 @@ def test_docx_has_no_empty_paragraph_run_before_the_signature(docx_letter):
 
 
 def test_docx_font_is_applied(docx_letter):
-    """`_apply_aptos_font` is best-effort but must actually set the font when it runs."""
+    """`_apply_standard_font` must set Calibri across the rendered DOCX."""
     from docx import Document
 
     path, _, _ = docx_letter
     document = Document(str(path))
     named = [run.font.name for p in document.paragraphs for run in p.runs if run.font.name]
     assert named, 'no run in the DOCX has an explicit font name'
-    assert all(name == 'Aptos' for name in named)
+    assert all(name == 'Calibri' for name in named)
+
+
+def _assert_clean_business_letter(docx_path: Path, pdf_path: Path, letter: TailoredCoverLetter, profile) -> None:
+    """Assert standard business-letter structure, reading order, metadata, and ATS cleanliness."""
+    from datetime import date
+    from docx import Document
+    from pypdf import PdfReader
+
+    today = date.today()
+    expected_date = f'{today.day} {today:%B %Y}'
+    expected_closing = letter.closing_line or 'Warm regards,'
+    expected_name = letter.signature_name or profile.identity.full_name
+    expected_salutation = f'Dear {letter.company_name} Hiring Team,'
+    expected_subject = f'Application for {letter.role_title}'
+
+    body_words = sum(len(p.split()) for p in letter.paragraphs)
+    assert 290 <= body_words <= 310, f'body word count {body_words} outside 290-310'
+    assert page_count(pdf_path) == 1, 'cover letter PDF must fit one page'
+
+    docx_doc = Document(str(docx_path))
+    assert len(docx_doc.tables) == 0, 'cover letter DOCX must be single-column without tables'
+    for sec in docx_doc.sections:
+        assert all(not p.text.strip() for p in sec.header.paragraphs), 'header must not hold text'
+        assert all(not p.text.strip() for p in sec.footer.paragraphs), 'footer must not hold text'
+    assert docx_doc.core_properties.author == expected_name
+    assert letter.role_title in (docx_doc.core_properties.title or '')
+
+    raw_docx = '\n'.join(p.text for p in docx_doc.paragraphs)
+    pdf_reader = PdfReader(str(pdf_path))
+    raw_pdf = '\n'.join(page.extract_text() or '' for page in pdf_reader.pages)
+    meta = pdf_reader.metadata or {}
+    assert meta.get('/Author') == expected_name
+    assert letter.role_title in (meta.get('/Title') or '')
+    assert letter.company_name in (meta.get('/Title') or '')
+
+    for kind, raw in (('DOCX', raw_docx), ('PDF', raw_pdf)):
+        bad_chars = [
+            (ch, hex(ord(ch)))
+            for ch in raw
+            if (0xFB00 <= ord(ch) <= 0xFB06) or (0xE000 <= ord(ch) <= 0xF8FF)
+        ]
+        assert not bad_chars, f'{kind} contains ligature/PUA characters: {bad_chars}'
+        assert 'Cover Letter' not in raw, f'{kind} still has generic Cover Letter heading'
+        assert f'@ {letter.company_name}' not in raw, f'{kind} still has @ Company subtitle'
+
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        assert lines[0] == expected_name, f'{kind} must start with candidate name, got {lines[0]!r}'
+        assert expected_date in lines, f'{kind} missing separated date {expected_date!r}'
+        date_idx = lines.index(expected_date)
+        contact_block = ' '.join(lines[1:date_idx])
+        assert profile.identity.email in contact_block, f'{kind} top contact block missing email'
+        if profile.identity.phone:
+            assert profile.identity.phone in contact_block, f'{kind} top contact block missing phone'
+        if profile.identity.location:
+            assert profile.identity.location in contact_block, f'{kind} top contact block missing location'
+        if profile.identity.linkedin:
+            clean_li = profile.identity.linkedin.replace('https://www.', '').replace('https://', '').rstrip('/')
+            assert clean_li in contact_block, f'{kind} top contact block missing LinkedIn'
+
+        # Contact details must appear in the top header only, never repeated in a footer.
+        assert raw.count(profile.identity.email) == 1, f'{kind} repeated email (footer leakage)'
+        if profile.identity.phone:
+            assert raw.count(profile.identity.phone) == 1, f'{kind} repeated phone (footer leakage)'
+
+        # Date, recipient, subject, salutation, closing line, and signature in order without fusion.
+        flat_lines = '\n'.join(lines)
+        for token in (
+            expected_date,
+            letter.company_name,
+            'Hiring Team',
+            expected_subject,
+            expected_salutation,
+            expected_closing,
+            expected_name,
+        ):
+            assert token in lines or token in flat_lines, f'{kind} missing separated token {token!r}'
+
+        assert lines[-2] == expected_closing, f'{kind} penultimate line must be closing_line, got {lines[-2]!r}'
+        assert lines[-1] == expected_name, f'{kind} final line must be signature name, got {lines[-1]!r}'
+
+
+@needs_latex
+def test_cover_letter_docx_and_pdf_follow_standard_business_letter_contract(tmp_path, content):
+    """Both DOCX and PDF share the same ATS-clean business-letter structure across profiles."""
+    if not latex_available():
+        pytest.skip('No pdflatex compiler could be resolved on this machine')
+
+    # Case 1: synthetic analyst fixture
+    analyst = load_profile('synthetic_analyst')
+    letter_one = TailoredCoverLetter.model_validate(content['cover_letter'])
+    out_one = tmp_path / 'one'
+    renderer_one = create_docx_renderer(outputs_dir=str(out_one))
+    docx_one, pdf_one = renderer_one.render_cover_letter(
+        letter_one, analyst, job_position=letter_one.role_title
+    )
+    _assert_clean_business_letter(Path(docx_one), Path(pdf_one), letter_one, analyst)
+
+    # Case 2: second profile with realistic-length ligature-prone prose and Warm regards sign-off
+    marketer = load_profile('synthetic_marketer')
+    lumen_payload = read_json('llm_responses', 'marketer_lumen', '02_cover_letter.json')['cover_letter']
+    ligature_prefix = (
+        'Workflow, first-class traffic, office, effective, confident, and flexible '
+        'channel analytics helped teams make faster budget choices across regions. '
+    )
+    p1_words = ligature_prefix.split() + lumen_payload['paragraphs'][0].split()
+    lumen_payload['paragraphs'][0] = ' '.join(p1_words[:len(lumen_payload['paragraphs'][0].split())])
+    lumen_payload['closing_line'] = 'Warm regards,'
+    letter_two = TailoredCoverLetter.model_validate(lumen_payload)
+    out_two = tmp_path / 'two'
+    renderer_two = create_docx_renderer(outputs_dir=str(out_two))
+    docx_two, pdf_two = renderer_two.render_cover_letter(
+        letter_two, marketer, job_position=letter_two.role_title
+    )
+    _assert_clean_business_letter(Path(docx_two), Path(pdf_two), letter_two, marketer)
+
+
+def test_cover_letter_renderer_does_not_mutate_paragraphs(tmp_path):
+    """A-7 regression: stripping an inline Dear line must not mutate caller data."""
+    renderer = DocxRenderer(outputs_dir=str(tmp_path))
+    renderer._generate_pdf_via_latex = lambda *args, **kwargs: tmp_path / 'letter.pdf'
+    profile = load_profile('synthetic_analyst')
+    original_paragraphs = ['Dear Hiring Manager,\nFirst sentence.', 'Second.', 'Third.', 'Fourth.']
+    letter = TailoredCoverLetter(
+        company_name='Adjoe',
+        role_title='Analyst',
+        paragraphs=list(original_paragraphs),
+        closing_line='Warm regards,',
+        signature_name=profile.identity.full_name,
+    )
+    renderer.render_cover_letter(letter, profile)
+    assert letter.paragraphs == original_paragraphs
 
 
 # --- page-count enforcement -----------------------------------------------------------

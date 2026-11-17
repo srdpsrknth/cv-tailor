@@ -6,6 +6,20 @@
 **Status:** Assessment complete. **Decisions approved 2026-10-23** (§11). Phase 1 implemented
 and complete; this document is retained as the Phase 0 record of what was found.
 
+> **Implemented update (2026-11-17):** the Streamlit UI now has a shared saved-application
+> review view (`ui/review.py`), with framework-free read/compare logic in
+> `services/application_review.py`, reached through `ui/services_bridge.py`. Optional
+> per-reply attribution and explicit cache/cost provenance extend saved manifests;
+> provider responses retain model IDs and request IDs. Shared posting validation is
+> in `services/posting.py`. No framework, storage or orchestration architecture was
+> replaced. See [ADR 0021](DECISIONS/0021-application-review-and-provenance.md).
+>
+> **Follow-up (2026-11-17):** GUI selection memory is isolated in
+> `services/gui_preferences.py` (ADR 0022), while backend profile resolution remains
+> explicit. Optional private cover-letter voice is loaded by
+> `services/writing_voice.py`; its exact effective context feeds both the letter
+> prompt and the existing cache key (ADR 0023). Profile facts and renderers unchanged.
+
 > This document describes the system **as implemented today**, verified against source.
 > Findings are labelled **VERIFIED** (read or executed) or **HYPOTHESIS** (reasoned, not proven).
 >

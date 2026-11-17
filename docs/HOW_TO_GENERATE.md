@@ -11,10 +11,16 @@ job application, not for a developer reading the code.
 | Best for | Anything that breaks; scripting; precision | Browsing applications, reading match explanations |
 | Requires | nothing extra | nothing extra |
 
-The web interface has four pages: **Generate**, **Find jobs**, **Applications** and
-**Help**. It reads the same store, so an application generated in a terminal appears
+The web interface has four pages: **New application**, **Find jobs**, **Applications** and
+**Settings & help**. It reads the same store, so an application generated in a terminal appears
 in the browser and vice versa. **The command line is the supported path for anything
 that goes wrong** — it has clearer errors and no browser in the way.
+
+**Windows shortcut:** double-click **CV Tailor** on the desktop or find it in the
+Start menu. It starts the GUI and opens your browser automatically. Choose your
+profile in the sidebar, then use Generate or Find jobs. Closing the browser leaves
+the app running; **Stop CV Tailor** shuts it down. To install these shortcuts, see
+[DEVELOPMENT.md](DEVELOPMENT.md#windows-gui-shortcuts).
 
 **This guide works on Windows and macOS.** The only difference is how you write the
 *interpreter path* — everything else, including every option, is identical:
@@ -75,10 +81,11 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 > that location explicitly, so a script or IDE terminal finds it anyway. If it still
 > fails, set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in `.env`.
 
-> **One `FAIL` is expected and harmless in this setup.** `doctor` reports
-> `outputs ... Permission denied` when it is run from inside the sandboxed agent
-> environment. PowerShell and the tool itself can write there; only the sandboxed
-> Python subprocess cannot. Real runs are unaffected.
+> **Do not ignore `outputs ... Permission denied`.** On this Windows checkout,
+> `.venv` inherited a Low integrity label, so its Python runs at Low integrity even
+> from a normal terminal and cannot write to the private store. PowerShell being
+> able to write there does not prove Python can. See the targeted repair in
+> [DEVELOPMENT.md](DEVELOPMENT.md#windows-python-output-permission-error).
 
 To see which profiles exist (`sreedeep` is this machine's):
 
@@ -216,7 +223,9 @@ Everything lands in your private store, **not** in this repository:
 Windows:  D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
 macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
 
-    2026_CV_<your_name>_<role>.pdf          <- the CV
+    2026_CV_<your_name>_<role>.pdf          <- the formatted CV (ATS-clean text layer)
+    2026_CV_<your_name>_<role>_upload.docx  <- plain single-column Word CV for portal autofill
+    2026_CV_<your_name>_<role>_upload.txt   <- plain-text copy for manual portal paste
     2026_cover_letter_<company>_<role>.pdf  <- the cover letter
     2026_cover_letter_<company>_<role>.docx <- Word version, if a form wants it
     source\
@@ -271,7 +280,8 @@ Narrow it to one document if you only changed one:
 ```
 
 **Re-render re-checks the page count**, so if your edit pushes the CV onto a third
-page it will tell you.
+page it will tell you. Re-rendering a cover letter stamps today's date (`date.today()`)
+into both the DOCX and PDF headers so the document carries the current submission date.
 
 ---
 
@@ -340,17 +350,78 @@ the services. Logs go to `.runtime/logs/`.
 > If a port is already in use, startup **refuses** rather than killing whatever is
 > there. Stop the other service, or change `UI_PORT` / `BACKEND_PORT` in `.env`.
 
-**First, choose a candidate** in the sidebar. The interface will not generate without
-one, and that is deliberate: the choice decides which folder the documents are filed
-under, so an unnoticed default is how the wrong person's CV gets sent. It insists even
-when only one profile exists.
+**First, check the active candidate** at the top. The GUI restores your last valid
+choice or selects the only usable profile; use the sidebar to change it. With
+multiple profiles and no remembered choice, select one before generating.
 
 | Page | What it does |
 |---|---|
-| **Generate** | Paste a posting, add optional company/role/country, generate. Shows progress, the cost breakdown, and download buttons. |
-| **Find jobs** | Free search over public job boards, with a plain-language reason for each match. |
-| **Applications** | Everything generated for this candidate, with downloads — including anything produced from the command line. |
-| **Help** | The rules the tool will not break. |
+| **New application** | Check the active candidate, paste a posting, check company/role/country and task models, then generate. Results remain available through reruns. |
+| **Find jobs** | Free search with matching signals, eligibility and source notes. **Use this posting** transfers known text to New application without making a model call. |
+| **Applications** | Search and filter saved applications by company/role, status or requested model, including CLI runs. Pages expose the whole library. |
+| **Settings & help** | Private-store location, read-only profile summary and local setup checks. Key presence is distinct from provider verification. |
+
+After generation, or after choosing an application in the library, use the review tabs:
+
+* **Documents:** preview the actual CV/letter PDFs and download PDF, Word, or
+  autofill files (`CV for autofill · DOCX` and `TXT`). For older saved
+  applications, click **Create / refresh CV for autofill** to build the
+  companion files from `content.json` and the saved profile snapshot with zero
+  model calls. For portals like Workday, try the plain `_upload.docx` when
+  accepted, and always verify extracted form fields.
+* **What changed:** compare the saved profile snapshot against final CV text. Projects
+  with changed names appear as separate source/final entries; ambiguous matches are
+  flagged instead of guessed. This is a text comparison, not a quality score.
+* **Why these changes:** read the saved model explanation for summary wording,
+  bullets, skills, projects and overall strategy. Older runs may have no explanation.
+* **Run details:** requested task models, provider, tokens, attempts and cost. New
+  runs also save provider-reported model IDs/request IDs when returned, and explicit
+  fresh/cache and cost-source records. Older missing fields say **Not recorded**;
+  they are never inferred from today's settings. Cached runs keep original-generation
+  usage separate from this run. Viewing any tab does not call the model.
+
+The GUI restores your last valid profile, or selects the only usable profile. The
+active name/id is shown at the top of every page. Your choice survives browser and
+server restarts in the private store's `preferences/gui.json`. With multiple profiles
+and no remembered choice, choose one in the sidebar; switching clears the previous
+candidate's draft/review state. The CLI and API still require an explicit profile id.
+
+The curated-model selector affects only new applications. The current catalogue
+contains one selected model; keeping configured routing also preserves any explicit
+per-task overrides. Browser reloads start a new draft session with the remembered
+profile; saved applications remain in the library.
+
+If generation fails before documents exist, raw responses and a failed-run record
+are saved when the store is writable. Review that attempt before paying for another
+draft. Missing or damaged historical source files still allow existing downloads.
+
+### Cover-letter voice
+
+Letters should explain why the particular work is relevant and develop one or two
+examples of what you did and why it mattered, rather than paraphrasing the CV or
+listing the posting's keywords. The existing four paragraphs / 290–310 body words /
+one-page limits still apply. A count passing is not proof that the prose is good.
+
+Optional personal preferences live privately at
+`<store>/profiles/<profile_id>/writing_style.json`:
+
+```json
+{
+  "version": 1,
+  "tone": "Warm, direct and professional",
+  "preferences": ["Explain who used the work and what it helped them do."],
+  "avoid": ["Repeated corporate flattery and long lists of tools."],
+  "sign_off": "Warm regards,"
+}
+```
+
+Only these distilled preferences are included in the letter brief; private reference
+paths and old letter collections are not sent. Historical examples guide style, not
+facts. The current profile remains authoritative. A changed effective voice brief
+invalidates the paired generation cache automatically, so the next draft may make
+fresh paid calls even if the posting is unchanged. Existing letters are not modified.
+If a style file exists but is invalid, fix it before generation; it is not ignored.
+Read every new letter yourself—naturalness and your voice are editorial judgments.
 
 **Read both documents before sending them**, whichever way you produced them.
 
@@ -371,7 +442,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 | `pdflatex not found` (Windows) | Install MiKTeX, or set `LATEX_COMPILER` to the full path of `pdflatex.exe`. |
 | `pdflatex compilation failed` | Usually a **temp-directory** problem, not a broken document. See the note below. |
 | Cover letter word count off | Re-render after editing `content.json`; the count is re-checked every time. |
-| Word file looks different from the PDF | Expected — DOCX and LaTeX lay out differently. Check both. Aptos may be unavailable on macOS; LibreOffice/Word substitutes a font. |
+| Word file looks different from the PDF | Minor spacing differences are expected between Word/LibreOffice (`Calibri`) and LaTeX (`Carlito`), though both follow the same single-column business-letter layout and stamp today's date (`date.today()`) at render time. Check both. |
 | It generated for the wrong person | Should be impossible — `profile_id` fails closed. If you believe otherwise, stop and report it. |
 
 > **About `pdflatex compilation failed`.** On Windows this is usually the temp

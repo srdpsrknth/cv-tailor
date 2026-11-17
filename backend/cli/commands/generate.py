@@ -4,9 +4,9 @@ The posting can come from ``--job-file``, ``--job`` (inline text) or stdin, so
 the command is usable both interactively and in a pipeline. This is the only
 command that calls a paid API.
 """
+
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -19,16 +19,7 @@ from cli.context import (
     human_pages,
 )
 
-#: TailorRequest enforces this; check it first so the message is the CLI's own.
-MIN_JOB_DESCRIPTION = 50
-
-# Catch a copied invocation as the posting (not code examples later in a real JD).
-_COMMAND_START = re.compile(
-    r"^(?:(?:[^\s]*[/\\])?python(?:\d+(?:\.\d+)*)?(?:\.exe)?\s+"
-    r"(?:[^\s]*[/\\])?cvtailor\.py(?:\s|$)"
-    r"|cvtailor(?:\.py)?\s+(?:--\S+|generate\b))",
-    re.I,
-)
+from services.posting import validate_posting
 
 
 def _load(path: Path):
@@ -75,16 +66,22 @@ def run(args, console: Console, config) -> int:
         try:
             profile_id = config.require_profile_id()
         except InvalidProfileIdError as error:
-            raise CliError(str(error), EXIT_USAGE,
-                           hint="Run `cvtailor profile list` to see the ids you have.")
+            raise CliError(
+                str(error),
+                EXIT_USAGE,
+                hint="Run `cvtailor profile list` to see the ids you have.",
+            )
         profile_path = store.profile_path(profile_id)
 
     try:
         # A store id goes through the store; a loose --profile file is loaded directly.
         profile = _load(profile_path) if profile_id is None else store.load(profile_id)
     except UnknownProfileError as error:
-        raise CliError(str(error), EXIT_NOT_FOUND,
-                       hint="Run `cvtailor profile list` to see the available ids.")
+        raise CliError(
+            str(error),
+            EXIT_NOT_FOUND,
+            hint="Run `cvtailor profile list` to see the available ids.",
+        )
     except FileNotFoundError:
         raise CliError(f"Profile not found: {profile_path}", EXIT_NOT_FOUND)
     except ValueError as error:
@@ -92,23 +89,21 @@ def run(args, console: Console, config) -> int:
 
     job_description = read_job_description(args, console).strip()
     first_line = next(
-        (line.strip() for line in job_description.splitlines()
-         if line.strip() and not line.strip().startswith('```')),
-        '',
+        (
+            line.strip()
+            for line in job_description.splitlines()
+            if line.strip() and not line.strip().startswith("```")
+        ),
+        "",
     )
-    if _COMMAND_START.match(first_line):
+    try:
+        validate_posting(job_description)
+    except ValueError as error:
         raise CliError(
-            "The job description starts with a CV Tailor command. "
-            "The clipboard may contain the command instead of the posting.",
+            str(error),
             EXIT_USAGE,
             hint="Save the actual posting to a text file, inspect it, then use --job-file <path>.",
-        )
-    if len(job_description) < MIN_JOB_DESCRIPTION:
-        raise CliError(
-            f"Job description is too short ({len(job_description)} characters).",
-            EXIT_USAGE,
-            hint=f"Paste the full posting; at least {MIN_JOB_DESCRIPTION} characters.",
-        )
+        ) from error
 
     if not config.has_api_key:
         raise CliError(
@@ -121,7 +116,9 @@ def run(args, console: Console, config) -> int:
         label = profile_id or str(profile_path)
         console.out(f"Profile:  {profile.identity.full_name}  [{label}]")
         console.out(f"Model:    {config.model}")
-        console.out(f"Posting:  {len(job_description):,} characters; {first_line[:120]}")
+        console.out(
+            f"Posting:  {len(job_description):,} characters; {first_line[:120]}"
+        )
         if getattr(args, "company", None):
             console.out(f"Company:  {args.company}")
         if getattr(args, "role", None):
@@ -159,8 +156,12 @@ def run(args, console: Console, config) -> int:
 
     console.out("")
     console.out(f"Done: {result.job_id}")
-    console.out(f"  CV:            {human_pages(result.cv_page_count)}  {result.cv_path}")
-    console.out(f"  Cover letter:  {human_pages(result.cover_letter_page_count)}  {result.cover_letter_path}")
+    console.out(
+        f"  CV:            {human_pages(result.cv_page_count)}  {result.cv_path}"
+    )
+    console.out(
+        f"  Cover letter:  {human_pages(result.cover_letter_page_count)}  {result.cover_letter_path}"
+    )
     if result.cl_pdf_path:
         console.out(f"  Cover PDF:     {result.cl_pdf_path}")
     console.out(f"  Editable copy: {result.source_path}")
@@ -177,5 +178,7 @@ def run(args, console: Console, config) -> int:
             console.out("")
             console.out(f"  Strategy: {strategy}")
     console.out("")
-    console.out(f"Revise the text in {result.source_path}, then: cvtailor render --content \"{result.source_path}\"")
+    console.out(
+        f'Revise the text in {result.source_path}, then: cvtailor render --content "{result.source_path}"'
+    )
     return 0

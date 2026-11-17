@@ -125,17 +125,20 @@
   \begin{adjustwidth}{}{\dimexpr-\marginparwidth-\marginparsep\relax}}
   {\end{adjustwidth}}
 
-\newcommand{\emailsymbol}{\faAt}
-\newcommand{\phonesymbol}{\faPhone}
+\newcommand{\emailsymbol}{\tikz[baseline=-0.1ex,scale=0.18,color=accent,line width=0.55pt]{\draw[rounded corners=0.5pt] (0,0) rectangle (1.5,1); \draw (0,1) -- (0.75,0.42) -- (1.5,1);}}
+\newcommand{\phonesymbol}{\tikz[baseline=-0.1ex,scale=0.18,color=accent,line width=0.55pt]{\draw[rounded corners=0.8pt] (0.2,0) rectangle (1.0,1.25); \fill (0.6,0.18) circle (0.08);}}
 \newcommand{\homepagesymbol}{\faChain}
-\newcommand{\locationsymbol}{\faMapMarker}
-\newcommand{\linkedinsymbol}{\faLinkedin}
+\newcommand{\locationsymbol}{\tikz[baseline=-0.1ex,scale=0.18,color=accent,line width=0.55pt]{\draw (0.5,0) .. controls (0.15,0.45) and (0,0.65) .. (0,0.82) arc (180:0:0.5) .. controls (1,0.65) and (0.85,0.45) .. (0.5,0) -- cycle; \fill (0.5,0.82) circle (0.18);}}
+\newcommand{\linkedinsymbol}{\tikz[baseline=-0.1ex,scale=0.18,color=accent,line width=0.6pt]{\draw[rounded corners=0.8pt] (0,0) rectangle (1.15,1.15); \fill (0.3,0.85) circle (0.08); \draw (0.3,0.22) -- (0.3,0.68); \draw (0.58,0.22) -- (0.58,0.68); \draw (0.58,0.52) .. controls (0.58,0.68) and (0.88,0.68) .. (0.88,0.52) -- (0.88,0.22);}}
 \newcommand{\twittersymbol}{\faTwitter}
-\newcommand{\githubsymbol}{\faGithub}
+\newcommand{\githubsymbol}{\tikz[baseline=-0.1ex,scale=0.18,color=accent,line width=0.6pt]{\draw (0.58,0.58) circle (0.55); \draw (0.38,0.38) -- (0.38,0.78); \draw (0.78,0.58) -- (0.78,0.78); \draw (0.38,0.58) -- (0.78,0.58); \fill (0.38,0.38) circle (0.1); \fill (0.38,0.78) circle (0.1); \fill (0.78,0.78) circle (0.1);}}
 \newcommand{\orcidsymbol}{\aiOrcid}
 \newcommand{\mailsymbol}{\faEnvelope}
+\newcommand{\calendarsymbol}{\tikz[baseline=-0.1ex,scale=0.18,color=accent,line width=0.55pt]{\draw[rounded corners=0.5pt] (0,0) rectangle (1.15,1.0); \draw (0,0.72) -- (1.15,0.72); \draw (0.3,0.85) -- (0.3,1.12); \draw (0.85,0.85) -- (0.85,1.12);}}
 
-\newcommand{\printinfo}[2]{\mbox{\textcolor{accent}{\normalfont #1}\hspace{0.5em}#2\hspace{2em}}}
+\newcommand{\atssep}[1]{\makebox[0pt][l]{{\fontsize{0.1pt}{0.1pt}\selectfont\textcolor{white}{#1}}}}
+
+\newcommand{\printinfo}[2]{\mbox{\textcolor{accent}{\normalfont #1}\hspace{0.4em}#2\hspace{1.2em}}}
 
 \newcommand{\name}[1]{\def\@name{#1}}
 \newcommand{\tagline}[1]{\def\@tagline{#1}}
@@ -215,8 +218,8 @@
   \ifstrequal{#2}{}{}{
   \textbf{\color{accent}#2}\par
   \smallskip}
-  \ifstrequal{#3}{}{}{{\small\makebox[0.5\linewidth][l]{\faCalendar\hspace{0.5em}#3}}}%
-  \ifstrequal{#4}{}{}{{\small\makebox[0.5\linewidth][l]{\faMapMarker\hspace{0.5em}#4}}}\par
+  \ifstrequal{#3}{}{}{{\small\makebox[0.5\linewidth][l]{\calendarsymbol\hspace{0.5em}#3}}}%
+  \ifstrequal{#4}{}{}{{\small\makebox[0.5\linewidth][l]{\locationsymbol\hspace{0.5em}#4}}}\par
   \medskip\normalsize
 }
 
@@ -239,12 +242,14 @@
     }%
     % Right block (#3 dates, #4 location)
     \makebox[0.5\linewidth][l]{%
+      \ifstrequal{#2}{}{}{\ifstrequal{#3}{}{}{\atssep{ | }}}%
       \ifstrequal{#3}{}{}{%
-        \faCalendar\hspace{0.5em}#3%
+        \calendarsymbol\hspace{0.5em}#3%
       }%
       \hfill%
       \ifstrequal{#4}{}{}{%
-        \faMapMarker\hspace{0.5em}#4%
+        \ifstrequal{#2#3}{}{}{\atssep{ | }}%
+        \locationsymbol\hspace{0.5em}#4%
       }%
     }%
     \par%
@@ -261,14 +266,14 @@
   \ifstrequal{#2}{}{}{
   {#2}\par
   \smallskip}
-  \ifstrequal{#3}{}{}{{\small\makebox[0.1\linewidth][l]{\faCalendar\hspace{0.5em}#3}}}%
-  \ifstrequal{#4}{}{}{{\small\makebox[0.1\linewidth][l]{\faMapMarker\hspace{0.5em}#4}}}\par
+  \ifstrequal{#3}{}{}{{\small\makebox[0.1\linewidth][l]{\calendarsymbol\hspace{0.5em}#3}}}%
+  \ifstrequal{#4}{}{}{{\small\makebox[0.1\linewidth][l]{\locationsymbol\hspace{0.5em}#4}}}\par
   \medskip\normalsize
 }
 
 \newcommand{\cvboard}[3]{%
   {\textbf{\normalsize\color{accent}#1}}
-  \ifstrequal{#3}{}{}{{\small\makebox[0.5\linewidth][r]{\faCalendar\hspace{0.5em}#3}}}\par
+  \ifstrequal{#3}{}{}{{\small\makebox[0.5\linewidth][r]{\calendarsymbol\hspace{0.5em}#3}}}\par
   \smallskip\normalsize
   \ifstrequal{#2}{}{}{
   {#2}\par

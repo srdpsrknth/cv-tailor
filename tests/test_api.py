@@ -195,6 +195,20 @@ def test_download_cover_letter_finds_the_docx(client, store_outputs):
     assert 'wordprocessingml' in response.headers['content-type']
 
 
+def test_download_cover_letter_excludes_the_upload_cv_docx(client, store_outputs):
+    """The cover-letter route must not hand back the autofill CV DOCX."""
+    profile_id, job_id, folder = store_outputs
+    (folder / '2026_CV_Someone_analyst_upload.docx').write_bytes(b'cv upload docx')
+    (folder / '2026_cover_letter_acme_analyst.docx').write_bytes(b'cover letter docx')
+
+    response = client.get(
+        f'/api/download/cover-letter/{job_id}', params={'profile_id': profile_id}
+    )
+    assert response.status_code == 200
+    assert response.content == b'cover letter docx'
+    assert 'cover_letter' in response.headers['content-disposition']
+
+
 def test_download_cover_letter_pdf_excludes_the_cv(client, store_outputs):
     """The letter route must not hand back the CV just because both are PDFs."""
     profile_id, job_id, folder = store_outputs

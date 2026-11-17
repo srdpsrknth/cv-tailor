@@ -572,6 +572,16 @@ def test_openrouter_sends_a_bearer_token_and_never_logs_it(monkeypatch):
     assert sent[-1]['headers']['Authorization'] == 'Bearer secret-key-value'
 
 
+def test_openrouter_sends_app_title_header(monkeypatch):
+    sent = _record_openrouter_requests(monkeypatch)
+    provider = OpenRouterProvider(api_key='k', default_model='vendor/model')
+
+    provider.generate('prompt')
+
+    assert sent[-1]['headers']['HTTP-Referer'] == 'https://github.com/srdpsrknth/cv-tailor'
+    assert sent[-1]['headers']['X-Title'] == 'CV Tailor'
+
+
 def test_openrouter_honours_a_per_call_model_override(monkeypatch):
     """This is the hook model-per-task routing uses."""
     sent = _record_openrouter_requests(monkeypatch)
@@ -923,6 +933,17 @@ def test_openrouter_reports_its_own_charge(monkeypatch):
     assert response.reported_cost_usd == pytest.approx(0.001234)
     # The request is unchanged: no `usage` opt-in was added to obtain this.
     assert 'usage' not in (sent[0]['json'] or {})
+
+
+def test_provider_retains_reported_model_and_request_identifier(monkeypatch):
+    _record_openrouter_requests(monkeypatch, reply={
+        'id': 'gen-synthetic-123', 'model': 'served-model',
+        'choices': [{'message': {'content': '{}'}}],
+        'usage': {'prompt_tokens': 10, 'completion_tokens': 5},
+    })
+    response = OpenRouterProvider(api_key='k', default_model='requested-model').generate('prompt')
+    assert response.reported_model == 'served-model'
+    assert response.request_id == 'gen-synthetic-123'
 
 
 def test_an_absent_reported_cost_is_none_never_zero(monkeypatch):

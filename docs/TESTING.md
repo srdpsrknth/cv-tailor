@@ -1,8 +1,68 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline:** **1170 passed, 3 skipped**, 1 warning, ~68 s on macOS, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+**Current baseline (2026-11-17, merged Mac refactor):** **1229 passed, 3 skipped**, 1 existing Google SDK warning, ~78 s, fully offline — no paid API calls. Includes the incoming GUI/cover-letter changes and local country-specific rules.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 34 LaTeX tests.
+
+Cover-letter business-letter and validation regressions add 8 cases across two files:
+`tests/test_renderers_documents.py` (`test_cover_letter_docx_and_pdf_follow_standard_business_letter_contract`
+testing `synthetic_analyst` and `synthetic_marketer` across DOCX and PDF for closing line,
+signature, top sender contact block, empty DOCX headers/footers, no ligature/PUA chars,
+non-fused date/company/role, metadata, 290–310 words, and 1 page; plus
+`test_cover_letter_renderer_does_not_mutate_paragraphs` for A-7, and `test_docx_font_is_applied`
+updated from `Aptos` to `Calibri`), and `tests/test_tailoring_pipeline.py` (rejecting
+`Dear <Company>`/`Warm regards` in body paragraphs, prose colons/semicolons, banned tools
+and wrong ownership in cover letters, and visa/Blue Card/sponsorship wording in
+home-country letters).
+
+ATS text-layer and autofill CV regressions add 10 tests across four files:
+`tests/test_upload_cv.py` (6 tests covering sequential DOCX/TXT content, acronym
+preservation, core properties, Unicode bullets, saved-snapshot export isolation, UI
+labels, and stale-bridge fallback), `tests/test_renderers_documents.py` (`test_cv_pdf_text_layer_is_ats_clean` and
+`test_cv_preserves_skill_category_acronyms`), `tests/test_api.py`
+(`test_download_cover_letter_excludes_the_upload_cv_docx`), and
+`tests/test_reading_packet.py` (`test_the_packet_excludes_autofill_upload_companions`).
+
+Preview rerun regressions in `test_ui_review.py` include real download widgets and
+repeated CV/cover-letter selection, a search action button across reruns, and an
+explicit client-state guard. Retain only editable input values, never button or
+PDF-component state. AppTest omits some client download states, so passing a page
+without artifacts was not adequate coverage. Browser QA also exercised a saved
+cover-letter PDF with its DOCX/PDF download buttons present.
+
+Do not edit inspected callback source while a suite using `AppTest.from_function`
+is running: it re-reads source at execution time. An initial baseline attempt during
+this fix hit a source-inspection `NameError` while test source was being edited;
+run the final verification against stable source.
+
+GUI profile memory adds six tests in `test_gui_preferences.py` plus an AppTest of
+restoring a selected candidate in a fresh session. Single-profile defaults are now
+intentional (ADR 0022); unremembered multi-profile sessions still start unselected.
+
+`test_writing_voice.py` adds five synthetic cases: missing/invalid private guidance,
+cross-profile and loose-file isolation, source-path exclusion, letter-only prompt
+injection and changed-voice cache invalidation. These prove plumbing and factual
+scope, not the literary quality of a new live draft. No paid review pass is added.
+
+Application-review increment adds 25 cases: `test_application_review.py` (18),
+`test_ui_review.py` (6) and a provider-reply attribution case in
+`test_provider_interface.py`. These cover legacy/corrupt records, profile/path
+boundaries, identity-aligned comparisons, HTML escaping, more than 20 applications,
+failed raw drafts, requested/reported model records and repeated-cache provenance.
+AppTest exercises deliberate profile choice, persistent reviews, candidate switches,
+no-call viewing, retained search results and posting handoff. Existing UI tests now
+make an explicit profile selection before exercising the generation form.
+
+Browser QA covers all four pages, actual PDF rendering, saved explanations, text
+comparisons, input persistence across navigation, setup checks and a 390 x 844
+viewport. No paid provider call or live source search was made for this increment.
+
+Windows launcher smoke checks (2026-11-17): run `scripts/windows_gui.ps1 -NoBrowser`
+with Windows PowerShell 5.1, check `/_stcore/health`, launch again and assert the
+listener PID is unchanged, then use `-Stop -NoBrowser` and confirm port release.
+Restart and verify shortcut targets. An unrelated listener on an overridden
+`UI_PORT` must be refused, including by stop. These checks passed. Real-store
+AppTest also completed with zero exceptions; no paid generation was run.
 
 The merged baseline includes the 1142-test upstream UI update and eight local CLI/
 correction-feedback regression cases. The full suite was verified after merging

@@ -79,6 +79,24 @@ def test_the_packet_holds_the_rendered_documents(tmp_path):
     assert names == ["cv.pdf", "letter.docx", "letter.pdf"]
 
 
+def test_the_packet_excludes_autofill_upload_companions(tmp_path):
+    outputs = tmp_path / "outputs"
+    profile = outputs / "eval_nordwind"
+    profile.mkdir(parents=True)
+    _job(
+        profile,
+        "2026_a_100",
+        "vendor/one",
+        documents=("cv.pdf", "cv_upload.docx", "cv_upload.txt", "letter.pdf", "letter.docx"),
+    )
+    packet = build_packet(outputs, tmp_path / "packet", ranking=("vendor/one",))
+
+    assert packet.document_count == 3
+    (case,) = packet.cases
+    names = sorted(p.name for p in case.documents)
+    assert names == ["cv.pdf", "letter.docx", "letter.pdf"]
+
+
 def test_pdfs_are_listed_before_the_docx(tmp_path):
     """A reader wants the rendered page first and the editable artefact second.
 

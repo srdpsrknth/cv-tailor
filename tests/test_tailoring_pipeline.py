@@ -641,8 +641,9 @@ def test_wrong_signature_name_is_rejected(analyst_profile, analyst_session):
         service._validate_cover_letter(letter, analyst_profile)
 
 
-@pytest.mark.parametrize('opening', ['Dear Hiring Manager,', 'Sincerely,', 'Best regards,',
-                                     'Kind regards,'])
+@pytest.mark.parametrize('opening', ['Dear Hiring Manager,', 'Dear Nordwind Hiring Team,',
+                                     'Sincerely,', 'Best regards,', 'Kind regards,',
+                                     'Warm regards,'])
 def test_salutation_or_signoff_inside_the_body_is_rejected(analyst_profile, analyst_session, opening):
     payload = analyst_session.step_payload('cover_letter')['cover_letter']
     payload['paragraphs'][0] = opening + ' ' + payload['paragraphs'][0]
@@ -650,6 +651,60 @@ def test_salutation_or_signoff_inside_the_body_is_rejected(analyst_profile, anal
 
     with pytest.raises(ValueError, match='salutation or signature'):
         service._validate_cover_letter(letter, analyst_profile)
+
+
+def test_cover_letter_rejects_banned_tool_and_wrong_ownership(analyst_profile, analyst_session):
+    payload = analyst_session.step_payload('cover_letter')['cover_letter']
+    payload['paragraphs'][1] = 'Built Fivetran ingestion pipelines. ' + ' '.join(['word'] * 65)
+    with pytest.raises(ValueError, match='Fivetran'):
+        service._validate_cover_letter(TailoredCoverLetter.model_validate(payload), analyst_profile)
+
+    payload2 = analyst_session.step_payload('cover_letter')['cover_letter']
+    payload2['paragraphs'][1] = 'At Aklamio I owned the 80-table data quality framework. ' + ' '.join(['word'] * 60)
+    with pytest.raises(ValueError, match='contribution'):
+        service._validate_cover_letter(TailoredCoverLetter.model_validate(payload2), analyst_profile)
+
+
+@pytest.mark.parametrize('punctuation,snippet', [
+    (':', 'I focus on what matters most: owning reliable models.'),
+    (';', 'Thank you for considering my application; I welcome a chat.'),
+])
+def test_cover_letter_rejects_colons_and_semicolons_in_paragraphs(
+    analyst_profile, analyst_session, punctuation, snippet,
+):
+    payload = analyst_session.step_payload('cover_letter')['cover_letter']
+    payload['paragraphs'][0] = snippet + ' ' + ' '.join(['word'] * (75 - len(snippet.split())))
+    with pytest.raises(ValueError, match='colons or semicolons'):
+        service._validate_cover_letter(TailoredCoverLetter.model_validate(payload), analyst_profile)
+
+
+def test_home_country_cover_letter_rejects_visa_or_sponsorship_wording(
+    isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
+):
+    analyst_profile.identity.visa_status = 'Valid EU Blue Card Visa'
+    draft = analyst_session.step_text('cv_draft')
+    bad_letter = analyst_session.step_payload('cover_letter')
+    words = bad_letter['cover_letter']['paragraphs'][-1].split()
+    bad_letter['cover_letter']['paragraphs'][-1] = (
+        'I hold a valid EU Blue Card and need a work permit. ' + ' '.join(words[12:])
+    )
+    # Adjust word count cleanly to stay in 290-310
+    total = sum(len(p.split()) for p in bad_letter['cover_letter']['paragraphs'])
+    if total < 290:
+        bad_letter['cover_letter']['paragraphs'][-1] += ' ' + ' '.join(['word'] * (295 - total))
+    elif total > 310:
+        bad_letter['cover_letter']['paragraphs'][-1] = ' '.join(
+            bad_letter['cover_letter']['paragraphs'][-1].split()[:-(total - 300)]
+        )
+    offline_service([draft] + [json.dumps(bad_letter)] * 3)
+    stub_renderers([2])
+
+    with pytest.raises(ValueError, match='home country'):
+        service.tailor_documents(
+            analyst_session.job_description_text, analyst_profile,
+            company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
+            work_country='Germany',
+        )
 
 
 # --- retry handling ------------------------------------------------------------------

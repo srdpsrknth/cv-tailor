@@ -456,6 +456,24 @@ LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
 
 ## Phase 6 — UI and deployment
 
+**Owner follow-ups (2026-11-17):** GUI remembers the last valid profile or selects
+the sole usable profile, with active identity shown at the top (ADR 0022). Backend
+identity remains explicit. A cover-letter editorial review also refined future
+drafting around explained evidence and optional private per-profile voice (ADR 0023),
+without changing factual/layout limits or rewriting existing applications.
+
+**Application review delivered (2026-11-17):** compact editorial UI; deliberate
+candidate selection; persistent draft/results; common Documents / What changed /
+Why these changes / Run details workspace; real PDF previews; saved-snapshot
+comparisons; optional provider-reply and cache/cost attribution; searchable,
+paginated application library; job-to-generation handoff and local setup checks.
+See ADR 0021. This is review and discovery, not Phase 5 submission tracking.
+
+**Windows local launch (2026-11-17):** desktop and Start-menu open/stop shortcuts
+installable with `scripts/install_windows_shortcuts.ps1`. The launcher starts only
+the GUI, waits for readiness, reuses this checkout's running instance, and keeps
+the service on loopback. Hosted deployment and authentication remain open.
+
 **Status: IN PROGRESS (2026-11-15) — the interface has been rebuilt; deployment and the
 remaining scope are open.** See [ADR 0020](DECISIONS/0020-streamlit-refactor.md).
 
@@ -475,9 +493,9 @@ and then reversed to refactoring, after NiceGUI could not be installed in this
 environment. The framework was never rejected on its merits.
 
 **Still open:** the deployment story, authentication *if* hosted, and any decision about
-the FastAPI layer's long-term role. **No visual screenshot was obtained** — headless
-capture of Streamlit is unreliable (it shows the skeleton loader even for a working
-app), so the UI is verified behaviourally and deserves a human eye.
+the FastAPI layer's long-term role. Browser visual verification now covers desktop
+and narrow layouts, including the real PDF viewer (2026-11-17); AppTest separately
+verifies behaviour. No paid provider call was made during this UI implementation.
 
 - **Objective:** decide the interface story.
 - **Scope:** assess keeping vs replacing Streamlit; multi-profile management; job search and

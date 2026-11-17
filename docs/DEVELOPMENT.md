@@ -34,6 +34,63 @@ git worktree add -b refactor/architecture-v2 ../cv-tailor-next master
 
 ## Environment isolation
 
+### Windows Python output permission error
+
+If `doctor` cannot write outputs even from a normal terminal, inspect the Python
+executable with `icacls .venv\Scripts\python.exe`. This checkout inherited a
+**Low Mandatory Level** label from an earlier agent sandbox. Windows therefore
+starts the venv Python at Low integrity, which cannot write to the normal private
+store even though its ordinary directory ACL grants Modify. This persists outside
+the agent; it is not a harmless doctor failure.
+
+The targeted repair restores the two Python launcher executables to Medium
+integrity. Run these in **PowerShell as Administrator**, adjusting the checkout
+path if needed:
+
+```powershell
+icacls "D:\coding\cv-tailor-next\.venv\Scripts\python.exe" /setintegritylevel M
+icacls "D:\coding\cv-tailor-next\.venv\Scripts\pythonw.exe" /setintegritylevel M
+```
+
+Then run `doctor` from a **normal**, non-administrator terminal. Both commands must
+report success; the repair has not been verified until doctor passes. Restart the
+GUI with the stop/open shortcuts so it uses a fresh Python process. No change to
+the private store's ACL, security software or profile data is needed. Recheck if
+the venv is later recreated under a Low-labelled checkout.
+
+### Windows GUI shortcuts
+
+The review UI requires the added `streamlit-pdf==2.1.0` dependency for inline PDF
+previews. Existing environments should install `requirements.lock.txt` after pulling
+this update, then restart the GUI. Missing preview support does not remove downloads.
+
+After installing the environment, run from the checkout:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install_windows_shortcuts.ps1
+```
+
+This installs **CV Tailor** and **Stop CV Tailor** on the current user's desktop
+and under **CV Tailor** in the Start menu. No administrator rights are needed.
+Double-click **CV Tailor** to start Streamlit in the background and open the browser
+after its health endpoint is ready. Reopening reuses the running GUI. Closing the
+browser leaves it running; use **Stop CV Tailor** to release the port.
+
+The launcher derives the checkout path, uses its `.venv`, reads `UI_PORT` from its
+`.env`, and binds to `127.0.0.1` only. It starts the GUI alone: generation runs in
+process, so FastAPI is optional. The explicit profile picker remains required.
+It refuses to reuse or stop another program occupying the port. Startup failures
+appear in a dialog; logs are `.runtime/logs/gui.stdout.log` and `gui.stderr.log`.
+Run the installer again after moving the checkout. The shortcuts contain local
+paths; they are installed on the machine, never committed.
+
+For terminal diagnostics without opening the browser:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows_gui.ps1 -NoBrowser
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows_gui.ps1 -Stop -NoBrowser
+```
+
 Each worktree needs **its own** `.venv`, `.env`, logs and ports.
 
 Generated documents do **not** live in either worktree: since ADR 0011 they are written to the

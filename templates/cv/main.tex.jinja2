@@ -14,6 +14,10 @@
   \usepackage[utf8]{inputenc}
   \usepackage[T1]{fontenc}
   \usepackage[default]{lato}
+  \input{glyphtounicode}
+  \pdfgentounicode=1
+  \usepackage[protrusion=false,expansion=false]{microtype}
+  \DisableLigatures[f]{encoding = *, family = *}
 \fi
 
 \usepackage{multicol}
@@ -51,14 +55,25 @@
 \tagline{{ '{' }}{{ tagline }}{{ '}' }}
 
 \personalinfo{{ '{' }}%
-  \email{\href{mailto:{{ email }}}{{ '{' }}{{ email }}{{ '}' }}}
-  \phone{\href{tel:{{ phone|replace(' ', '') }}}{{ '{' }}{{ phone }}{{ '}' }}}
+  {% set pinfo = namespace(prev=false) %}%
+  {% if email -%}
+  \email{\href{mailto:{{ email }}}{{ '{' }}{{ email }}{{ '}' }}}%
+  {% set pinfo.prev = true %}%
+  {%- endif %}%
+  {% if phone -%}
+  {% if pinfo.prev %}\atssep{ | }{% endif %}%
+  \phone{\href{tel:{{ phone|replace(' ', '') }}}{{ '{' }}{{ phone }}{{ '}' }}}%
+  {% set pinfo.prev = true %}%
+  {%- endif %}%
   {% if linkedin -%}
-  \linkedin{\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.linkedin.com/in/', '') }}{{ '}' }}}
-  {%- endif %}
+  {% if pinfo.prev %}\atssep{ | }{% endif %}%
+  \linkedin{\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}}%
+  {% set pinfo.prev = true %}%
+  {%- endif %}%
   {% if github -%}
-  \github{\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://github.com/', '') }}{{ '}' }}}
-  {%- endif %}
+  {% if pinfo.prev %}\atssep{ | }{% endif %}%
+  \github{\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}}%
+  {%- endif %}%
 {{ '}' }}
 
 \makecvheader
@@ -104,6 +119,7 @@
 \vspace{0.5mm}
 
 {% for project in exp.projects %}
+\needspace{1.2cm}
 {\small\textit{{ '{' }}{{ project.name }}{{ '}' }}}
 \begin{itemize}[topsep=1pt,itemsep=1pt]
 {% for bullet in project.bullets %}
@@ -116,7 +132,7 @@
 
 {% if exp.technologies %}
 \vspace{1mm}
-{\small\textbf{Technologies:} {{ exp.technologies|join(', ') }}}
+{\small\textbf{Technologies: }{{ exp.technologies|join(', ') }}}
 \vspace{1mm}
 {% endif %}
 
@@ -155,7 +171,7 @@
 \cveventsmall{Certifications:}{}{}{}
 \vspace{-4mm}
 {% for cert in certifications %}
-\cvtag{{ '{' }}{{ cert }}{{ '}' }}
+\cvtag{{ '{' }}{{ cert }}{{ '}' }}{% if not loop.last %}\atssep{, } {% endif %}
 {% endfor %}
 \vspace{1mm}
 {% endif %}
@@ -166,10 +182,10 @@
 \cvsection{Skills}
 
 {% for category, skill_list in skills.items() %}
-{\small\textbf{{ '{' }}{{ category|replace('_', ' ')|title ~ ":" }}{{ '}' }}}
+{\small\textbf{{ '{' }}{{ category ~ ":" }}{{ '}' }}}
 \vspace{0.5mm}
 {% for skill in skill_list %}
-\cvtag{{ '{' }}{{ skill }}{{ '}' }}
+\cvtag{{ '{' }}{{ skill }}{{ '}' }}{% if not loop.last %}\atssep{, } {% endif %}
 {% endfor %}
 \vspace{1.5mm}
 
@@ -181,7 +197,7 @@
 \needspace{2cm}
 \cvsection{Languages}
 {% for lang in languages %}
-\cvtag{{ '{' }}{{ lang.name ~ ": " ~ lang.proficiency }}{{ '}' }}
+\cvtag{{ '{' }}{{ lang.name ~ ": " ~ lang.proficiency }}{{ '}' }}{% if not loop.last %}\atssep{, } {% endif %}
 {% endfor %}
 \vspace{1mm}
 {% endif %}

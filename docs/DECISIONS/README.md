@@ -24,6 +24,9 @@ Only the owner can move a decision to **Approved**.
 | [0017](0017-curation-skill.md) | Curation is a procedure with two human steps: detection reports and cannot spend, the proposal is inert, and a candidate is ineligible without the owner's own writing/PDF/layout verdict | **Approved** — curation-skill items, 2026-10-30 |
 | [0018](0018-job-discovery.md) | Job discovery: verified sources behind one connector, provenance on every source-dependent field, dedupe only on proof, expiry observed not assumed, and a match score that is a count of named evidence with three-valued eligibility | **Approved** — Phase 4, 2026-11-05 |
 | [0020](0020-streamlit-refactor.md) | Refactor the Streamlit UI onto a framework-free service layer, rather than replace the framework | **Approved** — Phase 6, 2026-11-15 |
+| [0021](0021-application-review-and-provenance.md) | Shared read-only application review, snapshot comparisons and explicit requested/provider-reported model, cache and cost provenance | **Approved** — Phase 6, 2026-11-17 |
+| [0022](0022-gui-profile-memory.md) | GUI restores the last usable profile or defaults to the sole usable profile, with a prominent active identity | **Approved** — owner instruction, 2026-11-17 |
+| [0023](0023-private-writing-voice.md) | Purpose-led cover letters and optional private per-profile style guidance, with facts isolated and cache keys reflecting the effective voice | **Approved** — owner instruction, 2026-11-17 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1

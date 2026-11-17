@@ -106,6 +106,12 @@ def run(args, console: Console, config) -> int:
         pages = _count(pdf)
         result.update(cv_path=str(pdf), cv_pages=pages)
         generated.append(pdf)
+        from renderers.upload_cv import render_upload_cv
+
+        upload_paths = render_upload_cv(cv, profile, folder, role)
+        result.update(upload_paths)
+        generated.extend(Path(p) for p in upload_paths.values())
+        console.out(f"Autofill CV:   {upload_paths['cv_upload_docx_path']}")
         console.out(f"CV:            {human_pages(pages)}  {pdf}")
         if pages > 2:
             console.warn(

@@ -6,6 +6,7 @@ prices live in :mod:`services.pricing`, which is the one source of truth (D-4). 
 remains here is the pipeline's client of whichever provider ``config`` selects, plus
 the run-level token and cost roll-up.
 """
+
 import os
 from typing import Callable, Optional, Tuple
 
@@ -65,8 +66,12 @@ class LLMService:
     no prompt byte.
     """
 
-    def __init__(self, config: Optional[Config] = None, api_key: Optional[str] = None,
-                 render_schema: Optional[Callable] = None):
+    def __init__(
+        self,
+        config: Optional[Config] = None,
+        api_key: Optional[str] = None,
+        render_schema: Optional[Callable] = None,
+    ):
         """
         Initialize the service.
 
@@ -104,6 +109,7 @@ class LLMService:
         #: the failure these two counters exist to make visible.
         self.reported_calls = 0
         self.estimated_calls = 0
+        self.call_records = []
 
         #: The provider this service speaks to. Built from the already-resolved
         #: config, so choosing a provider is a configuration decision and never an
@@ -141,7 +147,10 @@ class LLMService:
         config = getattr(self, "config", None)
         provider = getattr(config, "provider", None) or pricing.DEFAULT_PROVIDER
         return pricing.estimate_cost(
-            input_tokens, output_tokens, model or self.model, provider=provider,
+            input_tokens,
+            output_tokens,
+            model or self.model,
+            provider=provider,
         )
 
     def _call_provider(
@@ -212,7 +221,11 @@ class LLMService:
             response = self.provider.generate(
                 prompt,
                 schema=schema,
-                max_tokens=max_output_tokens if max_output_tokens is not None else self.max_output_tokens,
+                max_tokens=(
+                    max_output_tokens
+                    if max_output_tokens is not None
+                    else self.max_output_tokens
+                ),
                 model=routed_model,
             )
         except ProviderError as error:
@@ -220,8 +233,32 @@ class LLMService:
 
         # The cap is checked against the running spend *before* the next call is made,
         # so a run stops at the budget instead of discovering the overrun afterwards.
+        self.call_records.append(
+            {
+                "task": task or "unspecified",
+                "requested_model": routed_model,
+                "reported_model": getattr(response, "reported_model", None),
+                "request_id": getattr(response, "request_id", None),
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "cost_source": (
+                    "reported"
+                    if response.reported_cost_usd is not None
+                    else "estimated"
+                ),
+                "cost_usd": (
+                    response.reported_cost_usd
+                    if response.reported_cost_usd is not None
+                    else self._estimate_cost(
+                        response.input_tokens, response.output_tokens, routed_model
+                    )
+                ),
+            }
+        )
         self._record_spend(
-            response.input_tokens, response.output_tokens, routed_model,
+            response.input_tokens,
+            response.output_tokens,
+            routed_model,
             reported_cost_usd=response.reported_cost_usd,
         )
 
@@ -277,7 +314,7 @@ class LLMService:
         cl_input_tokens: int,
         cl_output_tokens: int,
         cv_attempts: int = 1,
-        cl_attempts: int = 1
+        cl_attempts: int = 1,
     ) -> TokenUsage:
         """
         Calculate total token usage and costs.
@@ -311,9 +348,12 @@ class LLMService:
         # ``getattr`` because a service can legitimately be built without ``__init__``
         # -- tests construct one to exercise purely arithmetic paths -- and an object
         # with no spend counters has made no calls, so the table is the right answer.
-        reported = getattr(self, "reported_calls", 0)
         spent = getattr(self, "spent_usd", 0.0)
-        cost_usd = spent if reported else self._estimate_cost(total_input, total_output)
+        cost_usd = (
+            spent
+            if getattr(self, "calls_made", 0)
+            else self._estimate_cost(total_input, total_output)
+        )
 
         return TokenUsage(
             cv_input_tokens=cv_input_tokens,

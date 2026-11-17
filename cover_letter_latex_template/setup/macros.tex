@@ -1,47 +1,54 @@
-%%%%%%%%%%%%%%% Title of the letter %%%%%%%%%%%%%%% 
-\newcommand{\name}[2]{
-    % Name
-    \Huge
-    \raggedright \textbf{#1} \par
-
-    \vspace*{0.3em}
-    
-    % Profession
-    \LARGE
-    \raggedright #2 
-    \normalsize \par \vspace{3em}
+%%%%%%%%%%%%%%% Sender contact header %%%%%%%%%%%%%%%
+\newcommand{\senderblock}[2]{%
+    {\fontsize{22}{26}\selectfont\bfseries\textcolor{accent}{#1}\par}%
+    \if\relax\detokenize{#2}\relax\else
+        \vspace{3pt}%
+        {\fontsize{9.5}{12}\selectfont\textcolor{muted}{#2}\par}%
+    \fi
+    \vspace{6pt}%
+    {\color{accent}\rule{\linewidth}{1.5pt}\par}%
+    \vspace{12pt}%
 }
 
-%%%%%%%%%%%%%%% Person that receives the ;etter %%%%%%%%%%%%%%% 
-\newcommand{\receiver}[1]{
-    \large
-    \raggedright \textbf{To: #1}
-    \normalsize \par \vspace{1em}
+%%%%%%%%%%%%%%% Letter date %%%%%%%%%%%%%%%
+\newcommand{\letterdate}[1]{%
+    \noindent{\normalsize\textcolor{muted}{#1}\par}\vspace{8pt}%
 }
 
-%%%%%%%%%%%%%%% Paragraph of a letter %%%%%%%%%%%%%%% 
-\newcommand{\para}[1]{
-    \noindent \normalsize \justifying #1
-    \normalsize \par \vspace{1em}
+%%%%%%%%%%%%%%% Recipient block %%%%%%%%%%%%%%%
+\newcommand{\recipientblock}[2]{%
+    \if\relax\detokenize{#1}\relax\else
+        \noindent{\normalsize\textbf{\textcolor{emphasis}{#1}}\par}%
+    \fi
+    \if\relax\detokenize{#2}\relax\else
+        \noindent{\normalsize\textcolor{muted}{#2}\par}%
+    \fi
+    \vspace{10pt}%
 }
 
-%%%%%%%%%%%%%%% Signature of the letter %%%%%%%%%%%%%%% 
-\newcommand{\signature}[2]{
-    \normalsize \par \vspace{1em}
-    \raggedright #1 \par \vspace{0.5em}
-    \raggedright #2
+%%%%%%%%%%%%%%% Bold subject line %%%%%%%%%%%%%%%
+\newcommand{\subjectline}[1]{%
+    \noindent{\fontsize{11.5}{14}\selectfont\bfseries\textcolor{accent}{#1}\par}\vspace{8pt}%
 }
 
-%%%%%%%%%%%%%%% Bottom of the letter %%%%%%%%%%%%%%% 
-\newcommand{\bottom}[3]{
-    %%% Contact info in the footer %%%
-    \fancyfoot{
-        \normalsize
-        \raggedright #2 $\cdot$ \href{mailto:#3}{\underline{#3}} 
-
-        %%% Draw a rule under the footer %%%
-        \begin{tikzpicture}
-            \fill[bar] (0, 0) rectangle (20,0.15);
-        \end{tikzpicture}
-    }
+%%%%%%%%%%%%%%% Salutation %%%%%%%%%%%%%%%
+\newcommand{\salutation}[1]{%
+    \noindent{\normalsize\textcolor{emphasis}{#1}\par}\vspace{8pt}%
 }
+
+%%%%%%%%%%%%%%% Body paragraph %%%%%%%%%%%%%%%
+\newcommand{\para}[1]{%
+    \noindent\raggedright\normalsize\textcolor{bodytext}{#1}\par\vspace{8pt}%
+}
+
+%%%%%%%%%%%%%%% Closing signature %%%%%%%%%%%%%%%
+\newcommand{\signature}[2]{%
+    \vspace{6pt}%
+    \noindent\raggedright\normalsize\textcolor{bodytext}{#1}\par\vspace{4pt}%
+    \noindent\raggedright{\fontsize{11.5}{14}\selectfont\bfseries\textcolor{accent}{#2}\par}%
+}
+
+%%%%%%%%%%%%%%% Backwards-compatible no-op hooks %%%%%%%%%%%%%%%
+\newcommand{\name}[2]{}
+\newcommand{\receiver}[1]{}
+\newcommand{\bottom}[3]{}
