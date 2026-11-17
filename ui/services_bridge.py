@@ -491,6 +491,8 @@ def posting_handoff(job):
 
 
 def document_label(name):
+    if Path(name).stem.lower().endswith('_upload'):
+        return f"CV for autofill · {Path(name).suffix.lstrip('.').upper()}"
     suffix = Path(name).suffix.lstrip(".").upper()
     lower = name.lower()
     kind = (
@@ -499,6 +501,12 @@ def document_label(name):
         else "CV" if "cv" in lower else Path(name).stem.replace("_", " ")
     )
     return f"{kind} · {suffix}"
+
+
+def export_upload_cv(config, profile_id, job_id):
+    from services.upload_cv import export_saved_upload_cv
+
+    return export_saved_upload_cv(config, profile_id, job_id)
 
 
 def read_artifact(config, profile_id, job_id, name):

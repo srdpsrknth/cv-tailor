@@ -83,6 +83,10 @@ def main():
         pages = len(PdfReader(pdf).pages)
         manifest.update(cv_path=str(pdf), cv_pages=pages)
         generated.append(pdf)
+        from renderers.upload_cv import render_upload_cv
+        upload_paths = render_upload_cv(cv, profile, folder, role)
+        manifest.update(upload_paths)
+        generated.extend(Path(p) for p in upload_paths.values())
         print(f'CV: {pages} pages; {pdf}')
         if pages > 2:
             print('REVIEW REQUIRED: shorten content and rerender to reach the two-page target.')

@@ -1,8 +1,16 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17):** **1190 passed, 3 skipped**, 1 existing Google SDK warning, ~122 s on Windows, fully offline — no paid API calls.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+**Current baseline (2026-11-17):** **1201 passed, 3 skipped**, 1 existing Google SDK warning, ~144 s on Windows (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 33 LaTeX tests.
+
+ATS text-layer and autofill CV regressions add 10 tests across four files:
+`tests/test_upload_cv.py` (6 tests covering sequential DOCX/TXT content, acronym
+preservation, core properties, Unicode bullets, saved-snapshot export isolation, UI
+labels, and stale-bridge fallback), `tests/test_renderers_documents.py` (`test_cv_pdf_text_layer_is_ats_clean` and
+`test_cv_preserves_skill_category_acronyms`), `tests/test_api.py`
+(`test_download_cover_letter_excludes_the_upload_cv_docx`), and
+`tests/test_reading_packet.py` (`test_the_packet_excludes_autofill_upload_companions`).
 
 Preview rerun regressions in `test_ui_review.py` include real download widgets and
 repeated CV/cover-letter selection, a search action button across reruns, and an

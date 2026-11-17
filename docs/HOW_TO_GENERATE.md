@@ -193,7 +193,9 @@ Everything lands in your private store, **not** in this repository:
 Windows:  D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
 macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
 
-    2026_CV_<your_name>_<role>.pdf          <- the CV
+    2026_CV_<your_name>_<role>.pdf          <- the formatted CV (ATS-clean text layer)
+    2026_CV_<your_name>_<role>_upload.docx  <- plain single-column Word CV for portal autofill
+    2026_CV_<your_name>_<role>_upload.txt   <- plain-text copy for manual portal paste
     2026_cover_letter_<company>_<role>.pdf  <- the cover letter
     2026_cover_letter_<company>_<role>.docx <- Word version, if a form wants it
     source\
@@ -330,7 +332,12 @@ multiple profiles and no remembered choice, select one before generating.
 
 After generation, or after choosing an application in the library, use the review tabs:
 
-* **Documents:** preview the actual CV/letter PDFs and download PDF or Word files.
+* **Documents:** preview the actual CV/letter PDFs and download PDF, Word, or
+  autofill files (`CV for autofill · DOCX` and `TXT`). For older saved
+  applications, click **Create / refresh CV for autofill** to build the
+  companion files from `content.json` and the saved profile snapshot with zero
+  model calls. For portals like Workday, try the plain `_upload.docx` when
+  accepted, and always verify extracted form fields.
 * **What changed:** compare the saved profile snapshot against final CV text. Projects
   with changed names appear as separate source/final entries; ambiguous matches are
   flagged instead of guessed. This is a text comparison, not a quality score.

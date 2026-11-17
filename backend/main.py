@@ -140,8 +140,15 @@ def download_cover_letter(job_id: str, profile_id: Optional[str] = None):
     if not folder.exists():
         raise HTTPException(status_code=404, detail=f"Job folder not found: {job_id}")
 
-    # Find DOCX file in job folder
-    docx_files = list(folder.glob("*.docx"))
+    # Find cover letter DOCX in job folder, excluding CV autofill uploads.
+    docx_files = [
+        p for p in folder.glob("*.docx")
+        if "cover_letter" in p.name.lower()
+        or (not p.stem.lower().endswith("_upload") and "_cv_" not in p.name.lower())
+    ]
+    letter_docx = [p for p in docx_files if "cover_letter" in p.name.lower()]
+    if letter_docx:
+        docx_files = letter_docx
     if not docx_files:
         raise HTTPException(status_code=404, detail=f"Cover letter DOCX not found for job_id: {job_id}")
 

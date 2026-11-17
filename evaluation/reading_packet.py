@@ -161,7 +161,9 @@ def _documents_in(job_folder: Path) -> tuple[Path, ...]:
     return tuple(
         sorted(
             (p for p in job_folder.iterdir()
-             if p.is_file() and p.suffix.lower() in PACKET_DOCUMENT_SUFFIXES),
+             if p.is_file()
+             and p.suffix.lower() in PACKET_DOCUMENT_SUFFIXES
+             and not p.stem.lower().endswith("_upload")),
             key=lambda p: (p.suffix.lower() != ".pdf", p.name),
         )
     )

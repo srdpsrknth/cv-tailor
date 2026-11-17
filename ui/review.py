@@ -2,10 +2,17 @@
 
 import difflib
 import html
+from pathlib import Path
 import re
 
 import streamlit as st
 from ui import services_bridge as bridge
+
+
+def _document_label(name):
+    if Path(name).stem.lower().endswith("_upload"):
+        return f"CV for autofill · {Path(name).suffix.lstrip('.').upper()}"
+    return bridge.document_label(name)
 
 
 def highlighted(before, after):
@@ -62,6 +69,21 @@ def render_application(config, profile_id, job_id):
         ["Documents", "What changed", "Why these changes", "Run details"]
     )
     with documents:
+        if st.button("Create / refresh CV for autofill", key=f"{prefix}_export_upload"):
+            try:
+                exporter = getattr(bridge, "export_upload_cv", None)
+                if exporter is None:
+                    from services.upload_cv import export_saved_upload_cv as exporter
+                exporter(config, profile_id, job_id)
+                detail["artifacts"] = bridge.list_artifacts(detail["path"])
+                st.success("Autofill DOCX and text created from saved content. No model call.")
+            except (ValueError, OSError) as error:
+                st.error(str(error))
+        st.caption(
+            "For resume autofill, try the plain DOCX if the portal accepts it. "
+            "The text copy helps with manual corrections. Follow the portal’s file rules "
+            "and check all extracted fields. Word pagination can differ from the PDF."
+        )
         left, right = st.columns([3, 1])
         artifacts = detail["artifacts"]
         with right:
@@ -69,7 +91,7 @@ def render_application(config, profile_id, job_id):
             for artifact in artifacts:
                 try:
                     st.download_button(
-                        bridge.document_label(artifact["name"]),
+                        _document_label(artifact["name"]),
                         bridge.read_artifact(
                             config, profile_id, job_id, artifact["name"]
                         ),
@@ -97,13 +119,13 @@ def render_application(config, profile_id, job_id):
         with left:
             pdfs = sorted(
                 [a for a in artifacts if a["kind"] == "pdf"],
-                key=lambda a: not bridge.document_label(a["name"]).startswith("CV"),
+                key=lambda a: not _document_label(a["name"]).startswith("CV"),
             )
             if pdfs:
                 chosen = st.selectbox(
                     "Preview document",
                     [a["name"] for a in pdfs],
-                    format_func=bridge.document_label,
+                    format_func=_document_label,
                     key=f"preview_document_{profile_id}_{job_id}",
                 )
                 try:

@@ -3,8 +3,60 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *send X-Title header on OpenRouter requests*
+**Latest commit:** *(this commit)* — *fix ATS CV PDF text layer and add autofill CV companions*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## ATS PDF text-layer repair and autofill CV companion (2026-11-17)
+
+**Active task:** fix ATS/Workday auto-extraction on the primary LaTeX CV PDF and complete
+the companion Word/text autofill CV (`_upload.docx` / `_upload.txt`) — complete.
+
+Root causes identified in the primary PDF text stream and resolved in
+`templates/cv/altacv.cls`, `templates/cv/main.tex.jinja2`, and
+`backend/renderers/latex_renderer.py`:
+
+- Replaced FontAwesome Type 1 icons with pure TikZ vector icons (`\emailsymbol`,
+  `\phonesymbol`, `\locationsymbol`, `\linkedinsymbol`, `\githubsymbol`,
+  `\calendarsymbol`) so icon fonts no longer decode as `/ne`, `Ὄ`, `/♀nedn`, or
+  `/gtb` in PDF text extraction.
+- Added `\input{glyphtounicode}`, `\pdfgentounicode=1`, and
+  `microtype` (`\DisableLigatures[f]{encoding = *, family = *}`) to eliminate `ﬁ`/`ﬂ`
+  precomposed ligatures while keeping page widths and breaks stable.
+- Added zero-width text-layer delimiters (`\atssep{ | }` and `\atssep{, }`) between
+  contact header items, role/date/location blocks in `\cveventsmall`, and `\cvtag`
+  badges (`Certifications`, `Skills`, `Languages`), plus full `linkedin.com/in/...` and
+  `github.com/...` display text and `\needspace{1.2cm}` before individual project
+  headings.
+- Added `format_skill_category` in `backend/utils/text.py` (used by both the LaTeX
+  renderer and `upload_cv`) so uppercase acronyms (`AI`, `BI`, `SQL`, `ETL`, etc.) are
+  not lowercased to `Ai` / `Bi`.
+
+Completed the sequential autofill CV companion (`backend/renderers/upload_cv.py`,
+`backend/services/upload_cv.py`, `backend/cli/commands/render.py`,
+`backend/services/tailor_service.py`, `backend/services/application_store.py`,
+`scripts/render_application.py`, `ui/app.py`, `ui/review.py`, `ui/services_bridge.py`):
+
+- Generates `{year}_CV_{name}_{role}_upload.docx` and `_upload.txt` with one-column
+  headings, full month-year dates, plain URLs, Unicode `\u2022` bullets in `Arial`,
+  and document core properties; available both during generation/re-rendering and via
+  the GUI **Create / refresh CV for autofill** button (zero model calls).
+- Hardened `ui/review.py` and `ui/app.py` against stale cached `ui.services_bridge` /
+  `tailor_service` modules across Streamlit hot-reloads, and restarted the local GUI
+  server on port 8502 (`/_stcore/health` HTTP 200).
+- Fixed `/api/download/cover-letter/{job_id}` in `backend/main.py` to exclude
+  `*_upload.docx`, and excluded `*_upload.*` from `evaluation/reading_packet.py`.
+
+**Verification:** full suite **1201 passed, 3 skipped**, 1 existing Google SDK
+deprecation warning (run outside the Windows sandbox for `pdflatex` MiKTeX
+registry access and `TestClient` loopback sockets). Added 10 regression tests across
+`tests/test_renderers_documents.py`, `tests/test_upload_cv.py`, `tests/test_api.py`,
+and `tests/test_reading_packet.py`. Re-rendered four saved applications
+(`rabot_energy`, `flink`, `holy`, `pergolux`, zero LLM calls): all remain 2 pages with
+clean extracted text and generated `_upload.docx`/`_upload.txt` companions.
+
+**Next action:** refresh the running GUI tab in your browser and use the updated PDFs
+and `_upload.docx` files on your next portal application (such as Workday). Changes
+committed and pushed on `refactor/architecture-v2`; `master` untouched.
 
 ## OpenRouter app attribution header (2026-11-17)
 

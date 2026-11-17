@@ -286,6 +286,19 @@ def page_generate(config):
         st.session_state["generation_outcome"] = outcome
         if outcome.ok:
             st.session_state["active_application"] = outcome.job_id
+            folder = getattr(outcome, "job_folder", None) or bridge.job_folder(
+                config, candidate, outcome.job_id
+            )
+            if folder and not any(Path(folder).glob("*_upload.docx")):
+                try:
+                    exporter = getattr(bridge, "export_upload_cv", None)
+                    if exporter is None:
+                        from services.upload_cv import (
+                            export_saved_upload_cv as exporter,
+                        )
+                    exporter(config, candidate, outcome.job_id)
+                except (ValueError, OSError):
+                    pass
             if st.session_state.get("posting_provenance"):
                 try:
                     bridge.save_posting_provenance(

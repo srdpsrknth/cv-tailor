@@ -568,6 +568,9 @@ def tailor_documents(
             raise ValueError(
                 f"Cover-letter PDF is {cl_pages} pages; expected one page."
             )
+        from renderers.upload_cv import render_upload_cv
+
+        upload_paths = render_upload_cv(cv, profile, applications.job_folder, position)
     except Exception as error:
         # Preserve everything editable, then mark the folder failed explicitly (D-14).
         save_content()
@@ -645,6 +648,7 @@ def tailor_documents(
         ),
         job_id=job_id,
         cv_path=str(cv_path),
+        **upload_paths,
         cover_letter_path=str(cl_path),
         cl_pdf_path=str(cl_pdf_path),
         token_usage=usage,

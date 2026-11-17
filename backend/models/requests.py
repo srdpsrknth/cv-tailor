@@ -66,6 +66,8 @@ class TailorResponse(BaseModel):
     job_id: str
     status: str = "success"
     cv_path: str
+    cv_upload_docx_path: Optional[str] = None
+    cv_upload_text_path: Optional[str] = None
     cover_letter_path: str
     cl_pdf_path: Optional[str] = None
     cv_page_count: Optional[int] = None

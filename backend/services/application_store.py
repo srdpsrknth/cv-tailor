@@ -40,7 +40,7 @@ from services.profile_store import validate_profile_id
 logger = logging.getLogger(__name__)
 
 #: Manifest keys holding artifact paths that mirroring rewrites.
-ARTIFACT_KEYS = ("cv_path", "cover_letter_path", "cl_pdf_path")
+ARTIFACT_KEYS = ("cv_path", "cover_letter_path", "cl_pdf_path", "cv_upload_docx_path", "cv_upload_text_path")
 
 #: Files written into ``source/`` that are copied when mirroring.
 SOURCE_FILES = (

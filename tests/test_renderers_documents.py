@@ -253,6 +253,52 @@ def test_work_authorization_overrides_the_profile_tagline(tmp_path, content):
     assert profile.identity.visa_status not in text
 
 
+@needs_latex
+def test_cv_pdf_text_layer_is_ats_clean(rendered_cv, analyst_profile):
+    """The raw PDF text layer must be free of icon/ligature noise and fuse no fields."""
+    from pypdf import PdfReader
+
+    raw_text = '\n'.join(page.extract_text() or '' for page in PdfReader(str(rendered_cv)).pages)
+    flat_raw = ' '.join(raw_text.split())
+
+    for garbled in ('/ne', 'Ὄ', '\ufb00', '\ufb01', '\ufb02', '\ufb03', '\ufb04', '/♀nedn', '/gtb'):
+        assert garbled not in raw_text, f'garbled glyph/ligature {garbled!r} in PDF text layer'
+
+    assert f'{analyst_profile.identity.email} | {analyst_profile.identity.phone}' in flat_raw
+    assert 'linkedin.com/in/example-alex-sample | github.com/example-alex-sample' in flat_raw
+    assert 'Analytical Engineer | Apr 2023' in flat_raw
+    assert 'present | Sampletown, Germany' in flat_raw
+    assert '2018 – 2020 | Sampletown, Germany' in flat_raw
+
+    # Skill and certification tags must have comma delimiters in the extracted text layer.
+    assert 'Snowflake' in flat_raw and 'dbt' in flat_raw
+    snowflake_to_dbt = flat_raw[flat_raw.index('Snowflake'):flat_raw.index('dbt') + 3]
+    assert ',' in snowflake_to_dbt
+    cert_line = flat_raw[flat_raw.index('Synthetic Analytics Certificate'):flat_raw.index('Synthetic Reporting Qualification')]
+    assert ',' in cert_line
+
+
+@needs_latex
+def test_cv_preserves_skill_category_acronyms(tmp_path, content):
+    """Acronyms like BI and AI in skill headings must not be lowercased to Bi/Ai."""
+    profile = load_profile('synthetic_analyst')
+    payload = json.loads(json.dumps(content['cv']))
+    payload['skills'] = {
+        'BI_and_AI_platforms': ['Looker', 'Claude'],
+        'sql_and_etl': ['Snowflake', 'Airflow'],
+    }
+    cv = TailoredCV.model_validate(payload)
+
+    renderer = create_latex_renderer(outputs_dir=str(tmp_path))
+    pdf = Path(renderer.render_cv(cv, profile, job_position='Analytical Engineer'))
+    text = normalise(pdf_text(pdf))
+
+    assert 'BI And AI Platforms:' in text
+    assert 'SQL And ETL:' in text
+    assert 'Bi And' not in text
+    assert 'Ai Platforms:' not in text
+
+
 # --- DOCX cover letter ----------------------------------------------------------------
 
 @pytest.fixture

@@ -14,7 +14,7 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from models.tailored_output import TailoredCV
 from models.profile import Profile
-from utils.text import escape_latex, slugify
+from utils.text import escape_latex, format_skill_category, slugify
 
 
 class LaTeXRendererError(Exception):
@@ -215,7 +215,7 @@ class LaTeXRenderer:
             ] if tailored_cv.include_education else [],
             "certifications": [self._escape_latex(c) for c in profile.certifications] if tailored_cv.include_certifications else [],
             "skills": {
-                self._escape_latex(category): [self._escape_latex(s) for s in skills]
+                self._escape_latex(format_skill_category(category)): [self._escape_latex(s) for s in skills]
                 for category, skills in tailored_cv.skills.items()
             },
             "languages": [
