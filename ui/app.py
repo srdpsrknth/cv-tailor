@@ -54,12 +54,14 @@ def clear_candidate_state():
         "setup_report",
     }
     for key in list(st.session_state):
-        if key in names or str(key).startswith(("review_", "search_", "failed_")):
+        if key in names or str(key).startswith(
+            ("review_", "preview_document_", "search_", "failed_")
+        ):
             del st.session_state[key]
 
 
 def retain_inputs():
-    """Detach saved values from widget cleanup when their page is not rendered."""
+    """Retain editable inputs only; buttons/components own their runtime state."""
     names = {
         "job_description",
         "company",
@@ -72,9 +74,14 @@ def retain_inputs():
         "library_model",
         "library_page",
         "library_application",
+        "search_keywords",
+        "search_country",
+        "search_city",
+        "search_limit",
+        "search_remote",
     }
     for key in list(st.session_state):
-        if key in names or str(key).startswith(("search_", "review_")):
+        if key in names or str(key).startswith("preview_document_"):
             st.session_state[key] = st.session_state[key]
 
 

@@ -3,8 +3,36 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *purpose-led cover letters with private voice guidance*
+**Latest commit:** *(this commit)* — *fix preview reruns assigning button state*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Preview/download rerun repair (2026-11-17)
+
+**Active task:** fix the owner's cover-letter preview exception — complete.
+`retain_inputs` was assigning every key
+starting with `review_` or `search_`, including download/action buttons and PDF
+component state. Streamlit forbids those assignments, so selecting a different
+preview could fail before the viewer rendered.
+
+Retention now uses named input keys plus a dedicated `preview_document_` namespace
+for preview selectors. Buttons and PDF components keep framework-owned state;
+downloads use `on_click='ignore'` to avoid unnecessary reruns. Candidate-switch
+cleanup includes the new selector namespace. Documents and application sources
+are unchanged, and no generation is needed to repair the preview.
+
+Three regressions added: repeated CV/letter switching with real download widgets,
+a search-action rerun, and explicit protection of client download/component state.
+The old code failed the button-state tests; focused UI suites now pass **26 tests**.
+AppTest does not replay all download-client states, so the explicit guard complements
+the actual widget test. Live browser verification confirmed the owner's saved
+Ostrom cover-letter PDF renders with all download controls present after selection.
+No paid call or regeneration was performed. Full final suite: **1190 passed,
+3 skipped**, one existing Google SDK warning, ~122 s. Formatting and diff checks
+pass. Changes committed locally on `refactor/architecture-v2`; master untouched.
+
+**Next action:** refresh the existing GUI tab and reopen the saved application from
+Applications. The running server already serves the fix; it was not restarted to
+avoid interrupting the owner's other GUI work. No push was performed.
 
 ## Profile convenience and cover-letter review (2026-11-17)
 

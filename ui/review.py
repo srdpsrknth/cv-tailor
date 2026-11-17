@@ -76,6 +76,7 @@ def render_application(config, profile_id, job_id):
                         file_name=artifact["name"],
                         mime=artifact["mime"],
                         key=f"{prefix}_dl_{artifact['name']}",
+                        on_click="ignore",
                         use_container_width=True,
                     )
                 except OSError as error:
@@ -103,7 +104,7 @@ def render_application(config, profile_id, job_id):
                     "Preview document",
                     [a["name"] for a in pdfs],
                     format_func=bridge.document_label,
-                    key=f"{prefix}_pdf",
+                    key=f"preview_document_{profile_id}_{job_id}",
                 )
                 try:
                     st.pdf(

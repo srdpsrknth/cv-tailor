@@ -1,8 +1,20 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17):** **1187 passed, 3 skipped**, 1 existing Google SDK warning, ~124 s on Windows, fully offline — no paid API calls.
+**Current baseline (2026-11-17):** **1190 passed, 3 skipped**, 1 existing Google SDK warning, ~122 s on Windows, fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+
+Preview rerun regressions in `test_ui_review.py` include real download widgets and
+repeated CV/cover-letter selection, a search action button across reruns, and an
+explicit client-state guard. Retain only editable input values, never button or
+PDF-component state. AppTest omits some client download states, so passing a page
+without artifacts was not adequate coverage. Browser QA also exercised a saved
+cover-letter PDF with its DOCX/PDF download buttons present.
+
+Do not edit inspected callback source while a suite using `AppTest.from_function`
+is running: it re-reads source at execution time. An initial baseline attempt during
+this fix hit a source-inspection `NameError` while test source was being edited;
+run the final verification against stable source.
 
 GUI profile memory adds six tests in `test_gui_preferences.py` plus an AppTest of
 restoring a selected candidate in a fresh session. Single-profile defaults are now

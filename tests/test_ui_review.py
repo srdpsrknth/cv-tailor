@@ -141,6 +141,89 @@ def test_profile_switch_clears_review_search_and_posting(workspace):
     assert "search_outcome" not in at.session_state
 
 
+def test_preview_switch_with_downloads_survives_repeated_reruns(workspace, monkeypatch):
+    """Real download widgets must never be assigned values by retain_inputs."""
+    from pypdf import PdfWriter
+
+    job = save_review(workspace)
+    folder = workspace / "outputs" / "analyst_a" / job
+    for name in ("cv.pdf", "cover_letter.pdf"):
+        writer = PdfWriter()
+        writer.add_blank_page(width=200, height=250)
+        writer.write(folder / name)
+    (folder / "cover_letter.docx").write_bytes(b"synthetic download content")
+    monkeypatch.setattr(
+        bridge,
+        "run_generation",
+        lambda *a, **k: pytest.fail("preview called generation"),
+    )
+    at = selected_app()
+    at.session_state["active_application"] = job
+    at.run()
+    assert not at.exception
+    assert len(at.get("download_button")) == 3
+    preview = next(s for s in at.selectbox if s.label == "Preview document")
+    preview.select("cover_letter.pdf").run()
+    assert not at.exception, [e.message for e in at.exception]
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert (
+        next(s for s in at.selectbox if s.label == "Preview document").value
+        == "cover_letter.pdf"
+    )
+    next(s for s in at.selectbox if s.label == "Preview document").select(
+        "cv.pdf"
+    ).run()
+    assert not at.exception
+
+
+def test_retention_does_not_assign_a_search_action_button(workspace):
+    def render_actions():
+        import streamlit as st
+        from ui.app import retain_inputs
+
+        retain_inputs()
+        st.button("Use this posting", key="search_use_0")
+
+    at = AppTest.from_function(render_actions).run()
+    assert not at.exception
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+
+
+def test_retention_does_not_write_download_or_component_state(monkeypatch):
+    """AppTest omits some client widget states; guard that invariant explicitly."""
+    from ui.app import retain_inputs
+
+    class ClientState(dict):
+        def __setitem__(self, key, value):
+            if key in {
+                "review_a_job_dl_letter.docx",
+                "review_a_job_letter.pdf",
+                "search_use_0",
+            }:
+                raise AssertionError(
+                    f"Attempted assignment to non-editable widget: {key}"
+                )
+            super().__setitem__(key, value)
+
+    state = ClientState(
+        {
+            "review_a_job_dl_letter.docx": False,
+            "review_a_job_letter.pdf": {"component": "state"},
+            "search_use_0": False,
+            "preview_document_a_job": "letter.pdf",
+            "search_country": "DE",
+            "job_description": "Synthetic posting",
+        }
+    )
+    monkeypatch.setattr(st, "session_state", state)
+    retain_inputs()
+    assert state["preview_document_a_job"] == "letter.pdf"
+    assert state["search_country"] == "DE"
+    assert state["job_description"] == "Synthetic posting"
+
+
 def test_handoff_populates_form_without_generation(workspace, monkeypatch):
     monkeypatch.setattr(
         bridge,
