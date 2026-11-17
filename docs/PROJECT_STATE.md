@@ -3,13 +3,13 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *remember GUI profile and show active identity*
+**Latest commit:** *(this commit)* — *purpose-led cover letters with private voice guidance*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Profile convenience and cover-letter review (2026-11-17)
 
-**Active task:** two owner requests. GUI convenience is implemented; cover-letter
-tone/content assessment and voice-aware drafting are in progress.
+**Active task:** both owner requests complete: GUI profile convenience and a
+cover-letter tone/content assessment with improved future drafting guidance.
 
 GUI now restores the last usable selection from `<store>/preferences/gui.json`, or
 selects the only usable profile. With multiple profiles and no valid memory it
@@ -21,10 +21,41 @@ Verification for the profile increment: **1182 passed, 3 skipped**, existing Goo
 SDK warning, ~122 s. Six preference tests plus a new-session AppTest were added;
 existing picker tests now assert the owner's new behaviour. No paid call.
 
-**Next action:** finish the cover-letter assessment against the owner's nominated
-2024 application letters, keep originals unchanged, and store personal voice
-guidance/evidence only in the private store. Do not treat historical style samples
-as new facts about the candidate. Continue on this development branch.
+The owner nominated a private 2024 application directory as the voice reference.
+Reviewed 15 DOCX letters plus one PDF-only letter there, two current DOCX outputs,
+eight archived sources and the current prompt/validation path. Private evidence
+and assessment are at `<store>/reviews/<profile_id>/cover-letter-tone-2026-11-17/`.
+No source letters, old applications or factual profile data were overwritten.
+
+Assessment: the recent letters mostly meet the mechanical limits, but often
+compress CV responsibilities and tools into prose, repeat fit in the closing and
+under-explain why the work matters. The latest letter is 298 body words/four
+paragraphs; a January legacy letter is 288/four. The nominated references are
+warmer and more collaborative, but contain generic repetitions that should be
+edited rather than copied. No AI-detection score or guarantee was claimed.
+
+The shared brief now centres specific interest, one or two explained examples,
+practical meaning for users and a short closing. Optional per-profile
+`writing_style.json` lives outside the repository and is now configured for the
+owner from the nominated references. Only distilled tone/preferences/sign-off
+are included in the letter prompt; reference paths and old facts are not sent.
+Their exact effective context feeds the existing cache key. Changing voice causes
+a cache miss; other candidates and loose profile files do not inherit this voice.
+Malformed existing guidance fails before paid work. See ADR 0023.
+
+**Final verification:** **1187 passed, 3 skipped**, one existing Google SDK warning,
+~124 s. Five synthetic tests added for optional voice, isolation, invalid guidance,
+reference-path exclusion and cache invalidation. Private guidance loads correctly;
+formatting and dependency checks pass. Browser confirmed sole-profile startup
+selection and the full active name/id banner. No paid model call was made, so the
+quality of new live prose remains to be judged on the next actual application.
+Four paragraphs, 290–310 words, one page and all factual/country rules remain.
+
+**Next action:** refresh the running GUI and use the next real application to judge
+the revised voice. The private assessment includes concrete examples and proposed
+excerpts, not a replacement letter. Further tuning can update the private style
+preferences without changing facts or old documents. Changes committed locally;
+no push, merge to master or paid generation was performed.
 
 ## GUI implementation complete (2026-11-17)
 

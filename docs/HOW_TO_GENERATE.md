@@ -357,6 +357,34 @@ If generation fails before documents exist, raw responses and a failed-run recor
 are saved when the store is writable. Review that attempt before paying for another
 draft. Missing or damaged historical source files still allow existing downloads.
 
+### Cover-letter voice
+
+Letters should explain why the particular work is relevant and develop one or two
+examples of what you did and why it mattered, rather than paraphrasing the CV or
+listing the posting's keywords. The existing four paragraphs / 290–310 body words /
+one-page limits still apply. A count passing is not proof that the prose is good.
+
+Optional personal preferences live privately at
+`<store>/profiles/<profile_id>/writing_style.json`:
+
+```json
+{
+  "version": 1,
+  "tone": "Warm, direct and professional",
+  "preferences": ["Explain who used the work and what it helped them do."],
+  "avoid": ["Repeated corporate flattery and long lists of tools."],
+  "sign_off": "Warm regards,"
+}
+```
+
+Only these distilled preferences are included in the letter brief; private reference
+paths and old letter collections are not sent. Historical examples guide style, not
+facts. The current profile remains authoritative. A changed effective voice brief
+invalidates the paired generation cache automatically, so the next draft may make
+fresh paid calls even if the posting is unchanged. Existing letters are not modified.
+If a style file exists but is invalid, fix it before generation; it is not ignored.
+Read every new letter yourself—naturalness and your voice are editorial judgments.
+
 **Read both documents before sending them**, whichever way you produced them.
 
 If the interface misbehaves, use the command line — it is the supported path and gives

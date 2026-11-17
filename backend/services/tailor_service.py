@@ -351,6 +351,11 @@ def tailor_documents(
     profile_bytes = serialize_profile_bytes(profile)
     cv_prompt_source = PROMPT_CV_PATH.read_text(encoding="utf-8")
     cl_prompt_source = PROMPT_CL_PATH.read_text(encoding="utf-8")
+    from services.writing_voice import writing_voice_context
+
+    # Hash the exact effective letter brief, including optional private voice guidance.
+    # Changing voice must invalidate a prior draft just as changing the prompt does.
+    cl_prompt_source += writing_voice_context(config, resolved_profile_id)
     context = build_context(
         job_description,
         profile,

@@ -34,6 +34,7 @@ Keep `source/content.json`, `source/job_description.txt`, and `source/generation
 - Aklamio: attribution is the main selected project, with three substantive bullets; fold DQ, MCP, and dashboarding into regular bullets. No dates or "in progress" labels in project headings; describe ongoing work accurately in bullets. Location: "Berlin, Germany".
 - Keep chronological work history. Use the two-page space for relevant NeoTaste, ecoligo, and heycar details as well as the latest role. Do not invent bullets for older roles with empty profile entries.
 - Cover letter: default four paragraphs, 290-310 body words, one page, grounded in profile and opening. Distinguish developing work from shipped results. Preserve approved wording and manual edits; change only requested fields during revisions.
+- Cover-letter voice: optional private `<store>/profiles/<profile_id>/writing_style.json` is loaded by the application for the letter only (ADR 0023). Use nominated historical letters as style references, never as evidence overriding current profile facts. Prefer one or two explained examples and their practical meaning to a tool/keyword inventory. Preserve warmth and the user's sign-off preference while trimming generic flattery and repetition. The effective voice changes the generation cache key; do not promise a cached/free run after changing it. Editorial quality requires the owner's reading, not an AI-detection score.
 
 ## Applications outside Germany
 

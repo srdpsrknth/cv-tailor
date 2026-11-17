@@ -26,6 +26,7 @@ Only the owner can move a decision to **Approved**.
 | [0020](0020-streamlit-refactor.md) | Refactor the Streamlit UI onto a framework-free service layer, rather than replace the framework | **Approved** — Phase 6, 2026-11-15 |
 | [0021](0021-application-review-and-provenance.md) | Shared read-only application review, snapshot comparisons and explicit requested/provider-reported model, cache and cost provenance | **Approved** — Phase 6, 2026-11-17 |
 | [0022](0022-gui-profile-memory.md) | GUI restores the last usable profile or defaults to the sole usable profile, with a prominent active identity | **Approved** — owner instruction, 2026-11-17 |
+| [0023](0023-private-writing-voice.md) | Purpose-led cover letters and optional private per-profile style guidance, with facts isolated and cache keys reflecting the effective voice | **Approved** — owner instruction, 2026-11-17 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1

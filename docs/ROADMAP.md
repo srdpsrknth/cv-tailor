@@ -456,6 +456,12 @@ LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
 
 ## Phase 6 — UI and deployment
 
+**Owner follow-ups (2026-11-17):** GUI remembers the last valid profile or selects
+the sole usable profile, with active identity shown at the top (ADR 0022). Backend
+identity remains explicit. A cover-letter editorial review also refined future
+drafting around explained evidence and optional private per-profile voice (ADR 0023),
+without changing factual/layout limits or rewriting existing applications.
+
 **Application review delivered (2026-11-17):** compact editorial UI; deliberate
 candidate selection; persistent draft/results; common Documents / What changed /
 Why these changes / Run details workspace; real PDF previews; saved-snapshot
