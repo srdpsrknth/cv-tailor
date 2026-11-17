@@ -3,8 +3,28 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *application review workspace and model/run attribution*
+**Latest commit:** *(this commit)* — *remember GUI profile and show active identity*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Profile convenience and cover-letter review (2026-11-17)
+
+**Active task:** two owner requests. GUI convenience is implemented; cover-letter
+tone/content assessment and voice-aware drafting are in progress.
+
+GUI now restores the last usable selection from `<store>/preferences/gui.json`, or
+selects the only usable profile. With multiple profiles and no valid memory it
+requires a choice. The full active name/id is visible at the top. Candidate switches
+still clear prior candidate state. This explicitly supersedes the GUI-only empty
+picker requirement; CLI/API/services remain fail-closed (ADR 0022, AGENTS updated).
+
+Verification for the profile increment: **1182 passed, 3 skipped**, existing Google
+SDK warning, ~122 s. Six preference tests plus a new-session AppTest were added;
+existing picker tests now assert the owner's new behaviour. No paid call.
+
+**Next action:** finish the cover-letter assessment against the owner's nominated
+2024 application letters, keep originals unchanged, and store personal voice
+guidance/evidence only in the private store. Do not treat historical style samples
+as new facts about the candidate. Continue on this development branch.
 
 ## GUI implementation complete (2026-11-17)
 

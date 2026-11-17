@@ -96,7 +96,7 @@ def test_the_app_runs_without_exception(app):
 
 def test_the_app_titles_itself(app):
     at = app()
-    rendered = " ".join(str(c.value) for c in at.title)
+    rendered = " ".join(str(c.value) for c in list(at.title) + list(at.caption))
     assert "CV Tailor" in rendered or "Tailor a CV" in rendered
 
 
@@ -127,16 +127,17 @@ def test_the_picker_lists_the_real_profiles(app):
     pickers = at.sidebar.selectbox
     assert pickers, "the candidate picker is missing from the sidebar"
     assert "Alex Sample" in " ".join(str(o) for o in pickers[0].options)
-    assert pickers[0].value is None
+    assert pickers[0].value == "analyst_a"
     pickers[0].select("analyst_a").run()
     assert at.session_state["profile_id"] == "analyst_a"
 
 
-def test_the_picker_explains_that_a_choice_is_required(app):
-    """Even with one profile, the choice is explicit — that is the whole rule."""
+def test_the_active_profile_is_visible_at_the_top(app):
+    """The owner's approved GUI defaults must never hide the active identity."""
     at = app()
-    captions = " ".join(str(c.value) for c in at.caption)
-    assert "still have to choose" in captions
+    text = " ".join(str(item.value) for item in at.text)
+    assert "Active profile: Alex Sample" in text
+    assert "analyst_a" in text
 
 
 def test_an_empty_store_is_explained_rather_than_crashing(clear_cached_config):

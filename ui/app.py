@@ -97,6 +97,11 @@ def render_profile_picker(config, *, key="profile_picker"):
     labels = {
         option.profile_id: f"{option.name} · {option.profile_id}" for option in usable
     }
+    if key not in st.session_state:
+        st.session_state[key] = bridge.initial_gui_profile(config, list(labels))
+    elif st.session_state[key] is not None and st.session_state[key] not in labels:
+        clear_candidate_state()
+        st.session_state[key] = None
     chosen = st.selectbox(
         "Candidate",
         list(labels),
@@ -105,13 +110,16 @@ def render_profile_picker(config, *, key="profile_picker"):
         format_func=labels.get,
         key=key,
         on_change=clear_candidate_state,
-        help="Choose explicitly. Documents are saved under this candidate only.",
+        help="The only available profile is selected automatically. Otherwise your last valid choice is restored. Documents stay isolated by profile.",
     )
-    st.caption(
-        f"Profile: {chosen}"
-        if chosen
-        else "You still have to choose a candidate, even when only one profile is available."
-    )
+    if chosen:
+        st.caption(f"Profile: {chosen}")
+        if not bridge.remember_gui_profile(config, chosen):
+            st.warning(
+                "This profile is active, but the last choice could not be saved."
+            )
+    else:
+        st.caption("Choose a candidate. Your last valid choice will be remembered.")
     return chosen
 
 
@@ -130,8 +138,13 @@ def require_profile(config, purpose):
 def render_header(config):
     if not active_profile_id(config):
         st.title("CV Tailor")
+    candidate = active_profile_id(config)
+    if candidate:
+        profile = bridge.load_profile(config, candidate)
+        with st.container(border=True):
+            st.text(f"Active profile: {profile.identity.full_name} · {candidate}")
     st.caption(
-        f"Your application workspace · configured model: {config.model} via {config.provider_name}"
+        f"CV Tailor · configured model: {config.model} via {config.provider_name}"
     )
 
 

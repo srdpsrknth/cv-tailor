@@ -36,6 +36,11 @@ outputs/<profile_id>/<job_id>/
 **Fail closed**: if `profile_id` is missing or unknown, raise. Never fall back to a default
 profile and never infer one from context.
 
+**GUI amendment (owner instruction, 2026-11-17):** ADR 0022 permits the GUI to restore
+its last valid selection or select the sole usable profile. It prominently displays
+the active identity and passes that id explicitly. The rule above remains unchanged
+for the CLI, API and services; no backend path guesses a profile.
+
 ## Consequences
 
 - Cross-profile contamination becomes structurally impossible rather than merely unlikely.

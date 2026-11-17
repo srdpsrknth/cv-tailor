@@ -84,6 +84,18 @@ def test_configured_candidate_is_not_selected_without_user_action(workspace):
     assert at.session_state["profile_id"] is None
 
 
+def test_gui_restores_last_selected_candidate_in_a_new_session(workspace):
+    at = selected_app()
+    at.sidebar.selectbox[0].select("analyst_b").run()
+    fresh = AppTest.from_file(str(APP)).run()
+    assert not fresh.exception
+    assert fresh.sidebar.selectbox[0].value == "analyst_b"
+    assert any(
+        "Active profile:" in item.value and "analyst_b" in item.value
+        for item in fresh.text
+    )
+
+
 def test_generated_review_survives_form_reruns_without_new_call(workspace, monkeypatch):
     job = save_review(workspace)
     calls = []

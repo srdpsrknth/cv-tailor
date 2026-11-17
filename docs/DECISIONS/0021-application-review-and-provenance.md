@@ -29,6 +29,10 @@ candidates clears draft, search and review state. Reading a saved application,
 comparing it, or viewing its rationale never initiates generation. Model selection
 applies only to a new run and uses the existing curated catalogue.
 
+**Superseded GUI selection detail (2026-11-17):** the owner subsequently requested
+single-profile defaults and last-profile memory, implemented in ADR 0022. The
+other isolation and read-only review guarantees above are unchanged.
+
 ## Consequences
 
 The interface can distinguish configuration, historical requested models and actual

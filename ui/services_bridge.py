@@ -585,3 +585,15 @@ def setup_checks(config):
             doctor.check_api_key(config, verify=False),
         )
     ]
+
+
+def initial_gui_profile(config, available_ids):
+    from services.gui_preferences import initial_profile
+
+    return initial_profile(config, available_ids)
+
+
+def remember_gui_profile(config, profile_id):
+    from services.gui_preferences import remember_profile
+
+    return remember_profile(config, profile_id)

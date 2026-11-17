@@ -317,14 +317,13 @@ the services. Logs go to `.runtime/logs/`.
 > If a port is already in use, startup **refuses** rather than killing whatever is
 > there. Stop the other service, or change `UI_PORT` / `BACKEND_PORT` in `.env`.
 
-**First, choose a candidate** in the sidebar. The interface will not generate without
-one, and that is deliberate: the choice decides which folder the documents are filed
-under, so an unnoticed default is how the wrong person's CV gets sent. It insists even
-when only one profile exists.
+**First, check the active candidate** at the top. The GUI restores your last valid
+choice or selects the only usable profile; use the sidebar to change it. With
+multiple profiles and no remembered choice, select one before generating.
 
 | Page | What it does |
 |---|---|
-| **New application** | Choose a candidate explicitly, paste a posting, check company/role/country and task models, then generate. Results remain available through reruns. |
+| **New application** | Check the active candidate, paste a posting, check company/role/country and task models, then generate. Results remain available through reruns. |
 | **Find jobs** | Free search with matching signals, eligibility and source notes. **Use this posting** transfers known text to New application without making a model call. |
 | **Applications** | Search and filter saved applications by company/role, status or requested model, including CLI runs. Pages expose the whole library. |
 | **Settings & help** | Private-store location, read-only profile summary and local setup checks. Key presence is distinct from provider verification. |
@@ -343,10 +342,16 @@ After generation, or after choosing an application in the library, use the revie
   they are never inferred from today's settings. Cached runs keep original-generation
   usage separate from this run. Viewing any tab does not call the model.
 
+The GUI restores your last valid profile, or selects the only usable profile. The
+active name/id is shown at the top of every page. Your choice survives browser and
+server restarts in the private store's `preferences/gui.json`. With multiple profiles
+and no remembered choice, choose one in the sidebar; switching clears the previous
+candidate's draft/review state. The CLI and API still require an explicit profile id.
+
 The curated-model selector affects only new applications. The current catalogue
 contains one selected model; keeping configured routing also preserves any explicit
-per-task overrides. Switching candidates clears the previous candidate's draft and
-review state. Browser reloads start a new session; saved applications remain in the library.
+per-task overrides. Browser reloads start a new draft session with the remembered
+profile; saved applications remain in the library.
 
 If generation fails before documents exist, raw responses and a failed-run record
 are saved when the store is writable. Review that attempt before paying for another

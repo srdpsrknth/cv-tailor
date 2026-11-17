@@ -1,8 +1,12 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17):** **1175 passed, 3 skipped**, 1 existing Google SDK warning, ~124 s on Windows, fully offline — no paid API calls.
+**Current baseline (2026-11-17):** **1182 passed, 3 skipped**, 1 existing Google SDK warning, ~122 s on Windows, fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 31 LaTeX tests.
+
+GUI profile memory adds six tests in `test_gui_preferences.py` plus an AppTest of
+restoring a selected candidate in a fresh session. Single-profile defaults are now
+intentional (ADR 0022); unremembered multi-profile sessions still start unselected.
 
 Application-review increment adds 25 cases: `test_application_review.py` (18),
 `test_ui_review.py` (6) and a provider-reply attribution case in
