@@ -3,14 +3,14 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *Windows GUI launcher and desktop shortcuts*
+**Latest commit:** *(this commit)* — *confirm Windows output access repaired*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 ## Windows GUI setup (2026-11-17)
 
-### Follow-up: output writes blocked by Python integrity label
+### Follow-up: Python integrity label repaired — verified by owner
 
-**Active task:** repair Windows output access. The owner confirmed `doctor` also
+The owner confirmed `doctor` also
 fails in their normal terminal, disproving the earlier agent-only assumption below.
 Both ordinary and dot-prefixed Python write probes fail; the probe does not already
 exist. Private-store ACLs grant Authenticated Users Modify, and Defender Controlled
@@ -19,14 +19,14 @@ Folder Access is disabled. `whoami /groups` launched by the venv Python reports
 **Medium Mandatory Level**. `icacls` shows the checkout and venv inherited Low
 integrity, including the executable. That label explains the persistent failure.
 
-Attempting to set the two venv Python executables to Medium was denied by Windows;
-administrator rights are required. No ACL change succeeded. The exact targeted
-commands are in DEVELOPMENT's Windows Python output permission section. **Next
-action:** owner runs those two commands in Administrator PowerShell, then runs
-`doctor` normally and restarts the GUI. Output access remains blocked until that
-verification passes. Do not recommend changing private-store ACLs or ignoring the
-doctor error. No application code changed; diagnostic checks ran, but the full
-suite was not repeated for this documentation-only follow-up (previous 1150/3).
+The agent's attempt to restore the two venv Python executables to Medium required
+administrator rights. The owner applied the targeted repair and supplied a normal
+terminal `doctor` result with **every check passing**, including the private-store
+output write probe (2026-11-17). Output access is resolved. The repair commands are
+in DEVELOPMENT's Windows Python output permission section. Restart the GUI so its
+Python process receives the repaired integrity level. No application code changed;
+the full suite was not repeated for this documentation-only confirmation (previous
+1150 passed, 3 skipped). API key presence is verified; paid generation is not.
 
 **Active task:** Windows setup and convenient GUI launch — complete. Fast-forwarded
 the development worktree from `eddcf35` to GitHub's `854d24c`, preserving the Mac CLI
@@ -45,16 +45,12 @@ arguments, and browser-open launcher path. Real-store AppTest: zero exceptions.
 `pip check` passes. Baseline and final suite: **1150 passed, 3 skipped**, one
 existing Google SDK deprecation warning.
 
-**Remaining verification limit:** `doctor` passes Python, venv, store/profile,
-timezone, templates, MiKTeX and key-presence checks, but Python's output write probe
-is denied in this agent session. PowerShell can write/delete a disposable probe in
-the same output directory. The documented agent-environment caveat still applies;
-this session does not prove a desktop generation can write there. No permissions
-were broadened, no private data changed, and no paid generation/key verification
-was run. Confirm `doctor` from a normal Windows terminal before first generation.
+**Setup verification:** all doctor checks pass in the owner's normal terminal after
+the integrity-label repair above. No private-store permissions were broadened, no
+profile data changed, and no paid generation/key verification was run.
 
-**Next action:** use the desktop GUI, explicitly select a profile, and confirm a
-normal-terminal `doctor` run. Then resume remaining Phase 6 deployment scope;
+**Next action:** restart with Stop CV Tailor / CV Tailor, then explicitly select a
+profile and use the GUI. Resume remaining Phase 6 deployment scope when requested;
 hosted authentication and Phase 5 application management remain open.
 
 ## Where the project stands (2026-11-15)
