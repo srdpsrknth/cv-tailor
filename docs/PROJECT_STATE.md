@@ -3,8 +3,40 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *readable CVs, extraction checks, artifact freshness and writing guidance*
+**Latest commit:** *(this commit)* — *refine CV hierarchy while preserving readable text and extraction*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## CV visual refinement (2026-11-17)
+
+**Active task:** restore a sleeker, more modern CV after the owner preferred the
+original's visual hierarchy — complete. Primary PDF design now uses a 26pt charcoal
+name, navy professional headline, distinct company/role lines, aligned dates/location,
+subtle employer dividers, italic project names and lighter project/technology labels.
+Body remains 10.5pt with 12.2pt leading, metadata 9.5pt. Essential content is plain
+text in one reading column with explicit word spaces; no icons, badges, sidebar,
+text boxes or hidden separators were introduced. The Word companion and letter
+designs were not redesigned. Prompt/guide/installed skill describe the actual sizes.
+
+Backed up and refreshed the 12 current CVs using scoped rendering and configured
+mirrors. All CV PDFs and Word companions remain two pages. Application content,
+factual profile and all saved cover-letter files are byte-identical. No paid calls.
+Private evidence/backups, before/after screenshots and final checks are under
+`<store>/reviews/<profile_id>/cv-design-refinement-2026-11-17/`.
+
+**Verification:** initial baseline 1245 passed/3 skipped; focused real-render checks
+43 passed; final full suite **1245 passed, 3 skipped**, one existing Google SDK
+warning, 91.72 seconds. Both default extraction engines retain all compared source
+words and fields in correct checked order for all 12 CVs, with no suspicious glyphs.
+All final pages visually inspected (including independent smaller-model review);
+actual glyph bounds, language text, artifact freshness and mirrored bytes checked.
+Word companion pagination was rechecked with LibreOffice; Word desktop and real
+ATS screening remain untested. An initial spacing trial produced three pages in
+three cases; it was rejected before updating saved files. Final design fits two
+pages without reducing body type or changing wording.
+
+**Next action:** refresh the GUI preview or open the updated PDF and assess the
+visual direction. Future generations use this shared CV template. No blocker;
+development commit local only, no push requested and `master` unchanged.
 
 ## Application quality audit implementation (2026-11-17)
 

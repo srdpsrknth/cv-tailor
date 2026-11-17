@@ -12,6 +12,12 @@ uses article directly; the old AltaCV class remains for historical reproduction.
 Explicit interword spaces in pdfTeX output improve independent text extraction.
 Keep the current business-letter design and four paragraphs/290–310 body words.
 
+**Owner-requested design refinement, 2026-11-17:** retain these constraints while
+restoring stronger company/role hierarchy, a 26pt charcoal name, navy accents,
+aligned date/location text, subtle employer dividers and lighter project labels.
+The visual treatment is reversible template styling; it does not justify a smaller
+body font, columns, hidden separators or changes to approved application wording.
+
 Saved manifests may contain `artifact_provenance` keyed by filename, with schema
 version, UTC recording time and SHA-256 hashes of relevant content, render context,
 actual profile snapshot, rendering dependencies and artifact bytes. Scoped renders

@@ -266,7 +266,8 @@ def test_cv_pdf_text_layer_preserves_separate_fields(rendered_cv, analyst_profil
 
     assert f'{analyst_profile.identity.phone} | {analyst_profile.identity.email}' in flat_raw
     assert 'linkedin.com/in/example-alex-sample | github.com/example-alex-sample' in flat_raw
-    assert f'Analytical Engineer | {analyst_profile.experience[0].company}' in flat_raw
+    assert analyst_profile.experience[0].company in flat_raw
+    assert 'Analytical Engineer' in flat_raw
     assert 'Apr 2023' in flat_raw
     assert 'present | Sampletown, Germany' in flat_raw
     assert '2018 – 2020 | Sampletown, Germany' in flat_raw

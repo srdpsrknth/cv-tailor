@@ -64,7 +64,7 @@ WRITING AND FACTUAL RULES
   Adapt relevance only when supported; keep this factual, broad tone.
 
 STRUCTURE AND LENGTH
-- The renderer uses 10pt A4 and includes education, certifications, technologies,
+- The A4 renderer uses a 10.5pt body and 9.5pt metadata and includes education, certifications, technologies,
   skills, and languages. Target two readable pages; do not demand a minimum length.
 - Use enough relevant responsibility and project bullets to show the candidate's
   strongest evidence within the page budget. The 18-24 bullet / 650-750 word range is

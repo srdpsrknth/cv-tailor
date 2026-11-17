@@ -1,7 +1,7 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17):** **1245 passed, 3 skipped**, 1 existing Google SDK warning, 87.75 seconds (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
+**Current baseline (2026-11-17):** **1245 passed, 3 skipped**, 1 existing Google SDK warning, 91.72 seconds (run unconfined so MiKTeX registry reads and `TestClient` loopback sockets succeed), fully offline — no paid API calls.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes tests that require LaTeX.
 
 Application-quality follow-up adds real-render typography and default word-boundary
