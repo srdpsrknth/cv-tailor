@@ -3,8 +3,37 @@
 **Last updated:** 2026-11-17
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
-**Latest commit:** *(this commit)* — *confirm Windows output access repaired*
+**Latest commit:** *(this commit)* — *GUI review and interactive design proposal*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## GUI review and design proposal (2026-11-17)
+
+**Active task:** understand the current GUI and suggest visual/functional improvements
+— complete. Reviewed all four live pages and their backing services. Findings and
+priorities are in [GUI_REVIEW.md](GUI_REVIEW.md); the standalone interactive mockup
+is [design/gui-proposal.html](design/gui-proposal.html), using synthetic data only.
+No production GUI behaviour was changed and implementation is not yet approved.
+
+Recommended first increment: a persistent application review view shared by Generate
+and Applications, exposing saved model usage and tailoring rationale; correct
+deliberate profile selection and state across reruns. Follow with actual PDF preview,
+snapshot-to-output comparison and provider/cache/cost provenance. Keep Streamlit
+and service reuse (ADR 0020). Broader library/search/settings proposals are sequenced
+in the review; a full application tracker remains Phase 5 scope.
+
+Verified findings: picker currently preselects configured/first profile despite its
+explicit-choice wording; Generate writes last-result keys but does not restore them;
+Applications exposes downloads without saved explanations. Requested model routes
+are persisted, but provider response model/request IDs are not retained. Existing
+legacy applications may lack editable content and must remain readable without
+invented history. No model calls were made for this review.
+
+Verification: full suite **1150 passed, 3 skipped**, one existing Google SDK warning,
+~125 s. Live browser inspection succeeded (unlike the earlier headless attempt).
+Mockup checked visually at desktop width; all four tabs and arrow-key navigation
+worked. Narrow-screen CSS exists but was not visually verified. **Next action:**
+review the proposal and select the implementation scope; no framework migration
+or hard-to-reverse decision was made. Windows setup remains operational.
 
 ## Windows GUI setup (2026-11-17)
 
