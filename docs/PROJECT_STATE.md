@@ -6,6 +6,23 @@
 **Latest commit:** *(this commit)* — *sync refactor layout and document-verification updates*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
+## CV pagination investigation (2026-11-18)
+
+**Active task:** investigate uneven page filling in the new CV layout — complete,
+recommendations only. See [CV_LAYOUT_REVIEW.md](CV_LAYOUT_REVIEW.md). Frozen-content
+comparisons confirm page-2 whitespace comes from content length and semantic block
+pagination, not a shortening retry. Reverting the last header change leaves page 2
+unchanged. A private 11pt/13.2pt-leading trial balances the reviewed example, but
+pushes two of four current two-page examples onto three pages; do not apply globally.
+**Next recommended action:** implement reviewed standard/comfortable typography
+presets with deterministic render-based selection and advisory occupancy diagnostics.
+No production template, prompt, profile, application text or saved deliverable changed.
+Private evidence: `<store>/reviews/sreedeep/layout-review-2026-11-18/`.
+**Verification:** baseline **1267 passed, 3 skipped**, one existing SDK warning,
+42.85 seconds; six same-content layout variants and four cross-check renders.
+Independent pagination and research subagents used; Luna unavailable in this tool.
+No paid generation, ATS upload or Word desktop verification. Phase 6 unchanged.
+
 ## Mac refactor synchronization (2026-11-18)
 
 **Active task:** synchronize `refactor/architecture-v2` with GitHub. Merged the four
