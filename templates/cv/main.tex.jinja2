@@ -9,7 +9,7 @@
 \usepackage[protrusion=false,expansion=false]{microtype}
 \DisableLigatures[f]{encoding = *, family = *}
 \usepackage[a4paper,left=1.6cm,right=1.6cm,top=1.5cm,bottom=1.5cm]{geometry}
-\usepackage{xcolor,enumitem,needspace,hyperref}
+\usepackage{xcolor,enumitem,needspace,hyperref,refcount}
 \definecolor{accent}{HTML}{00004D}
 \definecolor{bodytext}{HTML}{2E2E2E}
 \definecolor{muted}{HTML}{526070}
@@ -18,15 +18,17 @@
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0pt}
+\raggedbottom
 \raggedright
 \hyphenpenalty=10000
 \emergencystretch=2em
-\renewcommand{\normalsize}{\fontsize{10.5}{12.2}\selectfont}
+\renewcommand{\normalsize}{\fontsize{{ '{' }}{{ layout.body_size }}{{ '}{' }}{{ layout.leading }}{{ '}' }}\selectfont}
 \newcommand{\metadata}{\fontsize{9.5}{11}\selectfont}
-\setlist[itemize]{leftmargin=1.2em,label=\textbullet,itemsep=1.5pt,topsep=3pt,parsep=0pt,partopsep=0pt}
+\newcommand{\sectiongap}{{ '{' }}{{ layout.section_spacing }}pt{{ '}' }}
+\setlist[itemize]{leftmargin=1.2em,label=\textbullet,itemsep={{ layout.item_spacing }}pt,topsep=3pt,parsep=0pt,partopsep=0pt}
 {% raw %}
-\newcommand{\cvsection}[1]{\needspace{4\baselineskip}\par\vspace{8pt}{\fontsize{12.5}{15}\selectfont\bfseries\color{accent}\MakeUppercase{#1}\par}\vspace{3pt}{\color{accent}\hrule height 0.6pt}\vspace{6pt}}
-\newcommand{\projectheading}[2]{\needspace{3\baselineskip}\vspace{3pt}{\metadata\bfseries\color{accent}Selected Projects:}\enspace {\itshape #1}\enspace {\metadata\color{muted}(#2)}\par\nopagebreak}
+\newcommand{\cvsection}[1]{\needspace{4\baselineskip}\par\vspace{\sectiongap}{\fontsize{12.5}{15}\selectfont\bfseries\color{accent}\MakeUppercase{#1}\par}\vspace{3pt}{\color{accent}\hrule height 0.6pt}\vspace{6pt}}
+\newcommand{\projectheading}[4]{\needspace{3\baselineskip}\vspace{3pt}{\metadata\bfseries\color{accent}Selected Projects:}\enspace {\itshape #1}\label{project-#3-#4}\enspace {\metadata\color{muted}(#2\ifnum\getpagerefnumber{project-#3-#4}>\getpagerefnumber{employer-#3}\relax{} - continued\fi)}\par\nopagebreak}
 {% endraw %}
 \begin{document}
 \normalsize\color{bodytext}
@@ -53,9 +55,11 @@
 {% endif %}
 \cvsection{Professional Experience}
 {% for exp in experience %}
+{% set employer_index = loop.index0 %}
+{% if break_before_employer_index == employer_index %}\newpage{% endif %}
 \needspace{4\baselineskip}
 \begin{samepage}
-{\fontsize{11.5}{13.5}\selectfont\bfseries {{ exp.company }}\par}\nopagebreak
+{\fontsize{11.5}{13.5}\selectfont\bfseries {{ exp.company }}\label{employer-{{ employer_index }}}\par}\nopagebreak
 \vspace{2pt}{\bfseries\color{accent}{{ exp.role }}}\hfill {\metadata\color{muted}{{ exp.start_date }} -- {{ exp.end_date }}{% if exp.location %} | {{ exp.location }}{% endif %}}\par\nopagebreak
 {% if exp.bullets %}
 \begin{itemize}
@@ -67,7 +71,7 @@
 {% if exp.projects %}
 {% for project in exp.projects %}
 \begin{samepage}
-\projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.company }}{{ "}" }}
+\projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.company }}{{ "}" }}{{ '{' }}{{ employer_index }}{{ '}{' }}{{ loop.index0 }}{{ '}' }}
 \begin{itemize}
 {% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}

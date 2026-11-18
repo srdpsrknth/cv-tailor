@@ -116,3 +116,30 @@ def test_missing_provenance_is_unknown_not_stale(tmp_path):
     pdf.write_bytes(b"legacy")
     result = artifact_freshness(tmp_path, {}, [pdf], {})
     assert result["legacy.pdf"]["status"] == "unknown"
+
+
+def test_selected_layout_is_recorded_and_selector_changes_make_it_stale(tmp_path):
+    import json
+    from pypdf import PdfWriter
+
+    _project(tmp_path)
+    selector = tmp_path / 'backend/renderers/cv_layout.py'
+    selector.write_text('selector version 1')
+    pdf = tmp_path / 'cv.pdf'
+    layout = {
+        'schema_version': 1, 'preset': 'comfortable', 'body_size': 11,
+        'leading': 13.2, 'page_count': 1,
+        'pages': [{'page': 1, 'used_height_fraction': 0.8,
+                   'blank_tail_mm': 50, 'largest_gap_pt': 12}],
+    }
+    writer = PdfWriter()
+    writer.add_blank_page(width=595.28, height=841.89)
+    writer.add_metadata({'/CVLayout': json.dumps(layout)})
+    with pdf.open('wb') as stream:
+        writer.write(stream)
+    content = {'cv': {'summary': ['Synthetic content']}}
+    rows = record_artifact_provenance(tmp_path, content, [(pdf, 'cv')])
+    assert rows['cv.pdf']['layout'] == layout
+    assert artifact_freshness(tmp_path, content, [pdf], rows)['cv.pdf']['status'] == 'current'
+    selector.write_text('selector version 2')
+    assert artifact_freshness(tmp_path, content, [pdf], rows)['cv.pdf']['status'] == 'stale'

@@ -1,6 +1,14 @@
 # CV layout review — 2026-11-18
 
-Status: investigation and private comparison renders only. No production template,
+Original status: investigation and private comparison renders only.
+
+**Implementation update (2026-11-18):** the owner approved the proposal; automatic
+readable presets, bounded employer-break trials, strict two-parser retention,
+page measurements and selected-layout provenance are now implemented. See ADR 0025
+and PROJECT_STATE.md for final verification. The investigation below describes
+the pre-change baseline.
+
+Original investigation scope: No production template,
 prompt, profile, application wording or saved deliverable changed. Independent
 subagents reviewed pagination and researched layout guidance; Luna was unavailable
 in the session's subagent model catalog.

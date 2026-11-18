@@ -148,6 +148,22 @@ def render_application(config, profile_id, job_id):
                     st.markdown(f"**{name}**")
                     if report.get("page_count") is not None:
                         st.caption(f"PDF pages: {report['page_count']}")
+                    layout = report.get("layout")
+                    if isinstance(layout, dict):
+                        preset = layout.get("preset", "custom")
+                        size = layout.get("body_size")
+                        st.caption(
+                            f"CV layout: {preset}"
+                            + (f" · {size:g}pt body" if isinstance(size, (int, float)) else "")
+                        )
+                        for page in layout.get("pages", []):
+                            fraction = page.get("used_height_fraction")
+                            if isinstance(fraction, (int, float)):
+                                st.caption(
+                                    f"Page {page.get('page')}: {fraction:.0%} of printable height used"
+                                )
+                        for warning in layout.get("warnings", []):
+                            st.caption(warning)
                     for engine, result in report.get("engines", {}).items():
                         retention = result.get("word_retention")
                         retention_label = (

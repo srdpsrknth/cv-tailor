@@ -257,7 +257,15 @@ Look for: correct employer names and dates · no orphaned section headings · no
 running off the page · the cover letter naming the right company and role · nothing
 invented that you cannot back up in an interview.
 
-The CV body uses one column, 10.5pt dark body text and visible skill separators.
+The CV body uses one column, readable 10.5–11pt dark body text and visible skill separators.
+The renderer compares comfortable, standard and compact typography plus eligible
+employer-boundary breaks using identical wording. It selects a readable fit within
+two pages, preferring balanced page endings. Genuine short CVs can remain one page.
+Only when no readable preset fits does generation request content shortening.
+The PDF and saved provenance record the selected preset and advisory page measurements.
+For an explicit typography choice when re-rendering, use `--layout-preset comfortable`,
+`standard` or `compact` with `cvtailor render` or `scripts/render_application.py`;
+the default is `auto`. A fixed choice can still exceed two pages and requires review.
 At the top, your name is on the left and contact/work-authorization details are
 right-aligned beside it, in ordinary document-body text. The professional headline
 starts on its own full-width line below this block so long titles do not interleave
@@ -275,7 +283,10 @@ The Documents tab flags stale files when saved content, profile context, renderi
 files or artifact bytes have changed. Older files without a render record show
 unknown freshness. Existing downloads remain available. Open **PDF text extraction
 checks · advisory** to compare two local parsers with the saved text. These are
-extraction diagnostics, not ATS or AI-authorship scores.
+extraction diagnostics, not ATS or AI-authorship scores. Newly rendered CVs also
+show their selected typography and printable-height usage there. Page balance is
+a visual preference, not a minimum word count or a screening score. The Word
+companion uses its separate sequential layout; check its pagination independently.
 
 Click **Check Word pagination** to estimate DOCX page counts with LibreOffice if
 installed. This checks each Word file independently and records a hash so an old

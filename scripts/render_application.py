@@ -21,6 +21,8 @@ def main():
     parser.add_argument('--mirror-configured', action='store_true')
     parser.add_argument('--check-word-layout', action='store_true',
                         help='Estimate each generated DOCX page count with LibreOffice when available.')
+    parser.add_argument('--layout-preset', choices=('auto', 'comfortable', 'standard', 'compact'),
+                        default='auto', help='CV typography; auto compares readable layouts.')
     args = parser.parse_args()
     root = args.project.resolve()
     content_path = args.content.resolve()
@@ -74,7 +76,7 @@ def main():
     generated_scopes = []
     if not args.cover_letter_only:
         renderer = create_latex_renderer(outputs_dir=str(folder))
-        pdf = Path(renderer.render_cv(cv, profile, job_position=role))
+        pdf = Path(renderer.render_cv(cv, profile, job_position=role, layout_preset=args.layout_preset))
         pages = len(PdfReader(pdf).pages)
         manifest.update(cv_path=str(pdf), cv_pages=pages, cv_page_count=pages)
         generated.append(pdf)

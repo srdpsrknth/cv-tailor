@@ -6,6 +6,8 @@ import os
 import re
 import subprocess
 import shutil
+import json
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -44,6 +46,7 @@ class LaTeXRenderer:
 
         self.templates_dir = Path(templates_dir)
         self.outputs_dir = Path(outputs_dir)
+        self.last_layout = None
 
         # Candidate pdflatex locations, most specific first. An explicit
         # LATEX_COMPILER always wins (see _resolve_pdflatex_path); these are the
@@ -88,7 +91,9 @@ class LaTeXRenderer:
         self,
         tailored_cv: TailoredCV,
         profile: Profile,
-        job_position: Optional[str] = None
+        job_position: Optional[str] = None,
+        *,
+        layout_preset: str = "auto",
     ) -> str:
         """
         Render CV to PDF.
@@ -97,6 +102,7 @@ class LaTeXRenderer:
             tailored_cv: Tailored CV content
             profile: Base profile (for identity info)
             job_position: Optional job position for filename; defaults to tailored_cv.title
+            layout_preset: Auto-select readable typography, or force a named preset.
 
         Returns:
             Path to generated PDF file
@@ -116,29 +122,150 @@ class LaTeXRenderer:
                 f"Template not found: main.tex.jinja2 in {self.templates_dir}"
             )
 
-        # Prepare template data
+        from renderers.cv_layout import PRESETS, measure_layout, rank_layout
+        from services.document_quality import inspect_document
+        from pypdf import PdfWriter
+
+        presets = [p for p in PRESETS if layout_preset in ("auto", p["name"])]
+        if not presets:
+            raise ValueError(f"Unknown CV layout preset: {layout_preset}")
+        self.last_layout = None
         template_data = self._prepare_template_data(tailored_cv, profile)
-
-        # Render LaTeX content
-        try:
-            latex_content = template.render(**template_data)
-        except Exception as e:
-            raise LaTeXRendererError(f"Template rendering failed: {e}")
-
-        # Save .tex file
         name_slug = self._slugify(profile.identity.full_name or "applicant")
         base_name = f"{year}_CV_{name_slug}_{safe_job}"
-        tex_path = self.outputs_dir / f"{base_name}.tex"
-        try:
-            with open(tex_path, 'w', encoding='utf-8') as f:
-                f.write(latex_content)
-        except Exception as e:
-            raise LaTeXRendererError(f"Failed to write .tex file: {e}")
+        paragraphs, fields = self._extraction_contract(tailored_cv, profile)
+        has_prose = any(re.search(r"\w", paragraph) for paragraph in paragraphs)
+        employers = [exp.company for exp in tailored_cv.experience]
+        projects = [(exp.company, project.name) for exp in tailored_cv.experience
+                    for project in exp.projects or []]
+        attempts = []
+        candidates = []
+        # Historical application-specific templates remain fixed rather than
+        # pretending that they support the shared typography presets.
+        template_source = self.jinja_env.loader.get_source(self.jinja_env, "main.tex.jinja2")[0]
+        adaptive = "layout.body_size" in template_source
+        if not adaptive:
+            presets = [next(p for p in PRESETS if p["name"] == "compact")]
+        # Every trial and failure is disposable; never overwrite an existing CV
+        # until a complete candidate has been checked and selected.
+        with tempfile.TemporaryDirectory(prefix="cvtailor-layout-") as scratch:
+            def trial(preset, break_before=None):
+                directory = Path(scratch) / str(len(attempts))
+                directory.mkdir()
+                data = {**template_data, "layout": preset,
+                        "break_before_employer_index": break_before}
+                try:
+                    latex_content = template.render(**data)
+                except Exception as exc:
+                    raise LaTeXRendererError(f"Template rendering failed: {exc}") from exc
+                tex = directory / f"{base_name}.tex"
+                tex.write_text(latex_content, encoding="utf-8")
+                compiler = LaTeXRenderer(templates_dir=self.templates_dir, outputs_dir=directory)
+                pdf = compiler._compile_pdf(tex, base_name)
+                metrics = measure_layout(pdf, employer_names=employers, project_names=projects)
+                # Both parsers must retain the supplied prose/fields in order.
+                # Layout scoring cannot trade away content to improve fullness.
+                extraction = inspect_document(pdf, expected_paragraphs=paragraphs,
+                                              expected_fields=fields)
+                text_ok = all(
+                    check["status"] == "ok"
+                    and check["page_count"] == metrics["page_count"]
+                    and (not has_prose or check["word_retention"] == 1.0)
+                    and (not has_prose or check["reading_order"] is True)
+                    and not check["missing_fields"]
+                    and not check["suspicious_glyphs"]
+                    for check in extraction["engines"].values()
+                )
+                report = {**metrics, "schema_version": 1,
+                          "preset": preset["name"] if adaptive else "custom",
+                          "body_size": preset["body_size"] if adaptive else None,
+                          "leading": preset["leading"] if adaptive else None,
+                          "break_before_employer_index": break_before,
+                          "extraction": extraction,
+                          "text_preserved": text_ok}
+                attempts.append({key: report[key] for key in (
+                    "preset", "break_before_employer_index", "page_count",
+                    "quality_score", "clipping", "orphan_headings", "text_preserved")})
+                if text_ok:
+                    index = next(i for i, p in enumerate(PRESETS) if p["name"] == preset["name"])
+                    candidates.append((rank_layout(metrics, index), len(attempts), pdf, report))
+                return report
 
-        # Compile to PDF
-        pdf_path = self._compile_pdf(tex_path, base_name)
+            for preset in presets:
+                report = trial(preset)
+                # One semantic alternative per preset is enough to compare a
+                # natural break with a clean boundary, without combinatorial search.
+                splits = report.get("split_employer_indices", [])
+                if adaptive and report["page_count"] == 2 and splits:
+                    boundary = next((i for i in splits if i > 0), None)
+                    if boundary is not None:
+                        trial(preset, boundary)
+            if not candidates:
+                raise LaTeXRendererError("No CV layout preserved the source text in both PDF parsers.")
+            _, _, selected_pdf, selected = min(candidates, key=lambda row: (row[0], row[1]))
+            if selected["page_count"] <= 2 and (selected["clipping"] or selected["orphan_headings"]):
+                raise LaTeXRendererError("No CV layout passed clipping and heading checks; review the editable content.")
+            selected["attempts"] = attempts
+            if selected["page_count"] > 2:
+                selected["warnings"].append("All readable presets exceed two pages; content shortening is required.")
+            # Embed metrics in the artifact itself so every generation, CLI,
+            # alias and mirror path can record the exact selected layout.
+            writer = PdfWriter(clone_from=str(selected_pdf))
+            writer.add_metadata({"/CVLayout": json.dumps(selected, sort_keys=True)})
+            ready = Path(scratch) / "selected.pdf"
+            with ready.open("wb") as stream:
+                writer.write(stream)
+            destination = self.outputs_dir / f"{base_name}.pdf"
+            # Copy into this filesystem before the atomic replacement.
+            with tempfile.NamedTemporaryFile(dir=self.outputs_dir, suffix=".pdf.tmp", delete=False) as staged:
+                staged_path = Path(staged.name)
+            try:
+                shutil.copyfile(ready, staged_path)
+                staged_path.replace(destination)
+            finally:
+                staged_path.unlink(missing_ok=True)
+            self.last_layout = selected
+        return str(destination)
 
-        return str(pdf_path)
+    def _extraction_contract(self, cv, profile):
+        """Source-backed prose and independently checked visible fields."""
+        paragraphs = list(cv.summary)
+        identity = profile.identity
+        fields = {"Candidate name": identity.full_name, "Email": identity.email}
+        for key, value in (("Headline", cv.title or identity.tagline),
+                           ("Location", identity.location), ("Phone", identity.phone),
+                           ("LinkedIn", identity.linkedin), ("GitHub", identity.github),
+                           ("Authorization", cv.work_authorization if cv.work_authorization is not None else identity.visa_status)):
+            if value:
+                fields[key] = value.replace("https://www.", "").replace("https://", "") if key in ("LinkedIn", "GitHub") else value
+        for index, exp in enumerate(cv.experience):
+            fields[f"Employer {index}"] = exp.company
+            fields[f"Role {index}"] = exp.role
+            fields[f"Start {index}"] = self._format_date(exp.start_date)
+            fields[f"End {index}"] = self._format_date(exp.end_date)
+            paragraphs.extend(exp.bullets)
+            for project in exp.projects or []:
+                paragraphs.append(project.name)
+                paragraphs.extend(project.bullets)
+            for item_index, item in enumerate(self._get_technologies_for_company(exp.company, profile)):
+                fields[f"Technology {index}/{item_index}"] = item
+        for category, items in cv.skills.items():
+            fields[f"Skill category {category}"] = format_skill_category(category)
+            for index, item in enumerate(items):
+                fields[f"Skill {category}/{index}"] = item
+        if cv.include_education:
+            for index, edu in enumerate(profile.education):
+                fields[f"Degree {index}"] = edu.degree
+                fields[f"Institution {index}"] = edu.institution
+                fields[f"Education dates {index}"] = f"{edu.start_year} -- {edu.end_year}"
+                if edu.location:
+                    fields[f"Education location {index}"] = edu.location
+        if cv.include_certifications:
+            for index, item in enumerate(profile.certifications):
+                fields[f"Certification {index}"] = item
+        for index, language in enumerate(profile.languages):
+            fields[f"Language {index}"] = f"{language.name}: {language.proficiency}"
+        return paragraphs, fields
 
     def _prepare_template_data(
         self,
@@ -280,8 +407,12 @@ class LaTeXRenderer:
             env["PATH"] = os.pathsep.join([str(Path(pdflatex_path).parent), env.get("PATH", "")])
             env["TEXINPUTS"] = str(self.templates_dir) + os.pathsep + env.get("TEXINPUTS", "")
 
-            # Run pdflatex twice for references
-            for run in range(2):
+            # Project continuation labels use shipped page references. Repeat
+            # until auxiliary references settle (normally two passes), allowing
+            # another pass if a continuation label itself changes wrapping.
+            aux_path = self.outputs_dir / f"{tex_path.stem}.aux"
+            for run in range(4):
+                previous_aux = aux_path.read_bytes() if aux_path.exists() else None
                 result = subprocess.run(
                     [
                         pdflatex_path,
@@ -314,6 +445,12 @@ class LaTeXRenderer:
                             pass
 
                     raise LaTeXRendererError(error_details)
+
+                current_aux = aux_path.read_bytes() if aux_path.exists() else None
+                if run >= 1 and current_aux == previous_aux:
+                    break
+            else:
+                raise LaTeXRendererError("PDF page references did not stabilize after four passes.")
 
             # Verify PDF was created
             if not pdf_path.exists():

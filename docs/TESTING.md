@@ -1,7 +1,24 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-18, merged Mac refactor):** **1267 passed, 3 skipped**, 1 existing Google SDK warning, ~42 s, fully offline — no paid API calls. Includes remote changes through `17fc56e` plus the preserved local country-specific rules.
+**Current baseline (2026-11-18, adaptive CV layout):** **1319 passed, 3 skipped**,
+1 existing Google SDK warning, 128.23 s, fully offline — no paid API calls.
+Pre-layout baseline: 1267 passed, 3 skipped (43.84 s). Multiple local compiler/parser
+trials increase render-test time; they add no model calls.
+
+Adaptive CV layout coverage in `test_cv_layout.py` (39) and
+`test_cv_layout_rendering.py` (12) checks geometry/ranking, metadata robustness,
+source privacy, real preset font sizes, deterministic selection, genuine one-page
+CVs, dense three/three/two-page fallback, full overflow for the existing shortening
+gate, empty prose with fields, shipped-page project continuation context, real CLI
+preset routing/provenance and preservation of prior artifacts on failed extraction.
+A provenance regression verifies selected metadata and selector freshness. The
+extractor implementation is a rendering fingerprint dependency too.
+Four private frozen-content examples remained two pages (two comfortable, two
+compact); eight PDF pages visually inspected, source prose/fields/order retained in
+both parsers, and four independently checked Word companions remained two pages
+via LibreOffice. Existing saved files are byte-identical. Word desktop/actual ATS
+uploads and paid new generation were not tested.
 **Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes tests that require LaTeX.
 
 Compact PDF contact-block regressions in `test_cv_readability.py` assert actual

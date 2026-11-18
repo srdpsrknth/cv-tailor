@@ -263,6 +263,10 @@ def inspect_application_pdfs(folder, content, snapshot, manifest):
         report = inspect_document(
             path, expected_paragraphs=paragraphs, expected_fields=fields
         )
+        if scope == "cv":
+            from renderers.cv_layout import read_layout_metadata
+
+            report["layout"] = read_layout_metadata(path)
         limit = 1 if scope == "cover_letter" else 2
         if isinstance(report.get("page_count"), int) and report["page_count"] > limit:
             report["warnings"].append(

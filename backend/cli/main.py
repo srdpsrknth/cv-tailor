@@ -115,6 +115,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Path to <application>/source/content.json.")
     only = render.add_mutually_exclusive_group()
     only.add_argument("--cv-only", action="store_true", help="Render only the CV.")
+    render.add_argument("--layout-preset", choices=("auto", "comfortable", "standard", "compact"),
+                        default="auto", help="CV typography; auto compares readable layouts.")
     only.add_argument("--cover-letter-only", action="store_true",
                       help="Render only the cover letter.")
     render.add_argument("--mirror-configured", action="store_true",

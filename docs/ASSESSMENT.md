@@ -6,6 +6,13 @@
 **Status:** Assessment complete. **Decisions approved 2026-10-23** (§11). Phase 1 implemented
 and complete; this document is retained as the Phase 0 record of what was found.
 
+> **Adaptive CV layout (2026-11-18):** the shared LaTeX renderer compares three
+> readable presets and eligible employer-boundary breaks before content shortening.
+> `renderers/cv_layout.py` measures page geometry and ranks unchanged-content trials;
+> two parsers guard source retention. Selected typography and metrics are embedded
+> in the PDF, recorded in artifact provenance and exposed by saved review. Word
+> remains independently paginated. See ADR 0025; orchestration and storage unchanged.
+>
 > **Application quality follow-up (2026-11-17):** `services/artifact_provenance.py`
 > records render inputs/dependencies and artifact hashes in optional manifest fields;
 > `services/document_quality.py` compares PDF extraction with two independent engines;

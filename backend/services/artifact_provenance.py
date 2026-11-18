@@ -34,6 +34,8 @@ def _dependencies(project_root: Path, scope: str) -> list[Path]:
     if scope == "cv":
         fixed = (
             "backend/renderers/latex_renderer.py",
+            "backend/renderers/cv_layout.py",
+            "backend/services/document_quality.py",
             "backend/renderers/upload_cv.py",
             "backend/utils/text.py",
         )
@@ -122,6 +124,12 @@ def record_artifact_provenance(
             "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "schema_version": 1,
         }
+        if scope == "cv" and path.suffix.lower() == ".pdf":
+            from renderers.cv_layout import read_layout_metadata
+
+            layout = read_layout_metadata(path)
+            if layout is not None:
+                rows[path.name]["layout"] = layout
     return rows
 
 

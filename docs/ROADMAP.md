@@ -1,5 +1,11 @@
 # Roadmap
 
+**CV layout follow-up (2026-11-18):** implemented deterministic readable typography
+and employer-boundary selection in the shared renderer, two-parser content checks,
+page-balance advisories and selected-layout provenance. Existing shortening applies
+only after local layout trials overflow. Saved applications unchanged; Phase 6
+remaining scope unchanged. See ADR 0025.
+
 **Application quality follow-up (2026-11-17):** implemented the approved audit's
 readable CV layouts, explicit PDF word spacing, per-artifact freshness metadata,
 two-engine extraction diagnostics and opt-in Word pagination checks in the existing

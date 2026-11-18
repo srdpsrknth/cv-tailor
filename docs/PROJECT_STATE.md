@@ -3,8 +3,42 @@
 **Last updated:** 2026-11-18
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this commit)* — *sync refactor layout and document-verification updates*
+**Latest commit:** *(this commit)* — *select readable two-page CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Adaptive CV layout implementation (2026-11-18)
+
+**Active task:** implement the approved future-run CV layout selection — implementation
+complete and verified. The shared renderer compares
+comfortable (11/13.2pt), standard (10.5/12.6pt) and compact (10.5/12.2pt) typography,
+plus at most one eligible employer-boundary break per preset. Identical source prose,
+fields and order must survive both PDF parsers. Geometry-safe results within two
+pages win; remaining page balance/gap/split preferences are advisory. Overflow returns
+to the existing validated shortening flow; genuine one-page CVs remain valid.
+
+Project continuation context uses stabilized shipped-page references. Failed trials
+leave previous saved PDFs intact. Embedded selected-layout metadata feeds artifact
+provenance and saved-review measurements; selector/extraction dependency hashes
+participate in freshness. Render CLI/script support `--layout-preset`, default auto.
+Prompt size guidance, application skill and user guide match the actual presets.
+See [ADR 0025](DECISIONS/0025-adaptive-cv-layout.md).
+
+**Private examples:** all four available two-page applications with editable source
+and snapshots stay two pages: two comfortable, two compact (one chooses an employer
+break). Eight PDF pages visually inspected; Veeva uses 86.5%/88.3% printable height.
+Word companions independently checked at two pages with LibreOffice. All original
+saved application files remain byte-identical. Evidence and reproduction:
+`<store>/reviews/sreedeep/layout-implementation-2026-11-18/`.
+**Verification:** pre-change baseline **1267 passed, 3 skipped** (43.84s); final
+full offline suite **1319 passed, 3 skipped**, one existing Google SDK warning,
+128.23s. `pip check` and whitespace checks pass. New coverage includes real dense
+fallback, shipped-page continuation labels, empty prose, CLI preset/provenance,
+metadata validation and failed-render isolation. Independent code review findings
+were fixed and covered. GUI restarted on port 8501; health HTTP 200.
+No paid generation, ATS upload, Word desktop test, master merge or remote push.
+**Next action:** use the restarted GUI; future generation and explicit re-rendering
+use automatic selection. Existing
+saved deliverables are not bulk-refreshed. Phase 6 remaining scope unchanged.
 
 ## CV pagination investigation (2026-11-18)
 

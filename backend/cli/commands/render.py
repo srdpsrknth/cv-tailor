@@ -104,7 +104,9 @@ def run(args, console: Console, config) -> int:
 
     if only != "cover-letter":
         renderer = create_latex_renderer(outputs_dir=str(folder))
-        pdf = Path(renderer.render_cv(cv, profile, job_position=role))
+        preset = getattr(args, "layout_preset", "auto")
+        layout_options = {"layout_preset": preset} if preset != "auto" else {}
+        pdf = Path(renderer.render_cv(cv, profile, job_position=role, **layout_options))
         pages = _count(pdf)
         result.update(cv_path=str(pdf), cv_pages=pages)
         result["cv_page_count"] = pages
