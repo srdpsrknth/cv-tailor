@@ -1,8 +1,33 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-17, merged Mac refactor):** **1229 passed, 3 skipped**, 1 existing Google SDK warning, ~78 s, fully offline — no paid API calls. Includes the incoming GUI/cover-letter changes and local country-specific rules.
-**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes the 34 LaTeX tests.
+**Current baseline (2026-11-18, merged Mac refactor):** **1267 passed, 3 skipped**, 1 existing Google SDK warning, ~42 s, fully offline — no paid API calls. Includes remote changes through `17fc56e` plus the preserved local country-specific rules.
+**Fast lane:** `python -m pytest -q -m "not requires_latex"` excludes tests that require LaTeX.
+
+Compact PDF contact-block regressions in `test_cv_readability.py` assert actual
+top-right placement and intact contact fields/headline in both extractors for short
+and long titles. A trial that wrapped the headline beside contact rows failed a
+real application field check; the accepted layout gives the title a full-width row.
+During this work an initial full run showed a space-glyph extraction mismatch in
+an existing readability check; focused reruns and subsequent full runs passed.
+Retain exact word/field checks if investigating a recurrence.
+
+Application-quality follow-up adds real-render typography and default word-boundary
+checks in `test_cv_readability.py`, independent PDF diagnostics in
+`test_document_quality.py`, isolated optional Word conversion in `test_word_layout.py`,
+and scoped input/dependency/artifact hash checks in `test_artifact_provenance.py`.
+Saved-review, CLI and companion-export regressions cover stale/unknown metadata,
+malformed optional source shapes, explicit Word checks and editable-source preservation.
+Cover-letter regressions align em-dash and effective sign-off rules with the prompt.
+The former `test_cv_pdf_text_layer_is_ats_clean` is now
+`test_cv_pdf_text_layer_preserves_separate_fields`: it makes a specific extraction
+claim rather than implying universal ATS compatibility.
+
+The two extraction engines run with their independent defaults; unavailable checks
+remain null. Word unit tests use synthetic conversion results and verify cleanup,
+failure, timeout and source isolation. Real LibreOffice checks are explicit/optional;
+they never run on passive GUI reads. Install the updated `requirements.lock.txt`
+for pdfplumber and its compatible dependencies; `python -m pip check` passes.
 
 Cover-letter business-letter and validation regressions add 8 cases across two files:
 `tests/test_renderers_documents.py` (`test_cover_letter_docx_and_pdf_follow_standard_business_letter_contract`

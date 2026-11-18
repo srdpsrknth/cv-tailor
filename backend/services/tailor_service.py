@@ -28,6 +28,7 @@ from models.requests import TailorResponse
 from models.tailored_output import TailoringExplanation
 from renderers import create_latex_renderer, create_docx_renderer
 from services.application_store import ApplicationStore, make_job_id
+from services.artifact_provenance import record_artifact_provenance
 from services.cache_store import (
     CACHE_FORMAT_VERSION,
     CacheEntry,
@@ -675,7 +676,29 @@ def tailor_documents(
     applications.save_drafts(drafts)
     # Mirroring is read from the config at call time, never at import time.
     mirror = applications.mirror(result, config)
-    applications.save_manifest(result.model_dump(), history)
+    manifest = result.model_dump()
+    saved_content = json.loads(
+        (applications.source_folder / "content.json").read_text(encoding="utf-8")
+    )
+    artifact_scopes = {
+        "cv_path": "cv",
+        "cv_upload_docx_path": "cv",
+        "cv_upload_text_path": "cv",
+        "cover_letter_path": "cover_letter",
+        "cl_pdf_path": "cover_letter",
+    }
+    rendered = [
+        (Path(manifest[key]), scope)
+        for key, scope in artifact_scopes.items()
+        if manifest.get(key)
+    ]
+    manifest["artifact_provenance"] = record_artifact_provenance(
+        config.project_root,
+        saved_content,
+        rendered,
+        profile_snapshot=profile.model_dump(),
+    )
+    applications.save_manifest(manifest, history)
     if mirror is not None:
         applications.save_manifest_copy(mirror)
     logger.info(

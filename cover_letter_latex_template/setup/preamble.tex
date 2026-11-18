@@ -11,6 +11,8 @@
 }
 \input{glyphtounicode}
 \pdfgentounicode=1
+% Preserve explicit word boundaries independently of extractor spacing heuristics.
+\ifdefined\pdfinterwordspaceon\pdfinterwordspaceon\fi
 \usepackage[protrusion=false,expansion=false]{microtype}
 \DisableLigatures[f]{encoding = *, family = *}
 

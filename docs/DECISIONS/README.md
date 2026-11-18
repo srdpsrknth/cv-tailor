@@ -5,6 +5,7 @@ Only the owner can move a decision to **Approved**.
 
 | # | Decision | Status |
 |---|---|---|
+| [0024](0024-document-quality-and-artifact-freshness.md) | Readable CVs, per-artifact freshness, advisory PDF extraction checks and optional Word pagination | **Approved** — owner audit implementation, 2026-11-17 |
 | [0001](0001-architecture-direction.md) | Modular redesign, executed incrementally | **Approved** |
 | [0002](0002-privacy-model.md) | Separate public code from private candidate data | **Approved** |
 | [0003](0003-profile-identity.md) | Thread an explicit `profile_id`; never default | **Approved** |

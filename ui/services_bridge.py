@@ -423,12 +423,20 @@ def list_applications(config, profile_id: str, limit: Optional[int] = 20) -> Lis
     ]
 
 
-def load_application(config, profile_id, job_id):
+def load_application(config, profile_id, job_id, *, include_quality=False):
     from services.application_review import load_review
 
-    detail = load_review(config, profile_id, job_id)
+    detail = load_review(
+        config, profile_id, job_id, include_quality=include_quality
+    )
     detail["artifacts"] = list_artifacts(Path(detail["path"]))
     return detail
+
+
+def check_word_layout(config, profile_id, job_id):
+    from services.application_review import check_saved_word_layout
+
+    return check_saved_word_layout(config, profile_id, job_id)
 
 
 def application_library(config, profile_id):

@@ -57,6 +57,7 @@ def find_content(explicit, config) -> Path:
 def run(args, console: Console, config) -> int:
     from models.tailored_output import TailoredCV, TailoredCoverLetter
     from renderers import create_latex_renderer, create_docx_renderer
+    from services.artifact_provenance import record_artifact_provenance
     from services.profile_store import (
         InvalidProfileIdError,
         UnknownProfileError,
@@ -99,18 +100,22 @@ def run(args, console: Console, config) -> int:
     only = getattr(args, "only", None)
     result = {"content": str(content_path), "folder": str(folder), "job_id": folder.name}
     generated = []
+    generated_scopes = []
 
     if only != "cover-letter":
         renderer = create_latex_renderer(outputs_dir=str(folder))
         pdf = Path(renderer.render_cv(cv, profile, job_position=role))
         pages = _count(pdf)
         result.update(cv_path=str(pdf), cv_pages=pages)
+        result["cv_page_count"] = pages
         generated.append(pdf)
+        generated_scopes.append((pdf, "cv"))
         from renderers.upload_cv import render_upload_cv
 
         upload_paths = render_upload_cv(cv, profile, folder, role)
         result.update(upload_paths)
         generated.extend(Path(p) for p in upload_paths.values())
+        generated_scopes.extend((Path(p), "cv") for p in upload_paths.values())
         console.out(f"Autofill CV:   {upload_paths['cv_upload_docx_path']}")
         console.out(f"CV:            {human_pages(pages)}  {pdf}")
         if pages > 2:
@@ -126,18 +131,32 @@ def run(args, console: Console, config) -> int:
         words = sum(len(p.split()) for p in cl.paragraphs)
         result.update(cover_letter_path=str(docx), cover_letter_body_words=words)
         generated.append(Path(docx))
+        generated_scopes.append((Path(docx), "cover_letter"))
         console.out(f"Cover letter:  {len(cl.paragraphs)} paragraphs, {words} words  {docx}")
         if pdf:
             pages = _count(Path(pdf))
             result.update(cl_pdf_path=str(pdf), cover_letter_pdf_pages=pages)
+            result["cover_letter_page_count"] = pages
             generated.append(Path(pdf))
+            generated_scopes.append((Path(pdf), "cover_letter"))
             console.out(f"Cover PDF:     {human_pages(pages)}  {pdf}")
             if pages != 1:
                 console.warn(f"Cover letter is {pages} pages; the target is one.")
         if len(cl.paragraphs) != 4 or not 290 <= words <= 310:
             console.warn("Cover letter target is four paragraphs of 290-310 words.")
 
-    _update_manifest(content_path.parent / "generation_result.json", result, folder)
+    artifact_provenance = record_artifact_provenance(
+        config.project_root,
+        data,
+        generated_scopes,
+        profile_snapshot=profile.model_dump(),
+    )
+    _update_manifest(
+        content_path.parent / "generation_result.json",
+        result,
+        folder,
+        artifact_provenance=artifact_provenance,
+    )
 
     if getattr(args, "mirror_configured", False):
         _mirror(console, config, folder, generated)
@@ -153,7 +172,9 @@ def _count(pdf_path: Path) -> int:
     return len(PdfReader(str(pdf_path)).pages)
 
 
-def _update_manifest(path: Path, result: dict, folder: Path) -> None:
+def _update_manifest(
+    path: Path, result: dict, folder: Path, *, artifact_provenance: dict | None = None
+) -> None:
     """Refresh the manifest the same way the render script does."""
     manifest = {}
     if path.exists():
@@ -162,6 +183,11 @@ def _update_manifest(path: Path, result: dict, folder: Path) -> None:
         except (OSError, json.JSONDecodeError):
             manifest = {}
     manifest.update({k: v for k, v in result.items() if k not in ("content", "folder")})
+    if artifact_provenance:
+        saved = manifest.get("artifact_provenance")
+        saved = saved if isinstance(saved, dict) else {}
+        saved.update(artifact_provenance)
+        manifest["artifact_provenance"] = saved
     manifest.setdefault("job_id", folder.name)
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 

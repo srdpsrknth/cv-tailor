@@ -1,10 +1,175 @@
 # Project state
 
-**Last updated:** 2026-11-17
+**Last updated:** 2026-11-18
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this commit)* — *merge latest refactor GUI and preserve country-specific rules*
+**Latest commit:** *(this commit)* — *sync refactor layout and document-verification updates*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Mac refactor synchronization (2026-11-18)
+
+**Active task:** synchronize `refactor/architecture-v2` with GitHub. Merged the four
+incoming commits through `17fc56e` into local `63b0226`, preserving the local India
+selection and country-specific work-right rules. Code merged automatically; project
+state and test-baseline conflicts retain both histories. Pre-sync suite: **1229
+passed, 3 skipped**, one existing Google SDK warning. Updated locked dependencies;
+`pip check` passes. Post-merge suite: **1267 passed, 3 skipped**, one existing Google
+SDK warning, ~42 s. Private profiles, saved applications and `.env` are unchanged.
+No paid generation, saved-document regeneration or remote push was performed.
+**Next action:** continue from the updated refactor branch; remaining Phase 6 scope
+is unchanged. No application server was running during this synchronization.
+
+## Compact top-right CV contacts (2026-11-17)
+
+**Active task:** put location, phone, email, LinkedIn, GitHub and authorization at
+the top right to save space, with explicit parser checks — complete. Primary PDF
+now pairs the name on the left with 9.5pt right-aligned contact text in the document
+body. The professional headline is full-width below this block. Main content stays
+single-column. The Word autofill companion keeps its stacked paragraphs.
+
+An initial trial kept the headline beside contacts, but pdfplumber interleaved a
+wrapped Artsy headline with contact lines. That trial was rejected. Separate
+full-width headline placement fixes this in both tested extractors, including a
+long-title synthetic regression. The accepted version saves 15.5–15.7pt (about
+5.5mm) before Professional Experience in all 12 current CVs. Body and metadata sizes
+are unchanged; all remain two pages. Contact text is not in a page header/footer,
+table, text box or image, but the paired top arrangement is still a parser tradeoff,
+not universal ATS certification. See ADR 0024's requested exception.
+
+**Verification:** focused real-render checks 45 passed; final full suite **1247
+passed, 3 skipped**, one existing Google SDK warning, 92.23 seconds. All 12 actual
+PDFs passed two-engine source-word/field/order checks and explicit candidate name,
+location, phone, email, LinkedIn, GitHub and authorization checks. All pages visually
+inspected, glyph bounds/languages/freshness/mirrors verified, Word companions still
+two pages via LibreOffice. One initial baseline hit an intermittent space-glyph
+extraction mismatch; it was not reproduced in targeted reruns or the subsequent
+full runs. No retention assertion was relaxed to hide it.
+
+Saved CVs refreshed after private backup; content.json, profile facts and cover-letter
+files remain byte-identical. Evidence and screenshots:
+`<store>/reviews/<profile_id>/cv-header-refinement-2026-11-17/`.
+No paid generation, real ATS upload or Word desktop test. Guide and installed
+application skill aligned. **Next action:** refresh the PDF preview; use the stacked
+Word companion if a portal's autofill struggles. No blocker. Local development
+commit only; no push requested and master untouched.
+
+## CV visual refinement (2026-11-17)
+
+**Active task:** restore a sleeker, more modern CV after the owner preferred the
+original's visual hierarchy — complete. Primary PDF design now uses a 26pt charcoal
+name, navy professional headline, distinct company/role lines, aligned dates/location,
+subtle employer dividers, italic project names and lighter project/technology labels.
+Body remains 10.5pt with 12.2pt leading, metadata 9.5pt. Essential content is plain
+text in one reading column with explicit word spaces; no icons, badges, sidebar,
+text boxes or hidden separators were introduced. The Word companion and letter
+designs were not redesigned. Prompt/guide/installed skill describe the actual sizes.
+
+Backed up and refreshed the 12 current CVs using scoped rendering and configured
+mirrors. All CV PDFs and Word companions remain two pages. Application content,
+factual profile and all saved cover-letter files are byte-identical. No paid calls.
+Private evidence/backups, before/after screenshots and final checks are under
+`<store>/reviews/<profile_id>/cv-design-refinement-2026-11-17/`.
+
+**Verification:** initial baseline 1245 passed/3 skipped; focused real-render checks
+43 passed; final full suite **1245 passed, 3 skipped**, one existing Google SDK
+warning, 91.72 seconds. Both default extraction engines retain all compared source
+words and fields in correct checked order for all 12 CVs, with no suspicious glyphs.
+All final pages visually inspected (including independent smaller-model review);
+actual glyph bounds, language text, artifact freshness and mirrored bytes checked.
+Word companion pagination was rechecked with LibreOffice; Word desktop and real
+ATS screening remain untested. An initial spacing trial produced three pages in
+three cases; it was rejected before updating saved files. Final design fits two
+pages without reducing body type or changing wording.
+
+**Next action:** refresh the GUI preview or open the updated PDF and assess the
+visual direction. Future generations use this shared CV template. No blocker;
+development commit local only, no push requested and `master` unchanged.
+
+## Application quality audit implementation (2026-11-17)
+
+**Active task:** implement the owner's approved audit recommendations — complete.
+Single-column primary CV now has a 10.5pt dark body, 9.5pt metadata, visible skill
+separators, current location and a separate work-authorization line. Role headers
+and main bullets, and individual projects, stay together in the PDF. Word CV has
+compact contacts/metadata and grouped education. Both PDF templates now emit
+explicit word-space glyphs. The existing business-letter layout remains.
+
+Shared prompts and private voice guidance now favour selected role-specific evidence,
+varied optional transitions and a brief close; colon/semicolon/em-dash and effective
+sign-off validation align with the voice rules. Default closing line is Warm regards.
+Four paragraphs/290–310 body words, factual ownership/status, exact historical titles,
+approved project structure and overseas-support policy are preserved. Existing
+saved prose was not rewritten. Repo and installed application skills are aligned.
+The changed effective voice brief will invalidate the paired generation cache for
+a future request; no paid generation or model comparison was run here.
+
+`artifact_provenance` records scoped content, rendering context/profile, dependencies,
+artifact hashes, schema version and UTC time. Generation, CLI, render script and
+saved autofill export update only rendered artifacts' records. Legacy files stay
+unknown; stale files warn without blocking downloads. Saved review compares PDF
+extraction with pypdf and pdfplumber and offers explicit Word pagination checks.
+The script supports `--check-word-layout`; missing LibreOffice remains unchecked.
+Word counts are tied to the actual DOCX hash. See [ADR 0024](DECISIONS/0024-document-quality-and-artifact-freshness.md).
+
+**Private outputs:** backed up and refreshed all 12 current applications with valid
+editable sources, mirrored configured deliverables and preserved manual alternate
+files. All CV PDFs and Word CVs are 2 pages; all cover-letter PDFs and Word letters
+are 1 page. All 12 `content.json` files and `profile.yaml` remain byte-identical.
+Historical application without editable source was preserved. Initial backup and
+evidence: `<store>/reviews/<profile_id>/layout-implementation-2026-11-17/`
+(`before-refresh-203248/`, `refresh-results.json`, `refresh-cv-results.json`,
+`extraction-current.json`, final page sheets and Word QA). Private writing-style
+and installed-skill backups are kept there too; no candidate artifacts committed.
+
+**Verification:** baseline 1209 passed/3 skipped; final full suite **1245 passed,
+3 skipped**, one existing Google SDK warning, 87.75 seconds. Follow-up voice/upload/
+readability checks: 14 passed. `pip check` and diff whitespace checks pass. All 24
+current PDFs retain 100% of compared normalized source words with zero missing
+checked fields, correct checked reading order and no suspicious glyphs in both
+engines. All 24 DOCX artifacts counted via LibreOffice; all final PDF pages and
+three final Word pairs visually inspected. Live browser check confirmed the saved
+review controls, 2/1-page Word counts and two-engine diagnostics; GUI restarted on
+8502 and health returned 200. No real ATS upload, submission, detector test, new
+live prose or Microsoft Word desktop pagination verification is claimed.
+
+**Next action:** refresh the GUI and use the updated saved deliverables. On the next
+new application, read the fresh prose for voice and inspect actual portal autofill
+before submitting. No blocker. Development changes committed locally; no push
+requested, `master` untouched. The earlier audit remains as pre-change evidence.
+
+## Full application quality audit (2026-11-17)
+
+**Active task:** audit generated CVs/cover letters and generation instructions for
+layout, content, voice, ATS parsing and AI screening — complete. Recommendations
+only; no templates, prompts, policy, profile or saved applications changed.
+
+Public findings and proposed acceptance checks:
+[APPLICATION_QUALITY_AUDIT.md](APPLICATION_QUALITY_AUDIT.md). Personal examples,
+extraction inventory, scripts and rendered page evidence remain privately under
+`<store>/reviews/<profile_id>/full-audit-2026-11-17/REPORT.md`.
+
+Verified concerns: primary CV prose is approximately 9pt despite the 10pt template;
+default pdfplumber extraction merges many words while pypdf and lower pdfplumber
+spacing tolerance recover them; several saved letters predate the new layout;
+three inspected Word CV companions render to three pages, including an education
+split. The current cover-letter design remains a good base. Content recommendations
+focus on evidence selection, material role gaps, less repetition and a shorter
+closing within the existing word policy. Two gpt-6-luna reviewers supported the audit.
+
+**Verification:** all 28 top-level PDFs inventoried across 13 folders (including
+historical/alternate artifacts); representative page images from five folders and
+all pages of three DOCX letter/CV pairs inspected. Full baseline **1209 passed,
+3 skipped**, one existing Google SDK deprecation warning, 148.17 seconds. No new
+paid calls, actual ATS upload, submission or AI-authorship detector used. LibreOffice
+pagination is not a Word desktop guarantee; extraction differences are not proof
+of rejection by a named ATS. No architecture or roadmap implementation changed.
+
+**Next recommended action:** implement artifact freshness and extraction checks,
+then trial a readable two-page CV in both intended upload formats. Keep the new
+letter layout. Existing word limits, approved project structure, immigration policy
+and manual application edits remain in force; proposed policy alternatives are not
+silently approved by this audit. No current blocker. Commit documentation together;
+no push requested and `master` untouched.
 
 ## Mac refactor branch synchronization (2026-11-17)
 
