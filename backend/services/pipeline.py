@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from models.profile import Profile
+from models.job import normalise_country
 from models.tailored_output import TailoredCV, TailoredCoverLetter
 
 from services.cv_delta import (
@@ -36,6 +37,30 @@ MAX_VALIDATION_ATTEMPTS = 3
 
 #: Layout attempts before the two-page target is declared unreachable.
 MAX_LAYOUT_ATTEMPTS = 4
+
+_SUPPORT = re.compile(
+    r"\b(?:sponsor(?:ship|ed|ing)?|employer (?:permit )?support|(?:work|employment) permit support)\b",
+    re.I,
+)
+_IMMIGRATION = re.compile(
+    r"\b(?:blue card|green card|(?:work|employment|residence) (?:permit|visa)|"
+    r"(?:immigration|visa) (?:status|support|requirements?|sponsorship)|"
+    r"work (?:authori[sz]ation|rights|eligibility)|right to work|authori[sz]ed to work|"
+    r"permanent residen(?:t|ce|cy)|citizen(?:ship)?|H[-‑]?1B)\b", re.I,
+)
+_STATUS = re.compile(r"\b(?:blue card|green card|permanent residen(?:t|ce|cy)|citizen(?:ship)?|H[-‑]?1B)\b", re.I)
+_HELD_PERMIT = re.compile(
+    r"\b(?:hold|have|possess)\s+(?:(?:a|an|valid|current|[a-z]+-issued)\s+)*"
+    r"(?:[a-z]+\s+)?((?:work|employment|residence) (?:permit|visa))\b", re.I,
+)
+_NEED_SUPPORT = re.compile(r"\b(?:need|require)\s+(?:[a-z]+\s+){0,3}" + _SUPPORT.pattern, re.I)
+_EXEMPTION = re.compile(
+    r"\b(?:no (?:employer )?(?:support|sponsorship)|"
+    r"(?:does not|do not|would not|don.t|won.t|without) (?:need |require )?(?:employer )?(?:support|sponsorship)|"
+    r"(?:sponsorship|employer support) (?:is not (?:needed|required)|is unnecessary)|"
+    r"(?:existing|unrestricted|automatic|full) (?:local )?(?:work rights|right to work|work authori[sz]ation))\b",
+    re.I,
+)
 
 
 @dataclass
@@ -66,6 +91,8 @@ class DocumentGenerator:
         profile: Profile,
         rules: Optional[ProfileRules] = None,
         status_callback: Optional[Callable[[str], None]] = None,
+        *,
+        layout_guidance: str = "",
     ):
         self.service = service
         self.profile = profile
@@ -73,6 +100,7 @@ class DocumentGenerator:
         # so a multi-profile setup validates each candidate against its own facts.
         self.rules = rules or ProfileRules.from_profile(profile)
         self.status_callback = status_callback
+        self.layout_guidance = layout_guidance
         self.counts = {"cv": TokenCounts(), "cover_letter": TokenCounts()}
         self.drafts: list = []
 
@@ -187,14 +215,23 @@ class DocumentGenerator:
         """Validate one parsed response and apply country/company/role adjustments."""
         if kind == "cv":
             model = TailoredCV.model_validate(data.get("cv", data))
-            self._apply_visa_label(model, work_country)
-            self._check_country_override_wording(model.model_dump_json(), work_country)
-            if re.search(r"sponsorship|employer support|work permit support",
-                         model.model_dump_json(), re.I):
+            label = model.work_authorization
+            override = self.rules.country_override(work_country)
+            allowed = override["work_authorization"] if override is not None else (
+                self.rules.visa_label or self.profile.identity.visa_status
+            )
+            if label and (not allowed or label.strip().casefold() != allowed.strip().casefold()):
+                raise ValueError("Use only the profile's confirmed work authorization label.")
+            prose = model.model_dump_json(exclude={"work_authorization"})
+            self._check_country_override_wording(prose, work_country)
+            if _SUPPORT.search(model.model_dump_json()) or (allowed and _SUPPORT.search(allowed)):
                 raise ValueError(
                     "Sponsorship and work permit support requirements belong only in the "
                     "cover letter, never in the CV."
                 )
+            if _IMMIGRATION.search(prose):
+                raise ValueError("Keep immigration and work authorization out of CV prose.")
+            self._apply_visa_label(model, work_country)
             validation.validate_cv(model, self.profile, self.rules)
         else:
             model = TailoredCoverLetter.model_validate(data.get("cover_letter", data))
@@ -212,24 +249,25 @@ class DocumentGenerator:
         if override is not None:
             cv.work_authorization = override["work_authorization"]
             return
-        visa = (self.profile.identity.visa_status or "").lower()
-        if not work_country or "blue card" not in visa:
-            return
         cv.work_authorization = (
-            None if work_country.lower() in self.rules.home_countries
-            else self.rules.visa_label
+            self.rules.visa_label if work_country and not self._is_home(work_country) else None
+        )
+
+    def _is_home(self, work_country: str) -> bool:
+        country = normalise_country(work_country) or work_country.strip().casefold()
+        return any(
+            (normalise_country(home) or home.strip().casefold()) == country
+            for home in self.rules.home_countries
         )
 
     def _check_country_override_wording(self, text: str, work_country: Optional[str]) -> None:
         override = self.rules.country_override(work_country)
-        if override is not None and not override["requires_employer_support"] and re.search(
-            r"\b(?:Blue Card|sponsor\w*|(?:work|employment) (?:permit|visa)|"
-            r"visa (?:support|sponsorship|status|requirements?)|employer support)\b",
-            text, re.I,
+        if override is not None and not override["requires_employer_support"] and (
+            _IMMIGRATION.search(text) or _SUPPORT.search(text)
         ):
             raise ValueError(
                 f"The profile confirms existing work rights in {work_country}. "
-                "Remove Blue Card, visa, permit and sponsorship wording; use the "
+                "Remove immigration and sponsorship wording and use the "
                 "country-specific tailoring guidance instead."
             )
 
@@ -239,37 +277,45 @@ class DocumentGenerator:
         if override is not None and not override["requires_employer_support"]:
             self._check_country_override_wording(" ".join(cl.paragraphs), work_country)
             return
-        visa = (self.profile.identity.visa_status or "").lower()
-        if not work_country:
-            return
-        if work_country.lower() in self.rules.home_countries:
-            body_text = " ".join(cl.paragraphs)
-            if re.search(
-                r"\b(Blue Card|work permit|work authorization|sponsorship|employer support for)\b",
-                body_text,
-                re.I,
-            ):
+        body = " ".join(cl.paragraphs)
+        if not work_country or (override is None and self._is_home(work_country)):
+            if _IMMIGRATION.search(body) or _SUPPORT.search(body):
                 raise ValueError(
-                    "Do not include visa, Blue Card, or sponsorship wording in a cover "
-                    "letter for a role in the candidate's home country."
+                    "Do not include immigration or sponsorship wording in a cover letter "
+                    "for a role in the candidate's home country or without a confirmed work country."
                 )
             return
-        if "blue card" not in visa:
+        visa = self.profile.identity.visa_status or ""
+        blue_card_policy = bool(
+            self.rules.visa_label and self.rules.home_countries and "blue card" in visa.casefold()
+        )
+        if override is None and not blue_card_policy:
+            if _IMMIGRATION.search(body) or _SUPPORT.search(body):
+                raise ValueError("Remove unsupported immigration and sponsorship claims.")
             return
         closing = cl.paragraphs[-1]
-        if not re.search(r"Blue Card", closing, re.I) or not re.search(
-            r"employer support|sponsor", closing, re.I
+        if not _NEED_SUPPORT.search(closing) or _EXEMPTION.search(body) or (
+            blue_card_policy and override is None and "blue card" not in closing.casefold()
         ):
             raise ValueError(
-                f"Include the German-issued EU Blue Card and employer permit support "
-                f"needed for {work_country} in the final cover-letter paragraph."
+                f"State the confirmed status and employer permit support needed for "
+                f"{work_country} in the final cover-letter paragraph."
             )
-        if work_country.lower() in self.rules.local_permit_countries and re.search(
-            r"Irish (?:EU )?Blue Card|Danish (?:EU )?Blue Card", closing, re.I
-        ):
+        evidence = f"{visa} {override['work_authorization'] if override else self.rules.visa_label or ''}"
+        status_claims = _STATUS.findall(body) + _HELD_PERMIT.findall(body)
+        if any(claim.casefold() not in evidence.casefold() for claim in status_claims):
+            raise ValueError("Remove immigration status claims absent from the selected profile.")
+        # Preserve the issuer words supplied by the profile, while allowing either
+        # the adjective before the status or the country after 'issued by'.
+        issuer_terms = re.findall(r"\b([a-z]+)(?:-issued)? (?:EU )?blue card\b", body, re.I)
+        issuer_terms += re.findall(r"\bblue card issued by ([a-z]+)\b", body, re.I)
+        evidence_words = set(re.findall(
+            r"[a-z]+", f"{evidence} {' '.join(self.rules.home_countries)}".casefold()
+        ))
+        qualifier_words = {"a", "an", "the", "my", "valid", "eu", "existing", "current"}
+        if any(term.casefold() not in evidence_words | qualifier_words for term in issuer_terms):
             raise ValueError(
-                "Ireland and Denmark do not issue EU Blue Cards; refer to the appropriate "
-                "local employment permit."
+                "Use only the Blue Card issuer confirmed by the selected profile."
             )
 
     # --- the full sequence -------------------------------------------------------------
@@ -324,7 +370,9 @@ class DocumentGenerator:
         self._status(f"CV is {page_count} pages; shortening content...")
         budget = layout_budget(attempt)
         cv, data = self.generate(
-            layout_retry_instruction(cv, page_count, budget, attempt, self.rules)
+            layout_retry_instruction(
+                cv, page_count, budget, attempt, self.rules, guidance=self.layout_guidance
+            )
             + cv.model_dump_json(indent=2),
             "cv", work_country, company_name, role_title,
             base_cv=cv,

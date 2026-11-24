@@ -86,6 +86,7 @@ def cache_key(
     model_cl: str,
     rules_fingerprint: str,
     format_version: int = CACHE_FORMAT_VERSION,
+    prompt_layout: str = "",
 ) -> str:
     """The identity of one generation: everything that can change its bytes.
 
@@ -96,6 +97,8 @@ def cache_key(
     ``model_cv``/``model_cl`` are both present because item 6 added model-per-task
     routing: one posting can be drafted by two different models, and a cache that
     knew only "the model" would serve one route's documents for the other's.
+    ``prompt_layout`` records the effective candidate guidance for layout retries
+    when supplied. Empty guidance preserves the existing generation key.
     """
     payload = {
         "format_version": format_version,
@@ -116,6 +119,8 @@ def cache_key(
         #: changing the profile block that was sent.
         "rules": rules_fingerprint,
     }
+    if prompt_layout:
+        payload["prompt_layout"] = prompt_layout
     return _digest(json.dumps(payload, sort_keys=True, ensure_ascii=False))
 
 

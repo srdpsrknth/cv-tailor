@@ -73,6 +73,9 @@ CVTAILOR_PROFILE_ID=<profile_id>
 ```
 
 `cvtailor profile list` shows the available ids; `cvtailor doctor` reports whether the store was found.
+The default setup check reads the selected provider's configuration locally. To
+verify the configured credential with that provider, run
+`.venv/bin/python scripts/check_setup.py --verify-key`.
 
 ```bash
 .venv/bin/python scripts/check_setup.py

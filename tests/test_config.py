@@ -17,13 +17,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'backend'))
 
-from config import DEFAULT_MODEL, PROJECT_ROOT, Config  # noqa: E402
+from config import DEFAULT_MODEL, PROJECT_ROOT, Config, ConfigError  # noqa: E402
 
 
 # --- defaults -------------------------------------------------------------------------
 
 def test_config_resolves_defaults_without_any_environment(monkeypatch):
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+    monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
     monkeypatch.delenv('GEMINI_MODEL', raising=False)
     monkeypatch.delenv('OUTPUTS_DIR', raising=False)
     monkeypatch.delenv('GEMINI_TEMPERATURE', raising=False)
@@ -142,6 +143,7 @@ def test_blank_outputs_dir_falls_back_to_the_default(monkeypatch, tmp_path):
 # --- api key handling -----------------------------------------------------------------
 
 def test_placeholder_api_key_is_not_treated_as_configured(monkeypatch):
+    monkeypatch.setenv('CVTAILOR_PROVIDER', 'gemini')
     monkeypatch.setenv('GEMINI_API_KEY', 'your_gemini_api_key_here')
     config = Config.from_env(load_env_file=False)
 
@@ -151,6 +153,7 @@ def test_placeholder_api_key_is_not_treated_as_configured(monkeypatch):
 
 
 def test_a_real_looking_key_is_reported_as_present_without_network_use(monkeypatch):
+    monkeypatch.setenv('CVTAILOR_PROVIDER', 'gemini')
     monkeypatch.setenv('GEMINI_API_KEY', 'test-key-not-a-real-credential')
     config = Config.from_env(load_env_file=False)
 
@@ -159,6 +162,7 @@ def test_a_real_looking_key_is_reported_as_present_without_network_use(monkeypat
 
 
 def test_missing_key_error_names_the_fix(monkeypatch):
+    monkeypatch.setenv('CVTAILOR_PROVIDER', 'gemini')
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     config = Config.from_env(load_env_file=False)
 
@@ -168,6 +172,26 @@ def test_missing_key_error_names_the_fix(monkeypatch):
     message = str(error.value)
     assert 'GEMINI_API_KEY' in message
     assert '.env' in message
+
+
+@pytest.mark.parametrize('provider', ['openrouter', 'gemini'])
+def test_only_the_selected_providers_key_counts(monkeypatch, provider):
+    selected = f'{provider.upper()}_API_KEY'
+    other = 'GEMINI_API_KEY' if provider == 'openrouter' else 'OPENROUTER_API_KEY'
+    monkeypatch.setenv('CVTAILOR_PROVIDER', provider)
+    monkeypatch.setenv(other, 'other-provider-test-key')
+    monkeypatch.setenv(selected, f'your_{provider}_api_key_here')
+
+    config = Config.from_env(load_env_file=False)
+    assert not config.has_api_key
+    with pytest.raises(ConfigError, match=selected) as error:
+        config.require_provider_key()
+    assert other not in str(error.value)
+
+    monkeypatch.setenv(selected, ' selected-test-key ')
+    config = Config.from_env(load_env_file=False)
+    assert config.has_api_key
+    assert config.require_provider_key() == 'selected-test-key'
 
 
 # --- immutability and overrides -------------------------------------------------------

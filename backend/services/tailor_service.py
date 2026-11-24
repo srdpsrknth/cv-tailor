@@ -37,6 +37,7 @@ from services.cache_store import (
     rules_fingerprint,
     serialize_profile_bytes,
 )
+from services.candidate_guidance import load_candidate_guidance
 from services.llm_service import LLMService
 from services.profile_store import (
     ProfileMismatchError,
@@ -53,6 +54,7 @@ from services.generation import (
     build_context,
     build_cv_prompt,
 )
+from services.prompts import candidate_guidance_block, pinned_project_clause
 from utils.text import slugify
 
 logger = logging.getLogger(__name__)
@@ -86,7 +88,7 @@ def validate_cv(cv, profile, rules: Optional[ProfileRules] = None) -> None:
     """Validate a CV, defaulting to the original candidate's rules."""
     from services.generation import validate_cv as _validate
 
-    return _validate(cv, profile, rules or DEFAULT_PROFILE_RULES)
+    return _validate(cv, profile, rules or ProfileRules.from_profile(profile))
 
 
 def validate_cover_letter(cl, profile) -> None:
@@ -352,8 +354,16 @@ def tailor_documents(
     # into the cache key. One string, so the key cannot describe a prompt the model
     # was not shown.
     profile_bytes = serialize_profile_bytes(profile)
+    guidance = load_candidate_guidance(config, resolved_profile_id)
+    effective_rules = rules or ProfileRules.from_profile(profile)
     cv_prompt_source = PROMPT_CV_PATH.read_text(encoding="utf-8")
     cl_prompt_source = PROMPT_CL_PATH.read_text(encoding="utf-8")
+    # Keep provider inputs identical when a private clause is already in the brief.
+    cv_prompt_source += candidate_guidance_block(guidance.cv, existing=cv_prompt_source)
+    cl_prompt_source += candidate_guidance_block(guidance.cover_letter, existing=cl_prompt_source)
+    layout_guidance = candidate_guidance_block(
+        guidance.layout, existing=pinned_project_clause(effective_rules)
+    )
     from services.writing_voice import writing_voice_context
 
     # Hash the exact effective letter brief, including optional private voice guidance.
@@ -371,7 +381,8 @@ def tailor_documents(
     cl_prompt = cl_prompt_source + context
 
     generator = DocumentGenerator(
-        service=service, profile=profile, rules=rules, status_callback=status_callback
+        service=service, profile=profile, rules=effective_rules, status_callback=status_callback,
+        layout_guidance=layout_guidance,
     )
 
     # The job folder is rooted in the *store* when the store is authoritative. ADR 0011
@@ -411,6 +422,7 @@ def tailor_documents(
         work_country=work_country,
         prompt_cv=cv_prompt_source,
         prompt_cl=cl_prompt_source,
+        prompt_layout=layout_guidance,
         prompt_version=_source_digest(PROMPT_CV_PATH),
         schema_version=_schema_digest(),
         provider=config.provider_name,

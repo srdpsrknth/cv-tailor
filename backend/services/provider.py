@@ -48,6 +48,8 @@ from typing import Any, Optional
 from google import genai
 from google.genai import types
 
+from config import PROVIDER_KEY_SETTINGS, configured_provider_key
+
 logger = logging.getLogger(__name__)
 
 #: Attempts per request before a provider gives up. Matches the historical
@@ -508,13 +510,10 @@ def build_provider(config, api_key: Optional[str] = None) -> Provider:
 
 def _require_key(config, provider_name: str) -> str:
     """The selected provider's key, or a fail-closed error naming the right variable."""
-    field = "openrouter_api_key" if provider_name == "openrouter" else "api_key"
-    key = getattr(config, field, None)
+    key = configured_provider_key(config, provider_name)
     if key:
         return key
-    env_var = (
-        "OPENROUTER_API_KEY" if provider_name == "openrouter" else "GEMINI_API_KEY"
-    )
+    env_var = PROVIDER_KEY_SETTINGS[provider_name][1]
     raise ProviderError(
         f"{env_var} is not set for the {provider_name} provider. Add it to .env or "
         "pass --api-key. Run `cvtailor doctor` to check your setup."

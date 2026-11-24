@@ -117,9 +117,9 @@ class ProfileRules(BaseModel):
     #: Immigration label substituted into the CV for non-home work countries.
     visa_label: Optional[str] = None
     #: Countries considered home, where no visa label is added.
-    home_countries: List[str] = Field(default_factory=lambda: ["germany", "deutschland", "de"])
+    home_countries: List[str] = Field(default_factory=list)
     #: Countries that issue their own permit, so an EU Blue Card must not be claimed.
-    local_permit_countries: List[str] = Field(default_factory=lambda: ["ireland", "denmark"])
+    local_permit_countries: List[str] = Field(default_factory=list)
     country_overrides: Dict[str, CountryApplicationRules] = Field(default_factory=dict)
 
 

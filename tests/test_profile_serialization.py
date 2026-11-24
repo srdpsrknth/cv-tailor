@@ -208,6 +208,8 @@ def test_the_facts_block_excludes_the_rules(analyst_profile):
     Declaring a tool banned must not silently un-ban it, so the text scanned for
     claims cannot contain the rules block that names the tool.
     """
+    from models.profile import ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(banned_tools=['Synthetic Tool'])
     facts = generation.profile_facts_json(analyst_profile)
 
     assert generation.ProfileRules.from_profile(analyst_profile).banned_tools, \
@@ -225,6 +227,9 @@ def test_the_facts_block_excludes_the_rules(analyst_profile):
 def test_a_banned_tool_is_still_rejected_after_memoization(analyst_profile, analyst_session):
     """The cached path must not weaken the rule it exists to speed up."""
     from models.tailored_output import TailoredCV
+    from models.profile import ProfileRules as DeclaredRules
+
+    analyst_profile.rules = DeclaredRules(banned_tools=['Synthetic Tool'])
 
     rules = generation.ProfileRules.from_profile(analyst_profile)
     payload = analyst_session.step_payload('cv_draft')

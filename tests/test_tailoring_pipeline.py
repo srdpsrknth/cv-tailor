@@ -315,10 +315,10 @@ def test_truncated_json_is_never_repaired_into_a_document():
 
 # --- candidate-scoped validation rules (A-1) -----------------------------------------
 
-def test_analyst_defaults_come_from_the_profile_rules_or_the_legacy_default(
+def test_missing_rules_are_neutral_and_declared_rules_are_profile_scoped(
     analyst_profile, marketer_profile,
 ):
-    """A profile with no rules block keeps the original single-candidate behaviour."""
+    """A profile with no rules block receives neutral defaults."""
     from services.generation import DEFAULT_PROFILE_RULES, ProfileRules
 
     assert ProfileRules.from_profile(analyst_profile) is DEFAULT_PROFILE_RULES
@@ -333,6 +333,9 @@ def test_profile_rules_replace_rather_than_extend_the_banned_tool_list(
 ):
     """The marketer may not claim Salesforce Pardot; the analyst's list must not leak in."""
     from services.generation import ProfileRules
+    from models.profile import ProfileRules as DeclaredRules
+
+    analyst_profile.rules = DeclaredRules(banned_tools=['Fivetran'])
 
     marketer = ProfileRules.from_profile(marketer_profile)
     analyst = ProfileRules.from_profile(analyst_profile)
@@ -353,7 +356,7 @@ def test_a_candidates_banned_tool_does_not_apply_to_another(marketer_profile):
     # Valid under the marketer's own rules.
     validate_cv(cv, marketer_profile, ProfileRules.from_profile(marketer_profile))
 
-    # And still valid under the analyst's rules: AWS is not on the marketer's CV.
+    # Neutral rules add no other candidate's restrictions.
     from services.generation import DEFAULT_PROFILE_RULES
     validate_cv(cv, marketer_profile, DEFAULT_PROFILE_RULES)
 
@@ -389,7 +392,7 @@ def test_a_profile_can_declare_its_own_visa_label(analyst_profile):
     assert rules.visa_label == 'Synthetic Work Permit'
     assert rules.home_countries == ('netherlands',)
     # The analyst's own profile is unaffected.
-    assert ProfileRules.from_profile(analyst_profile).visa_label == 'German EU Blue Card holder'
+    assert ProfileRules.from_profile(analyst_profile).visa_label is None
 
 
 def _minimal_cv(profile, summary, extra_bullet=None):
@@ -579,6 +582,8 @@ def test_inventing_bullets_for_an_empty_employer_is_rejected(analyst_profile, an
 @pytest.mark.parametrize('tool', ['Fivetran', 'Databricks', 'Tableau', 'ThoughtSpot',
                                   'DealCloud', 'Cortex', 'AWS'])
 def test_unclaimed_tools_are_rejected(analyst_profile, analyst_session, tool):
+    from models.profile import ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(banned_tools=[tool])
     payload = analyst_session.step_payload('cv_draft')['cv']
     payload['skills'] = {'Injected': [tool]}
     cv = TailoredCV.model_validate(payload)
@@ -589,6 +594,8 @@ def test_unclaimed_tools_are_rejected(analyst_profile, analyst_session, tool):
 
 @pytest.mark.parametrize('phrase', ['combines', 'builds', 'aims', 'passionate', 'dedicated to'])
 def test_aspirational_summary_language_is_rejected(analyst_profile, analyst_session, phrase):
+    from models.profile import ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(summary_forbidden_verbs=r'\b(combines|builds|aims|passionate|dedicated to)\b')
     payload = analyst_session.step_payload('cv_draft')['cv']
     payload['summary'] = [f'An analyst who {phrase} deliver value.']
     cv = TailoredCV.model_validate(payload)
@@ -654,14 +661,20 @@ def test_salutation_or_signoff_inside_the_body_is_rejected(analyst_profile, anal
 
 
 def test_cover_letter_rejects_banned_tool_and_wrong_ownership(analyst_profile, analyst_session):
+    from models.profile import EmployerRules, ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(
+        banned_tools=['Fivetran'], employers={'example corp': EmployerRules(
+            ownership_pattern=r'\bowned\b.*framework', ownership_message='Contribution only',
+        )},
+    )
     payload = analyst_session.step_payload('cover_letter')['cover_letter']
     payload['paragraphs'][1] = 'Built Fivetran ingestion pipelines. ' + ' '.join(['word'] * 65)
     with pytest.raises(ValueError, match='Fivetran'):
         service._validate_cover_letter(TailoredCoverLetter.model_validate(payload), analyst_profile)
 
     payload2 = analyst_session.step_payload('cover_letter')['cover_letter']
-    payload2['paragraphs'][1] = 'At Aklamio I owned the 80-table data quality framework. ' + ' '.join(['word'] * 60)
-    with pytest.raises(ValueError, match='contribution'):
+    payload2['paragraphs'][1] = 'At Example Corp I owned the data quality framework. ' + ' '.join(['word'] * 60)
+    with pytest.raises(ValueError, match='Contribution'):
         service._validate_cover_letter(TailoredCoverLetter.model_validate(payload2), analyst_profile)
 
 
@@ -701,6 +714,8 @@ def test_home_country_cover_letter_rejects_visa_or_sponsorship_wording(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
     analyst_profile.identity.visa_status = 'Valid EU Blue Card Visa'
+    from models.profile import ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(home_countries=['germany'])
     draft = analyst_session.step_text('cv_draft')
     bad_letter = analyst_session.step_payload('cover_letter')
     words = bad_letter['cover_letter']['paragraphs'][-1].split()

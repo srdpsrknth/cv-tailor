@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 from pypdf import PdfWriter
 
-from models.profile import Profile
+from models.profile import Profile, ProfileRules
 from models.requests import TokenUsage
 from models.tailored_output import TailoredCV, TailoredCoverLetter
 from services import tailor_service as service
@@ -146,6 +146,7 @@ def test_truncated_json_and_unreadable_pdf_fail():
 @pytest.mark.parametrize('country', ['Netherlands', 'Ireland'])
 def test_selected_country_controls_prompt_header_and_saved_context(monkeypatch, tmp_path, profile, country):
     profile.identity.visa_status = 'Valid EU Blue Card Visa'
+    profile.rules = ProfileRules(visa_label='German EU Blue Card holder', home_countries=['Germany'])
     cv = json.dumps({'cv': cv_data(profile)})
     letter = cl_data()
     closing = f'I hold a valid EU Blue Card issued by Germany and require employer support for an employment permit in {country}.'
@@ -260,9 +261,10 @@ def test_the_ui_omits_the_work_country_when_none_is_chosen(monkeypatch):
 
 
 def test_invented_tools_and_altered_job_dates_are_rejected(profile):
+    profile.rules = ProfileRules(banned_tools=['Synthetic ETL Tool'])
     cv = TailoredCV.model_validate(cv_data(profile))
-    cv.skills = {'Data': ['Fivetran']}
-    with pytest.raises(ValueError, match='Fivetran'):
+    cv.skills = {'Data': ['Synthetic ETL Tool']}
+    with pytest.raises(ValueError, match='Synthetic ETL Tool'):
         service._validate_cv(cv, profile)
     cv.skills = {}
     cv.experience[0].start_date = '2018-01'

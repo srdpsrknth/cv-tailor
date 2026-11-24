@@ -15,7 +15,7 @@ from support import read_json
 def local_rights_profile(analyst_profile):
     profile = analyst_profile.model_copy(deep=True)
     profile.identity.visa_status = 'Valid German EU Blue Card'
-    profile.rules = DeclaredRules(visa_label='German EU Blue Card holder')
+    profile.rules = DeclaredRules(visa_label='German EU Blue Card holder', home_countries=['Germany'])
     profile.rules.country_overrides['India'] = CountryApplicationRules(
         work_authorization='', requires_employer_support=False,
         tailoring_guidance=(
@@ -98,8 +98,7 @@ def test_override_does_not_give_other_candidates_local_work_rights(
     other_candidate.identity.visa_status = 'Valid German EU Blue Card'
     letter = TailoredCoverLetter(role_title='Analyst', company_name='Example',
                                 paragraphs=['First', 'Second', 'Third', 'Thank you.'])
-    with pytest.raises(ValueError, match='employer permit support'):
-        DocumentGenerator(None, other_candidate)._check_sponsorship_sentence(letter, 'India')
+    DocumentGenerator(None, other_candidate)._check_sponsorship_sentence(letter, 'India')
 
 
 def test_germany_preserves_existing_status(local_rights_profile):
@@ -112,6 +111,29 @@ def test_payment_brand_is_not_mistaken_for_a_visa_requirement(local_rights_profi
     DocumentGenerator(None, local_rights_profile)._check_country_override_wording(
         'Experience reporting on Visa card payments.', 'India',
     )
+
+
+@pytest.mark.parametrize('claim', [
+    'I hold a valid EU Blue Card issued by France and require employer support.',
+    'I hold a valid German EU Blue Card and a Green Card and require employer support.',
+    'I hold a valid German EU Blue Card and require no employer sponsorship.',
+])
+def test_overseas_support_policy_does_not_allow_other_claims(local_rights_profile, claim):
+    letter = TailoredCoverLetter(role_title='Analyst', company_name='Example',
+                                paragraphs=['First', 'Second', 'Third', claim])
+    with pytest.raises(ValueError, match='issuer|status|support'):
+        DocumentGenerator(None, local_rights_profile)._check_sponsorship_sentence(letter, 'Ireland')
+
+
+def test_explicit_support_override_can_apply_without_a_visa_status(analyst_profile):
+    analyst_profile.identity.visa_status = None
+    analyst_profile.rules = DeclaredRules(country_overrides={
+        'Canada': CountryApplicationRules(requires_employer_support=True),
+    })
+    letter = TailoredCoverLetter(role_title='Analyst', company_name='Example',
+                                paragraphs=['First', 'Second', 'Third',
+                                            'I would require employer support for a work permit.'])
+    DocumentGenerator(None, analyst_profile)._check_sponsorship_sentence(letter, 'Canada')
 
 
 @pytest.mark.parametrize('country', ['India', None])

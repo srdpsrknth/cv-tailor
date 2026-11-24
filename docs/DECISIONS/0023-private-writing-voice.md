@@ -28,6 +28,13 @@ The owner's personal reference excerpts, analysis and actual style file stay in
 the private store. The public repository contains only generic rules, code and
 synthetic tests. Existing applications are not overwritten or regenerated.
 
+Candidate policy uses a separate optional `candidate_guidance.json` with version 1
+`cv`, `cover_letter`, and `layout` lists. Each list is used only for its matching
+provider call. The cache key covers the effective instructions, and factual rules
+and country overrides retain precedence. The migration command reads the archived
+sources as data, verifies the current profile rules, and installs only the selected
+clauses. Generation reads the scoped sidecar directly.
+
 ## Verification boundary
 
 Tone cannot be certified by word counts, phrase tests or an AI detector. Use human

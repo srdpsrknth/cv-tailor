@@ -30,40 +30,15 @@ JOB-SPECIFIC TAILORING (required for every application)
 WRITING AND FACTUAL RULES
 - Country-specific application rules in the context take precedence over the generic
   work-authorization instructions below. Apply only the actual job country's rule.
-- Work authorization: the candidate holds a valid EU Blue Card issued by Germany
-  and requires employer support for the appropriate work authorization when taking
-  a role outside Germany. For clearly identified non-German job locations, set
-  work_authorization to "German EU Blue Card holder". Never mention sponsorship,
-  employer support, or work permit requirements anywhere in the CV; those belong
-  only in the cover letter.
-  For Germany or an unspecified/ambiguous work country, set it to null, retaining
-  the profile status. Infer country from the actual job location, not company HQ,
-  nationality, or a remote role's advertised markets. Do not imply EU-wide work
-  rights, automatic transfer, confirmed permit eligibility, or sponsorship exemption.
-  Keep immigration details out of the career summary and professional headline;
-  work_authorization is rendered separately alongside the headline.
+- Include work authorization only when supported by the profile and applicable to the actual job country. Do not imply rights or support requirements not established by the profile. Keep employer support requirements in the cover letter, not the CV.
 - No invented employers, titles, dates, tools, metrics, responsibilities, ownership,
   business outcomes, or completion status. Preserve exact job titles and dates.
 - Include every employer once, newest first, including older roles with no bullets.
 - Use plain, concrete language: action, scope, and supported impact. Avoid inflated
   claims such as "guaranteeing reliability", "enterprise architect", or "eliminating
   all errors" when the profile does not support them.
-- Aklamio does not use dbt; dbt belongs to previous roles and the skills section.
-  The candidate contributes to the approximately 80-table DQ framework and owns
-  funnel/sales-channel checks. Do not claim leadership of the entire framework.
-- Snowflake MCP integration and Claude-based dashboarding are developing work.
-  Use "Developing..." for these bullets, not "Built", "Delivered", or realized
-  cost savings. No claims about reduced BI licenses or deployed agents.
-- Do not claim Fivetran, DealCloud, AWS, or other job keywords absent from the profile.
-- Summary: one paragraph, roughly 35-45 words, about the breadth of the candidate's
-  experience rather than ambitions or a tool list. Avoid "Combines", "Builds",
-  "Aims", "passionate", and third-person present-tense descriptions.
-  Approved style:
-  "Senior analytics professional with experience across analytics engineering,
-  business intelligence, and growth analytics. Strong technical background in data
-  modeling, automation, and statistical analysis, supported by hands-on delivery
-  of reliable reporting, forecasting, and tools for business decision-making."
-  Adapt relevance only when supported; keep this factual, broad tone.
+- Preserve the profile’s factual ownership and ongoing-project status. Do not claim unverified tools, outcomes, or completed work.
+- Write a concise factual summary reflecting the candidate’s experience and the role.
 
 STRUCTURE AND LENGTH
 - The A4 renderer selects readable 10.5-11pt body typography with 9.5pt metadata,
@@ -75,21 +50,7 @@ STRUCTURE AND LENGTH
   concise, usually one or two lines, without arbitrary character-count restrictions.
 - Do not include every source project as a separate heading. Select or consolidate
   useful evidence. Never repeat the same achievement in both a role and a project.
-- Aklamio: target about 5-6 regular bullets on pipelines, orchestration, quality,
-  documentation, and developing MCP/dashboarding when the job relevance and page budget
-  support them. Exactly one selected project:
-  "Traffic Source & Customer Journey Attribution", with exactly three bullets:
-  implementation, safe rollout, and customer adoption/impact. Use the source's
-  72 brands and all customer success managers where relevant.
-- Fold Aklamio DQ, MCP, and dashboarding project details into normal role bullets.
-  No years, dates, "in progress", or release labels in project headings.
-- Use external vocabulary: traffic sources, customer journeys, business logic,
-  customer success managers. Avoid "Entrypoints v2", internal table names and la/int/dl.
-- Give NeoTaste, ecoligo, and heycar meaningful relevant detail. About 2-3 regular
-  bullets per role and 1-2 brief relevant projects are guides; select fewer when the
-  evidence is less relevant and do not add projects just to reach a count. Project
-  bullets can be one or two, except Aklamio's exactly three. Do not fabricate responsibilities for
-  ORMIT or Unilever, whose profile bullets are empty.
+- Follow the selected profile’s explicit project counts and factual constraints. Select the most relevant supported evidence without duplicating achievements.
 - Keep education and certifications. Use 3-4 compact skill categories with the
   most relevant EXISTING skills, not every available skill or target-job tool.
 - Keep all career roles even during length reduction. Shorten wording, remove

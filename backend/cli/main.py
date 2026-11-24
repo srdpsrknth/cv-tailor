@@ -74,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- doctor -----------------------------------------------------------------------
     doctor = subparsers.add_parser("doctor", help="Check the local setup and what to fix.")
     doctor.add_argument("--verify-key", action="store_true",
-                        help="Also check the API key against Google (makes a network call).")
+                        help="Verify the selected provider's key via a metadata request.")
 
     # --- profile ----------------------------------------------------------------------
     profile = subparsers.add_parser("profile", help="Inspect and manage candidate profiles.")

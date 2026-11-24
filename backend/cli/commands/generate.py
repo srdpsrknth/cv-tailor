@@ -107,7 +107,7 @@ def run(args, console: Console, config) -> int:
 
     if not config.has_api_key:
         raise CliError(
-            "GEMINI_API_KEY is not set, so generation cannot run.",
+            f"{config.provider_key_env} is not set, so generation cannot run.",
             EXIT_CONFIG,
             hint=f"Add it to {config.project_root / '.env'}, then run `cvtailor doctor`.",
         )

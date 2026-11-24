@@ -2,8 +2,7 @@
 
 These rules used to be hardcoded in the validator, which meant a second candidate was
 checked against the first candidate's employers and tool list (A-1). They are now data,
-resolved from the profile's optional ``rules`` block, with `DEFAULT_PROFILE_RULES`
-reproducing the original single-candidate behaviour exactly.
+resolved from the profile's optional ``rules`` block. Missing rules are neutral.
 """
 from __future__ import annotations
 
@@ -28,8 +27,7 @@ class ProfileRules:
     checked against the first candidate's employers and tool list (A-1). They are
     now data, resolved from the profile's optional ``rules`` block.
 
-    The defaults below reproduce the original single-candidate behaviour exactly, so
-    a profile that declares no rules validates as it always did.
+    An undeclared rule never inherits another candidate's policy.
     """
 
     #: Employers needing bespoke project/ownership rules, keyed by a lowercase match.
@@ -43,8 +41,8 @@ class ProfileRules:
 
     #: Immigration label for the CV, applied outside the home countries.
     visa_label: Optional[str] = None
-    home_countries: tuple = ("germany", "deutschland", "de")
-    local_permit_countries: tuple = ("ireland", "denmark")
+    home_countries: tuple = ()
+    local_permit_countries: tuple = ()
     country_overrides: dict = field(default_factory=dict)
 
     def country_override(self, country: Optional[str]) -> Optional[dict]:
@@ -55,11 +53,7 @@ class ProfileRules:
 
     @classmethod
     def from_profile(cls, profile: Profile) -> "ProfileRules":
-        """Resolve rules for a profile, falling back to the original defaults.
-
-        A profile with no ``rules`` block gets :data:`DEFAULT_PROFILE_RULES`, which
-        keeps every previously-working profile and fixture behaving identically.
-        """
+        """Resolve the selected profile's rules, or neutral defaults."""
         declared = getattr(profile, "rules", None)
         if declared is None:
             return DEFAULT_PROFILE_RULES
@@ -87,27 +81,8 @@ def _employer_rules_to_dict(rules) -> dict:
         if value is not None
     }
 
-#: The original candidate's rules, preserved as the default so behaviour is unchanged.
-#: A profile may override any part of this by declaring its own ``rules`` block.
-DEFAULT_PROFILE_RULES = ProfileRules(
-    special_employers={
-        "aklamio": {
-            "project_count": 1,
-            "bullets_per_project": 3,
-            "forbidden_project_name": r"entrypoints|in progress|20\d{2}",
-            "ongoing_tool": "MCP",
-            "ownership_pattern": r"\b(lead|led|own|owned)\b[^.]{0,50}(framework|80)",
-            "ownership_message": (
-                "Aklamio DQ framework is a contribution; ownership is limited to "
-                "funnel/sales-channel checks."
-            ),
-        },
-    },
-    banned_tools=("Fivetran", "Databricks", "Tableau", "ThoughtSpot", "DealCloud",
-                  "Cortex", "AWS"),
-    summary_forbidden_verbs=r"\b(combines|builds|aims|passionate|dedicated to)\b",
-    visa_label="German EU Blue Card holder",
-)
+# Compatibility name for callers that explicitly request candidate-neutral rules.
+DEFAULT_PROFILE_RULES = ProfileRules()
 
 def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     """Check a CV against the profile and the candidate-specific rules."""
@@ -167,22 +142,14 @@ def _apply_employer_rules(exp, rules: ProfileRules) -> None:
             continue
         expected_projects = employer_rules.get("project_count")
         bullets_each = employer_rules.get("bullets_per_project")
-        if expected_projects is not None:
-            if len(exp.projects) != expected_projects or any(
-                len(p.bullets) != bullets_each for p in exp.projects
-            ):
-                raise ValueError(
-                    f"{exp.company} must have {expected_projects} attribution project(s) "
-                    f"with exactly {bullets_each} bullets each; fold other projects into "
-                    "role bullets."
-                )
+        if expected_projects is not None and len(exp.projects) != expected_projects:
+            raise ValueError(f"{exp.company} must have exactly {expected_projects} project(s).")
+        if bullets_each is not None and any(len(p.bullets) != bullets_each for p in exp.projects):
+            raise ValueError(f"{exp.company} projects must have exactly {bullets_each} bullets each.")
         if exp.projects:
             forbidden = employer_rules.get("forbidden_project_name")
-            if forbidden and re.search(forbidden, exp.projects[0].name, re.I):
-                raise ValueError(
-                    "Use a clear external attribution project name without dates or "
-                    "status labels."
-                )
+            if forbidden and any(re.search(forbidden, project.name, re.I) for project in exp.projects):
+                raise ValueError("Use a project name that follows the profile's naming rules.")
     _validate_employer_prose_rules(exp.bullets, rules, company_filter=exp.company)
 
 def _validate_summary(cv: TailoredCV, rules: ProfileRules) -> None:

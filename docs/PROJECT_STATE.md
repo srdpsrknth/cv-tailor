@@ -6,6 +6,68 @@
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
+## Private policy capture verified (2026-11-24)
+
+The existing private profile explicitly declares its effective validation rules,
+including both country lists. The absent country overrides currently resolve to
+an empty mapping. The profile has an existing private writing-style file. The
+resolved rules matched the pre-cutover shared defaults; profile facts were preserved.
+
+`scripts/capture_candidate_policy.py` creates a private, no-overwrite backup
+and archives the effective rules and current CV, letter, context and retry
+instructions for the later migration. The sidecar is an archive and is not read
+by generation. Synthetic tests cover preservation, no overwrite and retry after
+failed publication. The owner ran the command. The private snapshot contains
+all five expected policy sections, and the profile and writing-style backups
+match the active files byte for byte.
+
+**1C cutover:** `services.candidate_guidance` reads optional version 1 guidance
+for the selected store profile, with separate CV, letter, and layout fields.
+Absent guidance is neutral, malformed guidance fails validation, and loose
+profile paths do not inherit store guidance. The loader rejects cross-profile
+filesystem aliases. Generation sends each field only on its corresponding call
+and includes the effective guidance in the paired generation cache key.
+
+`scripts/migrate_candidate_guidance.py` converts the recognized private archive
+to the scoped sidecar. Its read-only `--check` passed against the actual private
+archive and current profile. The owner installed the sidecar and the read-only
+check confirmed the installation matches the archive. Offline checks verified
+that all extracted clauses reach their corresponding provider calls after the
+cutover and that the installed profile retains its authorization behavior for
+the home-country and two overseas cases. Shared drafts, validation defaults,
+and layout retry requirements are now candidate-neutral. The authorization gate
+checks raw CV labels before normalization and letter claims against the active
+profile and country policy. All 13 original isolation regressions now pass.
+The non-TeX suite passed 1,370 tests with 3 skipped. The full suite passed
+1,373 tests and reproduced the baseline's 36 rendering failures and 11 setup
+errors under the MiKTeX registry restriction.
+
+**Next action:** commit the verified development changes. The roadmap then
+sequences CV content and layout before the private-store sync pilot.
+
+The linked worktree Git index remains outside the writable sandbox.
+
+## Candidate isolation and provider setup (2026-11-24)
+
+Synthetic candidate isolation coverage is in `tests/test_candidate_isolation.py`.
+It exercises neutral defaults, per-profile draft and retry rules, and rejection
+of unsupported work-authorization claims. The tests use synthetic profiles.
+
+Generation, `doctor`, `check_setup.py` and GUI diagnostics now check the
+selected provider's credential. `doctor --verify-key` uses provider metadata.
+OpenRouter reports the per-key spending limit remaining when available. Native
+Gemini remains opt-in. A synthetic Windows setup check passed with a fake
+OpenRouter credential and no usable Gemini key. Network verification and
+CLI generation were covered with stubs and no live credentials or paid calls.
+
+**Provider setup verification before the cutover:** 1,320 passed, 3 skipped and
+13 expected failures in the non-TeX run. The full Windows run reproduced 36 rendering
+failures and 11 setup errors under the MiKTeX registry restriction. A real
+one-page CV smoke test passed with the portable MiKTeX configuration.
+
+The linked worktree's Git metadata is outside the writable checkout. Staging
+failed at `index.lock`, so these changes still need to be committed.
+
 ## Select and save CV layouts (2026-11-24)
 
 **New application → CV page layout** offers Automatic and Balanced page breaks.

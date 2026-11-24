@@ -199,7 +199,9 @@ def test_a_delta_that_breaks_a_profile_rule_is_rejected(
     anything into a bullet -- so the summary rule, the thesis of this increment, is
     checked on a *merged* document, not only on a whole response.
     """
-    # The fixture profile forbids third-person verbs in the summary.
+    from models.profile import ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(summary_forbidden_verbs=r'\bcombines\b')
+    # The selected profile forbids this verb in the summary.
     forbidden = ['Analytical engineer combines warehouse modelling and reporting.']
     accepted = {
         'experience[0].bullets': ['Own batch pipelines from ingestion to reporting.'],
@@ -386,12 +388,14 @@ def test_a_bullet_that_claims_a_banned_tool_is_rejected_on_the_delta_path(
 ):
     """The validity checks that matter survive a delta.
 
-    The fixture profile bans several tools (``aws`` among them). A delta bullet that
-    claims one must be rejected by the gate, not merged in.
+    The selected profile explicitly bans a tool. A delta bullet that claims it
+    must be rejected by the gate, not merged in.
 
     Note the word boundary in the validator: "AWSome" is a substring, not the tool, so
     it is (correctly) not a claim. The delta has to say "AWS" as a word.
     """
+    from models.profile import ProfileRules as DeclaredRules
+    analyst_profile.rules = DeclaredRules(banned_tools=['AWS'])
     bad_delta = {
         'experience[1].bullets[0]': 'Migrated the reporting models to AWS.',
     }
@@ -467,7 +471,9 @@ def test_the_retry_brief_keeps_every_constraint_the_old_instruction_carried(
     skills, never shrink the font, never complete ongoing work, do not remove fields.
     Each is asserted in the text that is actually built.
     """
-    rules = generation.ProfileRules.from_profile(analyst_session.profile)
+    rules = generation.ProfileRules(special_employers={
+        'acme': {'project_count': 2, 'bullets_per_project': 3},
+    })
     current = draft_cv(analyst_session)
     instruction = generation.layout_retry_instruction(current, 3, 650, 0, rules)
 
@@ -475,17 +481,11 @@ def test_the_retry_brief_keeps_every_constraint_the_old_instruction_carried(
                    'font', 'ongoing', 'removing a field', 'rename', 'achievement', 'metric'):
         assert needle in instruction, f'the retry instruction lost {needle!r}'
 
-    # The project constraint is derived from the *profile's* rules, not hardcoded. This
-    # fixture declares no ``rules`` block, so it inherits DEFAULT_PROFILE_RULES (the
-    # pre-existing single-candidate behaviour) -- and therefore the Aklamio clause. The
-    # negative half: a profile whose own rules declare no project shape gets no clause.
-    assert generation.pinned_project_clause(rules) == generation.pinned_project_clause(
-        generation.DEFAULT_PROFILE_RULES
-    )
-    assert 'Aklamio' in instruction and 'three concise bullets' in instruction
+    # The selected profile controls its project and bullet counts.
+    assert '2 project(s) for Acme' in instruction and '3 bullets in each Acme' in instruction
     assert generation.pinned_project_clause(
         generation.ProfileRules(special_employers={'acme': {'project_count': 2}})
-    ).strip().startswith('Keep one Acme')
+    ).strip().startswith('Keep exactly 2 project(s) for Acme')
     assert generation.pinned_project_clause(generation.ProfileRules()) == ''
 
 

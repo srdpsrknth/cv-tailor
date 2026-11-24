@@ -2,6 +2,15 @@
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
 
+`tests/test_candidate_isolation.py` uses synthetic profiles to verify neutral
+defaults, isolated prompt and retry guidance, and rejection of unsupported
+work-authorization claims. All original isolation cases now run as regular tests.
+
+`tests/test_migrate_candidate_guidance.py` covers capture recognition, private
+publication, conflicts, and retries. `tests/test_candidate_guidance.py` replays
+the offline generation flow to verify CV, letter, and layout scope, cache
+invalidation, and identical prompts when migrated clauses are already present.
+
 **First product milestone (2026-11-24).** `test_ui_review.py` exercises automatic
 navigation after generation, recent application buttons, candidate-scoped URL restoration,
 partial downloads and revision-scoped PDF check reuse. `test_application_review.py` covers
@@ -805,10 +814,10 @@ validators before being written):
 | Document output validation | Yes (skips without LaTeX) | No |
 | **LLM quality evaluation** | **No — opt-in** | **Yes, budget-capped** |
 
-`cvtailor generate` is the only tested entry point whose *success* path needs a paid call, so
-its tests cover only the failure paths; the pipeline beneath it is covered offline through
-recorded responses. `cvtailor doctor` verifies the API key against Google only with
-`--verify-key`; the default run never touches the network, and a test asserts that.
+The generation pipeline is covered offline through recorded responses. CLI credential
+regressions use a stubbed generation service and test OpenRouter-only setup and
+provider-specific failures. `cvtailor doctor` checks the selected provider locally by
+default. `--verify-key` explicitly contacts that provider, and tests mock those calls.
 
 Keep deterministic software testing and LLM quality evaluation strictly separate. CI
 (`.github/workflows/tests.yml`) must never require a paid API call.

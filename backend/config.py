@@ -43,6 +43,18 @@ DEFAULT_PROVIDER = "openrouter"
 #: change the response contract underneath the caller.
 KNOWN_PROVIDERS = ("gemini", "openrouter")
 
+PROVIDER_KEY_SETTINGS = {
+    "gemini": ("api_key", "GEMINI_API_KEY"),
+    "openrouter": ("openrouter_api_key", "OPENROUTER_API_KEY"),
+}
+
+
+def configured_provider_key(config, provider_name: str) -> str:
+    """Read a provider's credential without accepting example values."""
+    field, env_var = PROVIDER_KEY_SETTINGS[provider_name]
+    key = (getattr(config, field, None) or "").strip()
+    return "" if key == f"your_{env_var.lower()}_here" else key
+
 #: Tasks that may have their own model, and the environment variable suffix for
 #: each. Model-per-task routing (ADR 0005) exists so a cheap model can serve
 #: routine work while document writing keeps the stronger one.
@@ -75,7 +87,7 @@ class Config:
     #: An explicit profile file, bypassing the store. Only ever set by a caller that
     #: named a file on purpose (``--profile <path>``, tests). It is never inferred.
     profile_path: Optional[Path] = None
-    #: Which provider implementation to speak to (ADR 0005). ``gemini`` by default.
+    #: Which provider implementation to speak to (ADR 0005).
     provider: str = DEFAULT_PROVIDER
     #: Key for the OpenRouter provider. Separate from ``api_key`` because the two
     #: providers are authenticated independently and neither substitutes for the
@@ -275,6 +287,11 @@ class Config:
         """The configured provider's name, normalised."""
         return (self.provider or DEFAULT_PROVIDER).strip().lower()
 
+    @property
+    def provider_key_env(self) -> str:
+        """Environment variable for the selected provider's credential."""
+        return PROVIDER_KEY_SETTINGS[self.provider_name][1]
+
     def require_provider_key(self) -> str:
         """Return the API key for the **selected** provider, or fail closed.
 
@@ -282,15 +299,14 @@ class Config:
         the other, so selecting OpenRouter without its key is an error rather than
         a silent attempt to use the Gemini key.
         """
-        if self.provider_name == "openrouter":
-            if not self.openrouter_api_key:
-                raise ConfigError(
-                    "OPENROUTER_API_KEY is not set. Add it to .env "
-                    f"({self.project_root / '.env'}) or pass --api-key. "
-                    "Run `cvtailor doctor` to check your setup."
-                )
-            return self.openrouter_api_key
-        return self.require_api_key()
+        key = configured_provider_key(self, self.provider_name)
+        if not key:
+            raise ConfigError(
+                f"{self.provider_key_env} is not set. Add it to .env "
+                f"({self.project_root / '.env'}). "
+                "Run `cvtailor doctor` to check your setup."
+            )
+        return key
 
     # --- optional budget cap ----------------------------------------------------------
 
@@ -351,12 +367,8 @@ class Config:
 
     @property
     def has_api_key(self) -> bool:
-        """True when a usable-looking API key is configured.
-
-        This is a presence check, never a network call: the key is not verified
-        against Google unless the caller explicitly asks for that.
-        """
-        return bool(self.api_key) and self.api_key != "your_gemini_api_key_here"
+        """Check for a usable-looking key for the selected provider, offline."""
+        return bool(configured_provider_key(self, self.provider_name))
 
     @property
     def is_mirroring(self) -> bool:
@@ -364,14 +376,8 @@ class Config:
         return self.outputs_dir != (self.project_root / "outputs").resolve()
 
     def require_api_key(self) -> str:
-        """Return the API key, or explain how to set it."""
-        if not self.has_api_key:
-            raise ConfigError(
-                "GEMINI_API_KEY is not set. Add it to .env "
-                f"({self.project_root / '.env'}) or pass --api-key. "
-                "Run `cvtailor doctor` to check your setup."
-            )
-        return self.api_key
+        """Return the selected provider's key, or explain how to set it."""
+        return self.require_provider_key()
 
 
 #: Environment variables that name a model, per provider. ``GEMINI_MODEL`` is

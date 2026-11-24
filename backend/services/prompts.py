@@ -77,7 +77,7 @@ def build_context(
             + "\nApply only the actual employment country's override (ISO country keys). "
             "An empty work_authorization means suppress the CV immigration label, "
             "not fall back to the profile status. If requires_employer_support is false, "
-            "omit Blue Card, visa, permit and sponsorship wording from both documents. "
+            "omit immigration status and sponsorship wording from both documents. "
             "Follow tailoring_guidance using only profile-backed experience; do not invent "
             "international clients, leadership, outcomes, or relocation availability.\n"
         )
@@ -107,6 +107,19 @@ EDITORIAL_REQUIREMENTS = (
     "- Treat the approved summary as a style reference, not mandatory identical wording.\n"
     "- Preserve work history and factual metrics exactly.\n"
 )
+
+def candidate_guidance_block(instructions: tuple[str, ...], *, existing: str = "") -> str:
+    """Render one guidance section for its matching provider call."""
+    additions = tuple(instruction for instruction in instructions if instruction not in existing)
+    if not additions:
+        return ""
+    return (
+        "\nCANDIDATE-SPECIFIC GUIDANCE\n"
+        + "\n".join(f"- {instruction}" for instruction in additions)
+        + "\nApply only guidance consistent with the profile facts, applicable country rules, "
+        "and output requirements.\n"
+    )
+
 
 def build_cv_prompt(prompt_text: str, context: str) -> str:
     """The CV prompt: the prompt file, the editorial requirements, then the context.
@@ -146,14 +159,16 @@ def pinned_project_clause(rules: ProfileRules) -> str:
     Derived from ``rules`` rather than hardcoded, so a second candidate is not told
     to keep an employer's project shape it does not have.
     """
+    clauses = []
     for needle, employer_rules in rules.special_employers.items():
-        expected_projects = employer_rules.get("project_count")
-        if expected_projects:
-            return (
-                f" Keep one {needle.capitalize()} attribution project with three concise "
-                "bullets; other projects can be summarized in role bullets."
-            )
-    return ""
+        projects = employer_rules.get("project_count")
+        bullets = employer_rules.get("bullets_per_project")
+        employer = needle.capitalize()
+        if projects is not None:
+            clauses.append(f" Keep exactly {projects} project(s) for {employer}.")
+        if bullets is not None:
+            clauses.append(f" Keep exactly {bullets} bullets in each {employer} project.")
+    return "".join(clauses)
 
 #: Marks a retry prompt. Deliberately not ``LAYOUT CORRECTION``: that string identified
 #: the old, whole-document contract, and a test must be able to tell the two apart.
@@ -198,7 +213,8 @@ def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
     )
 
 def layout_retry_instruction(
-    cv: TailoredCV, page_count: int, budget: int, attempt: int, rules: ProfileRules
+    cv: TailoredCV, page_count: int, budget: int, attempt: int, rules: ProfileRules,
+    *, guidance: str = "",
 ) -> str:
     """The targeted brief for one layout retry.
 
@@ -210,8 +226,8 @@ def layout_retry_instruction(
     * the complete-CV shape is still accepted, so a model that ignores the delta is not
       a failure -- it is simply as expensive as before.
 
-    The context (profile, job description, prompt file) is deliberately absent: it was
-    sent on the draft call, and repeating it is what this brief removes.
+    The profile, job description, and draft prompt stay out of this brief.
+    Only guidance scoped to layout is included alongside the current CV.
 
     The ``LAYOUT RETRY`` marker leads the brief so a retry is identifiable on its own.
     """
@@ -229,6 +245,7 @@ def layout_retry_instruction(
         "rather than removing a field. Do not rename, re-employer, re-date, remove an "
         "achievement or a metric, or drop a supporting claim.\n"
         + layout_inventory(cv, attempt + 1)
+        + guidance
         + '\nReturn either the complete shorter CV JSON, or a delta object of only the '
         'units that change, e.g. {"summary": [...], "experience[0].bullets[1]": '
         '"shorter text"}. Units not returned are kept unchanged. '

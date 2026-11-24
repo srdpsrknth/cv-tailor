@@ -1,8 +1,8 @@
 """CLI smoke tests.
 
-Every test here is offline: ``doctor`` never contacts Google unless
-``--verify-key`` is passed, ``render`` makes no API call at all, and
-``generate`` is only exercised on its failure paths (no key configured).
+Every test here is offline: ``doctor`` only attempts provider access with
+``--verify-key`` and a mocked client, ``render`` makes no API call at all, and
+``generate`` uses a mocked service when a key is configured.
 
 Commands are called through :func:`cli.main.main` with an explicit argv, so the
 tests cover the real parsing and dispatch rather than a reimplementation.
@@ -19,8 +19,10 @@ than assumed.
 from __future__ import annotations
 
 import json
+import runpy
 import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -44,7 +46,7 @@ def no_api_key(monkeypatch):
     """
     import config as config_module
 
-    for name in ('GEMINI_API_KEY', 'OPENROUTER_API_KEY'):
+    for name in ('GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'CVTAILOR_PROVIDER'):
         monkeypatch.delenv(name, raising=False)
     # `load_dotenv(candidate)` is the only step that reads the file; making it a no-op
     # leaves every other part of `from_env` under test.
@@ -124,19 +126,103 @@ def test_doctor_json_is_valid_and_lists_checks(capsys):
     assert {c['status'] for c in payload['checks']} <= {'ok', 'warn', 'fail'}
 
 
-def test_doctor_does_not_verify_the_key_unless_asked(monkeypatch, capsys):
+def test_doctor_does_not_verify_the_key_unless_asked(no_api_key, monkeypatch, capsys):
     """The default doctor must never make a network call."""
-    import cli.commands.doctor as doctor
+    request = Mock(side_effect=AssertionError('unexpected network call'))
+    monkeypatch.setattr('requests.get', request)
+    monkeypatch.setattr('google.genai.Client', request)
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test-router-key')
 
-    called = []
+    main(['--json', 'doctor'])
 
-    def explode(*args, **kwargs):
-        called.append(True)
-        raise AssertionError('doctor contacted Google without --verify-key')
+    check = _doctor_key_check(capsys)
+    assert check['status'] == 'ok'
+    assert 'not verified' in check['detail']
+    assert 'test-router-key' not in str(check)
+    request.assert_not_called()
 
-    monkeypatch.setattr(doctor, 'check_api_key', lambda config, verify=False: doctor.Check('api key', 'ok'))
-    main(['doctor'])
-    assert not called
+
+def _doctor_key_check(capsys):
+    result = json.loads(capsys.readouterr().out)
+    return next(check for check in result['checks'] if check['check'] == 'api key')
+
+
+def test_doctor_verifies_openrouter_via_metadata(no_api_key, monkeypatch, capsys):
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test-router-key')
+    response = Mock()
+    response.status_code = 200
+    response.json.return_value = {'data': {'limit_remaining': 3.25, 'label': 'test-router-key'}}
+    request = Mock(return_value=response)
+    monkeypatch.setattr('requests.get', request)
+
+    main(['--json', 'doctor', '--verify-key'])
+
+    check = _doctor_key_check(capsys)
+    assert check['status'] == 'ok'
+    assert '$3.25' in check['detail']
+    assert 'test-router-key' not in str(check)
+    assert request.call_args.args == ('https://openrouter.ai/api/v1/key',)
+    assert request.call_args.kwargs['headers'] == {'Authorization': 'Bearer test-router-key'}
+
+
+def test_doctor_redacts_provider_exceptions(no_api_key, monkeypatch, capsys):
+    from requests import RequestException
+
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test-router-key')
+    request = Mock(side_effect=RequestException('test-router-key'))
+    monkeypatch.setattr('requests.get', request)
+
+    assert main(['--json', 'doctor', '--verify-key']) == 1
+
+    check = _doctor_key_check(capsys)
+    assert check['status'] == 'fail'
+    assert 'test-router-key' not in str(check)
+    assert 'OPENROUTER_API_KEY' in check['fix']
+    request.assert_called_once()
+
+
+def test_doctor_reports_openrouter_rejection_without_reading_the_body(no_api_key, monkeypatch, capsys):
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test-router-key')
+    response = Mock(status_code=401)
+    monkeypatch.setattr('requests.get', Mock(return_value=response))
+
+    assert main(['--json', 'doctor', '--verify-key']) == 1
+
+    check = _doctor_key_check(capsys)
+    assert check['status'] == 'fail'
+    assert 'HTTP 401' in check['detail']
+    response.json.assert_not_called()
+
+
+def test_doctor_verifies_native_gemini_without_generating(no_api_key, monkeypatch, capsys):
+    monkeypatch.setenv('CVTAILOR_PROVIDER', 'gemini')
+    monkeypatch.setenv('GEMINI_API_KEY', 'test-gemini-key')
+    monkeypatch.setenv('CVTAILOR_MODEL', 'gemini-test-model')
+    client = Mock()
+    factory = Mock(return_value=client)
+    monkeypatch.setattr('google.genai.Client', factory)
+
+    main(['--json', 'doctor', '--verify-key'])
+
+    check = _doctor_key_check(capsys)
+    assert check['status'] == 'ok'
+    assert 'gemini-test-model' in check['detail']
+    assert 'test-gemini-key' not in str(check)
+    factory.assert_called_once_with(api_key='test-gemini-key')
+    client.models.get.assert_called_once_with(model='gemini-test-model')
+    client.models.generate_content.assert_not_called()
+
+
+def test_setup_script_forwards_verify_key(monkeypatch):
+    call = Mock(return_value=0)
+    monkeypatch.setattr('subprocess.call', call)
+    monkeypatch.setattr(sys, 'argv', ['check_setup.py', '--verify-key'])
+
+    with pytest.raises(SystemExit) as result:
+        runpy.run_path(str(ROOT / 'scripts' / 'check_setup.py'), run_name='__main__')
+
+    assert result.value.code == 0
+    assert call.call_args.args[0][2:] == ['doctor', '--verify-key']
 
 
 def test_doctor_fails_when_the_profile_is_missing(tmp_path, capsys, monkeypatch):
@@ -287,13 +373,49 @@ def test_render_page_count_matches_the_existing_script(tmp_path, monkeypatch, no
     assert cli_pdfs == script_pdfs, f'page counts differ: {cli_pdfs} vs {script_pdfs}'
 
 
-# --- generate (failure paths only; never calls the API) -------------------------------
+# --- generate (offline) ---------------------------------------------------------------
+
+@pytest.mark.parametrize('provider', ['openrouter', 'gemini'])
+def test_generate_accepts_only_the_selected_key(no_api_key, monkeypatch, capsys, provider):
+    from services import tailor_service
+
+    monkeypatch.setenv('CVTAILOR_PROVIDER', provider)
+    monkeypatch.setenv(f'{provider.upper()}_API_KEY', 'selected-test-key')
+    generate = Mock()
+    generate.return_value.model_dump.return_value = {'job_id': 'offline'}
+    monkeypatch.setattr(tailor_service, 'tailor_documents', generate)
+
+    assert main(['--json', 'generate', '--job', 'x' * 200]) == 0
+
+    generate.assert_called_once()
+    assert generate.call_args.kwargs['config'].require_provider_key() == 'selected-test-key'
+    assert json.loads(capsys.readouterr().out) == {'job_id': 'offline'}
+
+
+@pytest.mark.parametrize('provider', ['openrouter', 'gemini'])
+def test_cli_ignores_the_other_providers_key(no_api_key, monkeypatch, capsys, provider):
+    selected = f'{provider.upper()}_API_KEY'
+    other = 'GEMINI_API_KEY' if provider == 'openrouter' else 'OPENROUTER_API_KEY'
+    monkeypatch.setenv('CVTAILOR_PROVIDER', provider)
+    monkeypatch.setenv(other, 'other-provider-test-key')
+    generate = Mock(side_effect=AssertionError('unexpected paid generation'))
+    monkeypatch.setattr('services.tailor_service.tailor_documents', generate)
+
+    assert main(['generate', '--job', 'x' * 200]) == 3
+    error = capsys.readouterr().err
+    assert selected in error and other not in error
+    generate.assert_not_called()
+
+    assert main(['--json', 'doctor']) == 1
+    check = _doctor_key_check(capsys)
+    assert check['status'] == 'fail'
+    assert selected in check['detail'] and other not in check['detail']
 
 def test_generate_without_an_api_key_fails_with_a_fix(no_api_key, capsys):
     code = main(['generate', '--job', 'x' * 200])
     assert code != 0
     err = capsys.readouterr().err
-    assert 'GEMINI_API_KEY' in err
+    assert 'OPENROUTER_API_KEY' in err
     assert '.env' in err
 
 
@@ -320,7 +442,7 @@ def test_generate_accepts_a_job_file_path(no_api_key, tmp_path, capsys):
     code = main(['generate', '--job-file', str(job)])
 
     assert code != 0
-    assert 'GEMINI_API_KEY' in capsys.readouterr().err
+    assert 'OPENROUTER_API_KEY' in capsys.readouterr().err
 
 
 @pytest.mark.parametrize('source', ['inline', 'file', 'stdin'])
@@ -352,11 +474,11 @@ def test_generate_rejects_a_command_as_the_posting(
     assert main(argv) == 2
     error = capsys.readouterr().err
     assert 'command' in error.lower() and 'clipboard' in error.lower()
-    assert 'GEMINI_API_KEY' not in error
+    assert 'OPENROUTER_API_KEY' not in error
 
 
 def test_a_posting_can_mention_the_cli_below_its_title(no_api_key, capsys):
     posting = ('Python Engineer\nMaintain our internal application tooling.\n'
                'Example: python cvtailor.py generate --job-file posting.txt')
     assert main(['generate', '--job', posting]) == 3
-    assert 'GEMINI_API_KEY' in capsys.readouterr().err
+    assert 'OPENROUTER_API_KEY' in capsys.readouterr().err

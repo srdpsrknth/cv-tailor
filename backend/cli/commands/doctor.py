@@ -7,6 +7,7 @@ network verification is opt-in via ``--verify-key``.
 """
 from __future__ import annotations
 
+import math
 import shutil
 import sys
 from pathlib import Path
@@ -183,23 +184,63 @@ def check_pdflatex() -> Check:
 
 
 def check_api_key(config, verify: bool = False) -> Check:
+    provider = config.provider_name
+    env_var = config.provider_key_env
     if not config.has_api_key:
         return Check(
-            "api key", FAIL, "GEMINI_API_KEY is not set",
-            f"Add GEMINI_API_KEY to {config.project_root / '.env'} (never commit it).",
+            "api key", FAIL, f"{env_var} is not set",
+            f"Add {env_var} to {config.project_root / '.env'} (never commit it).",
         )
     if not verify:
-        return Check("api key", OK, f"present; model={config.model} (not verified)")
-    # Opt-in live check. This is the only code path that may contact Google.
+        return Check("api key", OK, f"{provider} key present; model={config.model} (not verified)")
+
+    key = config.require_provider_key()
+    fix = f"Check {env_var} in .env and confirm the provider is reachable."
+    if provider == "openrouter":
+        return _check_openrouter_key(key, fix)
+
     try:
         from google import genai
 
-        client = genai.Client(api_key=config.api_key)
-        client.models.generate_content(model=config.model, contents="ping")
-    except Exception as error:
-        return Check("api key", FAIL, f"rejected by Google: {error}",
-                     "Check the key and GEMINI_MODEL in .env.")
-    return Check("api key", OK, f"verified against Google; model={config.model}")
+        client = genai.Client(api_key=key)
+        try:
+            client.models.get(model=config.model)
+        finally:
+            client.close()
+    except Exception:
+        # Provider exceptions can include credentials or request metadata.
+        return Check("api key", FAIL, "Gemini model metadata verification failed",
+                     f"{fix} Check the configured Gemini model name.")
+    return Check("api key", OK, f"verified with Gemini model metadata; model={config.model}")
+
+
+def _check_openrouter_key(key: str, fix: str) -> Check:
+    from requests import RequestException, get
+
+    try:
+        response = get(
+            "https://openrouter.ai/api/v1/key",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=10,
+            allow_redirects=False,
+        )
+        if response.status_code != 200:
+            return Check("api key", FAIL, f"OpenRouter key check returned HTTP {response.status_code}", fix)
+        payload = response.json()
+    except (RequestException, ValueError):
+        return Check("api key", FAIL, "OpenRouter key metadata verification failed", fix)
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return Check("api key", FAIL, "OpenRouter returned invalid key metadata", fix)
+
+    detail = "verified with OpenRouter key metadata"
+    remaining = data.get("limit_remaining")
+    if type(remaining) in (int, float) and math.isfinite(remaining):
+        detail += f"; key limit remaining: ${remaining:.2f}"
+    elif "limit_remaining" in data and remaining is None:
+        detail += "; no per-key limit reported"
+    return Check("api key", OK, detail)
 
 
 def run(args, console: Console, config) -> int:

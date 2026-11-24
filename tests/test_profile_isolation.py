@@ -167,6 +167,9 @@ def test_candidate_specific_rules_are_not_borrowed_across_profiles(
 ):
     """A-1 held per profile: each candidate's own rules apply, not the other's."""
     from services.generation import ProfileRules
+    from models.profile import ProfileRules as DeclaredRules
+
+    analyst_profile.rules = DeclaredRules(banned_tools=['Synthetic Tool'], visa_label='Synthetic Permit')
 
     a_rules = ProfileRules.from_profile(analyst_profile)
     b_rules = ProfileRules.from_profile(marketer_profile)

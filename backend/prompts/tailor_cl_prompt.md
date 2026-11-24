@@ -25,22 +25,9 @@ Do not include salutation, sign-off, candidate name, phone, email, or contact de
 paragraphs. The template adds the sender block, date, recipient, subject, salutation,
 closing line, and signature separately.
 
-1. Open warmly and naturally using the posting's own language for the role's core
-   purpose. Name a relevant part of the stack only when it is supported by the profile
-   and adds meaning to the opening
-   (for example, "I am excited to apply for the <Role> role at <Company>." followed by
-   connecting your background in dbt, BigQuery, or warehouse modeling to turning
-   business logic into tested models rather than ad-hoc reports). Connect naturally
-   without using a colon. Avoid compressed skills summaries or invented company praise.
-2. Develop the strongest example mapped to the posting's top priority (such as layered SQL modeling,
-   automated quality tests, safe releases, attribution, or forecasting). Choose the
-   profile evidence that fits this specific role rather than defaulting to the same
-   project for every application. Preserve exact scope, collaboration, and ongoing
-   status; never upgrade a contribution into sole ownership.
-3. Develop a second complementary example from the profile, where useful, covering
-   another priority of the posting (for example,
-   building a BigQuery and dbt pipeline from scratch, moving logic out of spreadsheets,
-   or enabling stakeholder self-service). Omit unsupported requirements.
+1. Open naturally with the role’s purpose and the candidate’s supported interest.
+2. Explain a relevant profile-backed example, preserving scope and collaboration.
+3. Explain a complementary supported example where useful.
 4. Connect one remaining practical priority, such as documentation habits or
    collaboration across technical and business teams,
    add the overseas work-authorization sentence below if and only if required, and close
@@ -58,22 +45,7 @@ without employer support, omit immigration and sponsorship wording and use the
 country-specific tailoring guidance instead. Never infer those rights from nationality
 or previous work locations that the profile does not explicitly confirm.
 
-Otherwise, for a clearly identified role outside Germany, include one concise sentence in
-paragraph four: the candidate holds a valid German-issued EU Blue Card and will
-require employer support for the destination's appropriate work authorization.
-For a participating EU country, say "I hold a valid EU Blue Card issued by Germany
-and would require employer support for the appropriate work authorization in [country]."
-Do not claim automatic transfer, confirmed eligibility, or existing local work rights.
-Ireland and Denmark do not participate in the EU Blue Card scheme: use "employment
-permit" rather than a local Blue Card. For Ireland, use "I hold a valid German EU Blue
-Card and would require employer support for an Irish employment permit."
-Do not assert Critical Skills eligibility without checking the actual job and current
-official requirements. For other countries, use neutral "local work authorization"
-wording unless a specific route has been verified.
-For Germany or an ambiguous/unspecified work country, NEVER mention a visa label,
-EU Blue Card, work permit, or sponsorship requirement in the cover letter. Infer the
-work country from job location, not employer headquarters. Include the overseas sentence
-within the four-paragraph, 290-310-word budget rather than appending an extra paragraph.
+Discuss work authorization or employer support only when the selected profile and applicable country policy establish those facts. Do not infer status, requirements, or eligibility. Follow any explicit country-specific rules.
 
 VOICE AND EDITORIAL CHECK
 Use first-person prose that sounds like a capable colleague talking naturally about their
@@ -101,16 +73,7 @@ Make the requirement-to-example connection clear, explain the candidate's own ac
 and the practical result, and leave unsupported or materially unmatched requirements
 out rather than filling space with a tool list. Do not invent a gap explanation unless
 it is useful and supported by the profile.
-Do not fabricate tools, metrics, stakeholder teams, architecture ownership, financial
-industry credentials, or achieved outcomes from ongoing work. Aklamio does not use dbt;
-earlier roles do. The candidate contributes to the approximately 80-table DQ framework,
-owns funnel/sales-channel checks, and is developing MCP/dashboarding.
-Use externally understandable attribution terminology rather than "Entrypoints v2".
-Do not claim Fivetran, Databricks, Tableau, ThoughtSpot, DealCloud, Cortex, AWS, or other
-tools solely because the opening mentions them. State transferable experience without
-pretending to have an exact stack. For a finance-oriented role, use the profile's investor
-analytics, financial reporting, payment automation, and data-platform work; do not invent
-private equity experience.
+Do not fabricate tools, metrics, ownership, outcomes, or completed work. Use only evidence from the profile.
 
 Return valid JSON only, with standard escaping. Apostrophes are valid inside JSON
 strings and should not be removed from grammatical prose. Use the sign_off from

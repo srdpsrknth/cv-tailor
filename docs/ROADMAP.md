@@ -1,5 +1,26 @@
 # Roadmap
 
+**Candidate isolation follow-up (2026-11-24).** Keep the existing private store
+and make profiles with absent or empty rules independent of the original
+candidate's settings. Capture synthetic regressions first. Migrate and verify the
+original candidate's effective settings privately before removing shared
+defaults. The provider credential fix is an independent increment. The private
+capture and byte-identical backups are verified. Generation loads call-specific
+guidance from the selected profile and includes it in the cache key. The
+installed private guidance passed the archive comparison. The shared-default
+cutover and authorization gates pass the original isolation regressions.
+
+1. **Candidate isolation and setup.** Cover cross-profile generation and
+   unsupported work-authorisation claims. Resolve candidate guidance from the
+   selected private profile. Make setup checks use the selected provider.
+2. **CV content and layout.** Add ongoing education, standalone projects and
+   section ordering first, then publications, activities and optional display
+   preferences. Verify saved snapshots and supported export formats.
+3. **Windows–Mac private-store sync.** Complete the two-way synthetic round trip,
+   partial arrival and conflict restore in the [pilot](PRIVATE_STORE_SYNC.md).
+   Inventory and back up the real stores before agreeing the seed and shared
+   candidate folders. Keep credentials, Git metadata and machine settings local.
+
 **CV layout follow-up (2026-11-18):** implemented deterministic readable typography
 and employer-boundary selection in the shared renderer, two-parser content checks,
 page-balance advisories and selected-layout provenance. Existing shortening applies
