@@ -56,6 +56,11 @@
 \cvsection{Professional Experience}
 {% for exp in experience %}
 {% set employer_index = loop.index0 %}
+{% set split_role = split_before and split_before[0] == employer_index %}
+{% if split_role %}
+{% set split_kind = split_before[1] %}
+{% set split_index = split_before[2] %}
+{% endif %}
 {% if break_before_employer_index == employer_index %}\newpage{% endif %}
 \needspace{4\baselineskip}
 \begin{samepage}
@@ -63,23 +68,45 @@
 \vspace{2pt}{\bfseries\color{accent}{{ exp.role }}}\hfill {\metadata\color{muted}{{ exp.start_date }} -- {{ exp.end_date }}{% if exp.location %} | {{ exp.location }}{% endif %}}\par\nopagebreak
 {% if exp.bullets %}
 \begin{itemize}
-{% for bullet in exp.bullets %}\item {{ bullet }}
+{% for bullet in exp.bullets %}
+{% if split_role and split_kind == 'bullet' and split_index == loop.index0 %}
+\end{itemize}
+\end{samepage}
+\newpage
+\begin{samepage}
+{\metadata\bfseries\color{accent}{{ exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
+\begin{itemize}
+{% endif %}
+\item {{ bullet }}
 {% endfor %}
 \end{itemize}
+{% endif %}
+{% if split_role and not exp.projects and exp.technologies %}
+\nopagebreak
+\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 \end{samepage}
 {% if exp.projects %}
 {% for project in exp.projects %}
+{% set split_here = split_role and split_kind == 'project' and split_index == loop.index0 %}
+{% if split_here %}\newpage{% endif %}
 \begin{samepage}
+{% if split_here %}
+{\metadata\bfseries\color{accent}{{ exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
+{% endif %}
 \projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.company }}{{ "}" }}{{ '{' }}{{ employer_index }}{{ '}{' }}{{ loop.index0 }}{{ '}' }}
 \begin{itemize}
 {% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}
 \end{itemize}
+{% if split_role and loop.last and exp.technologies %}
+\nopagebreak
+\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
+{% endif %}
 \end{samepage}
 {% endfor %}
 {% endif %}
-{% if exp.technologies %}
+{% if exp.technologies and not split_role %}
 \vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 {% if not loop.last %}\vspace{3pt}{\color{divider}\hrule height 0.35pt}\vspace{5pt}{% endif %}

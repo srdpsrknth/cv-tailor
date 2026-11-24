@@ -360,6 +360,160 @@ def test_library_includes_more_than_twenty_saved_applications(review_config):
     assert len(bridge.application_library(review_config, "analyst_a")) == 24
 
 
+def test_library_reads_summary_without_loading_document_details(review_config, monkeypatch):
+    save_application(
+        review_config,
+        content={"company_name": "Northwind", "role_title": "Analyst"},
+        generation_result={"status": "failed", "models": {"cv": "historical"}},
+    )
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Listing history should not inspect saved documents")
+
+    monkeypatch.setattr("services.application_review.artifact_freshness", unexpected)
+    record, = bridge.application_library(review_config, "analyst_a")
+    assert (record["title"], record["company"], record["status"]) == (
+        "Analyst", "Northwind", "Failed"
+    )
+    assert record["manifest"]["models"] == {"cv": "historical"}
+
+
+def test_quality_fingerprint_changes_with_saved_sources_and_pdf(review_config):
+    folder = save_application(review_config, content={"cv": {"summary": ["Original"]}})
+    artifact = folder / "cv.pdf"
+    artifact.write_bytes(b"saved PDF")
+
+    def fingerprint():
+        return bridge.load_application(review_config, "analyst_a", "northwind")[
+            "quality_fingerprint"
+        ]
+
+    before = fingerprint()
+    (folder / "source/content.json").write_text(
+        json.dumps({"cv": {"summary": ["Manual edit"]}}), encoding="utf-8"
+    )
+    after_edit = fingerprint()
+    artifact.write_bytes(b"new PDF!!")
+    assert before != after_edit != fingerprint()
+
+
+def test_saved_sources_come_from_one_candidate_job(review_config):
+    from services.application_review import load_saved_sources
+
+    folder = save_application(review_config, content={"role_title": "Analyst"})
+    (folder / "source/job_description.txt").write_text("Saved posting", encoding="utf-8")
+    save_application(review_config, candidate="analyst_b")
+
+    sources = load_saved_sources(review_config, "analyst_a", "northwind")
+    assert sources["folder"] == folder.resolve()
+    assert sources["posting"] == "Saved posting"
+    assert sources["content"] == {"role_title": "Analyst"}
+    assert sources["snapshot"] == {}
+    assert load_saved_sources(review_config, "analyst_b", "northwind")["posting"] == ""
+
+
+def test_answers_only_application_opens_without_rendered_files(review_config):
+    from services.answers_only_application import create_answers_only_application
+    from services.application_review import load_saved_sources
+
+    description = "Northwind seeks an analyst to report on operations and metrics."
+    job_id = create_answers_only_application(
+        review_config, "analyst_b", description,
+        company="Northwind", role="Analyst", work_country="Germany",
+    )
+    detail = bridge.load_application(review_config, "analyst_b", job_id)
+    sources = load_saved_sources(review_config, "analyst_b", job_id)
+    assert detail["status"] == "Answers only"
+    assert detail["title"] == "Analyst"
+    assert detail["company"] == "Northwind"
+    assert detail["artifacts"] == []
+    assert sources["posting"] == description
+    assert sources["snapshot"]["identity"]
+    assert sources["content"]["work_country"] == "Germany"
+    assert "cv" not in sources["content"]
+    assert bridge.application_library(review_config, "analyst_a") == []
+
+
+def test_answers_only_application_validates_before_creating_a_folder(review_config):
+    from services.answers_only_application import create_answers_only_application
+    from services.profile_store import UnknownProfileError
+
+    with pytest.raises(ValueError, match="too short"):
+        create_answers_only_application(review_config, "analyst_a", "Analyst")
+    with pytest.raises(UnknownProfileError):
+        create_answers_only_application(
+            review_config, "missing", "Northwind seeks analysts to report on operations and metrics."
+        )
+    assert not (review_config.store.root / "outputs").exists()
+
+
+def test_answers_only_creation_keeps_failed_writes_out_of_history(review_config, monkeypatch):
+    from services.answers_only_application import create_answers_only_application
+    from services.application_store import ApplicationStore
+
+    def fail_write(*args, **kwargs):
+        raise OSError("Write failed")
+
+    monkeypatch.setattr(ApplicationStore, "save_manifest", fail_write)
+    with pytest.raises(OSError, match="Write failed"):
+        create_answers_only_application(
+            review_config, "analyst_a", "Northwind seeks analysts to report on operations and metrics."
+        )
+    assert bridge.application_library(review_config, "analyst_a") == []
+
+
+def test_layout_preview_uses_saved_revision_without_replacing_the_pdf(review_config, monkeypatch):
+    from types import SimpleNamespace
+
+    from services import application_layout_preview
+    from support import read_json
+
+    snapshot = review_config.store.load("analyst_a").model_dump(mode="json")
+    content = read_json("content", "valid_content.json")
+    folder = save_application(review_config, content=content, profile_snapshot=snapshot)
+    artifact = folder / "cv.pdf"
+    artifact.write_bytes(b"existing CV")
+
+    def create_renderer(*, outputs_dir):
+        assert Path(outputs_dir).is_dir()
+        assert not Path(outputs_dir).is_relative_to(folder)
+
+        def preview(cv, profile, *, job_position):
+            assert cv.summary == content["cv"]["summary"]
+            assert profile.model_dump(mode="json") == snapshot
+            assert job_position == content.get("role_title")
+            return b"%PDF-1.7\npreview", {
+                "page_count": 2, "text_preserved": True, "clipping": False,
+                "orphan_headings": False,
+            }
+
+        return SimpleNamespace(preview_cv_layout=preview)
+
+    monkeypatch.setattr(application_layout_preview, "create_latex_renderer", create_renderer)
+    pdf, report = application_layout_preview.preview_saved_cv_layout(
+        review_config, "analyst_a", "northwind"
+    )
+    assert report["page_count"] == 2
+    assert not list(folder.glob("cv_balanced_*"))
+    saved = application_layout_preview.save_cv_layout_preview(
+        review_config, "analyst_a", "northwind", pdf, report
+    )
+    assert saved.parent == folder.resolve()
+    assert saved.read_bytes() == pdf
+    assert application_layout_preview.save_cv_layout_preview(
+        review_config, "analyst_a", "northwind", pdf, report
+    ) == saved
+    assert len(list(folder.glob("cv_balanced_*"))) == 1
+    assert artifact.read_bytes() == b"existing CV"
+
+    content["cv"]["summary"].append("A new revision.")
+    (folder / "source/content.json").write_text(json.dumps(content), encoding="utf-8")
+    with pytest.raises(ValueError, match="CV changed"):
+        application_layout_preview.save_cv_layout_preview(
+            review_config, "analyst_a", "northwind", pdf, report
+        )
+
+
 def test_received_provider_reply_retains_task_model_and_cost(review_config):
     from services.llm_service import LLMService
     from services.provider import ProviderResponse

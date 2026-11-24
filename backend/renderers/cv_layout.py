@@ -7,6 +7,7 @@ extracted personal text is returned or persisted in a report.
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 import json
 import math
@@ -75,6 +76,7 @@ def measure_layout(
 
     employer_order = [_normalized(name) for name in employer_names]
     employers = {name for name in employer_order if name}
+    employer_counts = Counter(employer_order)
     projects = [(_normalized(employer), _normalized(project))
                 for employer, project in project_names if project]
     employer_pages: dict[str, int] = {}
@@ -161,9 +163,41 @@ def measure_layout(
             index for index, employer in enumerate(employer_order)
             if employer in split_employers
         ],
+        "second_page_employer_indices": [
+            index for index, employer in enumerate(employer_order)
+            if employer_pages.get(employer) == 1 and employer_counts[employer] == 1
+        ],
         "warnings": warnings,
         "quality_score": _quality_score(pages, int(splits)),
     }
+
+
+def preview_breaks(report: dict, role_sizes: list[tuple[int, int]]):
+    """Try two bounded splits near the natural break of a two-page layout."""
+    if report["page_count"] != 2:
+        return
+    next_roles = report["second_page_employer_indices"]
+    split_roles = report["split_employer_indices"]
+    # A moving role can provide both a complete bullet and a complete project
+    # boundary. If only its projects moved, try a neighboring project boundary.
+    if split_roles:
+        role_index, project_index = split_roles[0], 1
+    elif next_roles:
+        role_index, project_index = next_roles[0], 0
+    else:
+        return
+    bullets, projects = role_sizes[role_index]
+    if bullets > 1:
+        yield role_index, "bullet", 1
+    if bullets and projects > project_index:
+        yield role_index, "project", project_index
+
+
+def preview_quality_score(report: dict, *, continued: bool = False) -> float:
+    """Add advisory penalties for long tails and explicit role continuations."""
+    pages = report["pages"]
+    long_tail = max(0, max(page["blank_tail_mm"] for page in pages) - 40) / 4 if len(pages) == 2 else 0
+    return round(report["quality_score"] + long_tail + (2 if continued else 0), 6)
 
 
 def rank_layout(report: dict, preset_index: int = 0) -> tuple:

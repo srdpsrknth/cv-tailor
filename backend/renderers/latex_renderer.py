@@ -87,6 +87,31 @@ class LaTeXRenderer:
             lstrip_blocks=True
         )
 
+    def preview_cv_layout(
+        self,
+        tailored_cv: TailoredCV,
+        profile: Profile,
+        job_position: Optional[str] = None,
+        *,
+        layout_preset: str = "auto",
+    ) -> tuple[bytes, dict]:
+        """Compare experimental page breaks against the existing selector in scratch.
+
+        The caller supplies the saved CV revision and matching profile snapshot.
+        All rendered files are disposable, and the returned report contains no
+        source prose. The returned PDF is a preview, with no save side effect.
+        """
+        with tempfile.TemporaryDirectory(prefix="cvtailor-layout-preview-") as scratch:
+            renderer = LaTeXRenderer(templates_dir=self.templates_dir, outputs_dir=scratch)
+            path = renderer._render_cv(
+                tailored_cv, profile, job_position, layout_preset=layout_preset,
+                explore_breaks=True,
+            )
+            report = renderer.last_layout
+            if report["page_count"] > 2:
+                raise LaTeXRendererError("No CV layout preview fit within two pages.")
+            return Path(path).read_bytes(), report
+
     def render_cv(
         self,
         tailored_cv: TailoredCV,
@@ -94,6 +119,7 @@ class LaTeXRenderer:
         job_position: Optional[str] = None,
         *,
         layout_preset: str = "auto",
+        balance_cv_pages: bool = False,
     ) -> str:
         """
         Render CV to PDF.
@@ -103,6 +129,7 @@ class LaTeXRenderer:
             profile: Base profile (for identity info)
             job_position: Optional job position for filename; defaults to tailored_cv.title
             layout_preset: Auto-select readable typography, or force a named preset.
+            balance_cv_pages: Compare additional page breaks for more even pages.
 
         Returns:
             Path to generated PDF file
@@ -110,6 +137,15 @@ class LaTeXRenderer:
         Raises:
             LaTeXRendererError: If rendering fails
         """
+        return self._render_cv(
+            tailored_cv, profile, job_position, layout_preset=layout_preset,
+            explore_breaks=balance_cv_pages,
+        )
+
+    def _render_cv(
+        self, tailored_cv: TailoredCV, profile: Profile, job_position: Optional[str], *,
+        layout_preset: str, explore_breaks: bool,
+    ) -> str:
         job_pos = job_position or tailored_cv.title or "role"
         safe_job = self._slugify(job_pos)
         year = datetime.now().year
@@ -122,7 +158,9 @@ class LaTeXRenderer:
                 f"Template not found: main.tex.jinja2 in {self.templates_dir}"
             )
 
-        from renderers.cv_layout import PRESETS, measure_layout, rank_layout
+        from renderers.cv_layout import (
+            PRESETS, measure_layout, preview_breaks, preview_quality_score, rank_layout,
+        )
         from services.document_quality import inspect_document
         from pypdf import PdfWriter
 
@@ -149,11 +187,12 @@ class LaTeXRenderer:
         # Every trial and failure is disposable; never overwrite an existing CV
         # until a complete candidate has been checked and selected.
         with tempfile.TemporaryDirectory(prefix="cvtailor-layout-") as scratch:
-            def trial(preset, break_before=None):
+            def trial(preset, break_before=None, split_before=None):
                 directory = Path(scratch) / str(len(attempts))
                 directory.mkdir()
                 data = {**template_data, "layout": preset,
-                        "break_before_employer_index": break_before}
+                        "break_before_employer_index": break_before,
+                        "split_before": split_before}
                 try:
                     latex_content = template.render(**data)
                 except Exception as exc:
@@ -186,11 +225,22 @@ class LaTeXRenderer:
                 attempts.append({key: report[key] for key in (
                     "preset", "break_before_employer_index", "page_count",
                     "quality_score", "clipping", "orphan_headings", "text_preserved")})
+                if explore_breaks:
+                    report.update(
+                        split_before={"role_index": split_before[0], "kind": split_before[1],
+                                      "index": split_before[2]} if split_before else None,
+                        blank_tails_mm=[page["blank_tail_mm"] for page in metrics["pages"]],
+                        preview_score=preview_quality_score(metrics, continued=split_before is not None),
+                    )
+                    attempts[-1].update({key: report[key] for key in (
+                        "split_before", "blank_tails_mm", "preview_score")})
                 if text_ok:
                     index = next(i for i, p in enumerate(PRESETS) if p["name"] == preset["name"])
                     candidates.append((rank_layout(metrics, index), len(attempts), pdf, report))
                 return report
 
+            role_sizes = [(len(exp.bullets), len(exp.projects or []))
+                          for exp in tailored_cv.experience]
             for preset in presets:
                 report = trial(preset)
                 # One semantic alternative per preset is enough to compare a
@@ -200,9 +250,30 @@ class LaTeXRenderer:
                     boundary = next((i for i in splits if i > 0), None)
                     if boundary is not None:
                         trial(preset, boundary)
+                if explore_breaks and adaptive and "split_before" in template_source:
+                    for split_before in preview_breaks(report, role_sizes):
+                        trial(preset, split_before=split_before)
             if not candidates:
                 raise LaTeXRendererError("No CV layout preserved the source text in both PDF parsers.")
-            _, _, selected_pdf, selected = min(candidates, key=lambda row: (row[0], row[1]))
+            if explore_breaks:
+                _, _, _, baseline = min(
+                    (row for row in candidates if row[3]["split_before"] is None),
+                    key=lambda row: (row[0], row[1]), default=(None, None, None, None),
+                )
+                # The exact same content, page-count and geometry gates apply to
+                # every preview candidate, with only preferences changed.
+                _, _, selected_pdf, selected = min(candidates, key=lambda row: (
+                    rank_layout({**row[3], "quality_score": row[3]["preview_score"]}, row[0][-1]),
+                    row[1],
+                ))
+                selected["baseline"] = None if baseline is None else {
+                    key: baseline[key] for key in (
+                        "preset", "break_before_employer_index", "page_count", "blank_tails_mm",
+                        "clipping", "orphan_headings", "text_preserved", "preview_score",
+                    )
+                }
+            else:
+                _, _, selected_pdf, selected = min(candidates, key=lambda row: (row[0], row[1]))
             if selected["page_count"] <= 2 and (selected["clipping"] or selected["orphan_headings"]):
                 raise LaTeXRendererError("No CV layout passed clipping and heading checks; review the editable content.")
             selected["attempts"] = attempts

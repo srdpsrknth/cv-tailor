@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pdfplumber
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 import pytest
 
 from models.tailored_output import TailoredCV
@@ -179,6 +179,72 @@ def test_unknown_layout_preset_fails_before_compilation(tmp_path, analyst_profil
             _cv(), analyst_profile, layout_preset="microscopic"
         )
     assert list(tmp_path.iterdir()) == []
+
+
+def test_preview_compares_bounded_splits_without_writing_to_saved_outputs(
+    tmp_path, analyst_profile, monkeypatch
+):
+    from renderers import cv_layout
+    from services import document_quality
+
+    cv, profile = _expanded_cv(analyst_profile, employers=2)
+    cv.experience[1].projects = _cv().experience[0].projects
+    renderer = LaTeXRenderer(outputs_dir=tmp_path)
+    saved = tmp_path / "saved.pdf"
+    saved.write_bytes(b"previous CV")
+    invocations = []
+
+    def compile_trial(compiler, tex_path, base_name):
+        tex = tex_path.read_text(encoding="utf-8")
+        invocations.append((tex_path, tex))
+        path = compiler.outputs_dir / f"{base_name}.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        writer.add_blank_page(width=595, height=842)
+        writer.write(path)
+        return path
+
+    def measure_trial(path, **kwargs):
+        ordinal = int(path.parent.name)
+        return {
+            "page_count": 2, "pages": [{"blank_tail_mm": tail} for tail in (
+                [55, 25] if ordinal == 0 else [32, 35]
+            )],
+            "quality_score": 6 if ordinal == 0 else 2,
+            "split_employer_indices": [], "second_page_employer_indices": [1],
+            "clipping": False, "orphan_headings": False, "warnings": [],
+        }
+
+    def inspect_trial(path, **kwargs):
+        check = dict(status="ok", page_count=2, word_retention=1.0,
+                     reading_order=True, missing_fields=[], suspicious_glyphs=[])
+        # The third trial has an attractive layout but fails source extraction.
+        second_check = {**check, "word_retention": 0.9} if path.parent.name == "2" else check
+        return {"engines": {"pypdf": check, "pdfplumber": second_check}}
+
+    monkeypatch.setattr(LaTeXRenderer, "_compile_pdf", compile_trial)
+    monkeypatch.setattr(cv_layout, "measure_layout", measure_trial)
+    monkeypatch.setattr(document_quality, "inspect_document", inspect_trial)
+
+    preview, report = renderer.preview_cv_layout(cv, profile, layout_preset="standard")
+    assert preview.startswith(b"%PDF")
+    assert report["blank_tails_mm"] == [32, 35]
+    assert report["baseline"]["blank_tails_mm"] == [55, 25]
+    assert report["split_before"] == {"role_index": 1, "kind": "bullet", "index": 1}
+    assert [attempt["text_preserved"] for attempt in report["attempts"]] == [True, True, False]
+    assert len(invocations) == 3
+    assert "(continued)\\par" not in invocations[0][1]
+    bullet_split = invocations[1][1]
+    first_bullet, second_bullet = cv.experience[1].bullets[:2]
+    assert bullet_split.index(first_bullet) < bullet_split.index("\\newpage")
+    assert bullet_split.index("(continued)\\par") < bullet_split.index(second_bullet)
+    project_split = invocations[2][1]
+    assert project_split.index(cv.experience[1].bullets[-1]) < project_split.index("\\newpage")
+    assert project_split.index("(continued)\\par") < project_split.index(cv.experience[1].projects[0].name)
+    assert all(not path.exists() for path, _ in invocations)
+    assert list(tmp_path.iterdir()) == [saved]
+    assert saved.read_bytes() == b"previous CV"
+    assert renderer.last_layout is None
 
 
 @pytest.mark.requires_latex

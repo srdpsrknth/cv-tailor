@@ -25,8 +25,8 @@ def application_folder(config, profile_id, job_id):
         or job_id in (".", "..")
     ):
         raise ValueError("Invalid application identifier.")
-    folder = (root / job_id).resolve()
-    if folder.parent != root or not folder.is_dir():
+    folder = root / job_id
+    if folder.resolve() != folder or not folder.is_dir():
         raise ValueError(
             f"Application {job_id!r} not found for candidate {profile_id!r}."
         )
@@ -50,6 +50,35 @@ def read_json(folder, name, warnings):
     except (OSError, ValueError) as error:
         warnings.append(f"Could not read {name}: {error}")
         return {}
+
+
+def read_saved_posting(folder):
+    path = folder / "source" / "job_description.txt"
+    if not path.resolve().is_relative_to(folder.resolve()):
+        raise ValueError("Posting resolves outside the application.")
+    if not path.is_file():
+        return ""
+    if path.stat().st_size > 10_000_000:
+        raise ValueError("Saved posting is too large.")
+    return path.read_text(encoding="utf-8")
+
+
+def load_saved_sources(config, profile_id, job_id):
+    """Read drafting inputs from the selected application revision."""
+    folder = application_folder(config, profile_id, job_id)
+    warnings = []
+    try:
+        posting = read_saved_posting(folder)
+    except (OSError, ValueError) as error:
+        posting = ""
+        warnings.append(f"Could not read the saved posting: {error}")
+    return {
+        "folder": folder,
+        "posting": posting,
+        "content": read_json(folder, "content.json", warnings),
+        "snapshot": read_json(folder, "profile_snapshot.json", warnings),
+        "warnings": warnings,
+    }
 
 
 def text(value):
@@ -235,7 +264,7 @@ def inspect_application_pdfs(folder, content, snapshot, manifest):
 
     identity = snapshot.get("identity") if isinstance(snapshot, dict) else {}
     identity = identity if isinstance(identity, dict) else {}
-    pdfs = [path for path in Path(folder).iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
+    pdfs = [path for path in _document_files(folder) if path.suffix.lower() == ".pdf"]
     key_scopes = {
         "cv_path": "cv",
         "cl_pdf_path": "cover_letter",
@@ -280,8 +309,8 @@ def _word_layout_freshness(folder, manifest):
     saved = manifest.get("word_layout")
     saved = saved if isinstance(saved, dict) else {}
     result = {}
-    for path in Path(folder).iterdir():
-        if not path.is_file() or path.suffix.lower() != ".docx":
+    for path in _document_files(folder):
+        if path.suffix.lower() != ".docx":
             continue
         row = saved.get(path.name)
         if not isinstance(row, dict) or not isinstance(row.get("artifact_sha256"), str):
@@ -333,8 +362,32 @@ def check_saved_word_layout(config, profile_id, job_id):
     return report_by_name
 
 
-def load_review(config, profile_id, job_id, *, include_quality=False):
-    folder = application_folder(config, profile_id, job_id)
+def _document_files(folder):
+    return [
+        path
+        for path in folder.iterdir()
+        if path.suffix.lower() in {".pdf", ".docx", ".txt"}
+        and ".sync-conflict-" not in path.name.lower()
+        and path.is_file()
+        and path.resolve().is_relative_to(folder)
+    ]
+
+
+def _quality_fingerprint(paths, content, snapshot, manifest):
+    pdfs = {}
+    for path in paths:
+        if path.suffix.lower() == ".pdf":
+            try:
+                pdfs[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                return None
+    inputs = [
+        pdfs, content, snapshot, manifest.get("cv_path"), manifest.get("cl_pdf_path")
+    ]
+    return hashlib.sha256(json.dumps(inputs, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def _review_metadata(folder):
     warnings = []
     manifest = read_json(folder, "generation_result.json", warnings)
     for key in ("models", "token_usage"):
@@ -344,6 +397,42 @@ def load_review(config, profile_id, job_id, *, include_quality=False):
             )
             manifest[key] = {}
     content = read_json(folder, "content.json", warnings)
+    return manifest, content, warnings
+
+
+def _application_summary(folder, content, manifest):
+    letter = content.get("cover_letter")
+    letter = letter if isinstance(letter, dict) else {}
+    recorded_date = text(manifest.get("created_at"))
+    title = text(content.get("role_title")) or text(letter.get("role_title"))
+    status = {"failed": "Failed", "success": "Generated", "answers_only": "Answers only"}.get(
+        text(manifest.get("status")), "Legacy / incomplete"
+    )
+    return {
+        "job_id": folder.name,
+        "title": title or folder.name.replace("_", " "),
+        "company": text(content.get("company_name")) or text(letter.get("company_name")),
+        "created_at": recorded_date or datetime.fromtimestamp(
+            folder.stat().st_mtime, timezone.utc
+        ).isoformat(timespec="seconds"),
+        "date_source": "recorded" if recorded_date else "folder modified",
+        "status": status,
+    }
+
+
+def load_application_summary(config, profile_id, job_id):
+    """Read recent-list labels without inspecting document bytes or layout."""
+    folder = application_folder(config, profile_id, job_id)
+    manifest, content, _ = _review_metadata(folder)
+    return {
+        **_application_summary(folder, content, manifest),
+        "manifest": {"models": manifest.get("models", {})},
+    }
+
+
+def load_review(config, profile_id, job_id, *, include_quality=False):
+    folder = application_folder(config, profile_id, job_id)
+    manifest, content, warnings = _review_metadata(folder)
     snapshot = read_json(folder, "profile_snapshot.json", warnings)
     provenance = read_json(folder, "posting_provenance.json", warnings)
     saved_artifact_provenance = manifest.get("artifact_provenance")
@@ -352,11 +441,7 @@ def load_review(config, profile_id, job_id, *, include_quality=False):
         if isinstance(saved_artifact_provenance, dict)
         else {}
     )
-    renderable_files = [
-        path
-        for path in folder.iterdir()
-        if path.is_file() and path.suffix.lower() in {".pdf", ".docx", ".txt"}
-    ]
+    renderable_files = _document_files(folder)
     freshness = artifact_freshness(
         config.project_root,
         content,
@@ -384,7 +469,7 @@ def load_review(config, profile_id, job_id, *, include_quality=False):
         else "Fresh draft" if hit is False else "Not recorded"
     )
     return {
-        "job_id": job_id,
+        **_application_summary(folder, content, manifest),
         "path": str(folder),
         "manifest": manifest,
         "content": content,
@@ -397,29 +482,11 @@ def load_review(config, profile_id, job_id, *, include_quality=False):
             if include_quality
             else {}
         ),
+        "quality_fingerprint": _quality_fingerprint(
+            renderable_files, content, snapshot, manifest
+        ),
         "explanation": explanation,
         "warnings": warnings,
-        "title": text(content.get("role_title"))
-        or text(letter.get("role_title"))
-        or job_id.replace("_", " "),
-        "company": text(content.get("company_name"))
-        or text(letter.get("company_name")),
-        "created_at": text(manifest.get("created_at"))
-        or datetime.fromtimestamp(folder.stat().st_mtime, timezone.utc).isoformat(
-            timespec="seconds"
-        ),
-        "date_source": (
-            "recorded" if text(manifest.get("created_at")) else "folder modified"
-        ),
-        "status": (
-            "Failed"
-            if manifest.get("status") == "failed"
-            else (
-                "Generated"
-                if manifest.get("status") == "success"
-                else "Legacy / incomplete"
-            )
-        ),
         "run_type": run_type,
         "changes": compare_cv(snapshot, cv) if snapshot and cv else [],
         "comparison_available": bool(snapshot and cv),

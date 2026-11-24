@@ -404,29 +404,41 @@ multiple profiles and no remembered choice, select one before generating.
 
 | Page | What it does |
 |---|---|
-| **New application** | Check the active candidate, paste a posting, check company/role/country and task models, then generate. Results remain available through reruns. |
+| **New application** | Check the active candidate, paste a posting, check company/role/country and task models, then generate. Successful runs open the saved application workspace. |
 | **Find jobs** | Free search with matching signals, eligibility and source notes. **Use this posting** transfers known text to New application without making a model call. |
-| **Applications** | Search and filter saved applications by company/role, status or requested model, including CLI runs. Pages expose the whole library. |
+| **Applications** | Click a recent application to open its workspace. Search by company or role and use **Filters** for status or requested model. CLI runs also appear here. |
 | **Settings & help** | Private-store location, read-only profile summary and local setup checks. Key presence is distinct from provider verification. |
 
-After generation, or after choosing an application in the library, use the review tabs:
+The workspace puts available CV and cover-letter PDF downloads under the application
+title. Open the preview or run PDF checks when you need them. Other downloads include
+Word and autofill files. To build missing autofill files for an older run, use
+**Create / refresh CV for autofill**. It uses the saved editable text and profile
+snapshot without a model call. For portals like Workday, try the plain `_upload.docx`
+when accepted and verify the extracted form fields.
 
-* **Documents:** preview the actual CV/letter PDFs and download PDF, Word, or
-  autofill files (`CV for autofill · DOCX` and `TXT`). For older saved
-  applications, click **Create / refresh CV for autofill** to build the
-  companion files from `content.json` and the saved profile snapshot with zero
-  model calls. For portals like Workday, try the plain `_upload.docx` when
-  accepted, and always verify extracted form fields.
-* **What changed:** compare the saved profile snapshot against final CV text. Projects
-  with changed names appear as separate source/final entries; ambiguous matches are
-  flagged instead of guessed. This is a text comparison, not a quality score.
-* **Why these changes:** read the saved model explanation for summary wording,
-  bullets, skills, projects and overall strategy. Older runs may have no explanation.
-* **Run details:** requested task models, provider, tokens, attempts and cost. New
-  runs also save provider-reported model IDs/request IDs when returned, and explicit
-  fresh/cache and cost-source records. Older missing fields say **Not recorded**;
-  they are never inferred from today's settings. Cached runs keep original-generation
-  usage separate from this run. Viewing any tab does not call the model.
+Open **Details** for the original posting, saved profile comparisons, the model's
+explanation and run history. The run history distinguishes requested models from
+provider-reported replies, and cached runs separate original usage from the current run.
+Missing historical values are marked **Not recorded**. Opening a saved workspace or
+checking its documents does not call the model. A failed run can expose a saved attempt
+with whatever files survived.
+
+Open **Application folder** to get the local path of the saved PDFs and source files.
+For a saved CV with its profile snapshot, **Documents → Compare CV page breaks** shows
+a rendered preview and the blank space at each page end. **Save preview to application
+folder** saves a separate `cv_balanced_*.pdf` beside your original CV.
+
+On **New application**, select **Balanced page breaks** under **CV page layout** to
+include the alternative page breaks in the CV generated for that application.
+**Automatic** uses the existing layout rules. Balanced page breaks can take longer.
+
+Open **Answers** on a saved application, or choose **Answers only** when you already
+have your documents. Paste questions separated by blank lines and check the resulting
+rows. Add optional limits, notes, confirmed facts and public company excerpts. Drafting
+selected questions uses your configured model and may cost money. You can edit or
+write answers directly, copy each one, and select **Save answers** to keep a revision
+with the application. A new suggested draft leaves existing text in the editor until
+you choose to use it.
 
 The GUI restores your last valid profile, or selects the only usable profile. The
 active name/id is shown at the top of every page. Your choice survives browser and
@@ -436,8 +448,8 @@ candidate's draft/review state. The CLI and API still require an explicit profil
 
 The curated-model selector affects only new applications. The current catalogue
 contains one selected model; keeping configured routing also preserves any explicit
-per-task overrides. Browser reloads start a new draft session with the remembered
-profile; saved applications remain in the library.
+per-task overrides. Refreshing a saved workspace keeps it open when its application
+belongs to the active profile.
 
 If generation fails before documents exist, raw responses and a failed-run record
 are saved when the store is writable. Review that attempt before paying for another

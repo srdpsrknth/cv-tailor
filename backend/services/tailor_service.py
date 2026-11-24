@@ -264,6 +264,8 @@ def tailor_documents(
     profile_id: Optional[str] = None,
     use_cache: bool = True,
     service: Optional["LLMService"] = None,
+    *,
+    balance_cv_pages: bool = False,
 ) -> TailorResponse:
     """Produce a two-page CV and a one-page cover letter, and persist them.
 
@@ -523,6 +525,7 @@ def tailor_documents(
     position = role_title or cl.role_title
     page_count = 0
     history = []
+    layout_options = {"balance_cv_pages": True} if balance_cv_pages else {}
 
     def save_content() -> None:
         applications.save_content(
@@ -538,7 +541,7 @@ def tailor_documents(
     try:
         for attempt in range(MAX_LAYOUT_ATTEMPTS):
             save_content()
-            cv_path = latex.render_cv(cv, profile, job_position=position)
+            cv_path = latex.render_cv(cv, profile, job_position=position, **layout_options)
             page_count = count_pdf_pages(Path(cv_path))
             history.append(page_count)
             if page_count <= 2:

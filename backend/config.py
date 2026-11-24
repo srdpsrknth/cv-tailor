@@ -46,7 +46,7 @@ KNOWN_PROVIDERS = ("gemini", "openrouter")
 #: Tasks that may have their own model, and the environment variable suffix for
 #: each. Model-per-task routing (ADR 0005) exists so a cheap model can serve
 #: routine work while document writing keeps the stronger one.
-ROUTABLE_TASKS = ("cv", "cover_letter", "layout_retry")
+ROUTABLE_TASKS = ("cv", "cover_letter", "layout_retry", "portal_answers")
 
 #: Directory used as the profile store when none is configured (ADR 0011 expects a
 #: sibling directory outside the repository; this keeps a bare checkout working).

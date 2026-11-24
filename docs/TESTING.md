@@ -1,7 +1,23 @@
 # Testing
 
 **Baseline command:** `python -m pytest -q` (run from the repository root)
-**Current baseline (2026-11-18, adaptive CV layout):** **1319 passed, 3 skipped**,
+
+**First product milestone (2026-11-24).** `test_ui_review.py` exercises automatic
+navigation after generation, recent application buttons, candidate-scoped URL restoration,
+partial downloads and revision-scoped PDF check reuse. `test_application_review.py` covers
+the lightweight history, answers-only records, and saved-source lookup. The UI tests
+also use recorded provider responses to exercise real rendering and the workspace
+handoff. `test_portal_answers.py` covers per-question limits, evidence and revision
+conflicts. `test_private_store_sync.py` simulates replication and conflict recovery
+using disposable stores. See [PROJECT_STATE.md](PROJECT_STATE.md#milestone-continuation-2026-11-24)
+for the latest results.
+
+**Current baseline (2026-11-24, workspace continuation):** **1,357 passed, 3 skipped**
+across the non-TeX run and isolated TeX groups. The Windows verification used a
+process-local portable MiKTeX configuration and writable temporary folders. No paid
+provider calls were needed.
+
+**Prior baseline (2026-11-18, adaptive CV layout):** **1319 passed, 3 skipped**,
 1 existing Google SDK warning, 128.23 s, fully offline — no paid API calls.
 Pre-layout baseline: 1267 passed, 3 skipped (43.84 s). Multiple local compiler/parser
 trials increase render-test time; they add no model calls.

@@ -469,6 +469,15 @@ LLM call. Baseline 697/3 → **1079 passed, 3 skipped**.
 
 ## Phase 6 — UI and deployment
 
+**Product milestone (2026-11-24):** recent application buttons and successful
+generation now open the same candidate-scoped workspace. CV and cover-letter PDFs
+are available at the top. Preview and text extraction are user-initiated. See
+[PRODUCT_AUDIT.md](PRODUCT_AUDIT.md#first-implementation-milestone) for scope and
+[PROJECT_STATE.md](PROJECT_STATE.md) for verification. The workspace also opens the
+local output path, offers an on-demand CV layout comparison, and lets you draft and
+save portal answers with optional public excerpts. The two-peer
+[private-store pilot](PRIVATE_STORE_SYNC.md) remains a separate acceptance step.
+
 **Owner follow-ups (2026-11-17):** GUI remembers the last valid profile or selects
 the sole usable profile, with active identity shown at the top (ADR 0022). Backend
 identity remains explicit. A cover-letter editorial review also refined future

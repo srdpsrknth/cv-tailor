@@ -6,6 +6,16 @@
 **Status:** Assessment complete. **Decisions approved 2026-10-23** (§11). Phase 1 implemented
 and complete; this document is retained as the Phase 0 record of what was found.
 
+> **Application workspace (2026-11-24):** Streamlit reaches the same saved record
+> from generation and history using the active profile and job ID. The history reads
+> metadata without opening artifact bytes. The workspace delays PDF extraction until
+> requested and reuses its report while the saved sources and PDFs match. The portal
+> answers service reads those same application sources and returns per-question draft
+> status and evidence through an injected provider. The Answers workspace supports
+> document-free intake and explicit editing. Atomic, parent-linked editor revisions
+> preserve divergent copies during replication. Layout previews read the same saved
+> revision into disposable rendering directories.
+
 > **Adaptive CV layout (2026-11-18):** the shared LaTeX renderer compares three
 > readable presets and eligible employer-boundary breaks before content shortening.
 > `renderers/cv_layout.py` measures page geometry and ranks unchanged-content trials;

@@ -1,10 +1,127 @@
 # Project state
 
-**Last updated:** 2026-11-18
+**Last updated:** 2026-11-24
 **Branch:** `refactor/architecture-v2`
-**Worktree:** `/Users/srdpsrknth/Documents/Projects/cv-tailor` (macOS)
-**Latest commit:** *(this commit)* — *select readable two-page CV layouts before shortening*
+**Worktree:** `D:\coding\cv-tailor-next` (Windows)
+**Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
+
+## Select and save CV layouts (2026-11-24)
+
+**New application → CV page layout** offers Automatic and Balanced page breaks.
+Balanced generation uses the same additional break candidates as the saved-CV
+comparison. **Save preview to application folder** publishes a separate checked PDF.
+It rejects previews of an older CV revision and reuses the file when the same preview
+is saved again. The original PDF and application manifest are preserved.
+
+Verification passed 1,308 tests without TeX, with 3 skips, plus the real-render
+Streamlit test for Balanced generation. The checked two-page Optum preview saved
+byte-for-byte in a disposable copy of an application folder beside the original PDF.
+The owner confirmed the live GUI layout check was complete.
+
+## Milestone continuation (2026-11-24)
+
+The workspace exposes the local application folder. **Answers** is available on saved
+applications, and **Answers only** saves a posting and candidate snapshot without PDF
+rendering. Users can enter questions, edit drafts, add public excerpts and save atomic
+application-scoped revisions. Incomplete or divergent revision histories prevent a
+save while leaving readable answers available. Automatic company search remains a
+separate extension. The live GUI showed the Answers editor and folder control.
+
+The new CV layout comparison renders from saved text and a saved profile snapshot in
+temporary folders. It uses the existing extraction and geometry gates and keeps the
+original PDF available. The running development server initially held an older renderer
+after Streamlit reran the UI. A fresh process loads the new renderer, and the preview
+reports the need to restart when an older renderer is still in memory.
+
+**Verification:** 1,357 tests passed across the suite split, with 3 skips. The non-TeX
+run passed 1,307 tests and the TeX tests passed in isolated groups. The existing Google
+SDK deprecation warning remains. A portable MiKTeX process with writable temporary
+folders compiled previews of eight frozen CVs. Each kept two pages,
+passed both PDF extraction checks, and showed no clipping or orphan headings. Four
+previews shortened the first-page blank space. Two selected an explicit complete-bullet
+break, reducing first-page blank space from 55.1 to 33.6 mm and from 52.2 to 26.5 mm.
+All saved PDFs, editable content and profile snapshots retained their original hashes.
+A Streamlit end-to-end test replayed recorded provider replies, compiled actual CV and
+letter PDFs, and opened the newly created workspace automatically. Copying that output
+to an isolated second store preserved all ten file hashes. Both PDFs opened there.
+
+Windows Syncthing responded to its public local health endpoint. The local dashboard
+requires sign-in, and a Mac peer could not be reached from this session. The synthetic
+sync tests and [pilot instructions](PRIVATE_STORE_SYNC.md) are available. No real store
+migration took place. Git staging still fails at `index.lock` outside the writable
+worktree. Changes remain in the development checkout. The configured provider endpoint
+could not resolve from the shell, so provider tests use offline responses.
+
+**Next action:** restart any development server still holding the old renderer. A
+live provider check and the macOS sync round trip require reachable endpoints. Commit
+the verified development changes when the linked worktree index is writable.
+
+## First product milestone, initial integration (2026-11-24)
+
+**Active task:** integrate the faster application workspace first. A successful run opens
+the same workspace as a recent-application button. Available CV and cover-letter PDFs are
+direct downloads near the title. Candidate-scoped links restore the workspace on refresh.
+Failed and partial runs expose available files. History loads summaries, and the PDF text
+comparison runs on request and is cached while the saved inputs match.
+
+**Parallel handoffs:** the portal answers service drafts a batch with an injected provider,
+checks per-question limits and evidence IDs, and reports missing facts. Fake-provider tests
+cover it. The GUI, revision saves and research are pending. Synthetic sync tests cover
+relocation, partial replication and a hash-verified conflict restore. The
+[pilot instructions](PRIVATE_STORE_SYNC.md) cover the two physical peers. The layout
+prototype is kept in `.runtime/milestone-layout-preview.patch`. It adds a disposable
+role-bullet and project-break comparison. The patch applies cleanly and 45 non-TeX tests
+passed with it. A real render failed at MiKTeX registry access. The sampled saved files
+retained their hashes. The prototype is outside the integrated change so the first workspace
+release keeps the existing rendering fingerprints.
+
+**Verification and blockers:** 218 focused tests passed, including the existing
+autofill export compatibility check. The full Windows sandbox suite returned
+**1,293 passed, 35 failed, 11 errors, 3 skipped**. The failed and errored tests match
+the pre-change MiKTeX registry blocks. The synthetic Streamlit server started, but
+both browsers timed out connecting to it. Desktop, mobile and keyboard walkthroughs
+remain pending. Git metadata lives outside this worktree's writable area. Git denied
+`index.lock`, so the changes are in the development worktree and still need a commit.
+
+**Live browser follow-up:** the development GUI on port 8502 opened a saved application
+from history via keyboard, with both PDF download controls enabled. Streamlit then lost
+its connection and disabled the downloads before file delivery could be confirmed. The
+user restarted the development GUI. The browser reopened the saved application and
+both PDF controls accepted clicks, but no matching files were visible in the default
+Downloads directory from this session. The user reported a block at the browser step.
+The in-app CV preview loaded and both saved PDFs opened through the local PDF parser.
+The owner uses the PDFs from the local output folder, so browser download delivery is
+no longer a release check for this workflow. The live workspace reopened from history
+via keyboard at 390 px, and the workspace fit at 390 px and 1,280 px without horizontal
+page overflow. The original browser viewport was restored. The Streamlit UI suites
+passed all 32 tests, including automatic workspace routing after a simulated successful
+generation. A live generation check awaits the next real application.
+
+**Next action:** confirm the workspace handoff on the owner's next real application and
+rerun the full suite with working TeX. Review actual
+preview PDFs before integrating the layout patch. Once both devices are accessible, run
+the synthetic Syncthing round trip and restore before any migration of real data.
+
+## Product audit (2026-11-24)
+
+**Active task:** audit the application workflow and GUI, recent CV layout, portal answers,
+and Windows/macOS store portability. Findings, implementation order and acceptance criteria
+are in [PRODUCT_AUDIT.md](PRODUCT_AUDIT.md). Read-only audit of eight completed CVs and one
+failed attempt. All eight CVs fit two pages on the first generation pass. Six leave over
+40 mm of unused printable space on page one, and two continue projects on page two.
+
+**Next action:** move post-generation results, opening recent applications and the default
+downloads into one Streamlit workspace. Follow with controlled new break candidates and
+portal answers. Run the private-store sync pilot independently when both devices are
+available. Finish the Windows and macOS rendering and sync checks before migration.
+
+**Verification and blockers:** focused tests **123 passed**. Full Windows sandbox
+baseline **1,273 passed, 35 failed, 11 errors, 3 skipped**, with document-render subprocesses
+blocked by MiKTeX registry access. Streamlit component tests ran and the browser loopback
+preview timed out. A synthetic relocated store opened and downloaded using the new path
+despite a stale manifest location. Mac sync, actual Word pagination and portal extraction
+were unavailable for verification. Application code and private saved files were unmodified.
 
 ## Adaptive CV layout implementation (2026-11-18)
 

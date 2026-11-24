@@ -230,6 +230,7 @@ def run_generation(
     role: Optional[str] = None,
     work_country: Optional[str] = None,
     use_cache: bool = True,
+    balance_cv_pages: bool = False,
     status: Optional[Callable[[str], None]] = None,
 ) -> GenerationOutcome:
     """Generate documents for one posting, in-process.
@@ -267,6 +268,7 @@ def run_generation(
         return GenerationOutcome(ok=False, error=str(error))
 
     before = {a["job_id"] for a in list_applications(config, profile_id, limit=None)}
+    layout_options = {"balance_cv_pages": True} if balance_cv_pages else {}
     try:
         result = tailor_documents(
             job_description=job_description,
@@ -278,6 +280,7 @@ def run_generation(
             config=config,
             profile_id=profile_id,
             use_cache=use_cache,
+            **layout_options,
         )
     except Exception as error:  # noqa: BLE001 - converted for display
         return GenerationOutcome(
@@ -377,6 +380,7 @@ def list_artifacts(folder: Optional[Path]) -> List[dict]:
         if (
             not path.is_file()
             or path.suffix.lower() not in kinds
+            or ".sync-conflict-" in path.name.lower()
             or not path.resolve().is_relative_to(Path(folder).resolve())
         ):
             continue
@@ -392,18 +396,12 @@ def list_artifacts(folder: Optional[Path]) -> List[dict]:
     return artifacts
 
 
-def list_applications(config, profile_id: str, limit: Optional[int] = 20) -> List[dict]:
-    """Recent applications for one candidate, newest first.
-
-    Reads the real store, so a user can get back to documents produced by the CLI
-    as well as by the UI. That matters: the two interfaces share one store, and an
-    application generated in a terminal must not be invisible in the browser.
-    """
+def _recent_folders(config, profile_id):
     resolved = validate_profile_id(profile_id)
     outputs = config.store.outputs_dir(resolved)
     if not outputs.is_dir():
         return []
-    folders = sorted(
+    return sorted(
         (
             entry
             for entry in outputs.iterdir()
@@ -412,6 +410,10 @@ def list_applications(config, profile_id: str, limit: Optional[int] = 20) -> Lis
         key=lambda entry: entry.stat().st_mtime,
         reverse=True,
     )
+
+
+def list_applications(config, profile_id: str, limit: Optional[int] = 20) -> List[dict]:
+    """Recent applications for one candidate, newest first."""
     return [
         {
             "job_id": folder.name,
@@ -419,7 +421,7 @@ def list_applications(config, profile_id: str, limit: Optional[int] = 20) -> Lis
             "artifacts": list_artifacts(folder),
             "has_content": (folder / "source" / "content.json").is_file(),
         }
-        for folder in folders[:limit]
+        for folder in _recent_folders(config, profile_id)[:limit]
     ]
 
 
@@ -441,11 +443,12 @@ def check_word_layout(config, profile_id, job_id):
 
 def application_library(config, profile_id):
     """All saved applications with human labels, including partial historical runs."""
+    from services.application_review import load_application_summary
+
     records = []
-    for application in list_applications(config, profile_id, limit=None):
+    for folder in _recent_folders(config, profile_id):
         try:
-            detail = load_application(config, profile_id, application["job_id"])
-            records.append(detail)
+            records.append(load_application_summary(config, profile_id, folder.name))
         except (OSError, ValueError):
             continue
     return records
@@ -499,6 +502,8 @@ def posting_handoff(job):
 
 
 def document_label(name):
+    if name.startswith("cv_balanced_") and name.endswith(".pdf"):
+        return f"Balanced CV · {name.removeprefix('cv_balanced_').removesuffix('.pdf')} · PDF"
     if Path(name).stem.lower().endswith('_upload'):
         return f"CV for autofill · {Path(name).suffix.lstrip('.').upper()}"
     suffix = Path(name).suffix.lstrip(".").upper()
@@ -527,13 +532,10 @@ def read_artifact(config, profile_id, job_id, name):
 
 
 def saved_posting(config, profile_id, job_id):
-    from services.application_review import application_folder
+    from services.application_review import application_folder, read_saved_posting
 
     folder = application_folder(config, profile_id, job_id)
-    path = folder / "source" / "job_description.txt"
-    if path.is_file() and path.resolve().is_relative_to(folder):
-        return path.read_text(encoding="utf-8")
-    return "No posting was saved."
+    return read_saved_posting(folder) or "No posting was saved."
 
 
 def save_posting_provenance(config, profile_id, job_id, provenance):

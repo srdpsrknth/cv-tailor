@@ -10,6 +10,7 @@ for path in (ROOT / "backend", ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 from ui import services_bridge as bridge
+from ui import answers
 from ui.review import render_application
 from ui.theme import CSS
 
@@ -32,10 +33,26 @@ def active_profile_id(config):
     return st.session_state.get("profile_id") or None
 
 
+def workspace_address(profile_id, job_id, *, tab=None):
+    address = {"profile": profile_id, "application": job_id}
+    if tab:
+        address["tab"] = tab
+    return address
+
+
+def select_application(profile_id, job_id):
+    st.query_params.pop("tab", None)
+    st.query_params.update(workspace_address(profile_id, job_id))
+
+
+def clear_application_address():
+    for key in ("profile", "application", "tab"):
+        st.query_params.pop(key, None)
+
+
 def clear_candidate_state():
     """Sidebar callback runs before page widgets, so resets are safe."""
     names = {
-        "active_application",
         "generation_outcome",
         "search_outcome",
         "pending_handoff",
@@ -45,19 +62,22 @@ def clear_candidate_state():
         "role",
         "work_country",
         "generation_model",
+        "cv_page_layout",
         "fresh_draft",
         "library_query",
         "library_status",
         "library_model",
         "library_page",
-        "library_application",
         "setup_report",
+        "workspace_notice",
     }
     for key in list(st.session_state):
         if key in names or str(key).startswith(
             ("review_", "preview_document_", "search_", "failed_")
         ):
             del st.session_state[key]
+    if st.query_params.get("profile") != st.session_state.get("profile_picker"):
+        clear_application_address()
 
 
 def retain_inputs():
@@ -68,12 +88,12 @@ def retain_inputs():
         "role",
         "work_country",
         "generation_model",
+        "cv_page_layout",
         "fresh_draft",
         "library_query",
         "library_status",
         "library_model",
         "library_page",
-        "library_application",
         "search_keywords",
         "search_country",
         "search_city",
@@ -81,7 +101,11 @@ def retain_inputs():
         "search_remote",
     }
     for key in list(st.session_state):
-        if key in names or str(key).startswith("preview_document_"):
+        if (
+            key in names
+            or str(key).startswith("preview_document_")
+            or answers.is_editor_input(key)
+        ):
             st.session_state[key] = st.session_state[key]
 
 
@@ -155,7 +179,7 @@ def render_header(config):
     )
 
 
-def page_generate(config):
+def page_generate(config, applications_target):
     st.header("New application")
     profile = require_profile(config, "generate documents")
     if profile is None:
@@ -177,7 +201,6 @@ def page_generate(config):
         st.session_state["work_country"] = countries.get(handoff["work_country"], "")
         st.session_state["posting_provenance"] = handoff["provenance"]
         st.session_state.pop("generation_outcome", None)
-        st.session_state.pop("active_application", None)
     left, right = st.columns([3, 2], gap="large")
     with left:
         description = st.text_area(
@@ -214,6 +237,12 @@ def page_generate(config):
             ],
             key="work_country",
             help="The job's actual country, not the employer's headquarters. Check work-authorisation wording yourself.",
+        )
+        cv_page_layout = st.selectbox(
+            "CV page layout",
+            ["Automatic", "Balanced page breaks"],
+            key="cv_page_layout",
+            help="Balanced page breaks tries more ways to distribute the CV across two pages. It may take longer to render.",
         )
         catalogue = bridge.model_options(config)
         labels = {m.id: m.label for m in catalogue}
@@ -256,7 +285,8 @@ def page_generate(config):
             ]
         )
     with actions:
-        generate = st.button(
+        documents, answers_only = st.columns(2)
+        generate = documents.button(
             "Generate CV and cover letter",
             type="primary",
             use_container_width=True,
@@ -264,9 +294,37 @@ def page_generate(config):
             or not checks["key_configured"]
             or not checks["pdf_engine"],
         )
+        open_answers = answers_only.button(
+            "Answers only",
+            width="stretch",
+            disabled=not description.strip(),
+            help="Save the posting and open Answers without generating documents.",
+        )
         st.caption(
             "Paid generation · identical validated requests may reuse the cache. Review documents before sending."
         )
+    if open_answers:
+        from services.answers_only_application import create_answers_only_application
+        from services.profile_store import ProfileStoreError
+
+        try:
+            job_id = create_answers_only_application(
+                config,
+                candidate,
+                description,
+                company=company or None,
+                role=role or None,
+                work_country=country or None,
+            )
+        except (OSError, ValueError, ProfileStoreError) as error:
+            st.error(str(error))
+        else:
+            _save_workspace_posting(config, candidate, job_id)
+            st.session_state.pop("generation_outcome", None)
+            st.switch_page(
+                applications_target,
+                query_params=workspace_address(candidate, job_id, tab="answers"),
+            )
     if generate:
         with st.status("Preparing your application…", expanded=True) as progress:
             outcome = bridge.run_generation(
@@ -277,6 +335,7 @@ def page_generate(config):
                 role=role or None,
                 work_country=country or None,
                 use_cache=not fresh,
+                balance_cv_pages=cv_page_layout == "Balanced page breaks",
                 status=lambda message: st.caption(message),
             )
             progress.update(
@@ -285,8 +344,7 @@ def page_generate(config):
                 expanded=not outcome.ok,
             )
         st.session_state["generation_outcome"] = outcome
-        if outcome.ok:
-            st.session_state["active_application"] = outcome.job_id
+        if outcome.ok and outcome.job_id:
             folder = getattr(outcome, "job_folder", None) or bridge.job_folder(
                 config, candidate, outcome.job_id
             )
@@ -300,18 +358,13 @@ def page_generate(config):
                     exporter(config, candidate, outcome.job_id)
                 except (ValueError, OSError):
                     pass
-            if st.session_state.get("posting_provenance"):
-                try:
-                    bridge.save_posting_provenance(
-                        config,
-                        candidate,
-                        outcome.job_id,
-                        st.session_state["posting_provenance"],
-                    )
-                except (OSError, ValueError):
-                    st.warning(
-                        "Documents were saved, but the posting-source metadata could not be saved."
-                    )
+            _save_workspace_posting(config, candidate, outcome.job_id)
+            st.switch_page(
+                applications_target,
+                query_params=workspace_address(candidate, outcome.job_id),
+            )
+        if outcome.ok:
+            st.warning("Generation finished without a saved application identifier.")
     outcome = st.session_state.get("generation_outcome")
     if outcome and not outcome.ok:
         st.error(outcome.error)
@@ -321,11 +374,19 @@ def page_generate(config):
             )
         for job_id in outcome.details.get("applications", []):
             if st.button("Review saved attempt", key=f"failed_{candidate}_{job_id}"):
-                st.session_state["active_application"] = job_id
-    job_id = st.session_state.get("active_application")
-    if job_id:
-        st.divider()
-        render_application(config, candidate, job_id)
+                st.switch_page(
+                    applications_target,
+                    query_params=workspace_address(candidate, job_id),
+                )
+
+
+def _save_workspace_posting(config, profile_id, job_id):
+    provenance = st.session_state.get("posting_provenance")
+    if provenance:
+        try:
+            bridge.save_posting_provenance(config, profile_id, job_id, provenance)
+        except (OSError, ValueError):
+            st.session_state["workspace_notice"] = (profile_id, job_id)
 
 
 def page_find_jobs(config, generate_target=None):
@@ -415,23 +476,36 @@ def page_find_jobs(config, generate_target=None):
 
 
 def page_applications(config):
-    st.header("Applications")
     if require_profile(config, "review saved applications") is None:
         return
     candidate = active_profile_id(config)
+    job_id = st.query_params.get("application")
+    if job_id and st.query_params.get("profile") == candidate:
+        st.button(
+            "Back to applications",
+            key="back_to_applications",
+            on_click=clear_application_address,
+            type="tertiary",
+            icon=":material/arrow_back:",
+        )
+        if st.session_state.get("workspace_notice") == (candidate, job_id):
+            st.session_state.pop("workspace_notice")
+            st.warning(
+                "The application was saved. Its posting-source metadata could not be saved."
+            )
+        render_application(config, candidate, job_id)
+        return
+
+    st.header("Applications")
+    if job_id:
+        st.info("This workspace link is for a different candidate.")
     applications = bridge.application_library(config, candidate)
     if not applications:
         st.info(
             "No saved applications for this candidate yet. Create one on New application."
         )
         return
-    search, status, model = st.columns([3, 1, 2])
-    query = search.text_input("Search company or role", key="library_query").casefold()
-    status_filter = status.selectbox(
-        "Status",
-        ["All", *sorted({a["status"] for a in applications})],
-        key="library_status",
-    )
+    query = st.text_input("Search company or role", key="library_query").casefold()
     model_names = sorted(
         {
             str(m)
@@ -439,9 +513,16 @@ def page_applications(config):
             for m in (a["manifest"].get("models") or {}).values()
         }
     )
-    model_filter = model.selectbox(
-        "Requested model", ["All", *model_names], key="library_model"
-    )
+    with st.expander("Filters"):
+        status, model = st.columns(2)
+        status_filter = status.selectbox(
+            "Status",
+            ["All", *sorted({a["status"] for a in applications})],
+            key="library_status",
+        )
+        model_filter = model.selectbox(
+            "Requested model", ["All", *model_names], key="library_model"
+        )
     matches = [
         a
         for a in applications
@@ -465,22 +546,16 @@ def page_applications(config):
         else 1
     )
     visible = matches[(page - 1) * 20 : page * 20]
-    labels = {
-        a[
-            "job_id"
-        ]: f"{a['company'] or 'Application'} · {a['title']} · {a['created_at'][:10]} · {a['status']}"
-        for a in visible
-    }
-    if st.session_state.get("library_application") not in labels:
-        st.session_state.pop("library_application", None)
-    chosen = st.selectbox(
-        "Review an application",
-        list(labels),
-        format_func=labels.get,
-        key="library_application",
-    )
-    if chosen:
-        render_application(config, candidate, chosen)
+    for application in visible:
+        job_id = application["job_id"]
+        title = " · ".join(filter(None, (application["company"], application["title"])))
+        st.button(
+            f"{title} · {application['created_at'][:10]} · {application['status']}",
+            key=f"open_{candidate}_{job_id}",
+            on_click=select_application,
+            args=(candidate, job_id),
+            width="stretch",
+        )
 
 
 def page_about(config=None):
@@ -512,9 +587,8 @@ def page_about(config=None):
 **New application** — choose a candidate, paste a full posting, review the model and generate.
 Generation may make paid calls. Cached generation and re-rendering existing text avoid new drafting calls.
 
-**Review** — Documents shows PDFs and downloads. What changed compares the saved profile
-with final CV text. Why these changes shows the model’s explanation. Run details keeps
-historical usage separate from your current settings.
+**Applications** - open a recent application to download its PDFs. Open the preview to
+inspect a PDF, or use Details for text comparisons, the model's explanation and run history.
 
 **Find jobs** — free public-source search. Matching signals count stated evidence; they are not a hiring probability.
 
@@ -544,7 +618,7 @@ def main():
     retain_inputs()
 
     def generate_page():
-        page_generate(config)
+        page_generate(config, applications_target)
 
     def find_jobs_page():
         page_find_jobs(config, generate_target)
@@ -562,16 +636,17 @@ def main():
         url_path="generate",
         default=True,
     )
+    applications_target = st.Page(
+        applications_page,
+        title="Applications",
+        icon="🗂️",
+        url_path="applications",
+    )
     navigation = st.navigation(
         [
             generate_target,
             st.Page(find_jobs_page, title="Find jobs", icon="🔎", url_path="find-jobs"),
-            st.Page(
-                applications_page,
-                title="Applications",
-                icon="🗂️",
-                url_path="applications",
-            ),
+            applications_target,
             st.Page(settings_page, title="Settings & help", icon="⚙️", url_path="help"),
         ]
     )

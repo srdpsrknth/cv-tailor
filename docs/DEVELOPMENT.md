@@ -205,6 +205,9 @@ HTTP, so the UI works whether or not uvicorn is running. Keep `BACKEND_URL` matc
   Set `LATEX_COMPILER` if `pdflatex` is not on `PATH`.
 - Never commit credentials, virtual environments, logs or generated PDFs/DOCX.
 
+The [private store sync pilot](PRIVATE_STORE_SYNC.md) uses disposable profiles and
+outputs to check both directions, staggered arrivals and conflict recovery.
+
 ---
 
 ## Git workflow

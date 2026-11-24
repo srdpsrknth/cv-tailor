@@ -8,7 +8,14 @@ from pypdf.generic import (
     DecodedStreamObject, DictionaryObject, NameObject,
 )
 
-from renderers.cv_layout import PRESETS, measure_layout, rank_layout, read_layout_metadata
+from renderers.cv_layout import (
+    PRESETS,
+    measure_layout,
+    preview_breaks,
+    preview_quality_score,
+    rank_layout,
+    read_layout_metadata,
+)
 
 
 def _pdf(tmp_path, pages):
@@ -88,6 +95,52 @@ def test_project_on_same_page_is_not_a_split(tmp_path):
                             project_names=[("Example Ltd", "Example Project")])
     assert report["employer_project_splits"] == 0
     assert report["split_employer_indices"] == []
+
+
+def test_preview_targets_the_first_whole_role_on_page_two(tmp_path):
+    path = _pdf(tmp_path, [
+        [(45, 43, "First Company"), (45, 650, "First role evidence")],
+        [(45, 43, "Next Company"), (45, 60, "New role evidence"),
+         (45, 730, "Last line")],
+    ])
+    report = measure_layout(path, employer_names=["First Company", "Next Company"])
+    assert list(preview_breaks(report, [(3, 2), (4, 2)])) == [
+        (1, "bullet", 1), (1, "project", 0),
+    ]
+
+
+def test_preview_can_try_the_second_project_in_a_continuation(tmp_path):
+    path = _pdf(tmp_path, [
+        [(45, 43, "First Company"), (45, 635, "Role evidence")],
+        [(45, 43, "Selected Projects: Warehouse migration"),
+         (45, 730, "Project evidence")],
+    ])
+    report = measure_layout(path, employer_names=["First Company"],
+                            project_names=[("First Company", "Warehouse migration")])
+    assert list(preview_breaks(report, [(2, 3)])) == [
+        (0, "bullet", 1), (0, "project", 1),
+    ]
+
+
+def test_preview_avoids_ambiguous_and_short_roles(tmp_path):
+    path = _pdf(tmp_path, [
+        [(45, 43, "Repeat Company"), (45, 640, "First role evidence")],
+        [(45, 43, "Repeat Company"), (45, 60, "Next role evidence")],
+    ])
+    report = measure_layout(path, employer_names=["Repeat Company", "Repeat Company"])
+    assert list(preview_breaks(report, [(1, 0), (4, 3)])) == []
+    assert list(preview_breaks({**report, "page_count": 1}, [(1, 0)])) == []
+
+
+def test_preview_prefers_a_shorter_maximum_tail_but_charges_for_continuation():
+    long_tail = {"quality_score": 2, "pages": [
+        {"blank_tail_mm": 50}, {"blank_tail_mm": 22},
+    ]}
+    short_tails = {"quality_score": 2, "pages": [
+        {"blank_tail_mm": 32}, {"blank_tail_mm": 37},
+    ]}
+    assert preview_quality_score(short_tails, continued=True) < preview_quality_score(long_tail)
+    assert preview_quality_score(short_tails) < preview_quality_score(short_tails, continued=True)
 
 
 @pytest.mark.parametrize("heading", ["EDUCATION", "Example Ltd",

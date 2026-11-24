@@ -41,3 +41,13 @@ backfilled. Rendering previews adds `streamlit-pdf==2.1.0`; Streamlit stays pinn
 the lockfile and the minimum requirement now matches the verified 1.53.1 runtime.
 Full application/submission tracking remains Phase 5; this change provides review,
 search and downloads without inventing that workflow.
+
+## Portal answer revisions (2026-11-24)
+
+Each application saves explicit editor revisions under `source/portal_answers/`.
+Every revision contains the candidate and job IDs, its own ID, its parent ID, the
+questions, edited text and any supplied public excerpts. Publish a new revision by
+atomic rename. Checking the expected revision catches an already-synced edit while
+separate filenames let simultaneous edits survive as two revisions. If the history
+forks or arrives out of order, show the last unambiguous state and pause saves until
+the history is recovered. Opening, previewing and copying do not save revisions.
