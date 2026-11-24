@@ -198,7 +198,8 @@ def page_generate(config, applications_target):
         }
         for key in ("job_description", "company", "role"):
             st.session_state[key] = handoff[key]
-        st.session_state["work_country"] = countries.get(handoff["work_country"], "")
+        code = handoff["work_country"] or ""
+        st.session_state["work_country"] = countries.get(code, code)
         st.session_state["posting_provenance"] = handoff["provenance"]
         st.session_state.pop("generation_outcome", None)
     left, right = st.columns([3, 2], gap="large")
@@ -233,9 +234,9 @@ def page_generate(config, applications_target):
                 "United Kingdom",
                 "Austria",
                 "Switzerland",
-                "Other",
             ],
             key="work_country",
+            accept_new_options=True,
             help="The job's actual country, not the employer's headquarters. Check work-authorisation wording yourself.",
         )
         cv_page_layout = st.selectbox(
@@ -392,17 +393,23 @@ def _save_workspace_posting(config, profile_id, job_id):
 def page_find_jobs(config, generate_target=None):
     st.header("Find jobs")
     st.caption("Free discovery and evidence-based matching. No model call.")
-    if require_profile(config, "find jobs for your profile") is None:
+    profile = require_profile(config, "find jobs for your profile")
+    if profile is None:
         return
+    defaults = profile.job_search
+    if defaults:
+        for key in ("keywords", "country", "city"):
+            st.session_state.setdefault(f"search_{key}", getattr(defaults, key))
+        st.session_state.setdefault("search_remote", defaults.remote_only)
     with st.form("job_search"):
         columns = st.columns([3, 1, 1, 1])
         keywords = columns[0].text_input(
-            "Keywords", key="search_keywords", placeholder="data engineer"
+            "Keywords", key="search_keywords", placeholder="Job title or skill"
         )
         country = columns[1].text_input(
-            "Country", key="search_country", placeholder="DE"
+            "Country", key="search_country", placeholder="Country name or code"
         )
-        city = columns[2].text_input("City", key="search_city", placeholder="Berlin")
+        city = columns[2].text_input("City", key="search_city", placeholder="City name")
         limit = columns[3].number_input(
             "Max results",
             min_value=1,

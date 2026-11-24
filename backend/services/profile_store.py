@@ -94,7 +94,7 @@ def validate_profile_id(profile_id) -> str:
         raise InvalidProfileIdError(
             f"Invalid profile_id {profile_id!r}. Use lowercase letters, digits, "
             "'-' and '_', starting with a letter or digit (for example "
-            "'sreedeep'). The id becomes a directory name, so anything else is "
+            "'sample-analyst'). The id becomes a directory name, so anything else is "
             "rejected rather than sanitised."
         )
     return text

@@ -137,6 +137,7 @@ def list_sources(args, console: Console, config) -> int:
 def search(args, console: Console, config) -> int:
     """Run a search, deduplicate, rank, and report the outcome."""
     from models.job import SearchQuery
+    from models.profile import JobSearchDefaults
     from services.job_match import MatchPreferences
     from services.job_search import search_jobs, summarise
 
@@ -147,17 +148,24 @@ def search(args, console: Console, config) -> int:
         raise CliError(str(error), EXIT_FAILED,
                        hint="Run `cvtailor profile list` to see the available ids.")
 
-    keywords = getattr(args, "keywords", None)
+    defaults = profile.job_search or JobSearchDefaults()
+    fields = {
+        name: getattr(args, name) if getattr(args, name, None) is not None else getattr(defaults, name)
+        for name in ("keywords", "country", "city")
+    }
+    remote = getattr(args, "remote", None)
+    if remote is None:
+        remote = defaults.remote_only
     query = SearchQuery(
-        keywords=keywords,
-        country=getattr(args, "country", None),
-        city=getattr(args, "city", None),
-        remote=(True if getattr(args, "remote", False) else None),
+        **{name: value.strip() or None for name, value in fields.items()},
+        remote=True if remote else None,
         limit=getattr(args, "limit", None) or 10,
     )
+    if fields["country"].strip() and query.country is None:
+        raise CliError("Unknown search country. Supply a supported country name or code.", EXIT_USAGE)
 
     preferences = MatchPreferences.from_profile(
-        profile, keywords=tuple(keywords.split()) if keywords else (),
+        profile, keywords=tuple((query.keywords or "").split()),
     )
     sources = _apply_overrides(args, config)
 

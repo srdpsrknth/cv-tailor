@@ -101,6 +101,8 @@ class Config:
     #: means no cap. This is a *guard*, not an estimate: when the accumulated cost
     #: would exceed it the run stops rather than continuing to spend.
     max_cost_usd: Optional[float] = None
+    #: Machine-local calendar for new identifiers and upload filenames.
+    timezone_name: str = "UTC"
 
     # --- construction -----------------------------------------------------------------
 
@@ -156,6 +158,9 @@ class Config:
         # An explicit file is honoured only when the caller passed one. There is no
         # branch that fills this in with a default path.
         profile = overrides.pop("profile_path", None)
+        timezone_name = overrides.pop("timezone_name", None)
+        if timezone_name is None:
+            timezone_name = os.getenv("CVTAILOR_TIMEZONE", "")
 
         # --- provider selection (ADR 0005) ---------------------------------------
         # An unknown name is rejected here, at config time, rather than silently
@@ -231,6 +236,7 @@ class Config:
             ),
             task_models=task_models,
             max_cost_usd=max_cost_usd,
+            timezone_name=timezone_name.strip() or "UTC",
         )
         if overrides:
             raise TypeError(f"Unknown config overrides: {sorted(overrides)}")

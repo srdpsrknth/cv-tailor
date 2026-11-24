@@ -15,6 +15,7 @@ from typing import Optional
 from models.profile import Profile
 from models.tailored_output import TailoredCV
 
+from services.cache_store import serialize_profile_bytes
 from services.validation import ProfileRules
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -62,7 +63,7 @@ def build_context(
     if profile_bytes is None:
         profile_bytes = profile_json
     if profile_bytes is None:
-        profile_bytes = profile.model_dump_json(indent=2)
+        profile_bytes = serialize_profile_bytes(profile)
     country_context = (
         f"\nWORK COUNTRY (explicit user selection; overrides country inference): {work_country}. "
         "Apply the work-authorization rules for this country. Company headquarters and past job locations are irrelevant.\n"

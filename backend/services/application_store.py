@@ -30,10 +30,9 @@ import logging
 import shutil
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
-from zoneinfo import ZoneInfo
+from utils.calendar import calendar_year
 
 from services.profile_store import validate_profile_id
 
@@ -169,9 +168,9 @@ class ApplicationStore:
 
 
 def make_job_id(
-    company: str, role: str, slugify, profile_id: Optional[str] = None
+    company: str, role: str, slugify, profile_id: Optional[str] = None, *, timezone_name="UTC"
 ) -> str:
-    """Build ``<year>_<company>_<role>_<ms>`` using the Berlin calendar year.
+    """Build ``<year>_<company>_<role>_<ms>`` in the configured calendar.
 
     The timestamp keeps concurrent applications to the same posting distinct. The
     candidate is carried by the *folder* (``outputs/<profile_id>/<job_id>/``), not
@@ -184,6 +183,6 @@ def make_job_id(
     """
     if profile_id is not None:
         validate_profile_id(profile_id)
-    year = datetime.now(ZoneInfo("Europe/Berlin")).year
+    year = calendar_year(timezone_name)
     milliseconds = time.time_ns() // 1_000_000
     return f"{year}_{slugify(company)}_{slugify(role)}_{milliseconds}"

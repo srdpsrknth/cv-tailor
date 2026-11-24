@@ -55,6 +55,7 @@ from services.generation import (
     build_cv_prompt,
 )
 from services.prompts import candidate_guidance_block, pinned_project_clause
+from utils.calendar import calendar_zone
 from utils.text import slugify
 
 logger = logging.getLogger(__name__)
@@ -312,6 +313,7 @@ def tailor_documents(
     # Fail closed, and fail *early*: an unresolvable candidate must cost nothing and
     # must not leave a half-written folder behind.
     resolved_profile_id = resolve_profile_id(config, profile_id)
+    calendar_zone(config.timezone_name)
 
     # A well-formed id is not the same as a real one. Without this check a typo would
     # happily create `outputs/typo/...` and generate documents for an unnamed
@@ -496,6 +498,7 @@ def tailor_documents(
                 role_title or "application",
                 slugify,
                 profile_id=resolved_profile_id,
+                timezone_name=config.timezone_name,
             )
             failed = ApplicationStore(
                 outputs_root=outputs_root,
@@ -521,6 +524,7 @@ def tailor_documents(
         role_title or cl.role_title,
         slugify,
         profile_id=resolved_profile_id,
+        timezone_name=config.timezone_name,
     )
     applications = ApplicationStore(
         outputs_root=outputs_root, job_id=job_id, profile_id=resolved_profile_id
@@ -586,7 +590,9 @@ def tailor_documents(
             )
         from renderers.upload_cv import render_upload_cv
 
-        upload_paths = render_upload_cv(cv, profile, applications.job_folder, position)
+        upload_paths = render_upload_cv(
+            cv, profile, applications.job_folder, position, timezone_name=config.timezone_name
+        )
     except Exception as error:
         # Preserve everything editable, then mark the folder failed explicitly (D-14).
         save_content()

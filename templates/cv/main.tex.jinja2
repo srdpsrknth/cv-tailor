@@ -116,7 +116,7 @@
 {% for edu in education %}
 \needspace{3\baselineskip}
 {\bfseries {{ edu.degree }}\par}\nopagebreak
-{\metadata {{ edu.institution }} | {{ edu.start_year }} -- {{ edu.end_year }}{% if edu.location %} | {{ edu.location }}{% endif %}\par}
+{\metadata {{ edu.institution }} | {{ edu.dates }}{% if edu.location %} | {{ edu.location }}{% endif %}\par}
 {% if not loop.last %}\vspace{4pt}{% endif %}
 {% endfor %}
 {% endif %}

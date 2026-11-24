@@ -21,6 +21,35 @@ cutover and authorization gates pass the original isolation regressions.
    Inventory and back up the real stores before agreeing the seed and shared
    candidate folders. Keep credentials, Git metadata and machine settings local.
 
+## Current milestone checklist
+
+Use this checklist at the start and end of each work session. Start with the
+first pending item unless the owner changes the sequence. After each increment,
+record the result, verification, and any blocker in [Project state](PROJECT_STATE.md).
+Mark an item complete only when its acceptance checks pass, and check for open
+items before moving to the next milestone.
+
+The owner approved implementing ongoing education alongside 1E. Review the
+combined changes before advancing to standalone projects and section ordering.
+
+- [x] **1A. Synthetic coverage** for cross-profile leakage and authorization claims.
+- [x] **1B. Private policy capture** with verified backups of the original profile and writing preferences.
+- [x] **1C. Candidate isolation** with installed private guidance, neutral shared defaults, and all original isolation regressions passing. Pushed in `7227784`.
+- [x] **1D. Provider setup** with provider-specific credential checks and native Gemini opt-in. Verified offline and pushed in `7227784`.
+- [ ] **1E. Defaults and docs**
+  - [x] **Audit defaults.** Traced job-search filters, country selection, and timezones across the CLI, GUI, configuration, diagnostics, naming, and exports. Candidate filters and machine calendar settings are separate from source capabilities.
+  - [x] **Generalize defaults.** Explicit input overrides profile search preferences. Two synthetic profiles, an unfiltered profile, and a year-boundary case are covered. Existing application IDs are preserved.
+  - [x] **Update active docs, examples, and agent instructions.** Documented settings precedence, portable examples, and preserving the previous calendar with an explicit timezone.
+  - [ ] **Verify and close.** The non-TeX suite passed, and the owner passed the education PDF regression in regular Windows PowerShell. Commit and push before advancing beyond ongoing education.
+- [ ] **2. CV content and layout**
+  - [ ] Ongoing education and expected completion dates. Implemented for profile snapshots, CLI, LaTeX, and autofill exports. PDF verification passed. Commit and push remain open.
+  - [ ] Standalone projects and section ordering.
+  - [ ] Publications, activities, and optional display preferences.
+  - [ ] Verify legacy profiles, saved snapshots, and supported export formats.
+- [ ] **3. Windows-Mac private-store sync**
+  - [ ] Verify the synthetic two-way round trip, partial arrival, and conflict recovery.
+  - [ ] Inventory and back up both real stores before agreeing the seed and shared candidate folders.
+
 **CV layout follow-up (2026-11-18):** implemented deterministic readable typography
 and employer-boundary selection in the shared renderer, two-parser content checks,
 page-balance advisories and selected-layout provenance. Existing shortening applies

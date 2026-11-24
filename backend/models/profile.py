@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import List, Dict, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 # -------------------------
@@ -56,7 +56,22 @@ class Education(BaseModel):
     institution: str
     location: Optional[str] = None
     start_year: int
-    end_year: int
+    end_year: Optional[int] = None
+    ongoing: bool = False
+
+    @model_validator(mode="after")
+    def validate_completion(self):
+        if not self.ongoing and self.end_year is None:
+            raise ValueError("completed education requires an end_year")
+        return self
+
+    def end_date_label(self) -> str:
+        if self.ongoing:
+            return "Present" if self.end_year is None else f"Present (expected {self.end_year})"
+        return str(self.end_year)
+
+    def date_range(self, separator: str = " - ") -> str:
+        return f"{self.start_year}{separator}{self.end_date_label()}"
 
 
 class Language(BaseModel):
@@ -127,6 +142,17 @@ class ProfileRules(BaseModel):
 # Root profile model
 # -------------------------
 
+class JobSearchDefaults(BaseModel):
+    """Optional starting filters for this candidate's job searches."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    keywords: str = ""
+    country: str = ""
+    city: str = ""
+    remote_only: bool = False
+
+
 class Profile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -139,3 +165,4 @@ class Profile(BaseModel):
     skills: Dict[str, List[str]] = Field(default_factory=dict)
     languages: List[Language] = Field(default_factory=list)
     rules: Optional[ProfileRules] = None
+    job_search: Optional[JobSearchDefaults] = None

@@ -317,7 +317,8 @@ def test_retention_does_not_write_download_or_component_state(monkeypatch):
     assert state["job_description"] == "Synthetic posting"
 
 
-def test_handoff_populates_form_without_generation(workspace, monkeypatch):
+@pytest.mark.parametrize(("code", "choice"), [("DE", "Germany"), ("CA", "CA")])
+def test_handoff_populates_form_without_generation(workspace, monkeypatch, code, choice):
     monkeypatch.setattr(
         bridge,
         "run_generation",
@@ -328,14 +329,14 @@ def test_handoff_populates_form_without_generation(workspace, monkeypatch):
         "job_description": "Published job description",
         "company": "Northwind",
         "role": "Analyst",
-        "work_country": "DE",
+        "work_country": code,
         "provenance": {"source": "synthetic", "url": "https://example.test/role"},
     }
     at.run()
     assert not at.exception
     assert at.text_area[0].value == "Published job description"
     assert at.text_input(key="company").value == "Northwind"
-    assert at.selectbox(key="work_country").value == "Germany"
+    assert at.selectbox(key="work_country").value == choice
 
 
 def test_review_renders_legacy_explanation_state_without_paid_call(

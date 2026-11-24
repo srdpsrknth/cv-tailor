@@ -576,6 +576,8 @@ def search_from_fields(config, profile_id, keywords, country, city, remote, limi
         remote=True if remote else None,
         limit=limit,
     )
+    if country and country.strip() and query.country is None:
+        raise ValueError("Unknown search country. Supply a supported country name or code.")
     return run_job_search(
         config,
         profile_id,
@@ -596,7 +598,7 @@ def setup_checks(config):
             doctor.check_venv(config.project_root),
             doctor.check_store(config),
             doctor.check_profile(config),
-            doctor.check_timezone(),
+            doctor.check_timezone(config.timezone_name),
             doctor.check_templates(config.project_root),
             doctor.check_pdflatex(),
             doctor.check_outputs(config),

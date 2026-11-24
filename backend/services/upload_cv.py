@@ -29,7 +29,9 @@ def export_saved_upload_cv(config, profile_id, job_id):
             raise ValueError('Autofill export cannot update provenance because the saved manifest is not an object.')
     cv = TailoredCV.model_validate(content['cv'])
     profile = Profile.model_validate(snapshot)
-    paths = render_upload_cv(cv, profile, folder, content.get('role_title'))
+    paths = render_upload_cv(
+        cv, profile, folder, content.get('role_title'), timezone_name=config.timezone_name,
+    )
     rows = record_artifact_provenance(
         config.project_root,
         content,

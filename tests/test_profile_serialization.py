@@ -8,7 +8,7 @@ Two things this file is careful about:
 
 * **It is not a prompt change.** The text the model receives must be byte-identical
   to what it received before, so the central assertion compares the rendered prompt
-  against ``profile.model_dump_json(indent=2)`` directly rather than against a
+  against ``profile.model_dump_json(indent=2, exclude={"job_search"})`` directly rather than against a
   paraphrase of it. Wording changes belong to Phase 3 item 2, not here.
 * **It is not a call-count change.** The number of ``_call_provider`` calls is pinned
   by ``test_tailoring_pipeline.py`` and is asserted again here, because the whole
@@ -48,7 +48,7 @@ def fresh_profile():
 def test_the_prompt_profile_block_is_the_exact_profile_serialization(analyst_profile):
     """The bytes must be the model's own dump, not a re-rendering of it."""
     block = generation.build_context('A job description.', analyst_profile)
-    expected = analyst_profile.model_dump_json(indent=2)
+    expected = analyst_profile.model_dump_json(indent=2, exclude={"job_search"})
 
     assert expected in block
     assert block.endswith('BASE PROFILE (authoritative JSON):\n' + expected)
@@ -67,7 +67,7 @@ def test_passing_the_serialization_explicitly_is_byte_identical(analyst_profile)
     supplied = generation.build_context(
         'A job description.', analyst_profile, 'Nordwind Analytics GmbH',
         'Analytical Engineer', 'Ireland',
-        profile_json=analyst_profile.model_dump_json(indent=2),
+        profile_json=analyst_profile.model_dump_json(indent=2, exclude={"job_search"}),
     )
 
     assert plain == supplied
@@ -79,7 +79,7 @@ def test_the_header_is_unaffected_by_the_new_parameter(analyst_profile, country)
     """Every branch of the country header renders the same with and without it."""
     kwargs = dict(company_name='Example Ltd', role_title='Analyst', work_country=country)
     assert generation.build_context('JD', analyst_profile, **kwargs) == generation.build_context(
-        'JD', analyst_profile, profile_json=analyst_profile.model_dump_json(indent=2), **kwargs
+        'JD', analyst_profile, profile_json=analyst_profile.model_dump_json(indent=2, exclude={"job_search"}), **kwargs
     )
 
 
@@ -97,7 +97,7 @@ def test_every_prompt_carries_the_serialized_profile(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
 
-    block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2)
+    block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2, exclude={"job_search"})
     assert offline.call_count == 2
     assert all(block in prompt for prompt in offline.prompts), \
         'a prompt did not carry the exact serialized profile'
@@ -124,7 +124,7 @@ def test_a_layout_retry_does_not_re_send_the_serialized_profile(
     )
 
     assert offline.call_count == 3
-    block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2)
+    block = 'BASE PROFILE (authoritative JSON):\n' + analyst_profile.model_dump_json(indent=2, exclude={"job_search"})
     carrying = [p for p in offline.prompts if block in p]
     assert len(carrying) == 2, (
         'the profile block belongs on the draft and the letter, not on the retry'
@@ -220,7 +220,7 @@ def test_the_facts_block_excludes_the_rules(analyst_profile):
     assert json.loads(facts) == {
         key: value
         for key, value in analyst_profile.model_dump().items()
-        if key != 'rules'
+        if key not in {'rules', 'job_search'}
     }
 
 

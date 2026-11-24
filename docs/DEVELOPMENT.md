@@ -130,12 +130,12 @@ separate private store, named by `CVTAILOR_STORE`:
 <store>/applications/<job_id>/source/
 ```
 
-On this machine the store is `D:\coding\cv-tailor-data`, and it is its own Git repository.
-Point a worktree at it in `.env`:
+Point a worktree at a private store in `.env`. Paths relative to the worktree
+are portable when both directories share a parent.
 
 ```
-CVTAILOR_STORE=D:/coding/cv-tailor-data
-CVTAILOR_PROFILE_ID=sreedeep
+CVTAILOR_STORE=../cv-tailor-data
+CVTAILOR_PROFILE_ID=sample-analyst
 ```
 
 `profile_id` is required and fails closed: there is no default profile (ADR 0003). Use

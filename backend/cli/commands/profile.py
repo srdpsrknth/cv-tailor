@@ -175,7 +175,7 @@ def _show_loaded(console: Console, path: Path, label: str, profile=None, source=
         console.out("")
         console.out(f"Education ({len(profile.education)}):")
         for edu in profile.education:
-            console.out(f"  {edu.degree} -- {edu.institution} ({edu.start_year}-{edu.end_year})")
+            console.out(f"  {edu.degree} -- {edu.institution} ({edu.date_range('-')})")
 
     if profile.certifications:
         console.out("")

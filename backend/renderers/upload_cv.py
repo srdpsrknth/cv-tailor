@@ -1,9 +1,7 @@
 """Sequential Word/text companions for resume autofill. No model or office calls."""
 
-from datetime import datetime
 from pathlib import Path
 import re
-from zoneinfo import ZoneInfo
 
 from docx import Document
 from docx.oxml.ns import qn
@@ -11,6 +9,7 @@ from docx.shared import Cm, Pt, RGBColor
 
 from models.profile import Profile
 from models.tailored_output import TailoredCV
+from utils.calendar import calendar_year
 from utils.text import format_skill_category, slugify
 
 
@@ -43,7 +42,7 @@ def readable_date(value: str) -> str:
     return value
 
 
-def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position=None) -> dict:
+def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position=None, *, timezone_name="UTC") -> dict:
     """Render the accepted CV wording into one-column body paragraphs.
 
     The text companion is the exact paragraph text of the DOCX. No facts are
@@ -52,7 +51,7 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
     folder = Path(outputs_dir)
     folder.mkdir(parents=True, exist_ok=True)
     identity = profile.identity
-    year = datetime.now(ZoneInfo('Europe/Berlin')).year
+    year = calendar_year(timezone_name)
     stem = f'{year}_CV_{slugify(identity.full_name)}_{slugify(job_position or cv.title or "role")}_upload'
     paths = {'cv_upload_docx_path': str(folder / f'{stem}.docx'),
              'cv_upload_text_path': str(folder / f'{stem}.txt')}
@@ -136,7 +135,7 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
         for edu in profile.education:
             add(edu.degree, 'Heading 2', keep=True)
             add(' | '.join(value for value in (
-                edu.institution, f'{edu.start_year} - {edu.end_year}', edu.location
+                edu.institution, edu.date_range(), edu.location
             ) if value))
     if cv.include_certifications and profile.certifications:
         add('Certifications', 'Heading 1')

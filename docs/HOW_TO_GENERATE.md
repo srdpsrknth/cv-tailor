@@ -29,7 +29,7 @@ the app running; **Stop CV Tailor** shuts it down. To install these shortcuts, s
 |---|---|---|
 | Python | `.\.venv\Scripts\python.exe` | `.venv/bin/python` |
 | Line continuation | `` ` `` (backtick) | `\` (backslash) |
-| Store path example | `D:\coding\cv-tailor-data` | `~/cv-tailor-data` |
+| Store path example | `..\cv-tailor-data` | `~/cv-tailor-data` |
 
 Throughout this guide the Windows form is used. **On a Mac, substitute
 `.venv/bin/python`** for `.\.venv\Scripts\python.exe`, and use `\` instead of a
@@ -37,11 +37,11 @@ backtick to continue a line. For example, the same command on each:
 
 ```powershell
 # Windows
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 ```
 ```bash
 # macOS
-.venv/bin/python cvtailor.py --profile-id sreedeep generate --job-file job.txt
+.venv/bin/python cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 ```
 
 > **Setting up on a Mac for the first time?** Read
@@ -87,7 +87,7 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 > able to write there does not prove Python can. See the targeted repair in
 > [DEVELOPMENT.md](DEVELOPMENT.md#windows-python-output-permission-error).
 
-To see which profiles exist (`sreedeep` is this machine's):
+List available profiles and substitute your chosen ID for the synthetic example `sample-analyst`.
 
 ```powershell
 .\.venv\Scripts\python.exe cvtailor.py profile list
@@ -98,16 +98,14 @@ To see which profiles exist (`sreedeep` is this machine's):
 >
 > ```powershell
 > # right
-> cvtailor.py --profile-id sreedeep generate --job-file job.txt
-> cvtailor.py --profile-id sreedeep profile show
+> cvtailor.py --profile-id sample-analyst generate --job-file job.txt
+> cvtailor.py --profile-id sample-analyst profile show
 >
 > # wrong -- "unrecognized arguments"
-> cvtailor.py profile show --profile-id sreedeep
+> cvtailor.py profile show --profile-id sample-analyst
 > ```
 >
-> This machine's `.env` already sets `CVTAILOR_PROFILE_ID=sreedeep`, so commands work
-> without the flag here. Pass it explicitly anyway: it is what makes the command
-> unambiguous, and it is required on any machine whose `.env` does not set it.
+> Pass the candidate ID explicitly, or set `CVTAILOR_PROFILE_ID` in your own `.env`.
 
 ---
 
@@ -124,8 +122,8 @@ record easier to trace later.
 On a Mac, save the clipboard **while it contains the posting**, then inspect the file:
 
 ```bash
-pbpaste > ../cv-tailor-data/jobs/sreedeep/job.txt
-head -5 ../cv-tailor-data/jobs/sreedeep/job.txt
+pbpaste > ../cv-tailor-data/jobs/sample-analyst/job.txt
+head -5 ../cv-tailor-data/jobs/sample-analyst/job.txt
 ```
 
 Use your actual private store and profile directory; create the directory first if
@@ -142,26 +140,53 @@ the posting's length and first line before generation.
 ### 2. Generate
 
 ```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 ```
 
 For the saved Mac file, for example:
 
 ```bash
-.venv/bin/python cvtailor.py --profile-id sreedeep generate \
-  --job-file ../cv-tailor-data/jobs/sreedeep/job.txt \
+.venv/bin/python cvtailor.py --profile-id sample-analyst generate \
+  --job-file ../cv-tailor-data/jobs/sample-analyst/job.txt \
   --company "Northwind Analytics" --role "Analytics Engineer" --country Germany
 ```
 
 The company and role flags prevent generic inferred names if the posting is ambiguous.
 
-**Country of employment** is the actual job location. The Generate page includes
-Germany, Ireland, Netherlands and India; the CLI accepts the same names through
-`--country`. An explicit selection overrides location inference from the posting.
+**Country of employment** is the actual job location. Choose or enter the country
+in the Generate page, or pass `--country` in the CLI. An explicit selection
+overrides location inference from the posting.
 It changes the work-authorization instructions and validation, is saved with the
 application, and participates in the cache key. Changing country can therefore
 require a new paid draft. It does not change the document language, source profile,
 page/word limits, or the separate Find jobs country filter.
+
+**Search defaults** are optional. For example, a synthetic profile can start
+searches with the following private `profile.yaml` settings.
+
+```yaml
+job_search:
+  keywords: data engineer
+  country: CA
+  city: Toronto
+  remote_only: true
+```
+
+CLI flags override the selected profile's values. Omit a flag to use its profile
+default, pass an empty string to clear a text filter, or use `--no-remote` to allow
+any work mode. In Find jobs, edit or clear the prefilled fields. Existing profiles
+without `job_search` start unfiltered. Source coverage still determines which
+markets and filters can return results.
+
+**Calendar timezone** comes from `CVTAILOR_TIMEZONE` in the local environment or
+`.env` and defaults to UTC. To retain the former Berlin calendar for new application
+IDs and upload CV filenames, set `CVTAILOR_TIMEZONE=Europe/Berlin`. Existing IDs
+and files keep their names. Stored timestamps remain in UTC.
+
+**Ongoing education** uses `ongoing: true` in a private profile's education
+entry. Omit `end_year` if completion is unknown, or set it to the expected year
+to show, for example, `Present (expected 2028)`. Completed degrees use the
+existing `start_year` and `end_year` fields.
 
 For a profile holding a German EU Blue Card, the current rules behave as follows:
 
@@ -189,15 +214,15 @@ Useful variations:
 
 ```powershell
 # Give the company and role explicitly, instead of letting it infer them
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt `
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt `
     --company "Northwind Analytics GmbH" --role "Analytical Engineer"
 
 # Say which country the job is actually in (not the company headquarters)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt `
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt `
     --country Germany
 
 # Paste the posting inline instead of using a file
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job "We are looking for..."
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job "We are looking for..."
 ```
 
 **`--profile-id` is required and has no default.** That is deliberate: it makes it
@@ -220,7 +245,7 @@ Expect a minute or two. You will see progress in the terminal.
 Everything lands in your private store, **not** in this repository:
 
 ```
-Windows:  D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\
+Windows:  ..\cv-tailor-data\outputs\sample-analyst\<job_id>\
 macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
 
     2026_CV_<your_name>_<role>.pdf          <- formatted CV with searchable text; parser behavior varies
@@ -239,7 +264,7 @@ date:
 
 ```powershell
 # Windows
-Get-ChildItem D:\coding\cv-tailor-data\outputs\sreedeep |
+Get-ChildItem ..\cv-tailor-data\outputs\sample-analyst |
     Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name, LastWriteTime
 ```
 ```bash
@@ -317,8 +342,8 @@ nothing and does not touch the AI.
 3. Re-render:
 
 ```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep render `
-    --content "D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\source\content.json"
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst render `
+    --content "..\cv-tailor-data\outputs\sample-analyst\<job_id>\source\content.json"
 ```
 
 Narrow it to one document if you only changed one:
@@ -338,8 +363,8 @@ into both the DOCX and PDF headers so the document carries the current submissio
 If you have updated your profile and want the documents regenerated from scratch:
 
 ```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate `
-    --job-file "D:\coding\cv-tailor-data\outputs\sreedeep\<job_id>\source\job_description.txt" `
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate `
+    --job-file "..\cv-tailor-data\outputs\sample-analyst\<job_id>\source\job_description.txt" `
     --no-cache
 ```
 
@@ -358,7 +383,7 @@ AI call.
 .\.venv\Scripts\python.exe cvtailor.py jobs sources
 
 # Search
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep jobs search `
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search `
     --keywords "data engineer" --country DE --limit 10
 ```
 
@@ -371,7 +396,7 @@ Arbeitnow. Some need configuration:
 
 ```powershell
 # Read a specific employer's board (repeatable)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep jobs search `
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search `
     --ats lever:somecompany:"Some Company" --only ats
 ```
 
@@ -512,7 +537,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 > a writable folder, or concurrent LaTeX runs collide. Set them and retry:
 >
 > ```powershell
-> $env:TEMP = "D:\coding\cv-tailor-next\.tmp"; $env:TMP = $env:TEMP
+> $env:TEMP = (Join-Path $PWD ".tmp"); $env:TMP = $env:TEMP
 > ```
 >
 > The same failure can leave a *usable PDF* behind — pdflatex occasionally crashes on
@@ -525,7 +550,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 * **It never picks a profile for you.** No default, no "the only one".
 * **Your data never enters the repository.** Profiles, applications and generated
-  documents live in `D:\coding\cv-tailor-data`. This repo is public.
+  documents live in `..\cv-tailor-data`. This repo is public.
 * **It does not invent facts.** It tailors wording and emphasis from your real
   profile; it will not add a skill or employer you do not have.
 * **Sponsorship and permit wording goes only in cover letters, never the CV.**
@@ -543,16 +568,16 @@ Windows uses `.\.venv\Scripts\python.exe`; **on macOS use `.venv/bin/python`**.
 # Setup
 .\.venv\Scripts\python.exe cvtailor.py doctor
 .\.venv\Scripts\python.exe cvtailor.py profile list
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep profile show
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst profile show
 
 # Generate (costs ~$0.003)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep generate --job-file job.txt
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 
 # Find jobs (free)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep jobs search --keywords "data engineer"
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search --keywords "data engineer"
 
 # Revise (free)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sreedeep render --content <job_id>\source\content.json
+.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst render --content <job_id>\source\content.json
 
 # Help
 .\.venv\Scripts\python.exe cvtailor.py                  # guided menu

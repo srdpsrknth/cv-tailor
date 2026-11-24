@@ -114,7 +114,7 @@ def run(args, console: Console, config) -> int:
         generated_scopes.append((pdf, "cv"))
         from renderers.upload_cv import render_upload_cv
 
-        upload_paths = render_upload_cv(cv, profile, folder, role)
+        upload_paths = render_upload_cv(cv, profile, folder, role, timezone_name=config.timezone_name)
         result.update(upload_paths)
         generated.extend(Path(p) for p in upload_paths.values())
         generated_scopes.extend((Path(p), "cv") for p in upload_paths.values())

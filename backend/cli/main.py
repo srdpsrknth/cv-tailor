@@ -133,8 +133,8 @@ def build_parser() -> argparse.ArgumentParser:
     job_search.add_argument("--keywords", help="Words to look for in title and description.")
     job_search.add_argument("--country", help="Country code or name, e.g. DE or Germany.")
     job_search.add_argument("--city", help="City to prefer and filter on.")
-    job_search.add_argument("--remote", action="store_true",
-                            help="Only jobs the source states are remote.")
+    job_search.add_argument("--remote", action=argparse.BooleanOptionalAction,
+                            help="Use --remote for remote only or --no-remote for any work mode.")
     job_search.add_argument("--limit", type=int, default=10,
                             help="Maximum jobs to show (default 10).")
     job_search.add_argument("--max-requests", type=int, default=60,

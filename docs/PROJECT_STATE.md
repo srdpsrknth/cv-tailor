@@ -6,6 +6,33 @@
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
+**Active milestones: 1E and ongoing education.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
+before starting work and again before closing a session or moving to a new
+milestone. Update the checklist and record verification here after each increment.
+
+Job-search defaults are optional settings in the selected private profile. CLI
+flags and edits in the Find jobs form override them. The employment country can
+be entered explicitly and is carried from verified posting metadata when available.
+Source coverage and eligibility rules remain separate. `CVTAILOR_TIMEZONE` controls
+new application IDs and autofill CV filenames and defaults to UTC. Existing IDs
+and files remain in place. PDF and cover-letter layouts use their existing date
+handling. New and saved profiles can describe ongoing education with an optional
+expected completion year. Finished education keeps its previous date format.
+
+Combined offline verification passed 1,377 non-TeX tests with 3 skipped. The
+inherited SOCKS proxy caused four provider-test setup failures on the baseline
+and initial run. The offline rerun used a process-local `NO_PROXY=*` override.
+The full rerun passed 1,380 tests and reproduced the baseline's 36 render failures
+and 11 setup errors. MiKTeX registry access also blocked an ongoing-education PDF
+smoke test. The LaTeX source, DOCX, text, and snapshot checks passed. The linked
+Git index denied staging. Review the open items in the roadmap before proceeding
+to standalone projects and section ordering.
+
+The owner ran the real-PDF regression in regular Windows PowerShell on
+2026-11-24. One test passed and three were deselected. The check confirmed the
+expected completion year, the two-page limit, and absence of clipping. Commit
+and push the verified changes before advancing to standalone projects.
+
 ## Private policy capture verified (2026-11-24)
 
 The existing private profile explicitly declares its effective validation rules,
@@ -42,8 +69,8 @@ The non-TeX suite passed 1,370 tests with 3 skipped. The full suite passed
 1,373 tests and reproduced the baseline's 36 rendering failures and 11 setup
 errors under the MiKTeX registry restriction.
 
-**Next action:** commit the verified development changes. The roadmap then
-sequences CV content and layout before the private-store sync pilot.
+The verified 1C and 1D changes were pushed in `7227784`. The owner approved
+ongoing education in parallel with 1E. Review both before advancing the roadmap.
 
 The linked worktree Git index remains outside the writable sandbox.
 
@@ -65,8 +92,7 @@ CLI generation were covered with stubs and no live credentials or paid calls.
 failures and 11 setup errors under the MiKTeX registry restriction. A real
 one-page CV smoke test passed with the portable MiKTeX configuration.
 
-The linked worktree's Git metadata is outside the writable checkout. Staging
-failed at `index.lock`, so these changes still need to be committed.
+Provider setup changes were pushed with the candidate isolation cutover in `7227784`.
 
 ## Select and save CV layouts (2026-11-24)
 

@@ -81,7 +81,7 @@ def main():
         manifest.update(cv_path=str(pdf), cv_pages=pages, cv_page_count=pages)
         generated.append(pdf)
         from renderers.upload_cv import render_upload_cv
-        upload_paths = render_upload_cv(cv, profile, folder, role)
+        upload_paths = render_upload_cv(cv, profile, folder, role, timezone_name=config.timezone_name)
         manifest.update(upload_paths)
         generated.extend(Path(p) for p in upload_paths.values())
         generated_scopes.extend((Path(p), 'cv') for p in upload_paths.values())

@@ -175,8 +175,7 @@ def _profile_facts_json(profile: Profile) -> str:
     candidate has used it -- otherwise declaring a tool banned would silently
     un-ban it.
     """
-    data = profile.model_dump()
-    data.pop("rules", None)
+    data = profile.model_dump(exclude={"rules", "job_search"})
     return json.dumps(data, ensure_ascii=False)
 
 def profile_facts_json(profile: Profile) -> str:

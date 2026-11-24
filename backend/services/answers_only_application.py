@@ -27,7 +27,9 @@ def create_answers_only_application(
         raise ValueError("Candidate output directory resolves outside its own namespace.")
     company = (company or "").strip()
     role = (role or "").strip()
-    job_id = make_job_id(company[:40], role[:60], slugify, candidate) + f"_answers_{uuid4().hex[:8]}"
+    job_id = make_job_id(
+        company[:40], role[:60], slugify, candidate, timezone_name=config.timezone_name
+    ) + f"_answers_{uuid4().hex[:8]}"
     outputs.mkdir(parents=True, exist_ok=True)
 
     # Publish the whole application at once so history never sees a half-written record.

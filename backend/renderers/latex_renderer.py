@@ -328,7 +328,7 @@ class LaTeXRenderer:
             for index, edu in enumerate(profile.education):
                 fields[f"Degree {index}"] = edu.degree
                 fields[f"Institution {index}"] = edu.institution
-                fields[f"Education dates {index}"] = f"{edu.start_year} -- {edu.end_year}"
+                fields[f"Education dates {index}"] = edu.date_range(" -- ")
                 if edu.location:
                     fields[f"Education location {index}"] = edu.location
         if cv.include_certifications:
@@ -405,8 +405,10 @@ class LaTeXRenderer:
                     "degree": self._escape_latex(edu.degree),
                     "institution": self._escape_latex(edu.institution),
                     "location": self._escape_latex(edu.location or ""),
+                    "dates": edu.date_range(" -- "),
+                    # Keep these keys for historical/custom templates.
                     "start_year": edu.start_year,
-                    "end_year": edu.end_year
+                    "end_year": edu.end_date_label() if edu.ongoing else edu.end_year,
                 }
                 for edu in profile.education
             ] if tailored_cv.include_education else [],

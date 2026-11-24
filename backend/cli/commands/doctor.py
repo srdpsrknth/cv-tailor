@@ -11,7 +11,7 @@ import math
 import shutil
 import sys
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from utils.calendar import calendar_zone
 
 from cli.context import CliError, Console
 
@@ -149,15 +149,15 @@ def check_outputs(config) -> Check:
     return Check("outputs", OK, detail)
 
 
-def check_timezone() -> Check:
+def check_timezone(name: str = "UTC") -> Check:
     try:
-        ZoneInfo("Europe/Berlin")
+        calendar_zone(name)
     except Exception as error:  # missing tzdata on a bare Windows install
         return Check(
             "timezone", FAIL, str(error),
-            "Install the timezone data: pip install tzdata",
+            "Set CVTAILOR_TIMEZONE to an IANA timezone and install tzdata if needed.",
         )
-    return Check("timezone", OK, "Europe/Berlin")
+    return Check("timezone", OK, name)
 
 
 def check_templates(root: Path) -> Check:
@@ -251,7 +251,7 @@ def run(args, console: Console, config) -> int:
         check_venv(root),
         check_store(config),
         check_profile(config),
-        check_timezone(),
+        check_timezone(config.timezone_name),
         check_templates(root),
         check_pdflatex(),
         check_outputs(config),
