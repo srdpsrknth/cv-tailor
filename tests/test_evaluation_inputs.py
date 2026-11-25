@@ -469,9 +469,9 @@ def test_collapsing_the_dialects_did_not_change_the_shipped_schema():
     # schema is part of the generation cache key, so a change here is a cache
     # invalidation and a different request to the model -- never a refactor.
     assert digests == {
-        # 'cv' re-pinned deliberately: a6f5758 added `standalone_projects` to the CV schema
+        # 'cv' re-pinned deliberately: a6f5758 added `standalone_projects`, and WP5+6 made its items name-or-{name, bullets}
         # (the only change; cover_letter is untouched).
-        'cv': 'b811543dc75f9fff63c4aef630aba8eab0124555a331abbbbb18af151946bc9c',
+        'cv': '03c38848a5ef179a1c134b0729c608befb2a5b2d28032852b1b8a7c438881edc',
         'cover_letter': 'e259b8d12006eda91cabe6beae70e8d4b8f8ecfd3081a307677092379241f844',
     }, f'the shipped response schemas changed: {digests}'
 
