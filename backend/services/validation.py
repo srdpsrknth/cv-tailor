@@ -16,6 +16,7 @@ from models.profile import Profile
 from models.job import normalise_country
 from models.tailored_output import TailoredCV, TailoredCoverLetter
 from services.cv_structure import validate_role_set, validate_standalone_projects
+from services.fact_checks import validate_cv_numbers, validate_cv_skills
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,8 @@ def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
         _apply_employer_rules(exp, rules)
     _validate_summary(cv, rules)
     _validate_no_banned_tools(cv, profile, rules)
+    validate_cv_skills(cv, profile)
+    validate_cv_numbers(cv, profile)
     _validate_cv_has_no_gap_statements(cv)
     _validate_cv_tense(cv, profile)
 

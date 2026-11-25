@@ -23,10 +23,15 @@ JOB-SPECIFIC TAILORING (required for every application)
 - Rebuild the generated CV's skills section for this opening: prioritize relevant
   profile-backed tools, domain skills, and methods, then retain supported foundational
   skills normally expected for the role even if the posting does not name them.
-  For example, analytics engineering commonly benefits from SQL, data modeling,
-  Python, version control, automated quality checks, orchestration, and BI delivery
-  when supported by this profile. Change selection, order, and categories as needed;
+  Most fields have such a core (for example an engineer's languages, version control
+  and testing; a clinical researcher's data standards, documentation and quality
+  systems; a marketer's analytics, reporting and CRM tools), but include one only when
+  this profile supports it. Change selection, order, and categories as needed;
   remove low-relevance skills to keep the section compact.
+- Every skill must be a skill, tool, method or domain term the profile itself states
+  (its skills, technologies, project tools or experience). A posting's keywords are not
+  evidence. Do not put spoken languages or their levels (for example "English (Fluent)")
+  in skills: the CV has a separate Languages section.
 - The base profile is a reusable skills inventory. Tailor this application's skills
   output without editing or pruning the source profile for one employer.
 - In tailoring_explanation, state which important job terms were mapped to which
@@ -39,6 +44,8 @@ WRITING AND FACTUAL RULES
 - Include work authorization only when supported by the profile and applicable to the actual job country. Do not imply rights or support requirements not established by the profile. Keep employer support requirements in the cover letter, not the CV.
 - No invented employers, titles, dates, tools, metrics, responsibilities, ownership,
   business outcomes, or completion status. Preserve exact job titles and dates.
+  Any number, percentage or multiplier you write must already appear in the profile;
+  you are never required to include a metric.
 - Include every employer once, newest first, including older roles with no bullets
   (a role marked "optional": true in the profile may be omitted).
 - Use plain, concrete language: action, scope, and supported impact. Avoid inflated
@@ -50,11 +57,18 @@ WRITING AND FACTUAL RULES
 STRUCTURE AND LENGTH
 - The A4 renderer selects readable 10.5-11pt body typography with 9.5pt metadata,
   checks page balance before shortening, and includes education, certifications, technologies,
-  skills, and languages. Target two readable pages; do not demand a minimum length.
-- Use enough relevant responsibility and project bullets to show the candidate's
-  strongest evidence within the page budget. The 18-24 bullet / 650-750 word range is
-  a guide, not a quota; relevance and readable layout take priority. Bullets should be
-  concise, usually one or two lines, without arbitrary character-count restrictions.
+  skills, and languages. The CV must fit two readable pages; that is a ceiling, not a
+  minimum, and never a reason to pad.
+- For a full career (several roles over many years) aim for roughly 18-24 bullets in
+  total (responsibility and project bullets together) and 650-750 body words. These are
+  guides for filling two pages well. An early-career candidate or a short history will
+  have fewer bullets and words, and should: use what the profile supports and stop.
+  Relevance and readable layout take priority over reaching the range.
+- Body words means the summary plus the responsibility bullets written directly under
+  each role. Project bullets, skills, education and certifications are not counted. This
+  is the same count used later if you are asked to shorten the CV, so a word figure here
+  and a retry's word target mean the same thing. Bullets should be concise, usually one or two lines, without arbitrary
+  character-count restrictions.
 - Do not include every source project as a separate heading. Select or consolidate
   useful evidence. Never repeat the same achievement in both a role and a project.
 - Select optional personal, academic or other independent work from BASE PROFILE

@@ -15,10 +15,19 @@ __all__ = ["slugify", "escape_latex", "latex_url", "format_skill_category"]
 
 _WHITESPACE_RUN = re.compile(r"[^a-z0-9]+")
 
+#: Acronyms kept upper-case in a skill category heading. Domain-neutral on purpose: data,
+#: software, marketing, health and regulatory terms sit side by side so no one field is
+#: privileged. Lower-case tool names ("dbt") are handled separately.
 _UPPERCASE_ACRONYMS = frozenset({
-    "AI", "BI", "SQL", "ETL", "ELT", "LLM", "LLMS", "MCP", "CI", "CD", "CI/CD",
-    "GA4", "CRM", "KPI", "KPIS", "AWS", "GCP", "API", "APIS", "ML", "NLP",
-    "SEO", "SEM", "ROAS", "CAC", "LTV", "GDPR",
+    # data and software
+    "AI", "BI", "SQL", "ETL", "ELT", "LLM", "LLMS", "MCP", "CI", "CD", "CI/CD", "AWS",
+    "GCP", "API", "APIS", "ML", "NLP", "UX", "UI", "SDK", "ERP",
+    # marketing and analytics
+    "GA4", "CRM", "KPI", "KPIS", "SEO", "SEM", "ROAS", "CAC", "LTV",
+    # health, clinical and regulatory
+    "EHR", "EMR", "OMOP", "FHIR", "HL7", "CDISC", "SDTM", "GXP", "MDR", "IVDR",
+    "ISO", "QMS", "SOP", "SOPS", "CAPA", "GDPR", "HIPAA", "ICD", "SNOMED", "LOINC",
+    "CRO", "EDC", "CTMS", "GMP", "GLP", "FDA", "EMA",
 })
 
 #: Characters with a special meaning in LaTeX, escaped in one pass (``str.translate``) so that
@@ -146,16 +155,21 @@ def latex_url(value: str) -> str:
     return "".join(out)
 
 
-def _format_category_token(token: str) -> str:
+def _format_category_token(token: str, shouting: bool = False) -> str:
     if not token:
         return token
+    word = token.rstrip(",;:.")
+    if word != token and word:  # "sop," -> format "sop", keep the punctuation
+        return _format_category_token(word, shouting) + token[len(word):]
     upper = token.upper()
     if upper in _UPPERCASE_ACRONYMS:
         return upper
     if token.lower() == "dbt":
         return "dbt"
+    if len(token) >= 2 and token.isalpha() and token.isupper() and not shouting:
+        return token  # an acronym the author already wrote in capitals ("DICOM", "PROMS")
     if "/" in token:
-        return "/".join(_format_category_token(part) for part in token.split("/"))
+        return "/".join(_format_category_token(part, shouting) for part in token.split("/"))
     if any(ch.islower() for ch in token) and any(ch.isupper() for ch in token[1:]):
         return token
     return token.capitalize()
@@ -166,4 +180,6 @@ def format_skill_category(category: str) -> str:
     cleaned = " ".join((category or "").replace("_", " ").split())
     if not cleaned:
         return ""
-    return " ".join(_format_category_token(token) for token in cleaned.split(" "))
+    # A heading typed entirely in capitals is shouting, not acronyms, so it is title-cased.
+    shouting = cleaned.isupper()
+    return " ".join(_format_category_token(token, shouting) for token in cleaned.split(" "))

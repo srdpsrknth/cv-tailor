@@ -38,6 +38,7 @@ from services.cache_store import (
     serialize_profile_bytes,
 )
 from services.candidate_guidance import load_candidate_guidance
+from services.pipeline_fingerprint import pipeline_fingerprint
 from services.llm_service import LLMService
 from services.profile_store import (
     ProfileMismatchError,
@@ -432,6 +433,7 @@ def tailor_documents(
         model_cl=config.model_for("cover_letter"),
         rules_fingerprint=rules_fingerprint(generator.rules),
         format_version=CACHE_FORMAT_VERSION,
+        pipeline_version=pipeline_fingerprint(),
     )
     cache = GenerationCache(_cache_root(config) / resolved_profile_id)
     entry = None

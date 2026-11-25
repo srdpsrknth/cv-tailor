@@ -27,6 +27,13 @@ PROMPT_CV_PATH = PROJECT_ROOT / "backend/prompts/tailor_cv_prompt.md"
 PROMPT_CL_PATH = PROJECT_ROOT / "backend/prompts/tailor_cl_prompt.md"
 
 #: Target CV body length after each failed layout attempt, in words.
+#:
+#: "Body words" has ONE definition, :func:`cv_body_words`: the summary plus the bullets
+#: directly under each role (``exp.bullets``). Project bullets, skills, education and
+#: certifications are not counted. ``tailor_cv_prompt.md`` states its 650-750 guide in the
+#: same terms and the retry brief quotes the same measure, so the draft prompt, the
+#: layout budget and the inventory line all count words the same way. Change the
+#: definition here and in that prompt together.
 LAYOUT_BUDGET_START = 650
 LAYOUT_BUDGET_STEP = 100
 LAYOUT_BUDGET_FLOOR = 400

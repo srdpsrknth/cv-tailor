@@ -139,7 +139,8 @@ def apply_cv_delta(cv: TailoredCV, delta: dict) -> TailoredCV:
         elif key.startswith("standalone_projects["):
             _merge_standalone_unit(merged, key, value)
         elif key.startswith("skills."):
-            merged.skills[key[len("skills."):]] = _require_strings(value, key)
+            category = _existing_category(merged, key)
+            merged.skills[category] = _require_strings(value, key)
         else:
             _merge_experience_unit(merged, key, value)
     if unknown:
@@ -149,6 +150,24 @@ def apply_cv_delta(cv: TailoredCV, delta: dict) -> TailoredCV:
             "or an existing skills category"
         )
     return merged
+
+def _existing_category(cv: TailoredCV, key: str) -> str:
+    """The CV's own spelling of the category a ``skills.<category>`` key names.
+
+    A delta may reword the contents of a category the CV already has; it may not create
+    one, because a new category is the cheapest way to smuggle in arbitrary skills. Its
+    items are still checked against the profile when the merged CV re-enters
+    ``validate_cv``.
+    """
+    wanted = key[len("skills."):]
+    for category in cv.skills:
+        if category == wanted or category.casefold() == wanted.casefold():
+            return category
+    raise ValueError(
+        f"unknown unit {key!r}: no such skills category in the current CV; a delta can "
+        "only replace the items of an existing category"
+    )
+
 
 def _merge_standalone_unit(cv: TailoredCV, key: str, value) -> None:
     """Replace bullets of a standalone project the CV already rewords.

@@ -72,3 +72,20 @@ def test_non_list_skills_are_left_alone():
 
     assert TailoredCV.model_validate({'skills': {}}).skills == {}
     assert TailoredCV.model_validate({}).skills == {}
+
+
+@pytest.mark.parametrize('heading,expected', [
+    ('ehr and fhir data', 'EHR And FHIR Data'),
+    ('omop / cdisc standards', 'OMOP / CDISC Standards'),
+    ('gxp and iso 13485 qms', 'GXP And ISO 13485 QMS'),
+    ('sop, capa, hipaa, gdpr', 'SOP, CAPA, HIPAA, GDPR'),
+    ('nlp and llm ux ui', 'NLP And LLM UX UI'),
+    ('dbt and sql', 'dbt And SQL'),
+    ('data_engineering', 'Data Engineering'),
+    ('DICOM imaging', 'DICOM Imaging'),
+    ('DATA ENGINEERING', 'Data Engineering'),
+])
+def test_category_headings_keep_domain_neutral_acronyms(heading, expected):
+    from utils.text import format_skill_category
+
+    assert format_skill_category(heading) == expected

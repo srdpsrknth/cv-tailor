@@ -13,7 +13,7 @@ from services import tailor_service as service
 
 @pytest.fixture
 def profile():
-    return Profile(version='1.0', identity={'full_name': 'Candidate', 'email': 'name@example.com'},
+    return Profile(version='1.0', identity={'full_name': 'Candidate', 'email': 'name@example.com'}, skills={'Data': ['SQL']},
                    experience=[{'company': 'Example', 'role': 'Analyst', 'start_date': '2020-01',
                                 'end_date': 'present', 'bullets': ['Built reporting.']}])
 

@@ -87,6 +87,7 @@ def cache_key(
     rules_fingerprint: str,
     format_version: int = CACHE_FORMAT_VERSION,
     prompt_layout: str = "",
+    pipeline_version: str = "",
 ) -> str:
     """The identity of one generation: everything that can change its bytes.
 
@@ -99,6 +100,9 @@ def cache_key(
     knew only "the model" would serve one route's documents for the other's.
     ``prompt_layout`` records the effective candidate guidance for layout retries
     when supplied. Empty guidance preserves the existing generation key.
+    ``pipeline_version`` is ``services.pipeline_fingerprint.pipeline_fingerprint()``: the
+    editorial requirements, prompt-building code, layout budgets and CV template, none of
+    which are in the prompt files. Empty keeps keys built without it unchanged.
     """
     payload = {
         "format_version": format_version,
@@ -121,6 +125,8 @@ def cache_key(
     }
     if prompt_layout:
         payload["prompt_layout"] = prompt_layout
+    if pipeline_version:
+        payload["pipeline_version"] = pipeline_version
     return _digest(json.dumps(payload, sort_keys=True, ensure_ascii=False))
 
 
