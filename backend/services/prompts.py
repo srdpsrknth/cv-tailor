@@ -82,6 +82,13 @@ def build_context(
             "Follow tailoring_guidance using only profile-backed experience; do not invent "
             "international clients, leadership, outcomes, or relocation availability.\n"
         )
+    if profile.standalone_projects and profile.standalone_projects_policy == "all":
+        country_context += (
+            "\nSTANDALONE PROJECTS POLICY: all. Include every standalone project from the "
+            "profile in standalone_projects, in profile order, even if it is only loosely "
+            "relevant. Reword their bullets toward the posting where useful, but never "
+            "omit a project.\n"
+        )
     return (
         f"\nCOMPANY: {company_name or 'Infer from job description'}\n"
         f"ROLE: {role_title or 'Infer from job description'}\n"
@@ -213,9 +220,37 @@ def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
         + (f" Employers: {employers}." if employers else "")
     )
 
+def _standalone_clause(cv: TailoredCV, policy: str) -> str:
+    """What a layout retry may do to the selected standalone projects.
+
+    Projects are never dropped or reordered by a retry. A project the CV already
+    rewords (``{name, bullets}``) may have its bullets shortened, addressed as
+    ``standalone_projects[i].bullets``; one selected by name is kept as it is.
+    """
+    if not cv.standalone_projects:
+        return ""
+    clause = (
+        "Keep the same standalone_projects in the same order"
+        + (" (the profile requires every standalone project)" if policy == "all" else "")
+        + "; never drop a project. "
+    )
+    reworded = [
+        f"standalone_projects[{index}] ({item.name!r}, {len(item.bullets)} bullets)"
+        for index, item in enumerate(cv.standalone_projects) if not isinstance(item, str)
+    ]
+    if reworded:
+        clause += (
+            "You may shorten the bullets of " + "; ".join(reworded)
+            + " (keep at least one bullet, add no facts); other projects stay unchanged."
+        )
+    else:
+        clause += "Leave them unchanged."
+    return clause + "\n"
+
+
 def layout_retry_instruction(
     cv: TailoredCV, page_count: int, budget: int, attempt: int, rules: ProfileRules,
-    *, guidance: str = "",
+    *, guidance: str = "", standalone_policy: str = "select",
 ) -> str:
     """The targeted brief for one layout retry.
 
@@ -245,7 +280,7 @@ def layout_retry_instruction(
         + "\nKeep the summary and every responsibility bullet; merge or shorten them "
         "rather than removing a field. Do not rename, re-employer, re-date, remove an "
         "achievement or a metric, or drop a supporting claim.\n"
-        + ("Keep standalone_projects unchanged.\n" if cv.standalone_projects else "")
+        + _standalone_clause(cv, standalone_policy)
         + layout_inventory(cv, attempt + 1)
         + guidance
         + '\nReturn either the complete shorter CV JSON, or a delta object of only the '

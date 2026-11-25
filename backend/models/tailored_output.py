@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from models.profile import Profile, Project
@@ -54,15 +54,44 @@ class TailoredCV(BaseModel):
     experience: List[TailoredExperience] = Field(default_factory=list)
     include_education: bool = True
     include_certifications: bool = True
-    standalone_projects: List[str] = Field(default_factory=list)
+    #: Either a profile project name (rendered with the profile's bullets verbatim) or
+    #: ``{name, bullets}`` with bullets reworded toward the posting.
+    standalone_projects: List[Union[str, TailoredProject]] = Field(default_factory=list)
+
+    def standalone_project_names(self) -> List[str]:
+        return [item if isinstance(item, str) else item.name for item in self.standalone_projects]
 
     def resolve_standalone_projects(self, profile: Profile) -> List[Project]:
-        """Resolve the selected names against the profile used for this CV."""
+        """Resolve the selection against the profile used for this CV.
+
+        A name yields the profile's project unchanged. An object keeps the profile's
+        name, dates, context and technologies and takes the tailored bullets, after the
+        structural checks below. Whether those bullets are *factual* is
+        ``validate_cv``'s job; this only guarantees the shape the renderers rely on.
+        """
         available = {project.name: project for project in profile.standalone_projects}
-        if (len(self.standalone_projects) != len(set(self.standalone_projects))
-                or any(name not in available for name in self.standalone_projects)):
+        names = self.standalone_project_names()
+        if len(names) != len(set(names)) or any(name not in available for name in names):
             raise ValueError("Select distinct standalone project names exactly as written in the profile.")
-        return [available[name] for name in self.standalone_projects]
+        resolved: List[Project] = []
+        for item in self.standalone_projects:
+            if isinstance(item, str):
+                resolved.append(available[item])
+                continue
+            source = available[item.name]
+            bullets = [bullet.strip() for bullet in item.bullets]
+            if not source.bullets:
+                raise ValueError(
+                    f"Standalone project {item.name!r} has no profile bullets to reword; "
+                    "select it by name only."
+                )
+            if not bullets or any(not bullet for bullet in bullets) or len(bullets) > len(source.bullets) + 1:
+                raise ValueError(
+                    f"Standalone project {item.name!r} needs between 1 and "
+                    f"{len(source.bullets) + 1} non-empty bullets (the profile has {len(source.bullets)})."
+                )
+            resolved.append(source.model_copy(update={"bullets": bullets}))
+        return resolved
 
     @field_validator("skills", mode="before")
     @classmethod

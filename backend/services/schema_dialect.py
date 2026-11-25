@@ -104,13 +104,18 @@ def _dumped_schema(schema) -> dict:
             # Still recurse: a mapping without keywords at this level can hold objects
             # and arrays below it that do carry them.
             if isinstance(node, dict):
-                return {key: to_standard(value) for key, value in node.items()}
+                return {("anyOf" if key == "any_of" else key): to_standard(value)
+                        for key, value in node.items()}
             return node
 
         result = {}
         nullable = bool(node.get("nullable", False))
         for key, value in node.items():
             if key in _GEMINI_ONLY_KEYWORDS:
+                continue
+            if key == "any_of":
+                # The SDK dumps snake_case; JSON Schema, and every endpoint, says anyOf.
+                result["anyOf"] = to_standard(value)
                 continue
             if key == "type":
                 if isinstance(value, list):

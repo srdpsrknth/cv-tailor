@@ -161,7 +161,9 @@ class DocumentGenerator:
                     )
                 else:
                     model = self._build_model(data, kind, work_country, company_name, role_title)
-                if base_cv is not None and model.standalone_projects != base_cv.standalone_projects:
+                if base_cv is not None and (
+                    model.standalone_project_names() != base_cv.standalone_project_names()
+                ):
                     raise ValueError("Keep the selected standalone projects in the same order during layout retries.")
                 return model, data
             except ValueError as error:
@@ -373,7 +375,8 @@ class DocumentGenerator:
         budget = layout_budget(attempt)
         cv, data = self.generate(
             layout_retry_instruction(
-                cv, page_count, budget, attempt, self.rules, guidance=self.layout_guidance
+                cv, page_count, budget, attempt, self.rules, guidance=self.layout_guidance,
+                standalone_policy=self.profile.standalone_projects_policy,
             )
             + cv.model_dump_json(indent=2),
             "cv", work_country, company_name, role_title,

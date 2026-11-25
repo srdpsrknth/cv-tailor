@@ -16,6 +16,11 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from models.tailored_output import TailoredCV
 from models.profile import Profile
+from models.profile import certification_label, entry_bullets, entry_text
+from renderers.cv_sections import (
+    education_highlights_line, find_profile_project, find_role, project_as_subheading,
+    project_heading, project_meta, project_technologies_line, role_company_label,
+)
 from utils.text import escape_latex, format_skill_category, latex_url, slugify
 
 
@@ -356,9 +361,16 @@ class LaTeXRenderer:
             fields[f"Start {index}"] = self._format_date(exp.start_date)
             fields[f"End {index}"] = self._format_date(exp.end_date)
             experience_paragraphs.extend(exp.bullets)
-            for project in (exp.projects if "employer_projects" not in profile.cv_hidden_sections else []):
+            role = find_role(profile, exp.company)
+            for project_index, project in enumerate(
+                exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
+            ):
                 experience_paragraphs.append(project.name)
                 experience_paragraphs.extend(project.bullets)
+                self._project_fields(
+                    fields, f"Role {index} project {project_index}",
+                    find_profile_project(role, project.name), with_name=False,
+                )
             for item_index, item in enumerate(self._get_technologies_for_company(exp.company, profile)):
                 fields[f"Technology {index}/{item_index}"] = item
         prose_by_section = {
@@ -368,6 +380,9 @@ class LaTeXRenderer:
                 for line in (project.name, *project.bullets)
             ],
         }
+        if "projects" in sections:
+            for index, project in enumerate(cv.resolve_standalone_projects(profile)):
+                self._project_fields(fields, f"Project {index}", project)
         paragraphs = list(cv.summary) if "summary" not in profile.cv_hidden_sections else []
         for section in sections:
             paragraphs.extend(prose_by_section.get(section, ()))
@@ -382,16 +397,32 @@ class LaTeXRenderer:
                 fields[f"Education dates {index}"] = edu.date_range(" -- ")
                 if edu.location:
                     fields[f"Education location {index}"] = edu.location
+                if education_highlights_line(edu):
+                    fields[f"Education highlights {index}"] = education_highlights_line(edu)
         if cv.include_certifications and "certifications" in sections:
             for index, item in enumerate(profile.certifications):
-                fields[f"Certification {index}"] = item
+                fields[f"Certification {index}"] = certification_label(item)
         for index, language in enumerate(profile.languages if "languages" in sections else []):
             fields[f"Language {index}"] = f"{language.name}: {language.proficiency}"
         for section in ("publications", "activities"):
             if section in sections:
                 for index, entry in enumerate(getattr(profile, section)):
-                    fields[f"{section.title()} {index}"] = entry
+                    fields[f"{section.title()} {index}"] = entry_text(entry)
+                    for bullet_index, bullet in enumerate(entry_bullets(entry)):
+                        fields[f"{section.title()} {index} bullet {bullet_index}"] = bullet
         return paragraphs, fields
+
+    @staticmethod
+    def _project_fields(fields, label, project, with_name=True) -> None:
+        """Visible metadata of a project, checked in the extracted PDF text."""
+        if project is None:
+            return
+        meta = project_meta(project)
+        if meta:
+            fields[f"{label} heading"] = project_heading(project) if with_name else meta
+        line = project_technologies_line(project)
+        if line:
+            fields[f"{label} technologies"] = line
 
     def _prepare_template_data(
         self,
@@ -423,18 +454,24 @@ class LaTeXRenderer:
                 "bullets": [self._escape_latex(b) for b in exp.bullets],
                 "technologies": [self._escape_latex(t) for t in self._get_technologies_for_company(exp.company, profile)]
             }
+            role = find_role(profile, exp.company)
+            # The short name is for compact places only; the heading keeps the employer.
+            exp_data["project_company"] = self._escape_latex(role_company_label(role, exp.company))
 
             # Handle new projects structure
             if exp.projects and "employer_projects" not in profile.cv_hidden_sections:
                 exp_data["projects"] = [
                     {
                         "name": self._escape_latex(proj.name),
-                        "bullets": [self._escape_latex(b) for b in proj.bullets]
+                        "bullets": [self._escape_latex(b) for b in proj.bullets],
+                        **self._project_extras(find_profile_project(role, proj.name)),
                     }
                     for proj in exp.projects
                 ]
             else:
                 exp_data["projects"] = []
+            exp_data["project_as_subheading"] = project_as_subheading(
+                exp, show_projects=bool(exp_data["projects"]))
 
             experiences.append(exp_data)
 
@@ -458,11 +495,15 @@ class LaTeXRenderer:
             if "summary" not in profile.cv_hidden_sections else [],
             "experience": experiences,
             "cv_section_order": profile.visible_cv_sections(),
-            "publications": [self._escape_latex(entry) for entry in profile.publications],
-            "activities": [self._escape_latex(entry) for entry in profile.activities],
+            # Text-only lists keep the historical key; the entries carry their bullets.
+            "publications": [self._escape_latex(entry_text(entry)) for entry in profile.publications],
+            "activities": [self._escape_latex(entry_text(entry)) for entry in profile.activities],
+            "publication_entries": self._entries(profile.publications),
+            "activity_entries": self._entries(profile.activities),
             "standalone_projects": [
                 {"name": self._escape_latex(project.name),
-                 "bullets": [self._escape_latex(bullet) for bullet in project.bullets]}
+                 "bullets": [self._escape_latex(bullet) for bullet in project.bullets],
+                 **self._project_extras(project)}
                 for project in tailored_cv.resolve_standalone_projects(profile)
             ],
             "education": [
@@ -471,13 +512,14 @@ class LaTeXRenderer:
                     "institution": self._escape_latex(edu.institution),
                     "location": self._escape_latex(edu.location or ""),
                     "dates": edu.date_range(" -- "),
+                    "highlights": self._escape_latex(education_highlights_line(edu) or ""),
                     # Keep these keys for historical/custom templates.
                     "start_year": edu.start_year,
                     "end_year": edu.end_date_label() if edu.ongoing else edu.end_year,
                 }
                 for edu in profile.education
             ] if tailored_cv.include_education else [],
-            "certifications": [self._escape_latex(c) for c in profile.certifications] if tailored_cv.include_certifications else [],
+            "certifications": [self._escape_latex(certification_label(c)) for c in profile.certifications] if tailored_cv.include_certifications else [],
             "skills": {
                 self._escape_latex(format_skill_category(category)): [self._escape_latex(s) for s in skills]
                 for category, skills in tailored_cv.skills.items()
@@ -489,6 +531,23 @@ class LaTeXRenderer:
                 }
                 for lang in profile.languages
             ]
+        }
+
+    def _entries(self, entries) -> list:
+        return [
+            {"text": self._escape_latex(entry_text(entry)),
+             "bullets": [self._escape_latex(bullet) for bullet in entry_bullets(entry)]}
+            for entry in entries
+        ]
+
+    def _project_extras(self, project) -> Dict[str, Any]:
+        """Optional metadata of a profile project, empty when none is set."""
+        if project is None:
+            return {"meta": "", "technologies_line": ""}
+        return {
+            "meta": self._escape_latex(project_meta(project)),
+            "technologies_line": self._escape_latex(", ".join(
+                item.strip() for item in project.technologies if item.strip())),
         }
 
     @staticmethod

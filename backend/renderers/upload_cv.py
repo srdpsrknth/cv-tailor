@@ -7,7 +7,11 @@ from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
-from models.profile import Profile
+from models.profile import Profile, certification_label, entry_bullets, entry_text
+from renderers.cv_sections import (
+    education_highlights_line, find_profile_project, project_as_subheading, project_heading,
+    project_meta, project_technologies_line, role_company_label,
+)
 from models.tailored_output import TailoredCV
 from utils.calendar import calendar_year
 from utils.text import format_skill_category, slugify
@@ -127,10 +131,22 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                 p.paragraph_format.keep_with_next = bool(exp.bullets or employer_projects or (original and original.location))
                 for bullet in exp.bullets:
                     add(bullet, 'List Bullet')
+                company_label = role_company_label(original, exp.company)
+                subheading = project_as_subheading(exp, show_projects=bool(employer_projects))
                 for project in employer_projects:
-                    add(f'Project: {project.name} ({exp.company})', 'Heading 2', keep=True)
+                    extras = find_profile_project(original, project.name)
+                    if subheading:
+                        heading = add(project.name, keep=True)
+                        for run in heading.runs:
+                            run.italic = True
+                    else:
+                        add(f'Project: {project.name} ({company_label})', 'Heading 2', keep=True)
+                    if extras is not None and project_meta(extras):
+                        add(project_meta(extras), keep=True)
                     for bullet in project.bullets:
                         add(bullet, 'List Bullet')
+                    if extras is not None:
+                        add(project_technologies_line(extras))
                 if original and original.technologies:
                     add('Technologies: ' + ', '.join(original.technologies))
         elif section == 'projects':
@@ -138,9 +154,10 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
             if standalone_projects:
                 add('Projects', 'Heading 1')
                 for project in standalone_projects:
-                    add(project.name, 'Heading 2', keep=bool(project.bullets))
+                    add(project_heading(project), 'Heading 2', keep=bool(project.bullets))
                     for bullet in project.bullets:
                         add(bullet, 'List Bullet')
+                    add(project_technologies_line(project))
         elif section == 'education':
             if cv.include_education and profile.education:
                 add('Education', 'Heading 1')
@@ -149,11 +166,12 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                     add(' | '.join(value for value in (
                         edu.institution, edu.date_range(), edu.location
                     ) if value))
+                    add(education_highlights_line(edu))
         elif section == 'certifications':
             if cv.include_certifications and profile.certifications:
                 add('Certifications', 'Heading 1')
                 for cert in profile.certifications:
-                    add(cert, 'List Bullet')
+                    add(certification_label(cert), 'List Bullet')
         elif section == 'skills':
             if cv.skills:
                 add('Skills', 'Heading 1')
@@ -169,7 +187,9 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
             if entries:
                 add(section.title(), 'Heading 1')
                 for entry in entries:
-                    add(entry, 'List Bullet')
+                    add(entry_text(entry), 'List Bullet')
+                    for bullet in entry_bullets(entry):
+                        add(bullet, 'List Bullet')
     doc.save(paths['cv_upload_docx_path'])
     Path(paths['cv_upload_text_path']).write_text(
         '\n'.join(p.text for p in doc.paragraphs) + '\n', encoding='utf-8')

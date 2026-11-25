@@ -30,6 +30,7 @@
 {% raw %}
 \newcommand{\cvsection}[1]{\needspace{4\baselineskip}\par\vspace{\sectiongap}{\fontsize{12.5}{15}\selectfont\bfseries\color{accent}\MakeUppercase{#1}\par}\vspace{3pt}{\color{accent}\hrule height 0.6pt}\vspace{6pt}}
 \newcommand{\projectheading}[4]{\needspace{3\baselineskip}\vspace{3pt}{\metadata\bfseries\color{accent}Selected Projects:}\enspace {\itshape #1}\label{project-#3-#4}\enspace {\metadata\color{muted}(#2\ifnum\getpagerefnumber{project-#3-#4}>\getpagerefnumber{employer-#3}\relax{} - continued\fi)}\par\nopagebreak}
+\newcommand{\projectsubheading}[1]{\needspace{3\baselineskip}\vspace{3pt}{\itshape #1}\par\nopagebreak}
 {% endraw %}
 \begin{document}
 \normalsize\color{bodytext}
@@ -84,7 +85,7 @@
 \end{samepage}
 \newpage
 \begin{samepage}
-{\metadata\bfseries\color{accent}{{ exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
+{\metadata\bfseries\color{accent}{{ exp.project_company or exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
 \begin{itemize}
 {% endif %}
 \item {{ bullet }}
@@ -102,13 +103,23 @@
 {% if split_here %}\newpage{% endif %}
 \begin{samepage}
 {% if split_here %}
-{\metadata\bfseries\color{accent}{{ exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
+{\metadata\bfseries\color{accent}{{ exp.project_company or exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
 {% endif %}
-\projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.company }}{{ "}" }}{{ '{' }}{{ employer_index }}{{ '}{' }}{{ loop.index0 }}{{ '}' }}
+{% if exp.project_as_subheading %}
+\projectsubheading{{ "{" }}{{ project.name }}{{ "}" }}
+{% else %}
+\projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.project_company or exp.company }}{{ "}" }}{{ '{' }}{{ employer_index }}{{ '}{' }}{{ loop.index0 }}{{ '}' }}
+{% endif %}
+{% if project.meta %}
+\nopagebreak{\metadata\color{muted}{{ project.meta }}\par}
+{% endif %}
 \begin{itemize}
 {% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}
 \end{itemize}
+{% if project.technologies_line %}
+\nopagebreak\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ project.technologies_line }}\par}
+{% endif %}
 {% if split_role and loop.last and exp.technologies %}
 \nopagebreak
 \vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
@@ -125,13 +136,16 @@
 \cvsection{Projects}
 {% for project in standalone_projects %}
 \needspace{3\baselineskip}
-{\bfseries {{ project.name }}\par}
+{\bfseries {{ project.name }}}{% if project.meta %} {\metadata\color{muted}{{ project.meta }}}{% endif %}\par
 {% if project.bullets %}
 \nopagebreak
 \begin{itemize}
 {% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}
 \end{itemize}
+{% endif %}
+{% if project.technologies_line %}
+\nopagebreak\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ project.technologies_line }}\par}
 {% endif %}
 {% endfor %}
 {% elif section == 'education' and education %}
@@ -140,6 +154,8 @@
 \needspace{3\baselineskip}
 {\bfseries {{ edu.degree }}\par}\nopagebreak
 {\metadata {{ edu.institution }} | {{ edu.dates }}{% if edu.location %} | {{ edu.location }}{% endif %}\par}
+{% if edu.highlights %}\nopagebreak{\metadata\color{muted}{{ edu.highlights }}\par}
+{% endif %}
 {% if not loop.last %}\vspace{4pt}{% endif %}
 {% endfor %}
 {% elif section == 'certifications' and certifications %}
@@ -157,11 +173,23 @@
 {% for lang in languages %}{{ lang.name }}: {{ lang.proficiency }}{% if not loop.last %} | {% endif %}{% endfor %}\par
 {% elif section == 'publications' and publications %}
 \cvsection{Publications}
-{% for entry in publications %}{\metadata {{ entry }}\par}
+{% for entry in publication_entries %}{\metadata {{ entry.text }}\par}
+{% if entry.bullets %}\nopagebreak
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
 {% endfor %}
 {% elif section == 'activities' and activities %}
 \cvsection{Activities}
-{% for entry in activities %}{\metadata {{ entry }}\par}
+{% for entry in activity_entries %}{\metadata {{ entry.text }}\par}
+{% if entry.bullets %}\nopagebreak
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
 {% endfor %}
 {% endif %}
 {% endfor %}

@@ -15,6 +15,7 @@ from typing import Optional
 from models.profile import Profile
 from models.job import normalise_country
 from models.tailored_output import TailoredCV, TailoredCoverLetter
+from services.cv_structure import validate_role_set, validate_standalone_projects
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +87,9 @@ DEFAULT_PROFILE_RULES = ProfileRules()
 
 def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     """Check a CV against the profile and the candidate-specific rules."""
-    cv.resolve_standalone_projects(profile)
+    validate_standalone_projects(cv, profile)
     expected = {exp.company: exp for exp in profile.experience}
-    companies = [exp.company for exp in cv.experience]
-    if len(companies) != len(set(companies)) or set(companies) != set(expected):
-        raise ValueError("Include each profile employer exactly once, including older roles.")
+    validate_role_set(cv, profile)
     cv.experience.sort(key=lambda exp: list(expected).index(exp.company))
     for exp in cv.experience:
         base = expected[exp.company]
@@ -337,6 +336,9 @@ def _cv_texts(cv: TailoredCV) -> list[tuple[str, list[str]]]:
         blocks.append((f"CV bullet for {exp.company},", list(exp.bullets)))
         for project in exp.projects:
             blocks.append((f"CV project bullet for {exp.company},", list(project.bullets)))
+    for item in cv.standalone_projects:
+        if not isinstance(item, str):
+            blocks.append((f"CV standalone project bullet for {item.name},", list(item.bullets)))
     return blocks
 
 

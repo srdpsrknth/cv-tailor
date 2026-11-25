@@ -39,7 +39,8 @@ WRITING AND FACTUAL RULES
 - Include work authorization only when supported by the profile and applicable to the actual job country. Do not imply rights or support requirements not established by the profile. Keep employer support requirements in the cover letter, not the CV.
 - No invented employers, titles, dates, tools, metrics, responsibilities, ownership,
   business outcomes, or completion status. Preserve exact job titles and dates.
-- Include every employer once, newest first, including older roles with no bullets.
+- Include every employer once, newest first, including older roles with no bullets
+  (a role marked "optional": true in the profile may be omitted).
 - Use plain, concrete language: action, scope, and supported impact. Avoid inflated
   claims such as "guaranteeing reliability", "enterprise architect", or "eliminating
   all errors" when the profile does not support them.
@@ -56,14 +57,22 @@ STRUCTURE AND LENGTH
   concise, usually one or two lines, without arbitrary character-count restrictions.
 - Do not include every source project as a separate heading. Select or consolidate
   useful evidence. Never repeat the same achievement in both a role and a project.
-- Select optional personal, academic or other independent work by listing exact names
-  from BASE PROFILE standalone_projects. The renderer uses the profile's original
-  bullets. Leave the list empty when none are relevant or fit the page budget.
+- Select optional personal, academic or other independent work from BASE PROFILE
+  standalone_projects. List either the exact project name (the renderer then uses the
+  profile's original bullets verbatim) or an object {"name": exact name, "bullets": [...]}
+  when you reword that project's bullets toward the posting. Reworded bullets may use
+  only facts already in that project's profile bullets: do not add tools, metrics,
+  numbers, outcomes, responsibilities or ownership. Use at least one and at most one
+  more bullet than the profile has. Do not repeat a project. Leave the list empty when
+  none are relevant or fit the page budget, unless the context says the standalone
+  projects policy is "all": then include every standalone project, in profile order.
 - Follow the selected profile’s explicit project counts and factual constraints. Select the most relevant supported evidence without duplicating achievements.
 - Keep education and certifications. Use 3-4 compact skill categories with the
   most relevant EXISTING skills, not every available skill or target-job tool.
-- Keep all career roles even during length reduction. Shorten wording, remove
-  duplicated content, and merge less relevant projects into regular bullets first.
+- Keep all career roles even during length reduction, except roles the profile marks
+  "optional": true, which may be left out when irrelevant to the posting or to save
+  space. Shorten wording, remove duplicated content, and merge less relevant projects
+  into regular bullets first.
 
 OUTPUT
 Return a complete JSON object only. No markdown, commentary, or LaTeX. Standard
@@ -84,7 +93,7 @@ JSON escaping permits apostrophes in prose; do not remove grammar to avoid them.
         "projects": [{"name": "Clear external project title", "bullets": ["Evidence"]}]
       }
     ],
-    "standalone_projects": [],
+    "standalone_projects": ["Exact profile project name", {"name": "Exact profile project name", "bullets": ["Reworded using only that project's facts"]}],
     "include_education": true,
     "include_certifications": true
   },

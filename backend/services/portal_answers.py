@@ -19,7 +19,7 @@ from models.portal_answers import (
     ProviderAnswer,
     PublicAnswerSource,
 )
-from models.profile import Profile
+from models.profile import Profile, certification_label, entry_bullets, entry_text
 from services import application_review, pricing
 from services.profile_store import UnknownProfileError, validate_profile_id
 from services.provider import Provider, ProviderError
@@ -100,12 +100,18 @@ def _profile_evidence(
         add(", ".join(skills), category)
     for education in profile.education:
         add(f"{education.degree} at {education.institution}")
+        for highlight in education.highlights:
+            add(highlight, f"{education.degree} highlight")
     for certificate in profile.certifications:
-        add(certificate)
+        add(certification_label(certificate))
     for publication in profile.publications:
-        add(publication, "Publication")
+        add(entry_text(publication), "Publication")
+        for bullet in entry_bullets(publication):
+            add(bullet, "Publication")
     for activity in profile.activities:
-        add(activity, "Activity")
+        add(entry_text(activity), "Activity")
+        for bullet in entry_bullets(activity):
+            add(bullet, "Activity")
     for language in profile.languages:
         add(language.proficiency, language.name)
     return evidence

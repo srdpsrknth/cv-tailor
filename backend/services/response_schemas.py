@@ -124,7 +124,25 @@ def _cv_document_schema():
             ),
             "include_education": types.Schema(type="BOOLEAN"),
             "include_certifications": types.Schema(type="BOOLEAN"),
-            "standalone_projects": types.Schema(type="ARRAY", items=types.Schema(type="STRING")),
+            # Either a profile project name (the profile's bullets render verbatim) or
+            # {name, bullets} with the bullets reworded toward the posting.
+            "standalone_projects": types.Schema(
+                type="ARRAY",
+                items=types.Schema(
+                    any_of=[
+                        types.Schema(type="STRING"),
+                        types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "name": types.Schema(type="STRING"),
+                                "bullets": types.Schema(
+                                    type="ARRAY", items=types.Schema(type="STRING")
+                                ),
+                            },
+                        ),
+                    ]
+                ),
+            ),
             # extract_explanation reads a nested explanation too, so it must stay legal
             # here. Forbidding it would decide, on the model's behalf, which of the two
             # shapes it may return -- the thing `extract_explanation` exists not to do.

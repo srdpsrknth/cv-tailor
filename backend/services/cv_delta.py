@@ -80,6 +80,8 @@ _DELTA_KEY_PATTERN = re.compile(
     r"|experience\[\d+\]\.projects\[\d+\]\.name"
     r"|experience\[\d+\]\.projects\[\d+\]\.bullets"
     r"|experience\[\d+\]\.projects\[\d+\]\.bullets\[\d+\]"
+    r"|standalone_projects\[\d+\]\.bullets"
+    r"|standalone_projects\[\d+\]\.bullets\[\d+\]"
     r"|skills\.[^.\[\]]+"
     r")$"
 )
@@ -134,6 +136,8 @@ def apply_cv_delta(cv: TailoredCV, delta: dict) -> TailoredCV:
             continue
         if key == "summary":
             merged.summary = _require_strings(value, key)
+        elif key.startswith("standalone_projects["):
+            _merge_standalone_unit(merged, key, value)
         elif key.startswith("skills."):
             merged.skills[key[len("skills."):]] = _require_strings(value, key)
         else:
@@ -145,6 +149,32 @@ def apply_cv_delta(cv: TailoredCV, delta: dict) -> TailoredCV:
             "or an existing skills category"
         )
     return merged
+
+def _merge_standalone_unit(cv: TailoredCV, key: str, value) -> None:
+    """Replace bullets of a standalone project the CV already rewords.
+
+    Only the ``{name, bullets}`` spelling is addressable: a project selected by name
+    renders the profile's bullets, so there is nothing in the CV to shorten and a delta
+    cannot silently turn it into prose. The project list itself is never addressable,
+    so a delta cannot drop or reorder a project.
+    """
+    failure = ValueError(f"unknown unit {key!r}: no such unit in the current CV")
+    match = re.match(r"^standalone_projects\[(\d+)\]\.bullets(?:\[(\d+)\])?$", key)
+    if match is None or int(match.group(1)) >= len(cv.standalone_projects):
+        raise failure
+    project = cv.standalone_projects[int(match.group(1))]
+    if isinstance(project, str):
+        raise ValueError(
+            f"unknown unit {key!r}: that project is selected by name; return the complete "
+            "CV to reword it"
+        )
+    if match.group(2) is None:
+        project.bullets = _require_strings(value, key)
+        return
+    if int(match.group(2)) >= len(project.bullets):
+        raise failure
+    project.bullets[int(match.group(2))] = _require_strings(value, key)[0]
+
 
 def _merge_experience_unit(cv: TailoredCV, key: str, value) -> None:
     """Apply one ``experience[...]`` key, rejecting anything that does not exist."""

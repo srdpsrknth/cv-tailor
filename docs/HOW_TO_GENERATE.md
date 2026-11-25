@@ -195,7 +195,21 @@ and files keep their names. Stored timestamps remain in UTC.
 **Ongoing education** uses `ongoing: true` in a private profile's education
 entry. Omit `end_year` if completion is unknown, or set it to the expected year
 to show, for example, `Present (expected 2028)`. Completed degrees use the
-existing `start_year` and `end_year` fields.
+existing `start_year` and `end_year` fields. An optional `highlights` list
+(coursework, thesis title, focus) prints as one compact line under the degree,
+joined with ` · `, in the PDF, Word and text exports:
+
+```yaml
+education:
+  - degree: MSc Synthetic Analytics
+    institution: Sampletown Institute of Technology
+    start_year: 2018
+    end_year: 2020
+    highlights: ["Thesis: Synthetic Forecasting", "Focus: causal inference"]
+```
+
+**Certifications** may be plain strings or `{name, issuer, year}` objects (`issuer`
+and `year` optional); the latter prints as `name (issuer, year)`.
 
 **Standalone projects** go in the private profile's top-level
 `standalone_projects` list. Each entry has a unique `name` and a `bullets` list.
@@ -208,13 +222,36 @@ standalone_projects:
       - Mapped public transport gaps with open data.
 ```
 
-CV generation selects relevant projects by exact name. The Projects section
-appears after work experience and uses the profile's bullets verbatim. Saved
+A project may also carry `dates` (free text), `technologies` (a list, printed as a
+`Technologies:` line like an employer role) and `context` (for example
+`University team project`). They print as `Name — context | dates`. Employer
+projects under `experience[].selected_projects` use the same fields and ignore them
+unless set.
+
+CV generation selects relevant projects by exact name and may also reword a
+project's bullets toward the posting. Selecting a name renders the profile's
+bullets verbatim; an object `{name, bullets}` renders the model's bullets, which
+must use only facts already in that project's profile bullets (no new tools,
+numbers, outcomes or responsibilities), number between one and one more than the
+profile's, and pass the same banned-tool and gap checks as employer bullets. A
+project with no profile bullets can only be selected by name. Metadata (`dates`,
+`context`, `technologies`) always comes from the profile. Set
+`standalone_projects_policy: all` (default `select`) to require every standalone
+project, in profile order; layout retries may shorten reworded bullets but never
+drop a project. The Projects section appears after work experience. Saved
 application previews and autofill exports use the saved profile snapshot.
 For a manual edit to `content.json`, set `cv.standalone_projects` to an ordered
-list of names from the profile used for rendering. Omit the field or use an
+list of names (or `{name, bullets}` objects) from the profile used for rendering. Omit the field or use an
 empty list to leave the section out. Keep employer-specific projects under the
 corresponding experience entry.
+
+**Experience entries** accept two more optional fields. `optional: true` lets the
+model leave that role out when it is irrelevant or to save space; every other
+role is still required. `display_name` is a short company name used in compact
+places (the project parenthetical and continuation headers) while the heading
+keeps the full employer. A role with no regular `bullets` and exactly one project
+prints the project name as an italic subheading, without the `Selected Projects:`
+label or company parenthetical.
 
 **CV section choices** are optional. Set `cv_section_order` in the private profile
 to move sections to the front of the CV body, in the order listed:
@@ -234,19 +271,24 @@ source data. The contact header stays at the top.
 These preferences apply to the standard PDF and autofill DOCX and text. Saved
 application exports from review use the saved profile snapshot. Older custom
 LaTeX templates with a fixed layout continue to use their original layout.
+
 For a one-off layout, copy the profile to a private YAML file, adjust the display
 settings in that copy, then use `cvtailor --profile <private-copy.yaml> render
 --content <application>/source/content.json --cv-only`. Render in a copy of the
 application folder if you want to keep both versions.
 
 **Publications and activities** are optional. Add one plain-text citation or
-activity per line in the private profile. The standard PDF, Word, and text
+activity per line in the private profile, or an object `{text, bullets}` to list
+supporting bullets under it. `text` (the citation) is always printed verbatim and
+never sent for rewording. The standard PDF, Word, and text
 exports use those entries directly. Empty lists produce no headings, and hidden
 sections keep their source entries in the profile.
 
 ```yaml
 publications:
   - "A. Sample (2025). Mapping Transit Access. Example Journal."
+  - text: "A. Sample (2024). Second Paper. Example Press."
+    bullets: ["Peer-reviewed by two referees."]
 activities:
   - "Volunteer mentor, Community Data Club (2025–present)."
 cv_section_order: [education, publications, experience]
