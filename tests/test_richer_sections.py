@@ -321,7 +321,7 @@ def test_employer_project_metadata_and_display_name(rich_profile, tmp_path):
     word = [p.text for p in Document(paths["cv_upload_docx_path"]).paragraphs]
     assert "Project: Attribution Rebuild (Northwind)" in word       # display_name, not the full company
     assert "— Internal rebuild | 2023" in word and "Technologies: dbt" in word
-    assert "Northwind Analytics GmbH | April 2023 - Present | Sampletown, Germany" in word  # heading keeps it
+    assert "Northwind Analytics GmbH | April 2023 – Present | Sampletown, Germany" in word  # heading keeps it
 
 
 def test_a_role_that_is_one_project_prints_an_italic_subheading(analyst_profile, tmp_path):

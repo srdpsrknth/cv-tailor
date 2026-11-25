@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, ClassVar, List, Dict, Literal, Optional, Union
 from pydantic import (
     BaseModel, Field, ConfigDict, StringConstraints, field_validator, model_serializer,
@@ -241,6 +242,44 @@ class ProfileRules(BaseModel):
 # Root profile model
 # -------------------------
 
+class LetterPreferences(BaseModel):
+    """Optional cover-letter wording preferences of this candidate.
+
+    Both fields are optional; an unset field keeps the built-in wording
+    (``Dear {company} Hiring Team,`` and the letter's own closing line, normally
+    ``Warm regards,``). ``{company}`` is the only placeholder the salutation accepts.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    salutation: Optional[str] = None
+    sign_off: Optional[str] = None
+
+    @field_validator("salutation", "sign_off")
+    @classmethod
+    def _single_nonblank_line(cls, value):
+        if value is None:
+            return value
+        if not value or "\n" in value or "\r" in value:
+            raise ValueError("must be one non-empty line of text.")
+        return value
+
+    @field_validator("salutation")
+    @classmethod
+    def _only_company_placeholder(cls, value):
+        if value is not None and re.search(r"[{}]", value.replace("{company}", "")):
+            raise ValueError("the only placeholder allowed is {company}.")
+        return value
+
+    def salutation_for(self, company: str) -> Optional[str]:
+        """The salutation for ``company``, or ``None`` to use the built-in one."""
+        if not self.salutation:
+            return None
+        company = (company or "").strip()
+        text = self.salutation.replace("{company} ", f"{company} " if company else "")
+        return " ".join(text.replace("{company}", company).split())
+
+
 class JobSearchDefaults(BaseModel):
     """Optional starting filters for this candidate's job searches."""
 
@@ -254,7 +293,7 @@ class JobSearchDefaults(BaseModel):
 
 class Profile(_OmitDefaultsWhenNew):
     model_config = ConfigDict(extra="forbid")
-    _omit_when_default = ("standalone_projects_policy",)
+    _omit_when_default = ("standalone_projects_policy", "letter")
 
     version: str
     identity: Identity
@@ -266,6 +305,8 @@ class Profile(_OmitDefaultsWhenNew):
     languages: List[Language] = Field(default_factory=list)
     rules: Optional[ProfileRules] = None
     job_search: Optional[JobSearchDefaults] = None
+    #: Optional private cover-letter wording (salutation, sign-off).
+    letter: Optional[LetterPreferences] = None
     standalone_projects: List[Project] = Field(default_factory=list)
     publications: List[Union[CVEntry, CVEntryWithBullets]] = Field(default_factory=list)
     activities: List[Union[CVEntry, CVEntryWithBullets]] = Field(default_factory=list)

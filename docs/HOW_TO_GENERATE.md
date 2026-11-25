@@ -191,6 +191,20 @@ markets and filters can return results.
 `.env` and defaults to UTC. To retain the former Berlin calendar for new application
 IDs and upload CV filenames, set `CVTAILOR_TIMEZONE=Europe/Berlin`. Existing IDs
 and files keep their names. Stored timestamps remain in UTC.
+The cover-letter date and filename year follow the same setting; without it the
+letter uses the machine's local date.
+
+**Cover-letter wording** is optional. A private profile can set its salutation and
+sign-off; `{company}` is the only placeholder. Omitted fields keep the defaults
+(`Dear {company} Hiring Team,` and the letter's own closing, normally
+`Warm regards,`). The DOCX and PDF letters always match, and the profile value wins
+over wording the model wrote. The recipient line stays `Hiring Team`.
+
+```yaml
+letter:
+  salutation: "Dear {company} recruiting team,"
+  sign_off: "With best wishes,"
+```
 
 **Ongoing education** uses `ongoing: true` in a private profile's education
 entry. Omit `end_year` if completion is unknown, or set it to the expected year

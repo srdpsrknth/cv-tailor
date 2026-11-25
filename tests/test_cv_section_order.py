@@ -56,7 +56,7 @@ def test_snapshot_controls_pdf_source_and_autofill_order(analyst_profile, tmp_pa
     paths = render_upload_cv(cv, profile, tmp_path)
     paragraphs = [row.text for row in Document(paths["cv_upload_docx_path"]).paragraphs]
     assert Path(paths["cv_upload_text_path"]).read_text(encoding="utf-8").splitlines() == paragraphs
-    positions = [paragraphs.index(heading) for heading in ["Education", "Projects", "Skills", "Work Experience"]]
+    positions = [paragraphs.index(heading) for heading in ["Education", "Projects", "Skills", "Professional Experience"]]
     assert positions == sorted(positions)
 
     expected_prose, _ = renderer._extraction_contract(cv, profile)

@@ -7,9 +7,50 @@ escape or style it for their own medium.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from models.profile import Education, Experience, Project
+
+#: Section titles, decided once. The PDF upper-cases them; DOCX/TXT show them as written.
+#: ``summary`` is deliberately DOCX/TXT only: the PDF shows the summary as an unlabelled
+#: paragraph under the headline, but the upload copy keeps an explicit "Summary" heading
+#: because ATS resume parsers use headings to find the section.
+SECTION_TITLES = {
+    "summary": "Summary",
+    "experience": "Professional Experience",
+    "projects": "Projects",
+    "education": "Education",
+    "certifications": "Certifications",
+    "skills": "Skills",
+    "languages": "Languages",
+    "publications": "Publications",
+    "activities": "Activities",
+}
+
+#: Every fixed English label of the CV, kept together so a later localisation has a
+#: single place to change. (No localisation exists yet; these are today's words.)
+LABELS = {
+    "technologies": "Technologies:",
+    "selected_projects": "Selected Projects:",
+    "project": "Project:",
+    "continued": "continued",
+    "work_authorization": "Work authorization:",
+}
+
+#: Word shown for an ongoing role or study, in every output.
+PRESENT = "Present"
+
+#: Between the two ends of a date range, in every output (an en dash, not a hyphen).
+DATE_RANGE_SEPARATOR = " – "
+#: The same separator in LaTeX source, where ``--`` typesets an en dash.
+DATE_RANGE_SEPARATOR_LATEX = " -- "
+
+#: Fixed English month names. ``strftime`` follows the OS locale, which would change a
+#: CV's words between two machines; this table does not.
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December")
+MONTHS_SHORT = tuple(name[:3] for name in MONTHS)
 
 #: Separator for education highlights. One compact metadata line under the degree.
 HIGHLIGHT_SEPARATOR = " · "
@@ -34,7 +75,22 @@ def project_heading(project: Project) -> str:
 def project_technologies_line(project: Project) -> Optional[str]:
     """``Technologies: a, b``, laid out like an employer role's line."""
     items = [item.strip() for item in project.technologies if item.strip()]
-    return "Technologies: " + ", ".join(items) if items else None
+    return f"{LABELS['technologies']} " + ", ".join(items) if items else None
+
+
+def format_month_year(value: str, *, short: bool = True) -> str:
+    """``2025-08`` -> ``Aug 2025`` (or ``August 2025``); ``present``/blank -> ``Present``.
+
+    Locale independent. Any other text (a bare year, free wording) is returned as is.
+    """
+    text = (value or "").strip()
+    if not text or text.lower() == "present":
+        return PRESENT
+    match = re.fullmatch(r"(\d{4})-(\d{2})", text)
+    if match and 1 <= int(match.group(2)) <= 12:
+        names = MONTHS_SHORT if short else MONTHS
+        return f"{names[int(match.group(2)) - 1]} {match.group(1)}"
+    return text
 
 
 def education_highlights_line(education: Education) -> Optional[str]:

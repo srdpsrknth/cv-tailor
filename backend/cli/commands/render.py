@@ -127,7 +127,9 @@ def run(args, console: Console, config) -> int:
             )
 
     if only != "cv":
-        docx, pdf = create_docx_renderer(outputs_dir=str(folder)).render_cover_letter(
+        docx, pdf = create_docx_renderer(
+            outputs_dir=str(folder), timezone_name=config.timezone_name
+        ).render_cover_letter(
             cl, profile, job_position=role
         )
         words = sum(len(p.split()) for p in cl.paragraphs)

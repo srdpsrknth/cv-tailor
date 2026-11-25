@@ -14,6 +14,8 @@ import math
 import re
 from typing import Iterable
 
+from renderers.cv_sections import SECTION_TITLES
+
 PRESETS = (
     dict(name="comfortable", body_size=11, leading=13.2,
          item_spacing=1.5, section_spacing=8),
@@ -24,14 +26,24 @@ PRESETS = (
 )
 
 _MARGIN_PT = 15 / 25.4 * 72
-_SECTIONS = {
-    "professional experience", "education", "certifications", "skills",
-    "languages",
-}
-
-
 def _normalized(value: str) -> str:
     return " ".join(re.findall(r"\w+", value.casefold()))
+
+
+#: Every section heading the template can print (``summary`` has none in the PDF).
+_SECTIONS = {
+    _normalized(title) for key, title in SECTION_TITLES.items() if key != "summary"
+}
+#: A bare page number or "page 1 of 2" footer is not content.
+_FOOTER = re.compile(r"(page )?\d+( of \d+)?")
+
+
+def _last_content_line(normalized_lines: list[str]) -> str:
+    """The last line that is neither blank nor a page-number footer."""
+    for line in reversed(normalized_lines):
+        if line and not _FOOTER.fullmatch(line):
+            return line
+    return ""
 
 
 def _largest_gap(chars: list[dict]) -> float:
@@ -109,7 +121,7 @@ def measure_layout(
             for employer, project in projects:
                 if project in text:
                     project_pages.setdefault((employer, project), index)
-            last = normalized_lines[-1] if normalized_lines else ""
+            last = _last_content_line(normalized_lines)
             page_orphan = last in _SECTIONS or last in employers
             if last.startswith("selected projects"):
                 page_orphan = True

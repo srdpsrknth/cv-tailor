@@ -18,8 +18,10 @@ from models.tailored_output import TailoredCV
 from models.profile import Profile
 from models.profile import certification_label, entry_bullets, entry_text
 from renderers.cv_sections import (
-    education_highlights_line, find_profile_project, find_role, project_as_subheading,
-    project_heading, project_meta, project_technologies_line, role_company_label,
+    DATE_RANGE_SEPARATOR, DATE_RANGE_SEPARATOR_LATEX, LABELS, SECTION_TITLES,
+    education_highlights_line, find_profile_project, find_role, format_month_year,
+    project_as_subheading, project_heading, project_meta, project_technologies_line,
+    role_company_label,
 )
 from utils.text import escape_latex, format_skill_category, latex_url, slugify
 
@@ -394,7 +396,7 @@ class LaTeXRenderer:
             for index, edu in enumerate(profile.education):
                 fields[f"Degree {index}"] = edu.degree
                 fields[f"Institution {index}"] = edu.institution
-                fields[f"Education dates {index}"] = edu.date_range(" -- ")
+                fields[f"Education dates {index}"] = edu.date_range(DATE_RANGE_SEPARATOR)
                 if edu.location:
                     fields[f"Education location {index}"] = edu.location
                 if education_highlights_line(edu):
@@ -495,6 +497,9 @@ class LaTeXRenderer:
             if "summary" not in profile.cv_hidden_sections else [],
             "experience": experiences,
             "cv_section_order": profile.visible_cv_sections(),
+            "section_titles": dict(SECTION_TITLES),
+            "labels": {key: self._escape_latex(value) for key, value in LABELS.items()},
+            "date_separator": DATE_RANGE_SEPARATOR_LATEX,
             # Text-only lists keep the historical key; the entries carry their bullets.
             "publications": [self._escape_latex(entry_text(entry)) for entry in profile.publications],
             "activities": [self._escape_latex(entry_text(entry)) for entry in profile.activities],
@@ -511,7 +516,7 @@ class LaTeXRenderer:
                     "degree": self._escape_latex(edu.degree),
                     "institution": self._escape_latex(edu.institution),
                     "location": self._escape_latex(edu.location or ""),
-                    "dates": edu.date_range(" -- "),
+                    "dates": edu.date_range(DATE_RANGE_SEPARATOR_LATEX),
                     "highlights": self._escape_latex(education_highlights_line(edu) or ""),
                     # Keep these keys for historical/custom templates.
                     "start_year": edu.start_year,
@@ -737,27 +742,12 @@ class LaTeXRenderer:
 
     @staticmethod
     def _format_date(date_str: str) -> str:
+        """``YYYY-MM`` -> ``Aug 2025``; blank or ``present`` -> ``Present``.
+
+        Uses a fixed English month table, so the result never depends on the OS locale.
+        Anything unparsable is returned unchanged.
         """
-        Format date from YYYY-MM to 'Aug 2025' format.
-        Handles 'present' as-is.
-
-        Args:
-            date_str: Date in YYYY-MM format or 'present'
-
-        Returns:
-            Formatted date string like 'Aug 2025' or 'present'
-        """
-        if not date_str or date_str.lower() == 'present':
-            return 'present'
-
-        try:
-            # Parse YYYY-MM format
-            date_obj = datetime.strptime(date_str, '%Y-%m')
-            # Format as 'Aug 2025'
-            return date_obj.strftime('%b %Y')
-        except ValueError:
-            # If parsing fails, return original string
-            return date_str
+        return format_month_year(date_str)
 
 
 def create_latex_renderer(

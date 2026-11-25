@@ -3,7 +3,6 @@ DOCX renderer for tailored cover letters using docxtpl.
 """
 from __future__ import annotations
 
-from datetime import date
 import logging
 import os
 import re
@@ -20,6 +19,8 @@ from docx.oxml.ns import qn
 
 from models.profile import Profile
 from models.tailored_output import TailoredCoverLetter
+from renderers.cv_sections import MONTHS
+from utils.calendar import calendar_today, configured_timezone_name
 from utils.text import escape_latex, slugify
 
 
@@ -38,7 +39,11 @@ class DocxRenderer:
         self,
         templates_dir: Optional[str] = None,
         outputs_dir: Optional[str] = None,
+        timezone_name: Optional[str] = None,
     ) -> None:
+        # IANA zone for the letter date and the filename year. ``None`` follows
+        # ``CVTAILOR_TIMEZONE`` when it is set, else the machine's local date.
+        self.timezone_name = timezone_name or configured_timezone_name()
         base_dir = Path(__file__).parent.parent.parent
         self.templates_dir = Path(templates_dir) if templates_dir else base_dir / "templates" / "cover_letter"
         self.outputs_dir = Path(outputs_dir) if outputs_dir else base_dir / "outputs"
@@ -114,17 +119,21 @@ class DocxRenderer:
 
         return str(output_path), pdf_path
 
-    @staticmethod
-    def _format_render_date() -> str:
-        """Return today's date for the letter header.
+    def _today(self):
+        return calendar_today(self.timezone_name)
 
-        Render-time ``date.today()`` is intentional: generating or re-rendering an
+    def _format_render_date(self) -> str:
+        """Return today's date for the letter header, in the configured timezone.
+
+        Month names come from a fixed English table, never the OS locale.
+
+        Render-time "today" is intentional: generating or re-rendering an
         application on the day of submission stamps that submission date into both the
         DOCX and the PDF (e.g. ``17 November 2026``). Re-rendering an older folder on a
         later date updates the letter date accordingly.
         """
-        today = date.today()
-        return f"{today.day} {today:%B %Y}"
+        today = self._today()
+        return f"{today.day} {MONTHS[today.month - 1]} {today.year}"
 
     @staticmethod
     def _format_sender_contact_line(profile: Profile) -> str:
@@ -145,8 +154,14 @@ class DocxRenderer:
     @staticmethod
     def _extract_salutation_and_paragraphs(
         tailored_cl: TailoredCoverLetter,
+        profile: Optional[Profile] = None,
     ) -> tuple[str, list[str]]:
-        """Derive the salutation and body paragraphs without mutating ``tailored_cl``."""
+        """Derive the salutation and body paragraphs without mutating ``tailored_cl``.
+
+        A ``letter.salutation`` set in the private profile wins over both the built-in
+        wording and a salutation the model wrote; the model's own "Dear ..." line is
+        still removed from the body.
+        """
         company_name = (tailored_cl.company_name or "").strip()
         salutation = (
             f"Dear {company_name} Hiring Team," if company_name else "Dear Hiring Team,"
@@ -159,16 +174,26 @@ class DocxRenderer:
                 body_paras[0] = lines[1].strip()
             else:
                 body_paras = body_paras[1:]
-        return salutation, body_paras
+        preferences = getattr(profile, "letter", None)
+        preferred = preferences.salutation_for(company_name) if preferences else None
+        return preferred or salutation, body_paras
+
+    @staticmethod
+    def _resolve_closing_line(tailored_cl: TailoredCoverLetter, profile: Optional[Profile]) -> str:
+        """The sign-off: the profile's ``letter.sign_off``, else the letter's own, else the default."""
+        preferences = getattr(profile, "letter", None)
+        if preferences and preferences.sign_off:
+            return preferences.sign_off.strip()
+        return (tailored_cl.closing_line or "Warm regards,").strip()
 
     def _build_context(self, tailored_cl: TailoredCoverLetter, profile: Profile) -> dict:
-        salutation, paragraphs = self._extract_salutation_and_paragraphs(tailored_cl)
+        salutation, paragraphs = self._extract_salutation_and_paragraphs(tailored_cl, profile)
         company_name = (tailored_cl.company_name or "").strip()
         role_title = (tailored_cl.role_title or "").strip()
         candidate_name = (
             tailored_cl.signature_name or profile.identity.full_name or "Applicant"
         ).strip()
-        closing_line = (tailored_cl.closing_line or "Warm regards,").strip()
+        closing_line = self._resolve_closing_line(tailored_cl, profile)
         closing_para = (
             "\n\n".join(paragraphs[3:])
             if len(paragraphs) > 4
@@ -197,7 +222,7 @@ class DocxRenderer:
         return slugify(text)
 
     def _format_filename(self, company: str, job_position: str) -> str:
-        year = date.today().year
+        year = self._today().year
         safe_company = self._slugify(company)
         safe_job = self._slugify(job_position)
         return f"{year}_cover_letter_{safe_company}_{safe_job}.docx"
@@ -297,8 +322,8 @@ class DocxRenderer:
         company_name = (tailored_cl.company_name or "").strip()
         contact_line = self._format_sender_contact_line(profile)
         current_date = self._format_render_date()
-        closing_line = (tailored_cl.closing_line or "Warm regards,").strip()
-        salutation, body_paras = self._extract_salutation_and_paragraphs(tailored_cl)
+        closing_line = self._resolve_closing_line(tailored_cl, profile)
+        salutation, body_paras = self._extract_salutation_and_paragraphs(tailored_cl, profile)
 
         title_parts = [p for p in (candidate_name, "Cover Letter", role_title, company_name) if p]
         pdf_title = " - ".join(title_parts)
@@ -422,6 +447,8 @@ class DocxRenderer:
 def create_docx_renderer(
     templates_dir: Optional[str] = None,
     outputs_dir: Optional[str] = None,
+    timezone_name: Optional[str] = None,
 ) -> DocxRenderer:
     """Factory for DocxRenderer."""
-    return DocxRenderer(templates_dir=templates_dir, outputs_dir=outputs_dir)
+    return DocxRenderer(
+        templates_dir=templates_dir, outputs_dir=outputs_dir, timezone_name=timezone_name)

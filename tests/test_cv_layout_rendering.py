@@ -233,14 +233,14 @@ def test_preview_compares_bounded_splits_without_writing_to_saved_outputs(
     assert report["split_before"] == {"role_index": 1, "kind": "bullet", "index": 1}
     assert [attempt["text_preserved"] for attempt in report["attempts"]] == [True, True, False]
     assert len(invocations) == 3
-    assert "(continued)\\par" not in invocations[0][1]
+    assert "(\\lblcontinued)\\par" not in invocations[0][1]
     bullet_split = invocations[1][1]
     first_bullet, second_bullet = cv.experience[1].bullets[:2]
     assert bullet_split.index(first_bullet) < bullet_split.index("\\newpage")
-    assert bullet_split.index("(continued)\\par") < bullet_split.index(second_bullet)
+    assert bullet_split.index("(\\lblcontinued)\\par") < bullet_split.index(second_bullet)
     project_split = invocations[2][1]
     assert project_split.index(cv.experience[1].bullets[-1]) < project_split.index("\\newpage")
-    assert project_split.index("(continued)\\par") < project_split.index(cv.experience[1].projects[0].name)
+    assert project_split.index("(\\lblcontinued)\\par") < project_split.index(cv.experience[1].projects[0].name)
     assert all(not path.exists() for path, _ in invocations)
     assert list(tmp_path.iterdir()) == [saved]
     assert saved.read_bytes() == b"previous CV"
