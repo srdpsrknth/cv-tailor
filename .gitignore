@@ -14,8 +14,7 @@
 #
 # Synthetic fixtures under tests/fixtures/ are the only committed sample data.
 # ---------------------------------------------------------------------------
-/storage/profile/
-/storage/profiles/
+/storage/
 /applications/
 /outputs/*
 
@@ -100,9 +99,15 @@ pytest-cache-files-*/
 *.bak
 *.tmp
 
-# Scratch space used for throwaway worktrees, recorded provider listings and
-# staging roots. Explicitly ignored by name so a tracked directory named "tmp"
-# elsewhere is unaffected. Also holds the recorded OpenRouter listing the curated
-# model ids were read from: it is a 467-model blob, quoted and hashed in
-# evaluation/curated_models.py rather than committed.
+# Scratch space used for throwaway worktrees, raw provider listings and staging
+# roots. Explicitly ignored by name so a tracked directory named "tmp" elsewhere is
+# unaffected. The raw OpenRouter listing the curated model ids were read from lives
+# here and is not committed; a trimmed copy of public model metadata (ids, prices,
+# context sizes -- no personal data) is tracked as evaluation/listing_2026-10-30.json
+# and hashed in evaluation/curated_models.py.
 .tmp/
+
+# Generated documents dropped at the repository root, and agent worktrees.
+/*.pdf
+/*.docx
+.claude/

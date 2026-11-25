@@ -547,6 +547,7 @@ def _service_without_network(api_key: str = 'unit-test-key'):
     from services.llm_service import LLMService
 
     class _Config:
+        provider = 'gemini'
         model = 'gemini-3.8-flash'
         temperature = 0.3
         max_output_tokens = 8000

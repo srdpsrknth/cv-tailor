@@ -14,6 +14,7 @@ from pathlib import Path
 from utils.calendar import calendar_zone
 
 from cli.context import CliError, Console
+from python_floor import MIN_PYTHON, min_python_text
 
 #: (name, status) where status is one of "ok", "warn", "fail".
 OK = "ok"
@@ -35,8 +36,8 @@ class Check:
 
 def check_python() -> Check:
     version = ".".join(str(part) for part in sys.version_info[:3])
-    if sys.version_info < (3, 10):
-        return Check("python", FAIL, version, "Use Python 3.10 or newer.")
+    if tuple(sys.version_info[:2]) < MIN_PYTHON:
+        return Check("python", FAIL, version, f"Use Python {min_python_text()} or newer.")
     return Check("python", OK, version)
 
 
@@ -178,9 +179,39 @@ def check_pdflatex() -> Check:
     except Exception as error:
         return Check(
             "pdflatex", FAIL, str(error),
-            "Install MiKTeX or TeX Live, or set LATEX_COMPILER to the binary.",
+            "Install a TeX distribution (macOS: MacTeX; Windows: MiKTeX or TeX Live; "
+            "Linux: TeX Live), or set LATEX_COMPILER to the pdflatex binary.",
         )
     return Check("pdflatex", OK, str(compiler))
+
+
+def check_fonts(which=shutil.which, run=None) -> "Check | None":
+    """Warn (never fail) when the templates' font package is missing from the TeX install.
+
+    Both templates use Carlito (``carlito.sty``) and fall back to Lato. ``kpsewhich``
+    reports whether a file is installed; when it is not on PATH the check is skipped.
+    """
+    import subprocess
+
+    kpsewhich = which("kpsewhich")
+    if not kpsewhich:
+        return None
+    run = run or subprocess.run
+
+    def installed(name: str) -> bool:
+        try:
+            result = run([kpsewhich, name], capture_output=True, text=True,
+                         encoding="utf-8", timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            return True  # cannot tell; do not warn
+        return result.returncode == 0 and bool(result.stdout.strip())
+
+    if installed("carlito.sty"):
+        return Check("fonts", OK, "Carlito available")
+    fix = "Install the TeX package 'carlito' (tlmgr install carlito, or the MiKTeX package manager)."
+    if installed("lato.sty"):
+        return Check("fonts", WARN, "Carlito missing; documents fall back to Lato", fix)
+    return Check("fonts", WARN, "neither Carlito nor Lato found; documents may fail to compile", fix)
 
 
 def check_api_key(config, verify: bool = False) -> Check:
@@ -254,9 +285,11 @@ def run(args, console: Console, config) -> int:
         check_timezone(config.timezone_name),
         check_templates(root),
         check_pdflatex(),
+        check_fonts(),
         check_outputs(config),
         check_api_key(config, verify=getattr(args, "verify_key", False)),
     ]
+    checks = [c for c in checks if c is not None]  # a skipped check returns None
 
     failed = [c for c in checks if c.status == FAIL]
     warned = [c for c in checks if c.status == WARN]

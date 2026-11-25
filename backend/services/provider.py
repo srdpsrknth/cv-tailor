@@ -41,14 +41,46 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-# The Google SDK is imported at module scope so a test can replace its client factory
-# without reaching into a function body. Importing it has no side effects and reads no
-# environment (ADR 0010); only ``genai.Client(...)`` touches credentials, and that
-# happens in ``GeminiProvider.__init__``.
-from google import genai
-from google.genai import types
+import importlib
 
-from config import PROVIDER_KEY_SETTINGS, configured_provider_key
+
+class _LazyModule:
+    """Import ``module_name`` on first attribute access, forwarding reads and writes.
+
+    ``google-genai`` is only needed by the Gemini provider, so importing this module
+    (and running the OpenRouter path) must work without it. Keeping ``genai`` and
+    ``types`` as module-level names lets a test replace ``genai.Client`` without
+    reaching into a function body. Importing reads no environment (ADR 0010); only
+    ``genai.Client(...)`` touches credentials, in ``GeminiProvider.__init__``.
+    """
+
+    def __init__(self, module_name: str):
+        object.__setattr__(self, "_module_name", module_name)
+
+    def _load(self):
+        try:
+            return importlib.import_module(object.__getattribute__(self, "_module_name"))
+        except ImportError as error:  # pragma: no cover - exercised via sys.modules
+            raise ProviderError(
+                "The Gemini provider needs the 'google-genai' package "
+                "(pip install google-genai, or rerun scripts/setup.py). "
+                f"Import failed: {error}"
+            ) from error
+
+    def __getattr__(self, name):
+        return getattr(self._load(), name)
+
+    def __setattr__(self, name, value):
+        setattr(self._load(), name, value)
+
+    def __delattr__(self, name):
+        delattr(self._load(), name)
+
+
+genai = _LazyModule("google.genai")
+types = _LazyModule("google.genai.types")
+
+from config import DEFAULT_PROVIDER, PROVIDER_KEY_SETTINGS, configured_provider_key
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +510,7 @@ def _retry_delay(attempt: int, error: Exception) -> int:
 
 
 def build_provider(config, api_key: Optional[str] = None) -> Provider:
-    """Build the provider ``config`` names. Gemini is the default (decision 6).
+    """Build the provider ``config`` names; the default is ``DEFAULT_PROVIDER``.
 
     Reads only from the passed ``config``, so there is no import-time environment
     read (ADR 0010) and one test can override another's provider.
@@ -489,7 +521,7 @@ def build_provider(config, api_key: Optional[str] = None) -> Provider:
             It applies to the **selected** provider only, so passing one can never
             authenticate against a provider the caller did not choose.
     """
-    provider_name = (getattr(config, "provider", None) or "gemini").strip().lower()
+    provider_name = (getattr(config, "provider", None) or DEFAULT_PROVIDER).strip().lower()
     if provider_name not in ("gemini", "openrouter"):
         raise ProviderError(
             f"Unknown provider {provider_name!r}. "

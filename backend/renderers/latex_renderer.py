@@ -19,6 +19,33 @@ from models.profile import Profile
 from utils.text import escape_latex, format_skill_category, latex_url, slugify
 
 
+def discover_texlive_pdflatex(
+    windows_roots: Optional[list] = None, unix_roots: Optional[list] = None
+) -> list:
+    """Find ``pdflatex`` in per-year TeX Live directories, newest year first.
+
+    TeX Live installs to ``<root>/<year>/bin/<platform>/pdflatex``:
+    ``C:\\texlive\\2025\\bin\\windows`` or ``bin\\win64`` on Windows and
+    ``/usr/local/texlive/2025/bin/<arch>-<os>/pdflatex`` on Linux and macOS. The year
+    is a wildcard, so a new release needs no code change. The roots are parameters
+    so tests can point them at a temporary directory.
+    """
+    if windows_roots is None:
+        system_drive = os.getenv("SystemDrive", "C:")
+        windows_roots = [Path(system_drive + "/texlive")]
+    if unix_roots is None:
+        unix_roots = [Path("/usr/local/texlive")]
+
+    found: list = []
+    for root in windows_roots:
+        for pattern in ("*/bin/windows/pdflatex.exe", "*/bin/win64/pdflatex.exe"):
+            found.extend(Path(root).glob(pattern))
+    for root in unix_roots:
+        found.extend(Path(root).glob("*/bin/*/pdflatex"))
+    # Year directories are four digits, so a reverse string sort is newest first.
+    return [str(path) for path in sorted(found, key=lambda path: str(path), reverse=True)]
+
+
 class LaTeXRendererError(Exception):
     """Custom exception for LaTeX rendering errors."""
     pass
@@ -69,11 +96,12 @@ class LaTeXRenderer:
             "/opt/homebrew/bin/pdflatex",
             # Linux conventions.
             "/usr/bin/pdflatex",
-            "/usr/local/texlive/bin/pdflatex",
             # Windows -- MiKTeX and TeX Live.
             str(Path(os.getenv("ProgramFiles", "C:/Program Files")) / "MiKTeX/miktex/bin/x64/pdflatex.exe"),
             str(Path(os.getenv("ProgramFiles(x86)", "C:/Program Files (x86)")) / "MiKTeX/miktex/bin/x64/pdflatex.exe"),
             str(local_app_data / "Programs/MiKTeX/miktex/bin/x64/pdflatex.exe"),
+            # TeX Live installs into a per-year directory (newest year first).
+            *discover_texlive_pdflatex(),
         ]
 
         # Ensure directories exist
@@ -523,7 +551,7 @@ class LaTeXRenderer:
 
     def _compile_pdf_pdflatex(self, tex_path: Path, pdf_path: Path) -> Path:
         """
-        Compile LaTeX to PDF using pdflatex (fallback if tectonic unavailable).
+        Compile LaTeX to PDF using pdflatex.
 
         Args:
             tex_path: Path to .tex file
