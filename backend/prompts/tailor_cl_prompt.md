@@ -34,9 +34,9 @@ closing line, and signature separately.
    with a brief, natural thank-you or invitation to talk. Avoid repeating the opening,
    strengths already explained, or generic claims of fit.
    Never use a semicolon in the closing. Do not restate strengths ("I would bring this
-   combination of..."), repeat the opening, or end on a list of missing tools. A
-   necessary career-transition explanation should be brief and honest, framed through
-   supported experience.
+   combination of..."), repeat the opening, or end on a list of missing tools. Do
+   not explain, apologise for or mention missing experience, languages or requirements;
+   frame any career change only through supported experience.
 
 WORK AUTHORIZATION (country rules)
 Country-specific application rules in the context take precedence over the generic
@@ -54,7 +54,7 @@ NEVER use colons (:), semicolons (;), or em-dashes (—) inside cover-letter bod
 paragraphs. Connect clauses smoothly using conjunctions (and, so, where, while, which)
 or clean sentence breaks with periods.
 Use natural transitions where they help the reader follow the argument. Examples such
-as "In my current role at..." may help, but vary the wording and do not force a repeated
+as "At Employer, I..." may help, but vary the wording and do not force a repeated
 transition pattern. Short direct sentences are fine when they sound natural; avoid
 clipped fragments and unsupported mid-sentence claims (", which I led,").
 Natural contractions are fine when they fit the sentence; do not force formality or slang.
@@ -71,8 +71,10 @@ These are editorial checks, not a claim that text can pass an AI detector.
 Select evidence that directly demonstrates the posting's highest-priority requirements.
 Make the requirement-to-example connection clear, explain the candidate's own action
 and the practical result, and leave unsupported or materially unmatched requirements
-out rather than filling space with a tool list. Do not invent a gap explanation unless
-it is useful and supported by the profile.
+out rather than filling space with a tool list. Never state, imply, summarise or apologise
+for missing qualifications, experience, languages or requirements; omit unmatched
+requirements silently. Describe roles whose end_date has passed in the past tense and
+never as current; only roles marked present may be called current.
 Do not fabricate tools, metrics, ownership, outcomes, or completed work. Use only evidence from the profile.
 
 Return valid JSON only, with standard escaping. Apostrophes are valid inside JSON

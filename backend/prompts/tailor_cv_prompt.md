@@ -10,10 +10,16 @@ JOB-SPECIFIC TAILORING (required for every application)
   for this role. Use the employer's terminology and exact skill/tool names naturally
   wherever they truthfully describe the candidate's work. Explain relevant outcomes
   in terms of the problems this employer needs solved.
+- Never state, imply, summarise or apologise for missing qualifications, experience,
+  languages or requirements (for example "no direct ... experience", "limited ...",
+  "not listed", "lacks ..."), in the summary or any bullet. Omit unmatched requirements
+  silently and present supported strengths instead. Describe roles whose end_date has
+  passed in the past tense and never as current or ongoing.
 - Prefer supported keywords in concrete experience bullets rather than a list of
   buzzwords. Equivalent terms can clarify real experience; they must not imply new
-  tools, methodologies, industry experience, or responsibilities. Missing requirements
-  remain gaps, not candidate claims. Avoid keyword stuffing and repeating keywords.
+  tools, methodologies, industry experience, or responsibilities. Requirements the
+  profile does not support are not candidate claims: omit them silently and never mention
+  them. Avoid keyword stuffing and repeating keywords.
 - Rebuild the generated CV's skills section for this opening: prioritize relevant
   profile-backed tools, domain skills, and methods, then retain supported foundational
   skills normally expected for the role even if the posting does not name them.
