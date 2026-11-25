@@ -126,7 +126,7 @@ the page-count gate without spending anything.
 
 Prove the whole render path (templates, LaTeX, DOCX) on your Mac without an API key or any spend. Use either your own profile or the synthetic sample that ships with the tests.
 
-**Option A: your own profile.** Run one free generation-free render from a `content.json` you already have, as in the previous section. If you have none yet, create a minimal one from your own profile: copy `tests/fixtures/content/valid_content.json` to `<store>/outputs/<profile_id>/first_render_check/source/content.json` and replace the placeholder company, role, summary, experience entries and the cover-letter paragraphs and `signature_name` with text drawn from your own profile (the CV must match the facts in `profile.yaml`; the cover letter needs four paragraphs of 290-310 words in total to avoid a review warning).
+**Option A: your own profile.** Run one free local render (no AI call) from a `content.json` you already have, as in the previous section. If you have none yet, create a minimal one from your own profile: copy `tests/fixtures/content/valid_content.json` to `<store>/outputs/<profile_id>/first_render_check/source/content.json` and replace the placeholder company, role, summary, experience entries and the cover-letter paragraphs and `signature_name` with text drawn from your own profile (the CV must match the facts in `profile.yaml`; the cover letter needs four paragraphs of 290-310 words in total to avoid a review warning).
 
 **Option B: synthetic sample (no personal data).** Import the synthetic profile into a throwaway store and render its fixture content:
 
