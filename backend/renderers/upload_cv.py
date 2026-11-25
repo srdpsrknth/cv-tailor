@@ -102,60 +102,68 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
     authorization = cv.work_authorization if cv.work_authorization is not None else identity.visa_status
     if authorization:
         add(f'Work authorization: {authorization}')
-    if cv.summary:
+    if cv.summary and "summary" not in profile.cv_hidden_sections:
         add('Summary', 'Heading 1')
         add(' '.join(cv.summary))
-    if cv.experience:
-        add('Work Experience', 'Heading 1')
-    for exp in cv.experience:
-        add(exp.role, 'Heading 2', keep=True)
-        # Exact identity avoids borrowing location/tools from another role at
-        # the same employer. Ambiguous matches contribute no inferred metadata.
-        matches = [row for row in profile.experience if
-                   (row.company, row.role, row.start_date, row.end_date) ==
-                   (exp.company, exp.role, exp.start_date, exp.end_date)]
-        if not matches:
-            company_matches = [row for row in profile.experience if row.company == exp.company]
-            matches = company_matches if len(company_matches) == 1 else []
-        original = matches[0] if len(matches) == 1 else None
-        dates = ' - '.join(readable_date(d) for d in (exp.start_date, exp.end_date) if d)
-        metadata = [exp.company, dates, original.location if original else None]
-        p = doc.add_paragraph(' | '.join(value for value in metadata if value))
-        p.paragraph_format.keep_with_next = bool(exp.bullets or exp.projects or (original and original.location))
-        for bullet in exp.bullets:
-            add(bullet, 'List Bullet')
-        for project in exp.projects:
-            add(f'Project: {project.name} ({exp.company})', 'Heading 2', keep=True)
-            for bullet in project.bullets:
-                add(bullet, 'List Bullet')
-        if original and original.technologies:
-            add('Technologies: ' + ', '.join(original.technologies))
-    standalone_projects = cv.resolve_standalone_projects(profile)
-    if standalone_projects:
-        add('Projects', 'Heading 1')
-        for project in standalone_projects:
-            add(project.name, 'Heading 2', keep=bool(project.bullets))
-            for bullet in project.bullets:
-                add(bullet, 'List Bullet')
-    if cv.include_education and profile.education:
-        add('Education', 'Heading 1')
-        for edu in profile.education:
-            add(edu.degree, 'Heading 2', keep=True)
-            add(' | '.join(value for value in (
-                edu.institution, edu.date_range(), edu.location
-            ) if value))
-    if cv.include_certifications and profile.certifications:
-        add('Certifications', 'Heading 1')
-        for cert in profile.certifications:
-            add(cert, 'List Bullet')
-    if cv.skills:
-        add('Skills', 'Heading 1')
-        for category, skills in cv.skills.items():
-            add(format_skill_category(category) + ': ' + ', '.join(skills))
-    if profile.languages:
-        add('Languages', 'Heading 1')
-        for language in profile.languages:
-            add(f'{language.name}: {language.proficiency}')
+    for section in profile.visible_cv_sections():
+        if section == 'experience':
+            if cv.experience:
+                add('Work Experience', 'Heading 1')
+            for exp in cv.experience:
+                add(exp.role, 'Heading 2', keep=True)
+                # Exact identity avoids borrowing location/tools from another role at
+                # the same employer. Ambiguous matches contribute no inferred metadata.
+                matches = [row for row in profile.experience if
+                           (row.company, row.role, row.start_date, row.end_date) ==
+                           (exp.company, exp.role, exp.start_date, exp.end_date)]
+                if not matches:
+                    company_matches = [row for row in profile.experience if row.company == exp.company]
+                    matches = company_matches if len(company_matches) == 1 else []
+                original = matches[0] if len(matches) == 1 else None
+                dates = ' - '.join(readable_date(d) for d in (exp.start_date, exp.end_date) if d)
+                metadata = [exp.company, dates, original.location if original else None]
+                p = doc.add_paragraph(' | '.join(value for value in metadata if value))
+                employer_projects = exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
+                p.paragraph_format.keep_with_next = bool(exp.bullets or employer_projects or (original and original.location))
+                for bullet in exp.bullets:
+                    add(bullet, 'List Bullet')
+                for project in employer_projects:
+                    add(f'Project: {project.name} ({exp.company})', 'Heading 2', keep=True)
+                    for bullet in project.bullets:
+                        add(bullet, 'List Bullet')
+                if original and original.technologies:
+                    add('Technologies: ' + ', '.join(original.technologies))
+        elif section == 'projects':
+            standalone_projects = cv.resolve_standalone_projects(profile)
+            if standalone_projects:
+                add('Projects', 'Heading 1')
+                for project in standalone_projects:
+                    add(project.name, 'Heading 2', keep=bool(project.bullets))
+                    for bullet in project.bullets:
+                        add(bullet, 'List Bullet')
+        elif section == 'education':
+            if cv.include_education and profile.education:
+                add('Education', 'Heading 1')
+                for edu in profile.education:
+                    add(edu.degree, 'Heading 2', keep=True)
+                    add(' | '.join(value for value in (
+                        edu.institution, edu.date_range(), edu.location
+                    ) if value))
+        elif section == 'certifications':
+            if cv.include_certifications and profile.certifications:
+                add('Certifications', 'Heading 1')
+                for cert in profile.certifications:
+                    add(cert, 'List Bullet')
+        elif section == 'skills':
+            if cv.skills:
+                add('Skills', 'Heading 1')
+                for category, skills in cv.skills.items():
+                    add(format_skill_category(category) + ': ' + ', '.join(skills))
+        elif section == 'languages':
+            if profile.languages:
+                add('Languages', 'Heading 1')
+                for language in profile.languages:
+                    add(f'{language.name}: {language.proficiency}')
     doc.save(paths['cv_upload_docx_path'])
     Path(paths['cv_upload_text_path']).write_text(
         '\n'.join(p.text for p in doc.paragraphs) + '\n', encoding='utf-8')

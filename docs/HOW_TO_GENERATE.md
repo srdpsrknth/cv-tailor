@@ -207,6 +207,34 @@ list of names from the profile used for rendering. Omit the field or use an
 empty list to leave the section out. Keep employer-specific projects under the
 corresponding experience entry.
 
+**CV section choices** are optional. Set `cv_section_order` in the private profile
+to move sections to the front of the CV body, in the order listed:
+
+```yaml
+cv_section_order: [education, projects, experience]
+```
+
+Valid names are `experience`, `projects`, `education`, `certifications`, `skills`,
+and `languages`. Any unlisted sections follow in that default order. Set
+`cv_hidden_sections` to hide any of those, `summary`, or `employer_projects`.
+For example, `cv_hidden_sections: [projects]` keeps employer projects nested under
+Experience and hides the dedicated Projects section. A visible Projects section
+needs at least one selected standalone project. Hiding a section preserves its
+source data. The contact header stays at the top.
+
+These preferences apply to the standard PDF and autofill DOCX and text. Saved
+application exports from review use the saved profile snapshot. Older custom
+LaTeX templates with a fixed layout continue to use their original layout.
+For a one-off layout, copy the profile to a private YAML file, adjust the display
+settings in that copy, then use `cvtailor --profile <private-copy.yaml> render
+--content <application>/source/content.json --cv-only`. Render in a copy of the
+application folder if you want to keep both versions.
+
+For an LLM-guided setup from scratch or from a résumé PDF or Word document, ask
+your coding assistant to follow `skills/cv-tailor-setup/SKILL.md` in the checkout.
+It guides private profile intake, section choices, configuration, and the first
+CV and cover-letter generation.
+
 For a profile holding a German EU Blue Card, the current rules behave as follows:
 
 | Selection | Current document behaviour |

@@ -7,6 +7,7 @@ import json
 import re
 import hashlib
 
+from models.profile import resolve_cv_section_order
 from services.artifact_provenance import artifact_freshness
 from services.profile_store import validate_profile_id
 
@@ -175,15 +176,28 @@ def compare_cv(snapshot, cv):
     return changes
 
 
-def _expected_cv_text(content):
+def _expected_cv_text(content, *, section_order=None, summary_visible=None, employer_projects_visible=None):
     cv = content.get("cv") if isinstance(content.get("cv"), dict) else {}
+    snapshot = content.get("_profile_snapshot")
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    hidden = snapshot.get("cv_hidden_sections")
+    hidden = hidden if isinstance(hidden, list) else []
+    sections = section_order if isinstance(section_order, list) else resolve_cv_section_order(
+        snapshot.get("cv_section_order"), hidden,
+    )
+    if summary_visible is None:
+        summary_visible = "summary" not in hidden
+    if employer_projects_visible is None:
+        employer_projects_visible = "employer_projects" not in hidden
     summary = cv.get("summary")
-    paragraphs = [item for item in summary if isinstance(item, str)] if isinstance(summary, list) else []
+    paragraphs = [item for item in summary if isinstance(item, str)] if summary_visible and isinstance(summary, list) else []
+    experience_paragraphs = []
+    project_paragraphs = []
     fields = {}
     if isinstance(cv.get("title"), str) and cv["title"].strip():
         fields["CV title"] = cv["title"]
     experiences = cv.get("experience")
-    for experience in experiences if isinstance(experiences, list) else []:
+    for experience in experiences if "experience" in sections and isinstance(experiences, list) else []:
         if not isinstance(experience, dict):
             continue
         for key in ("role", "company"):
@@ -201,25 +215,24 @@ def _expected_cv_text(content):
         bullets = experience.get("bullets")
         for bullet in bullets if isinstance(bullets, list) else []:
             if isinstance(bullet, str):
-                paragraphs.append(bullet)
+                experience_paragraphs.append(bullet)
         projects = experience.get("projects")
-        for project in projects if isinstance(projects, list) else []:
+        for project in projects if employer_projects_visible and isinstance(projects, list) else []:
             if isinstance(project, dict):
                 if isinstance(project.get("name"), str):
-                    paragraphs.append(project["name"])
+                    experience_paragraphs.append(project["name"])
                 project_bullets = project.get("bullets")
                 if isinstance(project_bullets, list):
-                    paragraphs.extend(
+                    experience_paragraphs.extend(
                         bullet for bullet in project_bullets if isinstance(bullet, str)
                     )
     skill_map = cv.get("skills")
-    for skills in skill_map.values() if isinstance(skill_map, dict) else []:
+    for skills in skill_map.values() if "skills" in sections and isinstance(skill_map, dict) else []:
         for skill in skills if isinstance(skills, list) else []:
             if isinstance(skill, str) and skill.strip():
                 fields[f"Skill {len(fields) + 1}"] = skill
-    snapshot = content.get("_profile_snapshot")
     selected_projects = cv.get("standalone_projects")
-    if isinstance(snapshot, dict) and isinstance(selected_projects, list):
+    if "projects" in sections and isinstance(selected_projects, list):
         source_projects = snapshot.get("standalone_projects")
         if isinstance(source_projects, list):
             project_rows = {
@@ -229,11 +242,14 @@ def _expected_cv_text(content):
             for name in selected_projects:
                 if not isinstance(name, str) or name not in project_rows:
                     continue
-                paragraphs.append(name)
+                project_paragraphs.append(name)
                 bullets = project_rows[name].get("bullets")
                 if isinstance(bullets, list):
-                    paragraphs.extend(bullet for bullet in bullets if isinstance(bullet, str))
-    if isinstance(snapshot, dict) and cv.get("include_education") is not False:
+                    project_paragraphs.extend(bullet for bullet in bullets if isinstance(bullet, str))
+    prose_by_section = {"experience": experience_paragraphs, "projects": project_paragraphs}
+    for section in sections:
+        paragraphs.extend(prose_by_section.get(section, ()))
+    if "education" in sections and cv.get("include_education") is not False:
         education_rows = snapshot.get("education")
         for education in education_rows if isinstance(education_rows, list) else []:
             if not isinstance(education, dict):
@@ -242,7 +258,7 @@ def _expected_cv_text(content):
                 value = education.get(key)
                 if isinstance(value, str) and value.strip():
                     fields[f"Education {len(fields) + 1}"] = value
-    if isinstance(snapshot, dict) and cv.get("include_certifications") is not False:
+    if "certifications" in sections and cv.get("include_certifications") is not False:
         certifications = snapshot.get("certifications")
         for certification in certifications if isinstance(certifications, list) else []:
             if isinstance(certification, str) and certification.strip():
@@ -294,12 +310,20 @@ def inspect_application_pdfs(folder, content, snapshot, manifest):
         scope = manifest_paths.get(path.resolve())
         if scope is None:
             scope = "cover_letter" if "cover_letter" in path.stem.lower() else "cv"
+        layout = None
         if scope == "cover_letter":
             paragraphs, fields = _expected_letter_text(content)
         else:
+            from renderers.cv_layout import read_layout_metadata
+
+            layout = read_layout_metadata(path)
             content_with_snapshot = dict(content)
             content_with_snapshot["_profile_snapshot"] = snapshot
-            paragraphs, fields = _expected_cv_text(content_with_snapshot)
+            paragraphs, fields = _expected_cv_text(
+                content_with_snapshot, section_order=(layout or {}).get("section_order"),
+                summary_visible=(layout or {}).get("summary_visible"),
+                employer_projects_visible=(layout or {}).get("employer_projects_visible"),
+            )
         for label in ("Candidate name", "Email"):
             value = identity.get("full_name" if label == "Candidate name" else "email")
             if isinstance(value, str) and value.strip():
@@ -308,9 +332,7 @@ def inspect_application_pdfs(folder, content, snapshot, manifest):
             path, expected_paragraphs=paragraphs, expected_fields=fields
         )
         if scope == "cv":
-            from renderers.cv_layout import read_layout_metadata
-
-            report["layout"] = read_layout_metadata(path)
+            report["layout"] = layout
         limit = 1 if scope == "cover_letter" else 2
         if isinstance(report.get("page_count"), int) and report["page_count"] > limit:
             report["warnings"].append(

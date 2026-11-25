@@ -53,6 +53,8 @@
 \vspace{8pt}
 {{ summary|join(' ') }}\par
 {% endif %}
+{% for section in cv_section_order %}
+{% if section == 'experience' and experience %}
 \cvsection{Professional Experience}
 {% for exp in experience %}
 {% set employer_index = loop.index0 %}
@@ -111,7 +113,7 @@
 {% endif %}
 {% if not loop.last %}\vspace{3pt}{\color{divider}\hrule height 0.35pt}\vspace{5pt}{% endif %}
 {% endfor %}
-{% if standalone_projects %}
+{% elif section == 'projects' and standalone_projects %}
 \cvsection{Projects}
 {% for project in standalone_projects %}
 \needspace{3\baselineskip}
@@ -124,8 +126,7 @@
 \end{itemize}
 {% endif %}
 {% endfor %}
-{% endif %}
-{% if education %}
+{% elif section == 'education' and education %}
 \cvsection{Education}
 {% for edu in education %}
 \needspace{3\baselineskip}
@@ -133,21 +134,19 @@
 {\metadata {{ edu.institution }} | {{ edu.dates }}{% if edu.location %} | {{ edu.location }}{% endif %}\par}
 {% if not loop.last %}\vspace{4pt}{% endif %}
 {% endfor %}
-{% endif %}
-{% if certifications %}
+{% elif section == 'certifications' and certifications %}
 \cvsection{Certifications}
 {\metadata {{ certifications|join('; ') }}\par}
-{% endif %}
-{% if skills %}
+{% elif section == 'skills' and skills %}
 \cvsection{Skills}
 {% for category, skill_list in skills.items() %}
 \needspace{2\baselineskip}
 \textbf{{ '{' }}{{ category }}:{{ '}' }} {{ skill_list|join(', ') }}\par
 {% if not loop.last %}\vspace{2pt}{% endif %}
 {% endfor %}
-{% endif %}
-{% if languages %}
+{% elif section == 'languages' and languages %}
 \cvsection{Languages}
 {% for lang in languages %}{{ lang.name }}: {{ lang.proficiency }}{% if not loop.last %} | {% endif %}{% endfor %}\par
 {% endif %}
+{% endfor %}
 \end{document}

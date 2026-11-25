@@ -13,6 +13,8 @@ Derive the project root from the clone. Use `.venv/bin/python` on macOS and `.ve
 
 Keep job-search preferences in the selected private profile and document naming timezones in machine settings. Use synthetic profiles and portable paths in reusable examples.
 
+Use `skills/cv-tailor-setup/SKILL.md` as the entry point for onboarding and all user-facing CV Tailor workflows. Follow its application workflow reference for job-specific generation and revision.
+
 **`profile_id` is required and fails closed in the CLI/API/services** (ADR 0003). Pass `--profile-id <id>` or set `CVTAILOR_PROFILE_ID`; run `cvtailor profile list` to see the ids. **GUI exception approved 2026-11-17:** restore the last valid GUI selection, or select the only usable profile automatically. Show the active name/id prominently and pass that resolved id explicitly to services. With multiple profiles and no valid remembered choice, require selection; never default to the first. See ADR 0022.
 
 Saved applications are in `<store>/applications/<job_id>/source/`. Copy the application into `<store>/outputs/<profile_id>/<job_id>/` before regenerating; use its application-specific render script when present. Generic rendering: `python scripts/render_application.py --project . --profile-id <id> --content <store>/outputs/<profile_id>/<job_id>/source/content.json --mirror-configured`. Do not overwrite profile facts to satisfy a posting.
@@ -35,6 +37,10 @@ repository alone.
   `docs/ASSESSMENT.md` and milestone progress in `docs/ROADMAP.md` if the system changed;
   record hard-to-reverse choices in `docs/DECISIONS/`; then commit code and documentation
   together.
+- **For every repo change:** review the CV Tailor skill and its references. When a change
+  affects a user workflow, command, configuration, output, feature, or troubleshooting step,
+  update `skills/cv-tailor-setup/` and any affected application-skill instructions in the
+  same change. Point to the current source of truth and verify any changed examples.
 - **Report honestly:** state which tests passed, which failed, and which were not run.
   Never claim success from code inspection alone.
 

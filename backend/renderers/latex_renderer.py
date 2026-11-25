@@ -168,19 +168,24 @@ class LaTeXRenderer:
         if not presets:
             raise ValueError(f"Unknown CV layout preset: {layout_preset}")
         self.last_layout = None
+        template_source = self.jinja_env.loader.get_source(self.jinja_env, "main.tex.jinja2")[0]
+        configurable = "for section in cv_section_order" in template_source
+        if not configurable and (profile.cv_hidden_sections or profile.cv_section_order):
+            profile = profile.model_copy(update={"cv_section_order": [], "cv_hidden_sections": []})
         template_data = self._prepare_template_data(tailored_cv, profile)
         name_slug = self._slugify(profile.identity.full_name or "applicant")
         base_name = f"{year}_CV_{name_slug}_{safe_job}"
         paragraphs, fields = self._extraction_contract(tailored_cv, profile)
         has_prose = any(re.search(r"\w", paragraph) for paragraph in paragraphs)
-        employers = [exp.company for exp in tailored_cv.experience]
-        projects = [(exp.company, project.name) for exp in tailored_cv.experience
-                    for project in exp.projects or []]
+        visible_experience = tailored_cv.experience if "experience" in profile.visible_cv_sections() else []
+        show_employer_projects = "employer_projects" not in profile.cv_hidden_sections
+        employers = [exp.company for exp in visible_experience]
+        projects = [(exp.company, project.name) for exp in visible_experience
+                    for project in (exp.projects if show_employer_projects else [])]
         attempts = []
         candidates = []
         # Historical application-specific templates remain fixed rather than
         # pretending that they support the shared typography presets.
-        template_source = self.jinja_env.loader.get_source(self.jinja_env, "main.tex.jinja2")[0]
         adaptive = "layout.body_size" in template_source
         if not adaptive:
             presets = [next(p for p in PRESETS if p["name"] == "compact")]
@@ -239,8 +244,8 @@ class LaTeXRenderer:
                     candidates.append((rank_layout(metrics, index), len(attempts), pdf, report))
                 return report
 
-            role_sizes = [(len(exp.bullets), len(exp.projects or []))
-                          for exp in tailored_cv.experience]
+            role_sizes = [(len(exp.bullets), len(exp.projects) if show_employer_projects else 0)
+                          for exp in visible_experience]
             for preset in presets:
                 report = trial(preset)
                 # One semantic alternative per preset is enough to compare a
@@ -277,6 +282,9 @@ class LaTeXRenderer:
             if selected["page_count"] <= 2 and (selected["clipping"] or selected["orphan_headings"]):
                 raise LaTeXRendererError("No CV layout passed clipping and heading checks; review the editable content.")
             selected["attempts"] = attempts
+            selected["section_order"] = list(template_data["cv_section_order"])
+            selected["summary_visible"] = "summary" not in profile.cv_hidden_sections
+            selected["employer_projects_visible"] = show_employer_projects
             if selected["page_count"] > 2:
                 selected["warnings"].append("All readable presets exceed two pages; content shortening is required.")
             # Embed metrics in the artifact itself so every generation, CLI,
@@ -300,7 +308,7 @@ class LaTeXRenderer:
 
     def _extraction_contract(self, cv, profile):
         """Source-backed prose and independently checked visible fields."""
-        paragraphs = list(cv.summary)
+        experience_paragraphs = []
         identity = profile.identity
         fields = {"Candidate name": identity.full_name, "Email": identity.email}
         for key, value in (("Headline", cv.title or identity.tagline),
@@ -309,35 +317,43 @@ class LaTeXRenderer:
                            ("Authorization", cv.work_authorization if cv.work_authorization is not None else identity.visa_status)):
             if value:
                 fields[key] = value.replace("https://www.", "").replace("https://", "") if key in ("LinkedIn", "GitHub") else value
-        for index, exp in enumerate(cv.experience):
+        sections = profile.visible_cv_sections()
+        for index, exp in enumerate(cv.experience if "experience" in sections else []):
             fields[f"Employer {index}"] = exp.company
             fields[f"Role {index}"] = exp.role
             fields[f"Start {index}"] = self._format_date(exp.start_date)
             fields[f"End {index}"] = self._format_date(exp.end_date)
-            paragraphs.extend(exp.bullets)
-            for project in exp.projects or []:
-                paragraphs.append(project.name)
-                paragraphs.extend(project.bullets)
+            experience_paragraphs.extend(exp.bullets)
+            for project in (exp.projects if "employer_projects" not in profile.cv_hidden_sections else []):
+                experience_paragraphs.append(project.name)
+                experience_paragraphs.extend(project.bullets)
             for item_index, item in enumerate(self._get_technologies_for_company(exp.company, profile)):
                 fields[f"Technology {index}/{item_index}"] = item
-        for project in cv.resolve_standalone_projects(profile):
-            paragraphs.append(project.name)
-            paragraphs.extend(project.bullets)
-        for category, items in cv.skills.items():
+        prose_by_section = {
+            "experience": experience_paragraphs,
+            "projects": [
+                line for project in (cv.resolve_standalone_projects(profile) if "projects" in sections else [])
+                for line in (project.name, *project.bullets)
+            ],
+        }
+        paragraphs = list(cv.summary) if "summary" not in profile.cv_hidden_sections else []
+        for section in sections:
+            paragraphs.extend(prose_by_section.get(section, ()))
+        for category, items in (cv.skills.items() if "skills" in sections else ()):
             fields[f"Skill category {category}"] = format_skill_category(category)
             for index, item in enumerate(items):
                 fields[f"Skill {category}/{index}"] = item
-        if cv.include_education:
+        if cv.include_education and "education" in sections:
             for index, edu in enumerate(profile.education):
                 fields[f"Degree {index}"] = edu.degree
                 fields[f"Institution {index}"] = edu.institution
                 fields[f"Education dates {index}"] = edu.date_range(" -- ")
                 if edu.location:
                     fields[f"Education location {index}"] = edu.location
-        if cv.include_certifications:
+        if cv.include_certifications and "certifications" in sections:
             for index, item in enumerate(profile.certifications):
                 fields[f"Certification {index}"] = item
-        for index, language in enumerate(profile.languages):
+        for index, language in enumerate(profile.languages if "languages" in sections else []):
             fields[f"Language {index}"] = f"{language.name}: {language.proficiency}"
         return paragraphs, fields
 
@@ -373,7 +389,7 @@ class LaTeXRenderer:
             }
 
             # Handle new projects structure
-            if exp.projects:
+            if exp.projects and "employer_projects" not in profile.cv_hidden_sections:
                 exp_data["projects"] = [
                     {
                         "name": self._escape_latex(proj.name),
@@ -401,8 +417,10 @@ class LaTeXRenderer:
             "phone": identity.phone or "",
             "linkedin": identity.linkedin or "",
             "github": identity.github or "",
-            "summary": [self._escape_latex(s) for s in tailored_cv.summary],
+            "summary": [self._escape_latex(s) for s in tailored_cv.summary]
+            if "summary" not in profile.cv_hidden_sections else [],
             "experience": experiences,
+            "cv_section_order": profile.visible_cv_sections(),
             "standalone_projects": [
                 {"name": self._escape_latex(project.name),
                  "bullets": [self._escape_latex(bullet) for bullet in project.bullets]}

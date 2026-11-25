@@ -1,7 +1,19 @@
 from __future__ import annotations
 
-from typing import List, Dict, Optional
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import List, Dict, Literal, Optional
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+
+
+CVSection = Literal["experience", "projects", "education", "certifications", "skills", "languages"]
+DEFAULT_CV_SECTION_ORDER = ("experience", "projects", "education", "certifications", "skills", "languages")
+
+
+def resolve_cv_section_order(preferred, hidden=()):
+    """Put listed sections first and append the remainder in their default order."""
+    preferred = preferred if isinstance(preferred, list) else []
+    known = (section for section in preferred if section in DEFAULT_CV_SECTION_ORDER)
+    return tuple(section for section in dict.fromkeys((*known, *DEFAULT_CV_SECTION_ORDER))
+                 if section not in hidden)
 
 
 # -------------------------
@@ -167,6 +179,18 @@ class Profile(BaseModel):
     rules: Optional[ProfileRules] = None
     job_search: Optional[JobSearchDefaults] = None
     standalone_projects: List[Project] = Field(default_factory=list)
+    cv_section_order: List[CVSection] = Field(default_factory=list)
+    cv_hidden_sections: List[CVSection | Literal["summary", "employer_projects"]] = Field(default_factory=list)
+
+    @field_validator("cv_section_order", "cv_hidden_sections")
+    @classmethod
+    def validate_cv_section_order(cls, order):
+        if len(order) != len(set(order)):
+            raise ValueError("CV section preferences must not repeat a section.")
+        return order
+
+    def visible_cv_sections(self):
+        return resolve_cv_section_order(self.cv_section_order, self.cv_hidden_sections)
 
     @model_validator(mode="after")
     def validate_standalone_projects(self):

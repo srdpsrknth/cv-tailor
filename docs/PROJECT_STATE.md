@@ -6,9 +6,27 @@
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-**Active milestone: standalone projects.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
+**Active milestone: section ordering and display preferences.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new
 milestone. Update the checklist and record verification here after each increment.
+
+Optional `cv_section_order` moves listed sections to the front of the CV body
+in PDF, DOCX, and text. The header and summary stay at the top. Unlisted
+sections retain their default relative order. The preference is saved in the
+profile snapshot and excluded from the provider prompt and generation cache.
+Review follows the rendered PDF's section order when recorded in its metadata.
+`cv_hidden_sections` suppresses selected sections, including standalone and nested
+employer projects independently, while retaining profile evidence. The project
+setup skill guides users from an interview or existing résumé to a reviewed
+private profile and first generation. It also routes daily work across search,
+generation, revision, export, portal answers, API use, diagnostics, and sync.
+Review and update the skill with any relevant repo change as required by
+`AGENTS.md`. The skill lives under `skills/cv-tailor-setup/`
+because this session cannot write the existing `.agents/skills/` directory.
+155 focused tests passed, covering LaTeX source, Word and text output, legacy
+profiles, and extraction order. The owner passed both real PDF regressions in
+regular Windows PowerShell on 2026-11-25, including the hidden Projects case.
+Commit and push this checkpoint before starting publications and activities.
 
 The CV draft selects standalone projects by exact name from the optional private
 profile list. Renderers use the original project bullets, and a layout retry
@@ -18,8 +36,7 @@ Focused verification passed 140 tests. An earlier run also covered layout retry
 and upload compatibility. Automatic review stopped the broader run after a
 Visual Studio telemetry request. The owner passed the real PDF regression in
 regular Windows PowerShell on 2026-11-25 (one passed, five deselected). It verified
-the selected project text and the clipping check. Commit and push this checkpoint,
-then proceed to section ordering.
+the selected project text and the clipping check. Pushed in `a6f5758`.
 
 Job-search defaults are optional settings in the selected private profile. CLI
 flags and edits in the Find jobs form override them. The employment country can

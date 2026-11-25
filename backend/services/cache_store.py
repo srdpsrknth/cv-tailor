@@ -63,7 +63,7 @@ def serialize_profile_bytes(profile) -> str:
     Phase 3, item 4 made this a single stable block per run, which is what makes it
     keyable at all; this function is that decision's shared accessor.
     """
-    return profile.model_dump_json(indent=2, exclude={"job_search"})
+    return profile.model_dump_json(indent=2, exclude={"job_search", "cv_section_order", "cv_hidden_sections"})
 
 
 def _digest(text: str) -> str:
