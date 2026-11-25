@@ -22,26 +22,25 @@ profile in the sidebar, then use Generate or Find jobs. Closing the browser leav
 the app running; **Stop CV Tailor** shuts it down. To install these shortcuts, see
 [DEVELOPMENT.md](DEVELOPMENT.md#windows-gui-shortcuts).
 
-**This guide works on Windows and macOS.** The only difference is how you write the
-*interpreter path* — everything else, including every option, is identical:
+**This guide works on Windows, macOS and Linux.** Activate the project's virtual
+environment once per terminal, then every command is written `python cvtailor.py ...`:
 
-| | Windows | macOS / Linux |
-|---|---|---|
-| Python | `.\.venv\Scripts\python.exe` | `.venv/bin/python` |
-| Line continuation | `` ` `` (backtick) | `\` (backslash) |
-| Store path example | `..\cv-tailor-data` | `~/cv-tailor-data` |
-
-Throughout this guide the Windows form is used. **On a Mac, substitute
-`.venv/bin/python`** for `.\.venv\Scripts\python.exe`, and use `\` instead of a
-backtick to continue a line. For example, the same command on each:
-
-```powershell
-# Windows
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
-```
 ```bash
-# macOS
-.venv/bin/python cvtailor.py --profile-id sample-analyst generate --job-file job.txt
+# macOS / Linux (bash, zsh)
+source .venv/bin/activate
+```
+```powershell
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+```
+
+Without activating, call the interpreter directly: `.venv/bin/python` on macOS/Linux,
+`.venv\Scripts\python.exe` on Windows. Examples that span lines use the bash/zsh
+backslash (`\`); in PowerShell use a backtick (`` ` ``) instead. Store paths are shown as
+`<store>` (your `CVTAILOR_STORE`, for example `~/cv-tailor-data` or `..\cv-tailor-data`).
+
+```bash
+python cvtailor.py --profile-id <profile_id> generate --job-file job.txt
 ```
 
 > **Setting up on a Mac for the first time?** Read
@@ -63,8 +62,8 @@ is job search.
 
 You need three things. The `doctor` command checks all of them:
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py doctor
+```bash
+python cvtailor.py doctor
 ```
 
 | Check | What "ok" means |
@@ -81,7 +80,7 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 > that location explicitly, so a script or IDE terminal finds it anyway. If it still
 > fails, set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in `.env`.
 
-> **Do not ignore `outputs ... Permission denied`.** On this Windows checkout,
+> **Windows only: do not ignore `outputs ... Permission denied`.** On a Windows checkout where
 > `.venv` inherited a Low integrity label, so its Python runs at Low integrity even
 > from a normal terminal and cannot write to the private store. PowerShell being
 > able to write there does not prove Python can. See the targeted repair in
@@ -89,14 +88,14 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 
 List available profiles and substitute your chosen ID for the synthetic example `sample-analyst`.
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py profile list
+```bash
+python cvtailor.py profile list
 ```
 
 > **Where does `--profile-id` go?** It is a *global* option, so it goes **before**
 > the command name, not after it:
 >
-> ```powershell
+> ```bash
 > # right
 > cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 > cvtailor.py --profile-id sample-analyst profile show
@@ -119,16 +118,26 @@ plain text file. For example `job.txt`.
 Include the job URL and today's date at the top if you have them; it makes the saved
 record easier to trace later.
 
-On a Mac, save the clipboard **while it contains the posting**, then inspect the file:
+Or save the clipboard **while it contains the posting**, then inspect the file:
 
 ```bash
-pbpaste > ../cv-tailor-data/jobs/sample-analyst/job.txt
-head -5 ../cv-tailor-data/jobs/sample-analyst/job.txt
+# macOS
+pbpaste > <store>/jobs/sample-analyst/job.txt
+# Linux (X11: xclip; Wayland: wl-paste)
+xclip -selection clipboard -o > <store>/jobs/sample-analyst/job.txt
+wl-paste > <store>/jobs/sample-analyst/job.txt
+head -5 <store>/jobs/sample-analyst/job.txt
+```
+```powershell
+# Windows (PowerShell)
+Get-Clipboard | Set-Content -Encoding utf8 <store>\jobs\sample-analyst\job.txt
+Get-Content <store>\jobs\sample-analyst\job.txt -TotalCount 5
 ```
 
 Use your actual private store and profile directory; create the directory first if
 needed. Check that the first lines name the role and employer. Copying the generation
-command replaces the clipboard, so `--job "$(pbpaste)"` can accidentally submit the
+command replaces the clipboard, so passing the clipboard inline (for example
+`--job "$(pbpaste)"`) can accidentally submit the
 command itself. A saved file makes the input inspectable and repeatable. The CLI
 rejects input starting with a CV Tailor invocation before any paid call and prints
 the posting's length and first line before generation.
@@ -139,15 +148,15 @@ the posting's length and first line before generation.
 
 ### 2. Generate
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
+```bash
+python cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 ```
 
-For the saved Mac file, for example:
+For a posting saved in the store, for example:
 
 ```bash
-.venv/bin/python cvtailor.py --profile-id sample-analyst generate \
-  --job-file ../cv-tailor-data/jobs/sample-analyst/job.txt \
+python cvtailor.py --profile-id sample-analyst generate \
+  --job-file <store>/jobs/sample-analyst/job.txt \
   --company "Northwind Analytics" --role "Analytics Engineer" --country Germany
 ```
 
@@ -273,17 +282,17 @@ applications are not rewritten automatically.
 
 Useful variations:
 
-```powershell
+```bash
 # Give the company and role explicitly, instead of letting it infer them
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt `
+python cvtailor.py --profile-id sample-analyst generate --job-file job.txt \
     --company "Northwind Analytics GmbH" --role "Analytical Engineer"
 
 # Say which country the job is actually in (not the company headquarters)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt `
+python cvtailor.py --profile-id sample-analyst generate --job-file job.txt \
     --country Germany
 
 # Paste the posting inline instead of using a file
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job "We are looking for..."
+python cvtailor.py --profile-id sample-analyst generate --job "We are looking for..."
 ```
 
 **`--profile-id` is required and has no default.** That is deliberate: it makes it
@@ -306,15 +315,14 @@ Expect a minute or two. You will see progress in the terminal.
 Everything lands in your private store, **not** in this repository:
 
 ```
-Windows:  ..\cv-tailor-data\outputs\sample-analyst\<job_id>\
-macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
+<store>/outputs/<profile_id>/<job_id>/
 
     2026_CV_<your_name>_<role>.pdf          <- formatted CV with searchable text; parser behavior varies
     2026_CV_<your_name>_<role>_upload.docx  <- plain single-column Word CV for portal autofill
     2026_CV_<your_name>_<role>_upload.txt   <- plain-text copy for manual portal paste
     2026_cover_letter_<company>_<role>.pdf  <- the cover letter
     2026_cover_letter_<company>_<role>.docx <- Word version, if a form wants it
-    source\
+    source/
         content.json          <- the editable text (see revisions below)
         job_description.txt   <- the posting it worked from
         generation_result.json<- what was produced and whether it passed
@@ -325,12 +333,12 @@ date:
 
 ```powershell
 # Windows
-Get-ChildItem ..\cv-tailor-data\outputs\sample-analyst |
+Get-ChildItem <store>\outputs\<profile_id> |
     Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name, LastWriteTime
 ```
 ```bash
-# macOS
-ls -lt ~/cv-tailor-data/outputs/"$CVTAILOR_PROFILE_ID" | head -4
+# macOS / Linux
+ls -lt <store>/outputs/"$CVTAILOR_PROFILE_ID" | head -4
 ```
 
 ### 5. Read them before you send them
@@ -398,18 +406,18 @@ the generator does not load them automatically or treat them as new profile fact
 If you want to change wording yourself, edit the text and re-render. This costs
 nothing and does not touch the AI.
 
-1. Open `source\content.json` in the application folder.
+1. Open `source/content.json` in the application folder.
 2. Edit the text — `cv` and `cover_letter` sections.
 3. Re-render:
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst render `
-    --content "..\cv-tailor-data\outputs\sample-analyst\<job_id>\source\content.json"
+```bash
+python cvtailor.py --profile-id sample-analyst render \
+    --content "<store>/outputs/sample-analyst/<job_id>/source/content.json"
 ```
 
 Narrow it to one document if you only changed one:
 
-```powershell
+```bash
 # ...append --cv-only, or --cover-letter-only
 ```
 
@@ -423,9 +431,9 @@ into both the DOCX and PDF headers so the document carries the current submissio
 
 If you have updated your profile and want the documents regenerated from scratch:
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate `
-    --job-file "..\cv-tailor-data\outputs\sample-analyst\<job_id>\source\job_description.txt" `
+```bash
+python cvtailor.py --profile-id sample-analyst generate \
+    --job-file "<store>/outputs/sample-analyst/<job_id>/source/job_description.txt" \
     --no-cache
 ```
 
@@ -439,12 +447,12 @@ the stored result and costs nothing — useful to know if you re-run by accident
 The tool can search public job boards for you. This is **free** — no API key and no
 AI call.
 
-```powershell
+```bash
 # See which sources are available and what each can do
-.\.venv\Scripts\python.exe cvtailor.py jobs sources
+python cvtailor.py jobs sources
 
 # Search
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search `
+python cvtailor.py --profile-id sample-analyst jobs search \
     --keywords "data engineer" --country DE --limit 10
 ```
 
@@ -455,9 +463,9 @@ machine-readable output.
 Sources currently wired: softgarden, Personio, Lever/Greenhouse/Ashby boards, and
 Arbeitnow. Some need configuration:
 
-```powershell
+```bash
 # Read a specific employer's board (repeatable)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search `
+python cvtailor.py --profile-id sample-analyst jobs search \
     --ats lever:somecompany:"Some Company" --only ats
 ```
 
@@ -465,20 +473,14 @@ Arbeitnow. Some need configuration:
 
 ## Using the web interface
 
-```powershell
-# Windows
-.\.venv\Scripts\python.exe scripts\start.py
-```
 ```bash
-# macOS
-.venv/bin/python scripts/start.py
+python scripts/start.py
 ```
 
 It prints two addresses; open the **UI** one. Keep the terminal open — Ctrl+C stops
 the services. Logs go to `.runtime/logs/`.
 
-> **The port is whatever `UI_PORT` in `.env` says** — 8501 for a fresh clone, but this
-> machine uses 8502 (and `BACKEND_PORT=8001`). Read the URL `start.py` prints rather
+> **The port is whatever `UI_PORT` in `.env` says** — 8501 for a fresh clone, but your `.env` may differ (for example 8502 and `BACKEND_PORT=8001`). Read the URL `start.py` prints rather
 > than assuming; it is printed precisely because it varies.
 >
 > If a port is already in use, startup **refuses** rather than killing whatever is
@@ -598,6 +600,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 > a writable folder, or concurrent LaTeX runs collide. Set them and retry:
 >
 > ```powershell
+> # Windows
 > $env:TEMP = (Join-Path $PWD ".tmp"); $env:TMP = $env:TEMP
 > ```
 >
@@ -611,7 +614,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 * **It never picks a profile for you.** No default, no "the only one".
 * **Your data never enters the repository.** Profiles, applications and generated
-  documents live in `..\cv-tailor-data`. This repo is public.
+  documents live in your private store (`CVTAILOR_STORE`), outside this checkout. This repo is public.
 * **It does not invent facts.** It tailors wording and emphasis from your real
   profile; it will not add a skill or employer you do not have.
 * **Sponsorship and permit wording goes only in cover letters, never the CV.**
@@ -623,43 +626,24 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 ## Quick reference
 
-Windows uses `.\.venv\Scripts\python.exe`; **on macOS use `.venv/bin/python`**.
-
-```powershell
-# Setup
-.\.venv\Scripts\python.exe cvtailor.py doctor
-.\.venv\Scripts\python.exe cvtailor.py profile list
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst profile show
-
-# Generate (costs ~$0.003)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
-
-# Find jobs (free)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search --keywords "data engineer"
-
-# Revise (free)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst render --content <job_id>\source\content.json
-
-# Help
-.\.venv\Scripts\python.exe cvtailor.py                  # guided menu
-.\.venv\Scripts\python.exe cvtailor.py <command> --help
-```
-
-The macOS equivalents differ only in the interpreter and the line-continuation
-character:
+With the venv activated (see the top of this guide) the commands are identical on every OS; without activating, replace `python` with `.venv/bin/python` (macOS/Linux) or `.venv\Scripts\python.exe` (Windows).
 
 ```bash
 # Setup
-.venv/bin/python cvtailor.py doctor
-.venv/bin/python cvtailor.py profile list
+python cvtailor.py doctor
+python cvtailor.py profile list
+python cvtailor.py --profile-id <profile_id> profile show
 
 # Generate (costs ~$0.003)
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" generate --job-file job.txt
+python cvtailor.py --profile-id <profile_id> generate --job-file job.txt
 
 # Find jobs (free)
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" jobs search --keywords "data engineer"
+python cvtailor.py --profile-id <profile_id> jobs search --keywords "data engineer"
 
 # Revise (free)
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" render \
-    --content "$CVTAILOR_STORE/outputs/$CVTAILOR_PROFILE_ID/<job_id>/source/content.json"
+python cvtailor.py --profile-id <profile_id> render --content <store>/outputs/<profile_id>/<job_id>/source/content.json
+
+# Help
+python cvtailor.py                  # guided menu
+python cvtailor.py <command> --help
 ```

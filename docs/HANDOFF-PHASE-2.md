@@ -1,3 +1,5 @@
+**Historical (Phase 2 handoff); superseded by [`PROJECT_STATE.md`](PROJECT_STATE.md).** Paths below are placeholders (`<projects>` is the directory holding the checkouts).
+
 # Handoff — start of Phase 2
 
 > **Status: DISCHARGED (2026-10-24).** Phase 2 is implemented, committed and pushed. This file
@@ -7,8 +9,8 @@
 > resolved for *new* data and explicitly **not** resolved for already-published history.
 
 **Written:** 2026-10-24, at the end of Phase 1.
-**Branch:** `refactor/architecture-v2` (worktree `D:\coding\cv-tailor-next`), at `3e779f5`.
-**Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — untouched, still usable.
+**Branch:** `refactor/architecture-v2` (worktree `<projects>/cv-tailor-next`), at `3e779f5`.
+**Stable branch:** `master` (`<projects>/cv-tailor`) at `1416177` — untouched, still usable.
 
 This file exists so a **new chat** can begin Phase 2 without the Phase 1 conversation. Read
 [`PROJECT_STATE.md`](PROJECT_STATE.md) first; this only adds the Phase 2 entry conditions.
@@ -17,7 +19,7 @@ This file exists so a **new chat** can begin Phase 2 without the Phase 1 convers
 
 ## 1. Entry conditions (confirm before writing code)
 
-1. `git -C D:\coding\cv-tailor-next status --short` → clean.
+1. `git -C <projects>/cv-tailor-next status --short` → clean.
 2. `git rev-parse --abbrev-ref HEAD` → `refactor/architecture-v2`.
 3. `.venv\Scripts\python.exe -m pytest -q` → **190 passed** in ~110 s when this was written
    (**282 passed** after the Phase 2 close-out).
@@ -85,7 +87,7 @@ approval — both are on the "ask first" list in `AGENTS.md`.
 ## 6. Hazards specific to this worktree
 
 - **Pushing and committing** need unconfined access: this worktree's git metadata lives in
-  `D:\coding\cv-tailor\.git`, outside the sandbox.
+  `<projects>/cv-tailor/.git`, outside the sandbox.
 - **pytest `tmp_path`** errors under the `workspace-write` sandbox (ACL operations). Run the
   suite unconfined.
 - **The venv Python may be denied writes** under `outputs/` and `storage/profile/` while

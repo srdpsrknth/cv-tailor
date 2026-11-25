@@ -208,7 +208,7 @@ without waiting for discovery or tracking.
 - **CLI** — `profile list | new | import | export` beside `show`, and `--profile-id`. `doctor`
   reports the store and which profiles it holds.
 - **Migration** — the real profile was copied byte-for-byte (verified by SHA-256) into
-  `profiles/sreedeep/profile.yaml`, and loads through the store with all six roles, its two
+  `profiles/<profile_id>/profile.yaml`, and loads through the store with all six roles, its two
   degrees, its certifications and its complete `rules:` block intact. All 64 application files
   and the generated `outputs/` artifacts moved with it.
 - **Two real defects found by writing the tests**, both silent:
@@ -228,7 +228,7 @@ open D-items the owner still had to decide.
 
 - **`backend/main.py` is multi-profile aware and tested** (`a0b431c`) — the API resolved a
   profile with `load_profile()` and no argument, reading the pre-Phase-2 path
-  `storage/profile/profile.yaml` and bypassing the store entirely (ADR 0003). On this machine
+  `storage/profile/profile.yaml` and bypassing the store entirely (ADR 0003). On the original development machine
   that stale duplicate still existed and was byte-identical to the store's copy, so
   `/api/tailor` appeared to work while silently ignoring the store; on a fresh clone it raised.
   `/api/tailor` and all three download routes now take an explicit `profile_id`, resolve through

@@ -7,9 +7,9 @@ for settled choices. Do not repeat the architecture assessment unless the system
 
 On a new Mac, read `docs/MAC_SETUP.md` first and follow its initialization and validation workflow. Read `.agents/skills/cv-tailor-application/SKILL.md` before generating or revising applications. For setup, worktrees, ports and Git workflow, read `docs/DEVELOPMENT.md`; for the test baseline and its sandbox caveat, read `docs/TESTING.md`. **For the user-facing workflow — how to generate, revise and find jobs — read `docs/HOW_TO_GENERATE.md`.**
 
-Derive the project root from the clone. Use `.venv/bin/python` on macOS and `.venv/Scripts/python.exe` on Windows. Never assume this owner's Windows paths or copy an old virtual environment to a different OS. Do not print API keys or commit `.env`.
+Derive the project root from the clone. Pick the interpreter by OS: `.venv/bin/python` on macOS/Linux and `.venv/Scripts/python.exe` on Windows (examples below write `python`, meaning that interpreter or an activated venv). Never assume another machine's paths or copy an old virtual environment to a different OS. Do not print API keys or commit `.env`.
 
-**Profiles live in the private store, not in this repository** (ADR 0002, ADR 0011). Resolve `CVTAILOR_STORE` from the current machine's configuration (default `./storage`). Profiles live at `<store>/profiles/<profile_id>/profile.yaml` and outputs at `<store>/outputs/<profile_id>/<job_id>/`. Never commit a real profile, application or generated document here — this repository is public. Preserve manual edits, titles, dates, factual ownership and ongoing-project status. Tailor wording and skills to each role without fabricating requirements. Keep sponsorship/support requirements only in overseas cover letters. Default CV limit: two pages; cover letter: four paragraphs, 290–310 body words, one page.
+**Profiles live in the private store, not in this repository** (ADR 0002, ADR 0011). Resolve `CVTAILOR_STORE` from the current machine's configuration (default `./storage`). Profiles live at `<store>/profiles/<profile_id>/profile.yaml` and outputs at `<store>/outputs/<profile_id>/<job_id>/`. Never commit a real profile, application or generated document here — this repository is public. Preserve manual edits, titles, dates, factual ownership and ongoing-project status. Tailor wording and skills to each role without fabricating requirements. Keep sponsorship/support wording only in cover letters, and only where the selected profile's rules and `country_overrides` require it. Default CV limit: two pages; cover letter: four paragraphs, 290–310 body words, one page.
 
 Keep job-search preferences in the selected private profile and document naming timezones in machine settings. Use synthetic profiles and portable paths in reusable examples.
 
@@ -21,7 +21,7 @@ Saved applications are in `<store>/applications/<job_id>/source/`. Copy the appl
 
 Run `python -m pytest -q` after code changes. Inspect rendered pages after document edits: no orphan headings, broken bullets, clipping, or excessive forced whitespace. Keep actual font size readable. DOCX and LaTeX PDF layouts differ; check both when delivering Word files.
 
-Do not commit credentials, virtual environments, logs or new generated PDFs/DOCX. Reviewed application sources and portable reproduction scripts may be committed when authorized. This is a personal repository containing the owner's CV profile; do not treat it as an anonymous sample dataset.
+Do not commit credentials, virtual environments, logs or new generated PDFs/DOCX. Reviewed application sources and portable reproduction scripts may be committed when authorized. This public repository holds no real candidate data: real profiles, applications and outputs live in the private store (ADR 0002, ADR 0011). Use only synthetic profiles in fixtures and examples.
 
 ## Keeping project knowledge in the repository
 
@@ -33,7 +33,7 @@ repository alone.
 - **While working:** prefer small, focused, independently tested increments. Establish or
   extend tests before refactoring behaviour. Do not combine unrelated structural changes.
 - **Before finishing a task:** run the relevant tests; update `docs/PROJECT_STATE.md`
-  (active task, blockers, next action); update `docs/ARCHITECTURE`-level facts in
+  (active task, blockers, next action); update architecture-level facts in
   `docs/ASSESSMENT.md` and milestone progress in `docs/ROADMAP.md` if the system changed;
   record hard-to-reverse choices in `docs/DECISIONS/`; then commit code and documentation
   together.

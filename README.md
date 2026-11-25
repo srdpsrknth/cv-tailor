@@ -65,10 +65,11 @@ letter PDF with four body paragraphs and 290–310 words. Review the factual cla
 layouts before applying; these checks do not guarantee screening outcomes.
 
 The profile lives in a **private store**, not in this repository: `CVTAILOR_STORE`
-(default `./storage`, on the Windows development machine `D:\coding\cv-tailor-data`), at
+(default `./storage`; point it at a private directory outside the checkout), at
 `<store>/profiles/<profile_id>/profile.yaml`. Never commit a real profile here. Country
-context overrides inferred location. Overseas CVs show German-issued Blue Card status;
-employer permit support belongs only in the cover letter.
+context overrides inferred location. Work-authorization wording follows the selected profile's
+`rules` and `country_overrides`; employer permit support, where a profile requires it,
+belongs only in the cover letter.
 
 Every command needs an explicit candidate: pass `--profile-id <id>` or set
 `CVTAILOR_PROFILE_ID`. There is no default and no "the only one" fallback, so a missing id

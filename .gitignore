@@ -8,9 +8,9 @@
 # Real candidate data. Never public (ADR 0002, ADR 0011).
 #
 # These paths are untracked, not deleted: the files are still on disk and have
-# been migrated to the private store at CVTAILOR_STORE (D:\coding\cv-tailor-data
-# on this machine). This block is the guard -- without it a routine `git add -A`
-# would sweep the owner's personal data straight back into the public repo.
+# been migrated to the private store at CVTAILOR_STORE (outside this repository).
+# This block is the guard -- without it a routine `git add -A` would sweep a
+# candidate's personal data straight back into the public repo.
 #
 # Synthetic fixtures under tests/fixtures/ are the only committed sample data.
 # ---------------------------------------------------------------------------

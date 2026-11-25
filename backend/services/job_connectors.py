@@ -26,7 +26,7 @@ the knowledge that gets lost:
   reverse-engineered or per-customer integration; deferred rather than guessed at.
 
 The **sample employer list** for the ATS family is deliberately small and
-replaceable, per the owner's answer to Q3: the connector ships configured with
+replaceable (research doc, Q3): the connector ships configured with
 public example boards and the caller supplies their own.
 """
 from __future__ import annotations
@@ -297,7 +297,7 @@ class ArbeitnowSource(JobSource):
 
 
 #: A small, replaceable sample of public boards, so the ATS connector is usable
-#: before the owner configures their own employers (their answer to Q3). These are
+#: before the user configures their own employers (research doc, Q3). These are
 #: the tenants used during the 2026-10-31 research, chosen because they are public
 #: and well known -- not because they are recommended employers.
 SAMPLE_ATS_BOARDS = (

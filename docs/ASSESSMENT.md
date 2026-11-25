@@ -146,8 +146,8 @@ cover letter (DOCX + PDF), grounded in one authoritative YAML profile.
 
 **Verified end-to-end workflow**
 
-> **Superseded by Phase 2 (2026-10-24) and Phase 2 close-out (2026-10-26).** The diagram below is
-> the *pre-Phase-2* flow, kept as the Phase 0 record. The profile is no longer read from
+> **Historical; superseded by Phase 2 (2026-10-24) and Phase 2 close-out (2026-10-26), ADR 0002/0011.** The diagram below is
+> the *pre-Phase-2* flow, kept as the Phase 0 record (`PROFILE_PATH` and `storage/profile/profile.yaml` no longer describe current behaviour). The profile is no longer read from
 > `storage/profile/profile.yaml`: it is resolved by `profile_id` through `ProfileStore`
 > (ADR 0003, ADR 0011), and outputs are written to `<store>/outputs/<profile_id>/<job_id>/`.
 > As of 2026-10-26 the FastAPI adapter resolves the same way — it no longer calls
@@ -318,7 +318,7 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 
 ## 4. Testing and regression baseline
 
-**Measured baseline (this machine, 2026-10-23):**
+**Measured baseline (measured on the original development machine, Windows, 2026-10-23):**
 
 ```
 python -m pytest -q   →   12 passed, 1 warning   (2.45 s)
@@ -369,7 +369,7 @@ budget-capped suite.
 
 ## 5. Performance and cost
 
-**Measured on this machine**
+**Measured on the original development machine (Windows)**
 
 | Metric | Value |
 |---|---|
@@ -487,7 +487,7 @@ repeated input. See the measured effect below.
    application and reused by the CV prompt, the letter prompt and every layout retry
    (`tailor_service.tailor_documents` → `generation.build_context(..., profile_json=...)`).
    The *token* figures were unchanged by that increment, because the bytes sent to the model
-   are byte-identical — it removes repeated work, not content. Measured on this machine:
+   are byte-identical — it removes repeated work, not content. Measured on the original development machine (Windows):
    `model_dump_json(indent=2)` ≈ 0.044 ms and the banned-tool facts block ≈ 0.23 ms per
    call, against a typical run that rebuilt them 3–4 times and up to 8 times at the
    worst (7 banned tools × one scan each). That is single-digit milliseconds per
@@ -671,7 +671,8 @@ two calls rather than merely left unmeasured.
 - **No credential was ever committed.** `.env` never in history; secret-pattern scan over
   all refs found nothing. `.gitignore:2-5` covers `.env*`.
 - **Substantial personal data is committed to a public repo**: name, personal email, mobile,
-  home city, **immigration status**, full employment history, education — `storage/profile/profile.yaml`.
+  home city, **immigration status**, full employment history, education — `storage/profile/profile.yaml`
+  (*historical Phase 0 finding, since resolved for new data by the private store, ADR 0002/0011*).
 - **64 of 112 tracked files are application data**, including `profile_snapshot.json`
   (a full profile copy per application) and `application_answers.json` (free-text answers
   plus two eligibility attestations).
@@ -808,14 +809,14 @@ job desc ───┘                                      │
 
 ### Storage
 
-Start with **YAML/JSON on disk keyed by `profile_id`** (`storage/profiles/<id>/profile.yaml`,
+Start with **YAML/JSON on disk keyed by `profile_id`** (*historical Phase 0 proposal, superseded by the private store, ADR 0002/0011: now `<store>/profiles/<id>/profile.yaml` and `<store>/applications/<job_id>/`*; originally `storage/profiles/<id>/profile.yaml`,
 `storage/profiles/<id>/applications/<job_id>/`). It preserves git-diffability and the current
 editing workflow. Adopt SQLite only when job-discovery volume (Phase 4) makes file scanning
 painful — not before. **No database server.**
 
 > **Implemented in Phase 2**, with two deviations from the sketch above:
-> - The store is **outside the repository** (`CVTAILOR_STORE`, default `./storage`; on this
->   machine `D:\coding\cv-tailor-data`), because ADR 0002 requires real data not to be committed
+> - The store is **outside the repository** (`CVTAILOR_STORE`, default `./storage`; point it at a
+>   private directory outside the checkout), because ADR 0002 requires real data not to be committed
 >   here. The `<store>/profiles/<id>/profile.yaml` shape is as sketched.
 > - Applications are kept **shared** at `<store>/applications/<job_id>/`, not nested under the
 >   profile, because `job_id` is posting-derived and candidate-free. Generated documents go to
@@ -896,8 +897,8 @@ already public. Do not rewrite history or change visibility without explicit app
 
 ## 13. Environment findings
 
-- **Development worktree is correctly isolated:** `D:\coding\cv-tailor-next` on
-  `refactor/architecture-v2`; `D:\coding\cv-tailor` on `master`. Both clean.
+- **Development worktree is correctly isolated** (*historical Phase 0 finding*): `<projects>/cv-tailor-next` on
+  `refactor/architecture-v2`; `<projects>/cv-tailor` on `master`. Both clean.
 - **`refactor/architecture-v2` is currently identical to `master`** (`1416177`, 0 ahead /
   0 behind) — the branch was created but no work has landed yet.
 - **The development worktree has no `.venv` and no `.env`** — it cannot run today. Master has

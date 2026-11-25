@@ -593,7 +593,7 @@ Remove-Item -Recurse -Force "$env:CVTAILOR_STORE\cache"
 .venv\Scripts\python.exe cvtailor.py generate --profile-id <id> --job-file posting.txt --no-cache
 ```
 
-`<store>` defaults to `./storage`; on this machine it is `D:\coding\cv-tailor-data`.
+`<store>` defaults to `./storage`; set `CVTAILOR_STORE` to a private directory outside the checkout.
 **There is no eviction policy** — the directory grows by one small JSON file per distinct
 generation — so clearing it by hand is the documented mechanism rather than a fallback.
 

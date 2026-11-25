@@ -12,7 +12,7 @@ This document discharges **ADR 0008 §1** (*"Research and document ToS-compliant
 first, before writing any connector"*). It put a proposed source list in front of the
 owner, who approved it on 2026-11-05 per **ADR 0008 §5**.
 
-**Method.** Every endpoint below was called for real on 2026-10-31 from this machine with
+**Method.** Every endpoint below was called for real on 2026-10-31 from the original development machine with
 an honest `User-Agent`; the status code and payload shape were recorded. Both positive
 *and negative* results are reported, because the negatives drove the recommendation. The
 probe is committed as [`tools/probe_job_sources.py`](../../tools/probe_job_sources.py) so
