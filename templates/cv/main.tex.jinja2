@@ -50,10 +50,10 @@
 \begin{minipage}[t]{0.495\linewidth}
 \vspace{0pt}
 \raggedleft\metadata\color{muted}
-{{ location }}{% if phone %} | {{ phone }}{% endif %}{% if email %} | \href{{ '{' }}mailto:{{ email }}{{ '}' }}{{ '{' }}{{ email }}{{ '}' }}{% endif %}\par
+{{ location }}{% if phone %} | {{ phone_display }}{% endif %}{% if email %} | \href{{ '{' }}{{ email_url }}{{ '}' }}{{ '{' }}{{ email_display }}{{ '}' }}{% endif %}\par
 
-{% if linkedin %}\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}\par{}{% endif %}
-{% if github %}\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}\par{}{% endif %}
+{% if linkedin %}\href{{ '{' }}{{ linkedin_url }}{{ '}' }}{{ '{' }}{{ linkedin_display }}{{ '}' }}\par{}{% endif %}
+{% if github %}\href{{ '{' }}{{ github_url }}{{ '}' }}{{ '{' }}{{ github_display }}{{ '}' }}\par{}{% endif %}
 {% if work_authorization %}Work authorization: {{ work_authorization }}\par{}{% endif %}
 \end{minipage}\par
 \vspace{4pt}{\fontsize{11}{13}\selectfont\bfseries\color{accent}{{ tagline }}\par}

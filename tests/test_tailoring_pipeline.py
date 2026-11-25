@@ -956,10 +956,9 @@ def test_both_renderers_escape_latex_identically():
 
     sample = r'100% & 5_000 #1 $x {y} ~n ^c \d'
     assert LaTeXRenderer._escape_latex(sample) == DocxRenderer._escape_latex(sample)
-    # Backslash is replaced first, so the braces in its own replacement text are then
-    # escaped too. That is the long-standing behaviour of both original copies and is
-    # pinned here so consolidating them (D-12) cannot silently change it.
-    assert LaTeXRenderer._escape_latex('\\') == r'\textbackslash\{\}'
+    # Each character is escaped exactly once (single pass): the braces in the backslash
+    # replacement are not re-escaped (WP2 fixed the old double-escaping).
+    assert LaTeXRenderer._escape_latex('\\') == r'\textbackslash{}'
     assert LaTeXRenderer._escape_latex('a&b') == r'a\&b'
     assert LaTeXRenderer._escape_latex('100%') == r'100\%'
 

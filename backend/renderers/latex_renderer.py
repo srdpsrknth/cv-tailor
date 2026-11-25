@@ -16,7 +16,7 @@ from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from models.tailored_output import TailoredCV
 from models.profile import Profile
-from utils.text import escape_latex, format_skill_category, slugify
+from utils.text import escape_latex, format_skill_category, latex_url, slugify
 
 
 class LaTeXRendererError(Exception):
@@ -425,6 +425,7 @@ class LaTeXRenderer:
             "phone": identity.phone or "",
             "linkedin": identity.linkedin or "",
             "github": identity.github or "",
+            **self._contact_context(identity),
             "summary": [self._escape_latex(s) for s in tailored_cv.summary]
             if "summary" not in profile.cv_hidden_sections else [],
             "experience": experiences,
@@ -460,6 +461,31 @@ class LaTeXRenderer:
                 }
                 for lang in profile.languages
             ]
+        }
+
+    @staticmethod
+    def _contact_context(identity) -> Dict[str, str]:
+        """LaTeX-safe display text and ``\\href`` targets for the contact fields.
+
+        ``*_display`` is escaped body text; ``*_url`` is safe inside ``\\href{...}``.
+        """
+        email = (identity.email or "").strip()
+        phone = (identity.phone or "").strip()
+        linkedin = (identity.linkedin or "").strip()
+        github = (identity.github or "").strip()
+
+        def short(url: str) -> str:
+            return re.sub(r"^https?://(?:www\.)?", "", url)
+
+        return {
+            "email_display": escape_latex(email),
+            "email_url": latex_url("mailto:" + email) if email else "",
+            "phone_display": escape_latex(phone),
+            "phone_url": latex_url("tel:" + re.sub(r"\s+", "", phone)) if phone else "",
+            "linkedin_display": escape_latex(short(linkedin)),
+            "linkedin_url": latex_url(linkedin),
+            "github_display": escape_latex(short(github)),
+            "github_url": latex_url(github),
         }
 
     def _get_location_for_company(self, company: str, profile: Profile) -> str:
@@ -531,6 +557,8 @@ class LaTeXRenderer:
                     ],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=120,
                     env=env
                 )
