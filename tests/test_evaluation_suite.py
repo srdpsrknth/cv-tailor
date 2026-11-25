@@ -22,6 +22,18 @@ from __future__ import annotations
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _placeholder_provider_keys(monkeypatch):
+    """Make these tests independent of a developer's ``.env``.
+
+    Building the evaluation config requires a provider key to be *present*. These tests
+    never call a provider, so a placeholder is enough, and CI (which has no ``.env``)
+    would otherwise fail them.
+    """
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'test-placeholder-not-a-real-key')
+    monkeypatch.setenv('GEMINI_API_KEY', 'test-placeholder-not-a-real-key')
+
+
 # --- the suite cannot spend by accident ---------------------------------------------------
 
 def test_dry_run_makes_no_call_and_says_so():

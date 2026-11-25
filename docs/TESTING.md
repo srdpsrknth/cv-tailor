@@ -21,7 +21,15 @@ conflicts. `test_private_store_sync.py` simulates replication and conflict recov
 using disposable stores. See [PROJECT_STATE.md](PROJECT_STATE.md#milestone-continuation-2026-11-24)
 for the latest results.
 
-**Current baseline (2026-11-24, workspace continuation):** **1,357 passed, 3 skipped**
+**Current baseline (2026-11-25, WP1, macOS with MacTeX):** `python -m pytest -q` gives
+**1450 passed, 3 skipped** in about 153 s, with and without a `.env` present. `pytest.ini`
+registers the `requires_latex`, `slow` and `network` markers with `--strict-markers`.
+`requires_latex` tests skip automatically when `pdflatex` is missing (hook in
+`tests/conftest.py`); run only them with `-m requires_latex`, or exclude them with
+`-m "not requires_latex"`. No test reads the repository's real `.env`. CI runs the
+non-TeX suite on Ubuntu, Windows and macOS, and the TeX suite on Ubuntu.
+
+**Previous baseline (2026-11-24, workspace continuation):** **1,357 passed, 3 skipped**
 across the non-TeX run and isolated TeX groups. The Windows verification used a
 process-local portable MiKTeX configuration and writable temporary folders. No paid
 provider calls were needed.

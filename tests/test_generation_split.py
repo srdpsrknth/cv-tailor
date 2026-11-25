@@ -134,7 +134,9 @@ def test_the_response_schemas_are_unchanged_by_the_split():
         for kind, s in generation.RESPONSE_SCHEMAS.items()
     }
     assert digests == {
-        'cv': 'd08062c622fb9321c73d628854a453955400d7778ef130eaa7b900b8f40654cb',
+        # 'cv' re-pinned deliberately: a6f5758 added `standalone_projects` to the CV schema
+        # (the only change; cover_letter is untouched).
+        'cv': 'b811543dc75f9fff63c4aef630aba8eab0124555a331abbbbb18af151946bc9c',
         'cover_letter': 'e259b8d12006eda91cabe6beae70e8d4b8f8ecfd3081a307677092379241f844',
     }, f'the split changed the shipped response schemas: {digests}'
 
