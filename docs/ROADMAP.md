@@ -45,8 +45,8 @@ combined changes before advancing to standalone projects and section ordering.
   - [x] Ongoing education and expected completion dates. PDF verification passed. Pushed in `b45bc0d`.
   - [x] Standalone projects. Selection, PDF, DOCX, and text export are verified. Pushed in `a6f5758`.
   - [x] Section ordering and visibility. Both rendered PDF tests passed. Pushed in `4f4f986`.
-  - [ ] Publications and activities. Optional profile entries and exports are verified, including the rendered PDF. Commit and push remain open.
-  - [ ] Verify legacy profiles, saved snapshots, and supported export formats.
+  - [x] Publications and activities. Optional profile entries and exports are verified, including the rendered PDF. Pushed in `19ccbc0`.
+  - [ ] Verify legacy profiles, saved snapshots, and supported export formats. Both combined rendered export tests passed for legacy and current snapshots. Commit and push remain open.
 - [ ] **3. Windows-Mac private-store sync**
   - [ ] Verify the synthetic two-way round trip, partial arrival, and conflict recovery.
   - [ ] Inventory and back up both real stores before agreeing the seed and shared candidate folders.

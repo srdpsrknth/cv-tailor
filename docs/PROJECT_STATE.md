@@ -6,9 +6,23 @@
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-**Active milestone: publications and activities.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
+**Active milestone: legacy profile and saved export verification.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new
 milestone. Update the checklist and record verification here after each increment.
+
+Saved autofill exports now record freshness against the original saved JSON
+data. Previously, model defaults inserted during
+loading made freshly exported files from a legacy snapshot appear stale.
+133 focused non-TeX tests passed. The combined real-export regressions cover
+legacy and current snapshots, saved CV previews, autofill DOCX/text, and cover
+letter DOCX/PDF. MiKTeX registry access blocked compilation in the agent session.
+The owner's PDF run found that pdfplumber could not recover the long candidate
+name as a contiguous field. The shared template now gives a name its own row
+when it exceeds the width of the name column. Both extraction gates remain active.
+The owner reran the combined export tests in regular Windows PowerShell on
+2026-11-25. Both passed in 11.41 seconds, including the long candidate name in
+both PDF parsers. Commit and push the verified compatibility changes to close
+milestone 2. The Windows–Mac private-store sync pilot follows.
 
 Optional `publications` and `activities` lists render confirmed profile text in
 PDF and autofill Word and text. Both sections support ordering and visibility
@@ -16,8 +30,7 @@ preferences and are available as evidence for portal answers. The setup skill
 covers intake and display choices for both sections.
 132 focused tests passed, covering source snapshots, visibility, exports, and
 review. The owner passed the rendered PDF test in regular Windows PowerShell on
-2026-11-25 (one passed, four deselected). Commit and push this checkpoint, then
-verify legacy profiles, saved snapshots, and export formats together.
+2026-11-25 (one passed, four deselected). Pushed in `19ccbc0`.
 
 Optional `cv_section_order` moves listed sections to the front of the CV body
 in PDF, DOCX, and text. The header and summary stay at the top. Unlisted

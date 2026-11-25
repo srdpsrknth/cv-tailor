@@ -1,14 +1,17 @@
 """Text preservation and isolation of the parser-oriented CV export."""
 
 import json
+from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 from docx import Document
+from pypdf import PdfReader
 
-from models.tailored_output import TailoredCV
-from support import read_json
+from models.profile import Profile
+from models.tailored_output import TailoredCoverLetter, TailoredCV
+from support import latex_available, read_json
 
 
 def test_upload_preserves_content_and_has_sequential_body_only(tmp_path, analyst_profile):
@@ -49,7 +52,17 @@ def test_upload_omissions_and_authorization_override(tmp_path, analyst_profile):
     assert analyst_profile.identity.visa_status not in text
 
 
-def test_saved_export_uses_snapshot_and_leaves_sources_unchanged(tmp_path, analyst_profile, monkeypatch):
+@pytest.mark.parametrize(('legacy', 'render_pdfs'), [
+    pytest.param(False, False, id='current-snapshot'),
+    pytest.param(True, False, id='legacy-snapshot'),
+    pytest.param(False, True, id='current-full-exports', marks=pytest.mark.requires_latex),
+    pytest.param(True, True, id='legacy-full-exports', marks=pytest.mark.requires_latex),
+])
+def test_saved_export_uses_snapshot_and_leaves_sources_unchanged(
+    tmp_path, analyst_profile, legacy, render_pdfs, monkeypatch,
+):
+    if render_pdfs and not latex_available():
+        pytest.skip('pdflatex unavailable')
     from services.upload_cv import export_saved_upload_cv
     from config import Config
 
@@ -63,6 +76,23 @@ def test_saved_export_uses_snapshot_and_leaves_sources_unchanged(tmp_path, analy
     snapshot = analyst_profile.model_dump()
     snapshot['identity']['full_name'] = 'Historical Candidate'
     content = read_json('content', 'valid_content.json')
+    if legacy:
+        for field in ('cv_section_order', 'cv_hidden_sections', 'standalone_projects',
+                      'publications', 'activities', 'job_search'):
+            snapshot.pop(field)
+        for education in snapshot['education']:
+            education.pop('ongoing')
+        content['cv'].pop('standalone_projects', None)
+    else:
+        snapshot.update(
+            standalone_projects=[{'name': 'Transit Map', 'bullets': ['Mapped bus stops.']}],
+            publications=['A. Sample (2025). Transit Data.'],
+            activities=['Volunteer Mentor, Example Club.'],
+            cv_section_order=['education', 'projects', 'publications'],
+            cv_hidden_sections=['activities'],
+        )
+        snapshot['education'][0].update(ongoing=True, end_year=2028)
+        content['cv']['standalone_projects'] = ['Transit Map']
     for name, value in [('content', content), ('profile_snapshot', snapshot)]:
         (source / f'{name}.json').write_text(json.dumps(value), encoding='utf-8')
     (source / 'generation_result.json').write_text(
@@ -75,7 +105,62 @@ def test_saved_export_uses_snapshot_and_leaves_sources_unchanged(tmp_path, analy
         for name in ('content', 'profile_snapshot')
     }
     paths = export_saved_upload_cv(config, 'analyst_a', folder.name)
-    assert 'Historical Candidate' in Path(paths['cv_upload_text_path']).read_text(encoding='utf-8')
+    text = Path(paths['cv_upload_text_path']).read_text(encoding='utf-8')
+    assert text.splitlines() == [row.text for row in Document(paths['cv_upload_docx_path']).paragraphs]
+    assert 'Historical Candidate' in text
+    assert 'Volunteer Mentor' not in text
+    if legacy:
+        assert all(heading not in text.splitlines() for heading in ['Projects', 'Publications', 'Activities'])
+    else:
+        assert text.index('Education\n') < text.index('Projects\n') < text.index('Publications\n')
+        assert 'Present (expected 2028)' in text
+        assert 'Mapped bus stops.' in text and 'A. Sample (2025). Transit Data.' in text
+    if render_pdfs:
+        import pdfplumber
+
+        from renderers import LaTeXRendererError, create_docx_renderer
+        from services import document_quality
+        from services.application_layout_preview import preview_saved_cv_layout, save_cv_layout_preview
+
+        inspect = document_quality.inspect_document
+        trial_reports = []
+
+        def record_trial(path, **expected):
+            result = inspect(path, **expected)
+            trial_reports.append({engine: {
+                key: checks[key] for key in ('status', 'word_retention', 'reading_order',
+                                             'missing_fields', 'suspicious_glyphs')
+            } for engine, checks in result['engines'].items()})
+            return result
+
+        monkeypatch.setattr(document_quality, 'inspect_document', record_trial)
+        try:
+            pdf, report = preview_saved_cv_layout(config, 'analyst_a', folder.name)
+        except LaTeXRendererError as error:
+            if not trial_reports:
+                raise
+            pytest.fail(f'{error}\nPDF extraction trials: {json.dumps(trial_reports)}', pytrace=False)
+        saved = save_cv_layout_preview(config, 'analyst_a', folder.name, pdf, report)
+        assert saved.read_bytes() == pdf
+        reader = PdfReader(BytesIO(pdf))
+        pdf_text = ' '.join(' '.join(page.extract_text() or '' for page in reader.pages).split())
+        assert 'historical candidate' in pdf_text.casefold()
+        with pdfplumber.open(BytesIO(pdf)) as plumber_pdf:
+            plumber_text = ' '.join((plumber_pdf.pages[0].extract_text() or '').split())
+        assert 'historical candidate' in plumber_text.casefold()
+        assert ('Present (expected 2028)' in pdf_text) == (not legacy)
+        assert ('Mapped bus stops.' in pdf_text) == (not legacy)
+        assert ('Transit Data.' in pdf_text) == (not legacy)
+        assert 'Volunteer Mentor' not in pdf_text
+        letter = TailoredCoverLetter.model_validate(content['cover_letter'])
+        letter_docx, letter_pdf = create_docx_renderer(outputs_dir=folder).render_cover_letter(
+            letter, Profile.model_validate(snapshot),
+        )
+        letter_word_text = ' '.join(' '.join(row.text for row in Document(letter_docx).paragraphs).split())
+        letter_reader = PdfReader(letter_pdf)
+        assert len(letter_reader.pages) == 1
+        assert letter.paragraphs[0] in letter_word_text
+        assert letter.paragraphs[0] in ' '.join(letter_reader.pages[0].extract_text().split())
     assert originals == {
         name: (source / f'{name}.json').read_bytes()
         for name in ('content', 'profile_snapshot')

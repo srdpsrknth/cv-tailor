@@ -36,7 +36,7 @@ def export_saved_upload_cv(config, profile_id, job_id):
         config.project_root,
         content,
         [(Path(path), 'cv') for path in paths.values()],
-        profile_snapshot=profile.model_dump(),
+        profile_snapshot=snapshot,
     )
     saved_rows = manifest.get('artifact_provenance')
     saved_rows = saved_rows if isinstance(saved_rows, dict) else {}
