@@ -1,14 +1,25 @@
 # Project state
 
-**Last updated:** 2026-11-24
+**Last updated:** 2026-11-25
 **Branch:** `refactor/architecture-v2`
 **Worktree:** `D:\coding\cv-tailor-next` (Windows)
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-**Active milestones: 1E and ongoing education.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
+**Active milestone: standalone projects.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new
 milestone. Update the checklist and record verification here after each increment.
+
+The CV draft selects standalone projects by exact name from the optional private
+profile list. Renderers use the original project bullets, and a layout retry
+preserves the selection. Legacy profiles and CV documents default to no Projects
+section. Saved-app PDF checks and autofill exports use the saved project evidence.
+Focused verification passed 140 tests. An earlier run also covered layout retry
+and upload compatibility. Automatic review stopped the broader run after a
+Visual Studio telemetry request. The owner passed the real PDF regression in
+regular Windows PowerShell on 2026-11-25 (one passed, five deselected). It verified
+the selected project text and the clipping check. Commit and push this checkpoint,
+then proceed to section ordering.
 
 Job-search defaults are optional settings in the selected private profile. CLI
 flags and edits in the Find jobs form override them. The employment country can
@@ -30,8 +41,8 @@ to standalone projects and section ordering.
 
 The owner ran the real-PDF regression in regular Windows PowerShell on
 2026-11-24. One test passed and three were deselected. The check confirmed the
-expected completion year, the two-page limit, and absence of clipping. Commit
-and push the verified changes before advancing to standalone projects.
+expected completion year, the two-page limit, and absence of clipping. Both 1E
+and ongoing education were pushed in `b45bc0d`.
 
 ## Private policy capture verified (2026-11-24)
 

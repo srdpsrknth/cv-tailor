@@ -111,6 +111,20 @@
 {% endif %}
 {% if not loop.last %}\vspace{3pt}{\color{divider}\hrule height 0.35pt}\vspace{5pt}{% endif %}
 {% endfor %}
+{% if standalone_projects %}
+\cvsection{Projects}
+{% for project in standalone_projects %}
+\needspace{3\baselineskip}
+{\bfseries {{ project.name }}\par}
+{% if project.bullets %}
+\nopagebreak
+\begin{itemize}
+{% for bullet in project.bullets %}\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+{% endfor %}
+{% endif %}
 {% if education %}
 \cvsection{Education}
 {% for edu in education %}

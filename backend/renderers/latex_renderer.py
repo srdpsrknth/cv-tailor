@@ -320,6 +320,9 @@ class LaTeXRenderer:
                 paragraphs.extend(project.bullets)
             for item_index, item in enumerate(self._get_technologies_for_company(exp.company, profile)):
                 fields[f"Technology {index}/{item_index}"] = item
+        for project in cv.resolve_standalone_projects(profile):
+            paragraphs.append(project.name)
+            paragraphs.extend(project.bullets)
         for category, items in cv.skills.items():
             fields[f"Skill category {category}"] = format_skill_category(category)
             for index, item in enumerate(items):
@@ -400,6 +403,11 @@ class LaTeXRenderer:
             "github": identity.github or "",
             "summary": [self._escape_latex(s) for s in tailored_cv.summary],
             "experience": experiences,
+            "standalone_projects": [
+                {"name": self._escape_latex(project.name),
+                 "bullets": [self._escape_latex(bullet) for bullet in project.bullets]}
+                for project in tailored_cv.resolve_standalone_projects(profile)
+            ],
             "education": [
                 {
                     "degree": self._escape_latex(edu.degree),

@@ -245,6 +245,7 @@ def layout_retry_instruction(
         + "\nKeep the summary and every responsibility bullet; merge or shorten them "
         "rather than removing a field. Do not rename, re-employer, re-date, remove an "
         "achievement or a metric, or drop a supporting claim.\n"
+        + ("Keep standalone_projects unchanged.\n" if cv.standalone_projects else "")
         + layout_inventory(cv, attempt + 1)
         + guidance
         + '\nReturn either the complete shorter CV JSON, or a delta object of only the '

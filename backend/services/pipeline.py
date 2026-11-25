@@ -161,6 +161,8 @@ class DocumentGenerator:
                     )
                 else:
                     model = self._build_model(data, kind, work_country, company_name, role_title)
+                if base_cv is not None and model.standalone_projects != base_cv.standalone_projects:
+                    raise ValueError("Keep the selected standalone projects in the same order during layout retries.")
                 return model, data
             except ValueError as error:
                 last_error = str(error)

@@ -130,6 +130,13 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                 add(bullet, 'List Bullet')
         if original and original.technologies:
             add('Technologies: ' + ', '.join(original.technologies))
+    standalone_projects = cv.resolve_standalone_projects(profile)
+    if standalone_projects:
+        add('Projects', 'Heading 1')
+        for project in standalone_projects:
+            add(project.name, 'Heading 2', keep=bool(project.bullets))
+            for bullet in project.bullets:
+                add(bullet, 'List Bullet')
     if cv.include_education and profile.education:
         add('Education', 'Heading 1')
         for edu in profile.education:

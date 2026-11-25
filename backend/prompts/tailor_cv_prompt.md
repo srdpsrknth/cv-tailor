@@ -50,6 +50,9 @@ STRUCTURE AND LENGTH
   concise, usually one or two lines, without arbitrary character-count restrictions.
 - Do not include every source project as a separate heading. Select or consolidate
   useful evidence. Never repeat the same achievement in both a role and a project.
+- Select optional personal, academic or other independent work by listing exact names
+  from BASE PROFILE standalone_projects. The renderer uses the profile's original
+  bullets. Leave the list empty when none are relevant or fit the page budget.
 - Follow the selected profile’s explicit project counts and factual constraints. Select the most relevant supported evidence without duplicating achievements.
 - Keep education and certifications. Use 3-4 compact skill categories with the
   most relevant EXISTING skills, not every available skill or target-job tool.
@@ -75,6 +78,7 @@ JSON escaping permits apostrophes in prose; do not remove grammar to avoid them.
         "projects": [{"name": "Clear external project title", "bullets": ["Evidence"]}]
       }
     ],
+    "standalone_projects": [],
     "include_education": true,
     "include_certifications": true
   },

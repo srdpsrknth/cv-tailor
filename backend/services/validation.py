@@ -86,6 +86,7 @@ DEFAULT_PROFILE_RULES = ProfileRules()
 
 def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     """Check a CV against the profile and the candidate-specific rules."""
+    cv.resolve_standalone_projects(profile)
     expected = {exp.company: exp for exp in profile.experience}
     companies = [exp.company for exp in cv.experience]
     if len(companies) != len(set(companies)) or set(companies) != set(expected):

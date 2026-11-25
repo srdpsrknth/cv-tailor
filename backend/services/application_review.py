@@ -218,6 +218,21 @@ def _expected_cv_text(content):
             if isinstance(skill, str) and skill.strip():
                 fields[f"Skill {len(fields) + 1}"] = skill
     snapshot = content.get("_profile_snapshot")
+    selected_projects = cv.get("standalone_projects")
+    if isinstance(snapshot, dict) and isinstance(selected_projects, list):
+        source_projects = snapshot.get("standalone_projects")
+        if isinstance(source_projects, list):
+            project_rows = {
+                row["name"]: row for row in source_projects
+                if isinstance(row, dict) and isinstance(row.get("name"), str)
+            }
+            for name in selected_projects:
+                if not isinstance(name, str) or name not in project_rows:
+                    continue
+                paragraphs.append(name)
+                bullets = project_rows[name].get("bullets")
+                if isinstance(bullets, list):
+                    paragraphs.extend(bullet for bullet in bullets if isinstance(bullet, str))
     if isinstance(snapshot, dict) and cv.get("include_education") is not False:
         education_rows = snapshot.get("education")
         for education in education_rows if isinstance(education_rows, list) else []:

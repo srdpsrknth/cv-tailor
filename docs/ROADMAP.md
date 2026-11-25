@@ -36,14 +36,15 @@ combined changes before advancing to standalone projects and section ordering.
 - [x] **1B. Private policy capture** with verified backups of the original profile and writing preferences.
 - [x] **1C. Candidate isolation** with installed private guidance, neutral shared defaults, and all original isolation regressions passing. Pushed in `7227784`.
 - [x] **1D. Provider setup** with provider-specific credential checks and native Gemini opt-in. Verified offline and pushed in `7227784`.
-- [ ] **1E. Defaults and docs**
+- [x] **1E. Defaults and docs**
   - [x] **Audit defaults.** Traced job-search filters, country selection, and timezones across the CLI, GUI, configuration, diagnostics, naming, and exports. Candidate filters and machine calendar settings are separate from source capabilities.
   - [x] **Generalize defaults.** Explicit input overrides profile search preferences. Two synthetic profiles, an unfiltered profile, and a year-boundary case are covered. Existing application IDs are preserved.
   - [x] **Update active docs, examples, and agent instructions.** Documented settings precedence, portable examples, and preserving the previous calendar with an explicit timezone.
-  - [ ] **Verify and close.** The non-TeX suite passed, and the owner passed the education PDF regression in regular Windows PowerShell. Commit and push before advancing beyond ongoing education.
+  - [x] **Verify and close.** The non-TeX suite and the education PDF regression passed. Pushed in `b45bc0d`.
 - [ ] **2. CV content and layout**
-  - [ ] Ongoing education and expected completion dates. Implemented for profile snapshots, CLI, LaTeX, and autofill exports. PDF verification passed. Commit and push remain open.
-  - [ ] Standalone projects and section ordering.
+  - [x] Ongoing education and expected completion dates. PDF verification passed. Pushed in `b45bc0d`.
+  - [ ] Standalone projects. Selection, PDF, DOCX, and text export are verified. Commit and push remain open.
+  - [ ] Section ordering.
   - [ ] Publications, activities, and optional display preferences.
   - [ ] Verify legacy profiles, saved snapshots, and supported export formats.
 - [ ] **3. Windows-Mac private-store sync**

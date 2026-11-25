@@ -124,6 +124,7 @@ def _cv_document_schema():
             ),
             "include_education": types.Schema(type="BOOLEAN"),
             "include_certifications": types.Schema(type="BOOLEAN"),
+            "standalone_projects": types.Schema(type="ARRAY", items=types.Schema(type="STRING")),
             # extract_explanation reads a nested explanation too, so it must stay legal
             # here. Forbidding it would decide, on the model's behalf, which of the two
             # shapes it may return -- the thing `extract_explanation` exists not to do.

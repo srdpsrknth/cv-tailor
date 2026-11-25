@@ -166,3 +166,11 @@ class Profile(BaseModel):
     languages: List[Language] = Field(default_factory=list)
     rules: Optional[ProfileRules] = None
     job_search: Optional[JobSearchDefaults] = None
+    standalone_projects: List[Project] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_standalone_projects(self):
+        names = [project.name.strip().casefold() for project in self.standalone_projects]
+        if any(not name for name in names) or len(names) != len(set(names)):
+            raise ValueError("Standalone project names must be nonempty and unique.")
+        return self

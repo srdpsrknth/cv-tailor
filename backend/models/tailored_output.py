@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from typing import List, Optional, Dict
-from pydantic import BaseModel, Field, ConfigDict, field_validator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+
+from models.profile import Profile, Project
 
 
 # -------------------------
@@ -52,6 +54,15 @@ class TailoredCV(BaseModel):
     experience: List[TailoredExperience] = Field(default_factory=list)
     include_education: bool = True
     include_certifications: bool = True
+    standalone_projects: List[str] = Field(default_factory=list)
+
+    def resolve_standalone_projects(self, profile: Profile) -> List[Project]:
+        """Resolve the selected names against the profile used for this CV."""
+        available = {project.name: project for project in profile.standalone_projects}
+        if (len(self.standalone_projects) != len(set(self.standalone_projects))
+                or any(name not in available for name in self.standalone_projects)):
+            raise ValueError("Select distinct standalone project names exactly as written in the profile.")
+        return [available[name] for name in self.standalone_projects]
 
     @field_validator("skills", mode="before")
     @classmethod

@@ -188,6 +188,25 @@ entry. Omit `end_year` if completion is unknown, or set it to the expected year
 to show, for example, `Present (expected 2028)`. Completed degrees use the
 existing `start_year` and `end_year` fields.
 
+**Standalone projects** go in the private profile's top-level
+`standalone_projects` list. Each entry has a unique `name` and a `bullets` list.
+For example:
+
+```yaml
+standalone_projects:
+  - name: Transit Access Map
+    bullets:
+      - Mapped public transport gaps with open data.
+```
+
+CV generation selects relevant projects by exact name. The Projects section
+appears after work experience and uses the profile's bullets verbatim. Saved
+application previews and autofill exports use the saved profile snapshot.
+For a manual edit to `content.json`, set `cv.standalone_projects` to an ordered
+list of names from the profile used for rendering. Omit the field or use an
+empty list to leave the section out. Keep employer-specific projects under the
+corresponding experience entry.
+
 For a profile holding a German EU Blue Card, the current rules behave as follows:
 
 | Selection | Current document behaviour |

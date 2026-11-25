@@ -171,6 +171,10 @@ def _show_loaded(console: Console, path: Path, label: str, profile=None, source=
         console.out(f"  {exp.role} @ {exp.company}  ({dates})")
         console.out(f"    {len(exp.bullets)} bullets, {len(exp.selected_projects)} projects")
 
+    if profile.standalone_projects:
+        console.out("  Standalone projects:")
+        for project in profile.standalone_projects:
+            console.out(f"    {project.name} ({len(project.bullets)} bullets)")
     if profile.education:
         console.out("")
         console.out(f"Education ({len(profile.education)}):")
