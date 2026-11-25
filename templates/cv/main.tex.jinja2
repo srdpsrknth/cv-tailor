@@ -147,6 +147,14 @@
 {% elif section == 'languages' and languages %}
 \cvsection{Languages}
 {% for lang in languages %}{{ lang.name }}: {{ lang.proficiency }}{% if not loop.last %} | {% endif %}{% endfor %}\par
+{% elif section == 'publications' and publications %}
+\cvsection{Publications}
+{% for entry in publications %}{\metadata {{ entry }}\par}
+{% endfor %}
+{% elif section == 'activities' and activities %}
+\cvsection{Activities}
+{% for entry in activities %}{\metadata {{ entry }}\par}
+{% endfor %}
 {% endif %}
 {% endfor %}
 \end{document}

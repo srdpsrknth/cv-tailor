@@ -263,6 +263,12 @@ def _expected_cv_text(content, *, section_order=None, summary_visible=None, empl
         for certification in certifications if isinstance(certifications, list) else []:
             if isinstance(certification, str) and certification.strip():
                 fields[f"Certification {len(fields) + 1}"] = certification
+    for section in ("publications", "activities"):
+        entries = snapshot.get(section)
+        if section in sections and isinstance(entries, list):
+            for index, entry in enumerate(entries):
+                if isinstance(entry, str) and entry.strip():
+                    fields[f"{section.title()} {index}"] = entry
     return paragraphs, fields
 
 

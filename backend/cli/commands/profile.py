@@ -192,6 +192,14 @@ def _show_loaded(console: Console, path: Path, label: str, profile=None, source=
         console.out("")
         console.out(f"Skills: {total} across {len(profile.skills)} categories")
 
+    for section in ("publications", "activities"):
+        entries = getattr(profile, section)
+        if entries:
+            console.out("")
+            console.out(f"{section.title()} ({len(entries)}):")
+            for entry in entries:
+                console.out(f"  {entry}")
+
     rules = profile.rules
     console.out("")
     console.out(f"Validation rules: {'declared in profile' if rules else 'built-in defaults'}")

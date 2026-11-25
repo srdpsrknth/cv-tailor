@@ -215,7 +215,7 @@ cv_section_order: [education, projects, experience]
 ```
 
 Valid names are `experience`, `projects`, `education`, `certifications`, `skills`,
-and `languages`. Any unlisted sections follow in that default order. Set
+`languages`, `publications`, and `activities`. Any unlisted sections follow in that default order. Set
 `cv_hidden_sections` to hide any of those, `summary`, or `employer_projects`.
 For example, `cv_hidden_sections: [projects]` keeps employer projects nested under
 Experience and hides the dedicated Projects section. A visible Projects section
@@ -229,6 +229,20 @@ For a one-off layout, copy the profile to a private YAML file, adjust the displa
 settings in that copy, then use `cvtailor --profile <private-copy.yaml> render
 --content <application>/source/content.json --cv-only`. Render in a copy of the
 application folder if you want to keep both versions.
+
+**Publications and activities** are optional. Add one plain-text citation or
+activity per line in the private profile. The standard PDF, Word, and text
+exports use those entries directly. Empty lists produce no headings, and hidden
+sections keep their source entries in the profile.
+
+```yaml
+publications:
+  - "A. Sample (2025). Mapping Transit Access. Example Journal."
+activities:
+  - "Volunteer mentor, Community Data Club (2025–present)."
+cv_section_order: [education, publications, experience]
+cv_hidden_sections: [activities]
+```
 
 For an LLM-guided setup from scratch or from a résumé PDF or Word document, ask
 your coding assistant to follow `skills/cv-tailor-setup/SKILL.md` in the checkout.

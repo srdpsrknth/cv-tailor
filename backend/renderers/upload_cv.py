@@ -164,6 +164,12 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                 add('Languages', 'Heading 1')
                 for language in profile.languages:
                     add(f'{language.name}: {language.proficiency}')
+        elif section in ('publications', 'activities'):
+            entries = getattr(profile, section)
+            if entries:
+                add(section.title(), 'Heading 1')
+                for entry in entries:
+                    add(entry, 'List Bullet')
     doc.save(paths['cv_upload_docx_path'])
     Path(paths['cv_upload_text_path']).write_text(
         '\n'.join(p.text for p in doc.paragraphs) + '\n', encoding='utf-8')

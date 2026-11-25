@@ -172,6 +172,10 @@ class LaTeXRenderer:
         configurable = "for section in cv_section_order" in template_source
         if not configurable and (profile.cv_hidden_sections or profile.cv_section_order):
             profile = profile.model_copy(update={"cv_section_order": [], "cv_hidden_sections": []})
+        unsupported = [section for section in ("publications", "activities")
+                       if f"section == '{section}'" not in template_source]
+        if unsupported:
+            profile = profile.model_copy(update={"cv_hidden_sections": [*profile.cv_hidden_sections, *unsupported]})
         template_data = self._prepare_template_data(tailored_cv, profile)
         name_slug = self._slugify(profile.identity.full_name or "applicant")
         base_name = f"{year}_CV_{name_slug}_{safe_job}"
@@ -355,6 +359,10 @@ class LaTeXRenderer:
                 fields[f"Certification {index}"] = item
         for index, language in enumerate(profile.languages if "languages" in sections else []):
             fields[f"Language {index}"] = f"{language.name}: {language.proficiency}"
+        for section in ("publications", "activities"):
+            if section in sections:
+                for index, entry in enumerate(getattr(profile, section)):
+                    fields[f"{section.title()} {index}"] = entry
         return paragraphs, fields
 
     def _prepare_template_data(
@@ -421,6 +429,8 @@ class LaTeXRenderer:
             if "summary" not in profile.cv_hidden_sections else [],
             "experience": experiences,
             "cv_section_order": profile.visible_cv_sections(),
+            "publications": [self._escape_latex(entry) for entry in profile.publications],
+            "activities": [self._escape_latex(entry) for entry in profile.activities],
             "standalone_projects": [
                 {"name": self._escape_latex(project.name),
                  "bullets": [self._escape_latex(bullet) for bullet in project.bullets]}

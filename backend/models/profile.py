@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import List, Dict, Literal, Optional
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from typing import Annotated, List, Dict, Literal, Optional
+from pydantic import BaseModel, Field, ConfigDict, StringConstraints, field_validator, model_validator
 
 
-CVSection = Literal["experience", "projects", "education", "certifications", "skills", "languages"]
-DEFAULT_CV_SECTION_ORDER = ("experience", "projects", "education", "certifications", "skills", "languages")
+CVSection = Literal["experience", "projects", "education", "certifications", "skills", "languages",
+                    "publications", "activities"]
+DEFAULT_CV_SECTION_ORDER = ("experience", "projects", "education", "certifications", "skills", "languages",
+                            "publications", "activities")
+CVEntry = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, pattern=r"^[^\r\n]+$")]
 
 
 def resolve_cv_section_order(preferred, hidden=()):
@@ -179,6 +182,8 @@ class Profile(BaseModel):
     rules: Optional[ProfileRules] = None
     job_search: Optional[JobSearchDefaults] = None
     standalone_projects: List[Project] = Field(default_factory=list)
+    publications: List[CVEntry] = Field(default_factory=list)
+    activities: List[CVEntry] = Field(default_factory=list)
     cv_section_order: List[CVSection] = Field(default_factory=list)
     cv_hidden_sections: List[CVSection | Literal["summary", "employer_projects"]] = Field(default_factory=list)
 

@@ -37,6 +37,7 @@ def test_legacy_and_partial_section_order(analyst_profile):
     assert resolve_cv_section_order(Profile.model_validate(legacy).cv_section_order) == DEFAULT_CV_SECTION_ORDER
     assert resolve_cv_section_order(["languages", "education"]) == (
         "languages", "education", "experience", "projects", "certifications", "skills",
+        "publications", "activities",
     )
 
 

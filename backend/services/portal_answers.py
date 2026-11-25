@@ -102,6 +102,10 @@ def _profile_evidence(
         add(f"{education.degree} at {education.institution}")
     for certificate in profile.certifications:
         add(certificate)
+    for publication in profile.publications:
+        add(publication, "Publication")
+    for activity in profile.activities:
+        add(activity, "Activity")
     for language in profile.languages:
         add(language.proficiency, language.name)
     return evidence

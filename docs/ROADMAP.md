@@ -44,8 +44,8 @@ combined changes before advancing to standalone projects and section ordering.
 - [ ] **2. CV content and layout**
   - [x] Ongoing education and expected completion dates. PDF verification passed. Pushed in `b45bc0d`.
   - [x] Standalone projects. Selection, PDF, DOCX, and text export are verified. Pushed in `a6f5758`.
-  - [ ] Section ordering and visibility. Profile preferences and export paths are implemented, including independent visibility of standalone and employer projects. Both rendered PDF tests passed. Commit and push remain open.
-  - [ ] Publications and activities.
+  - [x] Section ordering and visibility. Both rendered PDF tests passed. Pushed in `4f4f986`.
+  - [ ] Publications and activities. Optional profile entries and exports are verified, including the rendered PDF. Commit and push remain open.
   - [ ] Verify legacy profiles, saved snapshots, and supported export formats.
 - [ ] **3. Windows-Mac private-store sync**
   - [ ] Verify the synthetic two-way round trip, partial arrival, and conflict recovery.

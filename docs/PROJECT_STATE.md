@@ -6,9 +6,18 @@
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
 **Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
-**Active milestone: section ordering and display preferences.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
+**Active milestone: publications and activities.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new
 milestone. Update the checklist and record verification here after each increment.
+
+Optional `publications` and `activities` lists render confirmed profile text in
+PDF and autofill Word and text. Both sections support ordering and visibility
+preferences and are available as evidence for portal answers. The setup skill
+covers intake and display choices for both sections.
+132 focused tests passed, covering source snapshots, visibility, exports, and
+review. The owner passed the rendered PDF test in regular Windows PowerShell on
+2026-11-25 (one passed, four deselected). Commit and push this checkpoint, then
+verify legacy profiles, saved snapshots, and export formats together.
 
 Optional `cv_section_order` moves listed sections to the front of the CV body
 in PDF, DOCX, and text. The header and summary stay at the top. Unlisted
@@ -26,7 +35,7 @@ because this session cannot write the existing `.agents/skills/` directory.
 155 focused tests passed, covering LaTeX source, Word and text output, legacy
 profiles, and extraction order. The owner passed both real PDF regressions in
 regular Windows PowerShell on 2026-11-25, including the hidden Projects case.
-Commit and push this checkpoint before starting publications and activities.
+The checkpoint was pushed in `4f4f986`.
 
 The CV draft selects standalone projects by exact name from the optional private
 profile list. Renderers use the original project bullets, and a layout retry
