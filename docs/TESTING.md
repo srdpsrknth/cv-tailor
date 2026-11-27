@@ -21,8 +21,8 @@ conflicts. `test_private_store_sync.py` simulates replication and conflict recov
 using disposable stores. See [PROJECT_STATE.md](PROJECT_STATE.md#milestone-continuation-2026-11-24)
 for the latest results.
 
-**Current baseline (2026-11-25, WP1, macOS with MacTeX):** `python -m pytest -q` gives
-**1450 passed, 3 skipped** in about 153 s, with and without a `.env` present. `pytest.ini`
+**Current baseline (2026-11-27, `arundhathi/backlog` after WP1-WP13, macOS with MacTeX):** `python -m pytest -q` gives
+**1742 passed, 3 skipped** in about 184 s (1450 at WP1 on 2026-11-25), with and without a `.env` present. `pytest.ini`
 registers the `requires_latex`, `slow` and `network` markers with `--strict-markers`.
 `requires_latex` tests skip automatically when `pdflatex` is missing (hook in
 `tests/conftest.py`); run only them with `-m requires_latex`, or exclude them with
