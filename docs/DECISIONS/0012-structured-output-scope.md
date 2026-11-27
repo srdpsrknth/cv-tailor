@@ -1,7 +1,7 @@
 # 0012 — Structured output is scoped per call, not enabled globally
 
 **Status:** Approved (2026-10-26) — implemented in Phase 3, increment 3
-**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §5 optimisation 3, §3 D-1;
+**Related:** [Phase 0 assessment](../ARCHIVE.md#phase-0-assessment);
 [ADR 0005](0005-llm-provider-interface.md)
 
 ## Context

@@ -769,7 +769,7 @@ def test_layout_retry_shortens_the_cv_until_it_fits(
     assert '2 words' not in retry[0]
 
 
-def test_layout_retry_budget_shrinks_with_each_attempt(
+def test_layout_retry_targets_ten_percent_less_than_the_current_draft(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
     offline = offline_service(analyst_session.texts())
@@ -780,10 +780,22 @@ def test_layout_retry_budget_shrinks_with_each_attempt(
         company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
     )
 
-    budgets = [p for p in offline.prompts if 'LAYOUT RETRY' in p]
-    assert len(budgets) == 2
-    assert 'approximately 650 words' in budgets[0]
-    assert 'approximately 550 words' in budgets[1]
+    retries = [p for p in offline.prompts if 'LAYOUT RETRY' in p]
+    assert len(retries) == 2
+    for prompt, pages in zip(retries, (4, 3), strict=True):
+        brief, draft_json = prompt.split('CURRENT CV:\n', 1)
+        draft = json.loads(draft_json)
+        prose = list(draft['summary'])
+        for role in draft['experience']:
+            prose.extend(role['bullets'])
+            for project in role['projects']:
+                prose.extend(project['bullets'])
+        for project in draft['standalone_projects']:
+            if isinstance(project, dict):
+                prose.extend(project['bullets'])
+        words = sum(len(line.split()) for line in prose)
+        assert f'The current CV rendered to {pages} pages.' in brief
+        assert f'approximately {words * 90 // 100} editable prose words' in brief
 
 
 def test_three_page_cv_is_never_reported_as_success(

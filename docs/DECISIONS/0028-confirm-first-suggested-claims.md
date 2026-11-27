@@ -17,8 +17,8 @@ added to the profile as facts.
 1. The CV call may return a top-level `suggested_claims` list, at most 8 items. Each item has a
    `requirement`, a `proposed_text` (a past-tense **statement**, never a question), an `attach_to`
    target (experience, experience project, standalone project or skill category, using exact
-   profile names) and a `rationale`. The prompt asks for 3-8 items when important requirements are
-   uncovered and related activities are plausible.
+   profile names) and a `rationale`. The prompt asks only about relevant, distinct activities
+   that the available facts make plausible, up to the same cap.
 2. Suggestions are validated: targets must exist in the profile, and question-shaped, duplicate,
    over-long or already-present items are dropped with a log note. They are stored as
    `source/suggested_claims.json` and are **never rendered**.
@@ -28,8 +28,13 @@ added to the profile as facts.
    "Suggested claims (confirm only what is true)" panel with a confirmation step. Accepted text is
    written into the **private** profile by a comment-preserving targeted edit. A timestamped
    backup is taken first, the result is re-validated, and the edit is rolled back on failure. The
-   decision is recorded with the application. Regeneration is needed before the claim can appear
-   in documents.
+   decision is recorded with the application, including the exact accepted text.
+5. Reviewers can edit the profile entry before confirming. An explicit paid action can draft
+   profile evidence and CV wording from the reviewer's notes, the target's existing facts, and
+   the relevant posting requirement. A draft requires a separate confirmation before saving.
+6. After saving a fact, the reviewer can approve one addition or replacement in the saved CV.
+   CV Tailor validates and renders PDF, Word, and text locally as a version of the same
+   application. Reviewers can download that version alongside the original.
 
 ## Consequences
 

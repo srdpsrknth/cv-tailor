@@ -1,4 +1,13 @@
-# Private store sync pilot
+# Private store sync pilot (synthetic data only)
+
+## Current status
+
+This document is a test plan, not approval to sync a real profile store. Use disposable synthetic
+profiles and outputs only. The automated test simulates two local stores; it does not establish
+that transport between Windows and macOS works. The latest recorded live observation below is
+from 2026-11-24 and did **not** complete a two-peer transport test. Re-check both peers and record
+the result before treating the pilot as complete. Do not place profile facts, real application
+content, credentials, or machine-specific store paths in this repository.
 
 Run this pilot against disposable synthetic stores on Windows and macOS. Use the same
 CV Tailor revision and working local TeX on both peers. Test the full round trip and a

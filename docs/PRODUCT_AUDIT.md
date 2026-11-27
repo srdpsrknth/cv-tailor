@@ -1,5 +1,7 @@
 # CV Tailor product audit
 
+> Historical product audit. See [Roadmap](ROADMAP.md) for open work and the [user guide](HOW_TO_GENERATE.md) for current features.
+
 Reviewed 2026-11-24 on `refactor/architecture-v2` at `2f784b2` using the Windows worktree, shared services, Streamlit tests, and a recent private output sample. This is a product audit and implementation proposal. [ASSESSMENT.md](ASSESSMENT.md) covers the underlying architecture. The audit keeps the current Streamlit design decision ([ADR 0020](DECISIONS/0020-streamlit-refactor.md)), explicit candidate scope ([ADR 0022](DECISIONS/0022-gui-profile-memory.md)), and the local private store ([ADR 0011](DECISIONS/0011-private-store-location.md)).
 
 ## Priority and acceptance

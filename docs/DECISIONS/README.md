@@ -5,7 +5,6 @@ Only the owner can move a decision to **Approved**.
 
 | # | Decision | Status |
 |---|---|---|
-| [0024](0024-document-quality-and-artifact-freshness.md) | Readable CVs, per-artifact freshness, advisory PDF extraction checks and optional Word pagination | **Approved** — owner audit implementation, 2026-11-17 |
 | [0001](0001-architecture-direction.md) | Modular redesign, executed incrementally | **Approved** |
 | [0002](0002-privacy-model.md) | Separate public code from private candidate data | **Approved** |
 | [0003](0003-profile-identity.md) | Thread an explicit `profile_id`; never default | **Approved** |
@@ -18,7 +17,7 @@ Only the owner can move a decision to **Approved**.
 | [0010](0010-config-object.md) | One explicit `Config` object; no import-time environment reads | **Approved** — implemented |
 | [0011](0011-private-store-location.md) | Private store is a sibling repo; untrack real data, do not rewrite history | **Approved** — Phase 2 |
 | [0012](0012-structured-output-scope.md) | Structured output scoped per call; schema constrains the envelope, not the document body | **Approved** — Phase 3 increment 3 |
-| [0013](0013-provider-interface-and-routing.md) | Thin provider interface; Gemini default, OpenRouter second *(historical: the default is now OpenRouter, see ADR 0013's later amendments and the 2026-11-27 PROJECT_STATE entry)*; model-per-task routing; optional budget cap | **Approved** — Phase 3 item 6 |
+| [0013](0013-provider-interface-and-routing.md) | Thin provider interface; Gemini default, OpenRouter second *(historical: the default is now OpenRouter, see [provider configuration](../../backend/config.py) for current defaults)*; model-per-task routing; optional budget cap | **Approved** — Phase 3 item 6 |
 | [0014](0014-evaluation-suite-and-curation.md) | The live evaluation suite stays opt-in and budget-capped; curation is a shortlist until measured | **Approved** — Phase 3 item 6 |
 | [0015](0015-generation-cache.md) | Cache validated generations, keyed by the bytes the model was shown; only a validated result is stored, and the store is always safe to delete | **Approved** — Phase 3 item 5 |
 | [0016](0016-per-candidate-inputs-and-one-winner.md) | One schema and prompt per candidate, judged on cost per accepted result; the study selects one model rather than shipping a menu | **Approved** — Phase 3 item 6, discharged 2026-10-27 |
@@ -28,12 +27,11 @@ Only the owner can move a decision to **Approved**.
 | [0021](0021-application-review-and-provenance.md) | Shared read-only application review, snapshot comparisons and explicit requested/provider-reported model, cache and cost provenance | **Approved** — Phase 6, 2026-11-17 |
 | [0022](0022-gui-profile-memory.md) | GUI restores the last usable profile or defaults to the sole usable profile, with a prominent active identity | **Approved** — owner instruction, 2026-11-17 |
 | [0023](0023-private-writing-voice.md) | Purpose-led cover letters and optional private per-profile style guidance, with facts isolated and cache keys reflecting the effective voice | **Approved** — owner instruction, 2026-11-17 |
-
 | [0024](0024-document-quality-and-artifact-freshness.md) | Readable document layouts, independent PDF diagnostics and per-artifact freshness | **Approved** — owner instruction, 2026-11-17 |
 | [0025](0025-adaptive-cv-layout.md) | Compare readable CV layouts deterministically before shortening, with content retention and recorded preset/measurements | **Approved** — owner instruction, 2026-11-18 |
 | [0026](0026-profile-grounded-tailoring.md) | Omit unmatched requirements, use correct tense, and ground skills, transferable methods, and numbers in profile evidence | **Approved** — owner decision, 2026-11-27 |
 | [0027](0027-richer-profile-sections.md) | Optional richer profile sections; standalone projects can be required and reworded from their own facts | **Approved** — owner decision, 2026-11-27 |
-| [0028](0028-confirm-first-suggested-claims.md) | Confirm-first suggested claims: statements stored with the application, never rendered, added to the profile only when confirmed | **Approved** — owner decision, 2026-11-27 |
+| [0028](0028-confirm-first-suggested-claims.md) | Confirm-first suggested claims: suggestions stored with the application, with profile confirmation and an explicit CV revision | **Approved** — owner decision, 2026-11-27 |
 | [0029](0029-pipeline-fingerprint-cache-key.md) | Pipeline fingerprint (prompt code, budgets, template, validators) in the generation cache key | **Approved** — owner decision, 2026-11-27 |
 | [0030](0030-job-search-redesign.md) | Redesign job search rather than patch it; audit findings recorded as requirements | **Deferred** — 2026-11-27 |
 

@@ -2,7 +2,7 @@
 
 **Status:** Approved (2026-10-23)
 **Date:** 2026-10-23
-**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §2 A-1, A-9
+**Related:** [Phase 0 assessment](../ARCHIVE.md#phase-0-assessment)
 
 ## Context
 
@@ -46,6 +46,6 @@ for the CLI, API and services; no backend path guesses a profile.
 - Cross-profile contamination becomes structurally impossible rather than merely unlikely.
 - Existing single-profile call sites must be updated — a deliberate, visible change.
 - `_validate_cv`'s candidate-specific rules move into profile-scoped configuration
-  (see [ASSESSMENT.md](../ASSESSMENT.md) §2 A-1).
+  (see [Phase 0 assessment](../ARCHIVE.md#phase-0-assessment)).
 - Requires a migration for the existing profile; it must preserve manual edits, titles,
   dates, factual ownership and ongoing-project status.

@@ -723,7 +723,7 @@ def test_claims_panel_requires_a_selection_and_an_explicit_confirmation(workspac
     assert not [c for c in at.checkbox if c.value]
     assert at.button(key=f"{prefix}_claims_add").disabled
     assert any("TRUE" in c.value for c in at.caption)
-    assert any("Regenerate" in c.value or "regenerate" in c.value for c in at.caption)
+    assert any("CV revision" in c.value for c in at.caption)
 
     at.checkbox(key=f"{prefix}_claim_1").check().run()
     at.button(key=f"{prefix}_claims_add").click().run()
@@ -755,7 +755,7 @@ def test_confirming_adds_only_the_selected_claim_to_the_profile_with_a_backup(wo
     assert data["experience"][0]["selected_projects"][0]["bullets"][-1] == CLAIM_TEXT
     assert "Cohort definition" not in data["skills"]["core_analytics"]
     assert len(list(profile_file(workspace).parent.glob("profile.backup-*.yaml"))) == 1
-    assert any("Regenerate this application" in s.value for s in at.success)
+    assert any("review a CV edit" in s.value for s in at.success)
 
     from services import suggested_claims
 
@@ -766,6 +766,106 @@ def test_confirming_adds_only_the_selected_claim_to_the_profile_with_a_backup(wo
     # The accepted claim is no longer offered again.
     assert f"{prefix}_claim_1" not in [c.key for c in at.checkbox]
     assert f"{prefix}_claim_2" in [c.key for c in at.checkbox]
+
+
+def test_claim_ai_draft_requires_a_click_then_saves_only_the_edited_entry(workspace, monkeypatch):
+    from services import suggested_claims
+    from services.provider import ProviderResponse
+
+    job = save_review(workspace)
+    save_claims(workspace, job)
+    prefix = f"review_analyst_a_{job}"
+    source = workspace / "outputs" / "analyst_a" / job / "source"
+    before = profile_file(workspace).read_bytes()
+    content = (source / "content.json").read_bytes()
+    requests = []
+    monkeypatch.setenv("CVTAILOR_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "synthetic-test-key")
+
+    class FakeProvider:
+        name = "openrouter"
+
+        def generate(self, prompt, **kwargs):
+            requests.append(json.loads(prompt.split("\n", 1)[1]))
+            return ProviderResponse(json.dumps({
+                "profile_entry": "Defined cohort rules and checked the exclusions with analysts.",
+                "cv_bullet": "Defined and validated cohort exclusions.",
+            }), 100, 60, reported_cost_usd=0.001)
+
+    monkeypatch.setattr("services.provider.build_provider", lambda config: FakeProvider())
+    at = open_saved_application(selected_app(), job)
+    at.checkbox(key=f"{prefix}_claim_1").check().run()
+    at.button(key=f"{prefix}_claims_add").click().run()
+    at.text_area(key=f"{prefix}_claim_notes_1").input("I defined the exclusions and reviewed them with analysts.").run()
+    assert requests == [] and profile_file(workspace).read_bytes() == before
+    at.button(key=f"{prefix}_claim_ai_1").click().run()
+    assert not at.exception
+    assert len(requests) == 1
+    assert set(requests[0]) == {"confirmed_notes", "target", "posting_requirement", "existing_target_facts"}
+    assert profile_file(workspace).read_bytes() == before
+    assert at.text_area(key=f"{prefix}_claim_edit_1").value == "Defined cohort rules and checked the exclusions with analysts."
+    corrected = "Defined cohort exclusions and reviewed the criteria with analysts."
+    at.text_area(key=f"{prefix}_claim_edit_1").input(corrected).run()
+    at.button(key=f"{prefix}_claims_yes").click().run()
+    assert not at.exception
+    assert len(requests) == 1
+    saved = suggested_claims.load_suggestions(source / "content.json")["suggestions"][0]
+    assert saved["accepted_text"] == corrected
+    assert saved["proposed_text"] == CLAIM_TEXT
+    assert corrected in profile_file(workspace).read_text(encoding="utf-8")
+    assert (source / "content.json").read_bytes() == content
+
+
+def test_approved_claim_revision_preserves_original_and_publishes_checked_exports(workspace, monkeypatch):
+    from config import Config
+    from services import claim_cv_revision as revisions
+    from support import load_profile, read_json
+
+    job = save_review(workspace)
+    save_claims(workspace, job)
+    folder = workspace / "outputs" / "analyst_a" / job
+    source = folder / "source"
+    (source / "content.json").write_text(json.dumps(read_json("content", "valid_content.json")), encoding="utf-8")
+    (source / "profile_snapshot.json").write_text(load_profile("synthetic_analyst").model_dump_json(), encoding="utf-8")
+    original = (source / "content.json").read_bytes()
+    (folder / "original.pdf").write_bytes(b"unchanged")
+    config = Config.from_env()
+    bridge.accept_claims(config, "analyst_a", job, [1])
+    prior = profile_file(workspace).read_bytes()
+    source_id, entries = revisions.claim_cv_options(config, "analyst_a", job, 1)
+    assert entries
+    layout = {"page_count": 3, "text_preserved": True, "clipping": False, "orphan_headings": False}
+
+    def renderer(outputs_dir, **kwargs):
+        def render(cv, profile, **options):
+            path = outputs_dir / "generated.pdf"
+            path.write_bytes(b"%PDF-test")
+            return path
+        return SimpleNamespace(render_cv=render, last_layout=layout)
+
+    monkeypatch.setattr(revisions, "create_latex_renderer", renderer)
+    with pytest.raises(ValueError, match="two-page"):
+        revisions.save_claim_cv_revision(config, "analyst_a", job, 1, CLAIM_TEXT, 0, source_id)
+    assert revisions.list_claim_cv_revisions(config, "analyst_a", job) == []
+    layout["page_count"] = 2
+    revision = revisions.save_claim_cv_revision(config, "analyst_a", job, 1, CLAIM_TEXT, 0, source_id)
+    assert revisions.read_claim_cv_artifact(config, "analyst_a", job, revision, "PDF") == b"%PDF-test"
+    assert CLAIM_TEXT.encode() in revisions.read_claim_cv_artifact(config, "analyst_a", job, revision, "Text")
+    assert profile_file(workspace).read_bytes() == prior
+    assert (source / "content.json").read_bytes() == original
+    assert (folder / "original.pdf").read_bytes() == b"unchanged"
+    with pytest.raises(ValueError, match="changed"):
+        revisions.save_claim_cv_revision(config, "analyst_a", job, 1, CLAIM_TEXT, None, source_id)
+
+    prefix = f"review_analyst_a_{job}"
+    at = open_saved_application(selected_app(), job)
+    assert at.selectbox(key=f"{prefix}_claim_revisions").value == revision
+    at.checkbox(key=f"{prefix}_claim_cv_open").check().run()
+    at.text_area(key=f"{prefix}_claim_cv_text_1").input("Defined cohort eligibility from source records.").run()
+    at.button(key=f"{prefix}_claim_cv_save").click().run()
+    assert not at.exception
+    saved = revisions.list_claim_cv_revisions(config, "analyst_a", job)
+    assert len(saved) == 2 and saved[0]["id"] == at.selectbox(key=f"{prefix}_claim_revisions").value
 
 
 def test_dismissing_selected_claims_records_them_rejected_without_touching_the_profile(workspace):

@@ -1,5 +1,7 @@
 # CV layout review — 2026-11-18
 
+> Historical layout investigation behind [ADR 0025](DECISIONS/0025-adaptive-cv-layout.md). See the [user guide](HOW_TO_GENERATE.md) for current layout options.
+
 Original status: investigation and private comparison renders only.
 
 **Implementation update (2026-11-18):** the owner approved the proposal; automatic

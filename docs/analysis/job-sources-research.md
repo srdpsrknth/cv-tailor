@@ -1,5 +1,7 @@
 # Job sources — ADR 0008 §1 research finding
 
+> Dated research. See [ADR 0030](../DECISIONS/0030-job-search-redesign.md) for the active redesign requirements.
+
 **Status:** Research complete; **the source list was approved by the owner on
 2026-11-05 and is implemented** — see [ADR 0018](../DECISIONS/0018-job-discovery.md).
 This document remains the evidence behind those choices and behind the refusals.

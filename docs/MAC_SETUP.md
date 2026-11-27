@@ -25,7 +25,7 @@ Optional visual QA tools: LibreOffice (render DOCX independently) and Poppler (`
 ## Clone and initialize
 
 ```bash
-git clone https://github.com/srdpsrknth/cv-tailor.git
+git clone --branch refactor/architecture-v2 https://github.com/srdpsrknth/cv-tailor.git
 cd cv-tailor
 python3.12 scripts/setup.py
 ```
@@ -35,41 +35,21 @@ If `python3.12` is not found after Homebrew installation, use `$(brew --prefix p
 > **Use a native Python on Apple Silicon.** An Intel (x86_64) Python running under Rosetta,
 > for example an old Anaconda install, cannot install some locked wheels (`cryptography` 50.x has
 > no macOS x86_64 wheel). `scripts/setup.py` checks an existing `.venv`'s Python version and CPU
-> architecture and stops with a message if they don't match the machine. Delete `.venv`
+> architecture and stops with a message if they don't match the machine. Move `.venv` aside
 > and rerun setup with a native arm64 Python 3.12 (Homebrew `python@3.12`, the python.org
 > universal installer, or an arm64 conda environment). Setup never deletes `.venv` itself.
 
-### Credentials and model (current as of Phase 3)
+### Credentials and paths
 
-**The default provider is OpenRouter, and the default model is `openai/gpt-6-luna`**
-— the model the curation study selected on measured cost per accepted result
-(ADR 0016). Have the user put `OPENROUTER_API_KEY` into `.env` directly; get a key
-from https://openrouter.ai/settings/keys, and note that the account **needs credit**.
-
-Do not ask them to paste a key into chat or log it.
-
-* **Gemini still works** but is no longer the default: set
-  `CVTAILOR_PROVIDER=gemini` and provide `GEMINI_API_KEY`. Note that the Google-routed
-  path reports `cost: 0` and carries the real figure in
-  `cost_details.upstream_inference_cost`.
-* **`GEMINI_MODEL` is deliberately ignored unless the provider is Gemini.** A leftover
-  value cannot redirect the default run — this was a real bug once: an existing
-  `GEMINI_MODEL=gemini-3.8-flash` silently overrode the new default and ran the old
-  model through OpenRouter, where the bare name is not even a priced route. Use
-  `CVTAILOR_MODEL` for the provider-neutral override.
-* **Do not silently change the model.** If generation fails, inspect the error and ask
-  the user; a fresh installation needs its own credentials and its own credit.
-
-A generation costs roughly **$0.003** on the default model. Optional guard:
-`CVTAILOR_MAX_COST_USD` refuses a run whose *estimated* cost exceeds the cap.
+Set the provider key directly in the local `.env`. See [the configuration template](../.env.example) for provider-specific keys, model overrides and the cost limit. OpenRouter requires credit. The [user guide](HOW_TO_GENERATE.md) explains the cost summary and which actions make a provider call.
 
 Start with `OUTPUTS_DIR=outputs`. If mirroring to OneDrive, ask for the actual local Mac folder; Windows OneDrive paths are invalid. A relative outputs path resolves against the clone. Set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` if the shell does not find the compiler.
 
-Point the project at the store and name the candidate. Both are required; a missing profile id fails rather than guessing:
+Point the project at the transferred private store and set a candidate ID for commands run from this terminal:
 
 ```bash
 export CVTAILOR_STORE="$HOME/cv-tailor-data"   # wherever the store was transferred
-export CVTAILOR_PROFILE_ID=<profile_id>
+export CVTAILOR_PROFILE_ID='<profile_id>'
 ```
 
 To make these permanent rather than per-terminal, put them in `.env`:
@@ -90,28 +70,7 @@ verify the configured credential with that provider, run
 .venv/bin/python scripts/start.py
 ```
 
-Open http://localhost:8501 . The backend is at http://localhost:8000 and its interactive API docs at `/docs`. Keep the startup terminal open; Ctrl+C stops both services. Logs are in `.runtime/logs/`. Startup checks ports and will not kill unrelated applications. For changed backend ports, set `BACKEND_URL` in `.env` as well.
-
-### Two interfaces, one store
-
-Both the web UI and the CLI read the same private store, so an application generated
-in a terminal appears in the browser and vice versa.
-
-```bash
-.venv/bin/python scripts/start.py     # prints the UI and API URLs; open the UI one
-.venv/bin/python scripts/start.py --status   # services started by start.py, if any
-.venv/bin/python scripts/start.py --stop     # stops only processes start.py started
-.venv/bin/python cvtailor.py doctor   # command line: the supported path for problems
-```
-
-> **The ports come from `.env`** (`UI_PORT`, `BACKEND_PORT`) and `start.py` prints
-> them, so read the printed URL rather than assuming 8501. A fresh clone's
-> `.env.example` uses 8501/8000; another machine may differ.
-
-**The UI requires you to choose a candidate explicitly**, even with one profile — the
-choice decides which folder the documents are filed under (ADR 0003). Day-to-day use of
-both is documented in [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md); every command there
-uses `.venv/bin/python` on macOS (Windows uses `.venv\Scripts\python.exe`).
+Open the UI URL printed by `start.py`. The API's interactive documentation is at `/docs` on the printed API URL. Use Ctrl+C from the startup terminal or `scripts/start.py --stop` with the checkout's virtual environment. See the [user guide](HOW_TO_GENERATE.md) for daily CLI and GUI workflows.
 
 ### Check the free paths before anything that costs money
 

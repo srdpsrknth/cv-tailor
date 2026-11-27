@@ -1,5 +1,7 @@
 # LinkedIn MCP: signed-in browser access
 
+> Dated research. See [ADR 0030](../DECISIONS/0030-job-search-redesign.md) for the active redesign requirements.
+
 **Reviewed:** 2026-11-15. Source inspected at
 [`e9b47a48634200a836571b4e7c02444844038229`](https://github.com/stickerdaniel/linkedin-mcp-server/tree/e9b47a48634200a836571b4e7c02444844038229).
 Read-only source review; no installation, account login or live LinkedIn query.

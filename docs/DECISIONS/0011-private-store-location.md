@@ -25,7 +25,7 @@ The owner confirmed all three choices on 2026-10-24, before any code was written
 ### 1. Location — a sibling directory containing its own private Git repository
 
 ```
-D:\coding\cv-tailor-data\           <- private store root, outside the public repo
+<private-store>           <- private store root, outside the public repo
     profiles\
         <profile_id>\
             profile.yaml

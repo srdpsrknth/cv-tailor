@@ -45,7 +45,7 @@ point of Phase 1 was to make the suite a reliable safety net.
 - [`DECISIONS/0002-privacy-model.md`](DECISIONS/0002-privacy-model.md) — **not yet implemented**
 - [`DECISIONS/0003-profile-identity.md`](DECISIONS/0003-profile-identity.md) — the core of Phase 2
 - [`DECISIONS/0004-storage.md`](DECISIONS/0004-storage.md) — files keyed by `profile_id`
-- [`ASSESSMENT.md`](ASSESSMENT.md) §6 — the privacy analysis and path-traversal findings
+- [Phase 0 assessment](ARCHIVE.md#phase-0-assessment) — the historical assessment and privacy decisions
 
 ## 4. The privacy problem is now the critical path
 

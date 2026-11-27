@@ -1,7 +1,7 @@
 # 0001 — Modular redesign, executed incrementally
 
 **Status:** Approved (2026-10-23)
-**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §8, §9
+**Related:** [Phase 0 assessment](../ARCHIVE.md#phase-0-assessment)
 
 ## Context
 

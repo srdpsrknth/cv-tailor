@@ -636,23 +636,23 @@ def claims_for(config, profile_id, job_id) -> List[dict]:
     return [{"number": n, **item} for n, item in enumerate(record["suggestions"], 1)]
 
 
-def plan_claims(config, profile_id, job_id, numbers):
+def plan_claims(config, profile_id, job_id, numbers, *, edits=None):
     """Exactly what accepting ``numbers`` would change in the profile. Writes nothing."""
     from services.claim_acceptance import accept_suggestions
 
     return accept_suggestions(
         _claims_content(config, profile_id, job_id), config.store.profile_path(profile_id),
-        list(numbers), expected_profile_id=profile_id, dry_run=True,
+        list(numbers), expected_profile_id=profile_id, dry_run=True, edits=edits,
     )
 
 
-def accept_claims(config, profile_id, job_id, numbers):
+def accept_claims(config, profile_id, job_id, numbers, *, edits=None):
     """Write the confirmed suggestions into the private profile (after a backup)."""
     from services.claim_acceptance import accept_suggestions
 
     return accept_suggestions(
         _claims_content(config, profile_id, job_id), config.store.profile_path(profile_id),
-        list(numbers), expected_profile_id=profile_id,
+        list(numbers), expected_profile_id=profile_id, edits=edits,
     )
 
 
@@ -661,3 +661,14 @@ def reject_claims(config, profile_id, job_id, numbers):
     from services.claim_acceptance import reject_suggestions
 
     return reject_suggestions(_claims_content(config, profile_id, job_id), list(numbers))
+
+
+def draft_claim(config, profile_id, job_id, number, notes):
+    from services.claim_drafting import draft_claim_wording
+    from services.provider import build_provider
+
+    claim = next((item for item in claims_for(config, profile_id, job_id)
+                  if item["number"] == number and item.get("status", "pending") == "pending"), None)
+    if claim is None:
+        raise ValueError("This suggestion is no longer pending.")
+    return draft_claim_wording(config, config.store.load(profile_id), claim, notes, build_provider(config))

@@ -3,7 +3,7 @@
 **Status:** Approved (2026-10-23) — **implemented in Phase 3 item 6 (2026-10-26)**; see
 [0013](0013-provider-interface-and-routing.md) for the interface as built and
 [0014](0014-evaluation-suite-and-curation.md) for the evaluation suite and curation.
-**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §3 D-1, D-3, §5
+**Related:** [Phase 0 assessment](../ARCHIVE.md#phase-0-assessment)
 
 ## Context
 

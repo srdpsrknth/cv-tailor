@@ -1,5 +1,7 @@
 # Application quality audit
 
+> Historical evidence for [ADR 0024](DECISIONS/0024-document-quality-and-artifact-freshness.md). See the [user guide](HOW_TO_GENERATE.md) for current document checks.
+
 Date: 2026-11-17. Scope: generated CVs and cover letters, their templates,
 prompts, validation and generation instructions. This is a recommendation record;
 it does not change generation policy, templates or existing applications.

@@ -1,5 +1,7 @@
 # GUI review and proposed improvements
 
+> Historical interface review. See the [user guide](HOW_TO_GENERATE.md) for the current application workspace.
+
 Reviewed 2026-11-17 against the running Windows GUI, all four pages, `ui/app.py`,
 `ui/services_bridge.py`, generation persistence and provider response handling.
 **Implementation status (2026-11-17):** the owner approved this proposal and the

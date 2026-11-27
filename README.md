@@ -15,9 +15,9 @@ true enter your profile, via `cvtailor claims` or the review page), richer CV se
 with bullets, education highlights, structured certifications), and a free offline
 `cvtailor applications check` that re-validates saved applications against the current rules.
 
-**Verifying a pull:** after pulling a new version, run `cvtailor --profile-id <id> applications
-check`; for the multi-candidate cleanup (PR #1) follow
-[docs/HANDOFF-PR1-VERIFY.md](docs/HANDOFF-PR1-VERIFY.md).
+**Verifying a pull:** see [Testing](docs/TESTING.md) and run the free
+[`applications check`](docs/HOW_TO_GENERATE.md#checking-saved-applications-against-the-current-rules)
+for the selected profile. The [archive](docs/ARCHIVE.md) indexes earlier releases and audits.
 
 **Fresh Mac setup:** read [docs/MAC_SETUP.md](docs/MAC_SETUP.md). The assisting LLM should
 read [AGENTS.md](AGENTS.md) and the
@@ -29,7 +29,7 @@ Install Python 3.12+, Git, and a full pdflatex distribution: MacTeX on
 Mac, MiKTeX on Windows, or TeX Live on Linux. Tectonic is not used.
 
 ```bash
-git clone https://github.com/srdpsrknth/cv-tailor.git
+git clone --branch refactor/architecture-v2 https://github.com/srdpsrknth/cv-tailor.git
 cd cv-tailor
 python3.12 scripts/setup.py
 # Put OPENROUTER_API_KEY in .env (https://openrouter.ai/settings/keys — needs credit)
@@ -63,9 +63,10 @@ browser, no session state.
 .venv/bin/python cvtailor.py --profile-id <id> jobs search --keywords "data engineer"
 ```
 
-The UI has four pages: **Generate**, **Find jobs**, **Applications**, **Help**. Job
-search and re-rendering are **free** — no API key, no model call. A generation costs
-roughly **$0.003**.
+The UI has four pages: **New application**, **Find jobs**, **Applications** and
+**Settings & help**. Job search and re-rendering are **free** - no API key, no model
+call. Generation costs vary by provider, model, prompt size and retries. The run
+summary reports the provider's cost when available, otherwise a token-based estimate.
 
 ## Generation and revision
 
@@ -82,10 +83,10 @@ context overrides inferred location. Work-authorization wording follows the sele
 `rules` and `country_overrides`; employer permit support, where a profile requires it,
 belongs only in the cover letter.
 
-Every command needs an explicit candidate: pass `--profile-id <id>` or set
-`CVTAILOR_PROFILE_ID`. There is no default and no "the only one" fallback, so a missing id
-fails rather than tailoring the wrong person's CV. The UI requires the same explicit
-choice, even when only one profile exists.
+Candidate-specific CLI commands require `--profile-id <id>` or `CVTAILOR_PROFILE_ID`.
+Candidate-specific API requests require a profile ID in the request or path. The GUI
+restores its last valid profile selection or selects the only usable profile. With
+multiple profiles and no valid remembered choice, select one in the sidebar.
 
 Each application lives in `<store>/outputs/<profile_id>/<job_id>/`. Final documents are at
 the top level; `source/content.json` is editable text, alongside the posting, profile
@@ -126,8 +127,8 @@ Included: code, prompts, Word/LaTeX templates, tests, setup/start scripts, depen
 and reusable agent skill. **Not included:** the real profile, saved applications and
 generated documents — these live in the private store (ADR 0002/ADR 0011). Also excluded
 from new commits: API credentials, virtual environments, duplicate profile backups, logs,
-QA images and generated PDF/DOCX outputs. The three adjoe documents that were tracked
-before Phase 2 were removed from the branch tip; they remain in the repository's history.
+QA images and generated PDF/DOCX outputs. See [ADR 0011](docs/DECISIONS/0011-private-store-location.md)
+for the transition to a private store and the status of older Git history.
 
 GitHub Actions runs the unit tests on Python 3.12 on Ubuntu, Windows and macOS, plus a separate
 Ubuntu job with TeX Live for the LaTeX tests. Tests need no API key, network or `.env`.

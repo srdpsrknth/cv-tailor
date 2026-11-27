@@ -17,10 +17,10 @@ in the browser and vice versa. **The command line is the supported path for anyt
 that goes wrong** — it has clearer errors and no browser in the way.
 
 **Windows shortcut:** double-click **CV Tailor** on the desktop or find it in the
-Start menu. It starts the GUI and opens your browser automatically. Choose your
-profile in the sidebar, then use Generate or Find jobs. Closing the browser leaves
+Start menu. It starts the GUI and opens your browser automatically. Confirm the active
+profile in the sidebar, then use **New application** or **Find jobs**. Closing the browser leaves
 the app running; **Stop CV Tailor** shuts it down. To install these shortcuts, see
-[DEVELOPMENT.md](DEVELOPMENT.md#windows-gui-shortcuts).
+[DEVELOPMENT.md](DEVELOPMENT.md#windows-gui-shortcuts-windows-only).
 
 **This guide works on Windows, macOS and Linux.** Activate the project's virtual
 environment once per terminal, then every command is written `python cvtailor.py ...`:
@@ -51,10 +51,10 @@ python cvtailor.py --profile-id <profile_id> generate --job-file job.txt
 tailored to that posting using your saved profile, and produces a PDF (and Word
 file) ready to send.
 
-**What it costs:** roughly **$0.003 per application** on the default model
-(`openai/gpt-6-luna`) — about a third of a cent. A full application is one CV call
-plus one cover-letter call. Re-rendering an existing application is **free**, and so
-is job search.
+**What it costs:** a fresh generation makes paid provider calls. Cost depends on the
+provider, model, prompt and output size, and retries. The run summary reports the
+provider-reported cost when available or a token-based estimate. Re-rendering existing
+text, saved-application checks and job search are free and make no model call.
 
 ---
 
@@ -84,7 +84,7 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 > `.venv` inherited a Low integrity label, so its Python runs at Low integrity even
 > from a normal terminal and cannot write to the private store. PowerShell being
 > able to write there does not prove Python can. See the targeted repair in
-> [DEVELOPMENT.md](DEVELOPMENT.md#windows-python-output-permission-error).
+> [DEVELOPMENT.md](DEVELOPMENT.md#windows-python-output-permission-error-windows-only).
 
 List available profiles and substitute your chosen ID for the synthetic example `sample-analyst`.
 
@@ -532,12 +532,21 @@ layout it cannot edit safely does it fall back to rewriting the whole file (whic
 comments) and say so in a warning. The accepted or rejected state is recorded in the
 application.
 
-In the web interface, the saved application's page has a **Suggested claims (confirm only
-what is true)** panel with checkboxes, an **Add selected to my profile** button (with an
-explicit confirmation step) and a **Dismiss selected** button, which marks the chosen
-suggestions as not wanted and never changes your profile (the same as `claims reject`). Either way the existing documents do not change: **regenerate
-the application** (for example `generate --job-file <...>/source/job_description.txt
---no-cache`) so the confirmed claims can appear in a new CV.
+In the web interface, open **Suggested claims (confirm only what is true)** and
+select the claims you want to review. Edit the profile entry before confirming
+if the proposed text needs context or correction. Confirming as written and
+editing manually both run locally. **Send notes and draft with AI (paid)**
+sends the notes, target facts and relevant posting requirement to the configured
+provider. It previews a profile entry and a CV bullet for your review. Confirm
+the exact profile wording to save it. Use **Dismiss selected** to close unwanted
+suggestions without changing the profile.
+
+After saving a claim, choose **Use a confirmed claim in this CV**. Add an entry or
+choose an existing one to replace, review the wording, and save the revision.
+CV Tailor validates the revised CV and checks the rendered two-page layout
+locally. Download its PDF, Word and text files from **Revised CVs**. The original
+files and cover letter remain available. The CLI can still use confirmed facts
+in a new generation.
 
 ---
 
@@ -794,12 +803,15 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 ## The rules this tool will not break
 
-* **It never picks a profile for you.** No default, no "the only one".
+* **Candidate-specific CLI commands require a profile ID.** The GUI restores the last valid
+  selection or chooses the only usable profile; with several profiles and no valid
+  remembered choice, select one in the sidebar.
 * **Your data never enters the repository.** Profiles, applications and generated
   documents live in your private store (`CVTAILOR_STORE`), outside this checkout. This repo is public.
 * **It does not invent facts.** It tailors wording and emphasis from your real
   profile; it will not add a skill or employer you do not have.
-* **Sponsorship and permit wording goes only in cover letters, never the CV.**
+* **Employer sponsorship or permit-support requests belong in the cover letter.**
+  The CV shows the candidate's applicable work-authorization label.
 * **Default limits:** CV two pages, cover letter four paragraphs / 290–310 words. The
   cover-letter format and word range are fixed application requirements; they do not
   certify prose quality or ATS compatibility.
@@ -816,7 +828,7 @@ python cvtailor.py doctor
 python cvtailor.py profile list
 python cvtailor.py --profile-id <profile_id> profile show
 
-# Generate (costs ~$0.003)
+# Generate (paid provider calls; see the run summary for reported or estimated cost)
 python cvtailor.py --profile-id <profile_id> generate --job-file job.txt
 
 # Find jobs (free)

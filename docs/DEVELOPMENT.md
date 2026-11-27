@@ -110,8 +110,7 @@ Generated documents do **not** live in either worktree: since ADR 0011 they are 
 private store, `<store>/outputs/<profile_id>/<job_id>/`, so the two worktrees cannot collide
 regardless of `OUTPUTS_DIR`.
 
-`refactor/architecture-v2` is already set up and runnable. To create this setup from scratch on
-another machine:
+To create the development environment from scratch on another machine:
 
 ```powershell
 # Windows
@@ -140,8 +139,8 @@ on any FAIL):
 python cvtailor.py --profile-id <profile_id> applications check [--render]
 ```
 
-See [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md#checking-saved-applications-against-the-current-rules)
-and, for the PR #1 pull, [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md).
+See [saved-application checks](HOW_TO_GENERATE.md#checking-saved-applications-against-the-current-rules)
+and the current [test commands](TESTING.md).
 
 ### The private profile store
 
@@ -195,16 +194,14 @@ while pip was stuck.
 
 `scripts/setup.py` does not yet pass `--no-cache-dir`; consider fixing it if this recurs.
 
-### Current state of this worktree
+### Historical environment snapshot
 
-*Historical note (snapshot from the original development worktree; see `PROJECT_STATE.md` for the live baseline):* runnable: `.venv` with all locked dependencies, `.env` created from `.env.example`, ports set
-to 8001/8502. `scripts/check_setup.py` reports profile/timezone/LaTeX/templates OK, and
-`python -m pytest -q` → **1142 passed, 3 skipped** (see [`TESTING.md`](TESTING.md) for the
-current baseline).
-
-The only outstanding item is `OPENROUTER_API_KEY`, which the owner must enter into `.env`
-directly (the user, not an agent) — never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too;
-without them every command that touches candidate data fails closed by design (ADR 0003).
+This snapshot describes the original Windows development worktree, not the current machine.
+Check the live environment with `scripts/check_setup.py`; the test baseline and sandbox caveat
+are in [`TESTING.md`](TESTING.md), and active task status is in
+[`PROJECT_STATE.md`](PROJECT_STATE.md#current-work). Enter API keys directly into the local
+`.env`; never paste or print them. Configure `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` locally
+before running commands that use candidate data.
 
 > **Run the suite with `TEMP`/`TMP` pointed inside the worktree**, or the LaTeX tests can
 > fail with a spurious `pdflatex compilation failed` even with nothing else running:
@@ -280,8 +277,8 @@ approves**. Use a pull request for the final review.
 
 ## Cross-machine synchronisation
 
-1. Commit and push on machine A (development branch only).
+1. Commit and push on machine A (development branch only), after the owner explicitly authorizes it.
 2. On machine B: `git fetch`, then `git -C cv-tailor-next pull --ff-only`.
 3. Re-run `scripts/setup.py` if `requirements.lock.txt` changed.
-4. Re-run the test baseline before continuing.
+4. Follow [`TESTING.md`](TESTING.md) to run and record applicable checks before continuing.
 5. Never copy `.venv`, `.env`, `outputs/` or `.runtime/` between machines.

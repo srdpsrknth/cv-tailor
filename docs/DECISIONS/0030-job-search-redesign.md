@@ -5,10 +5,7 @@
 
 ## Context
 
-An audit during the multi-candidate cleanup, and real use by a second candidate (health and
-regulatory roles in Berlin, remote in Germany, and Ireland), found that the job-search feature
-does not serve a multi-candidate, multi-country user well. Fixing it piecemeal was started and
-then stopped in favour of a redesign.
+An audit during the multi-candidate cleanup found limits in job search across different target roles and countries. Work on individual fixes stopped in favour of a redesign.
 
 ## Requirements for the redesign (from the audit; verified items marked V)
 

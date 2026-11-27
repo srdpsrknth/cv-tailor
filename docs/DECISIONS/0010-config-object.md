@@ -1,7 +1,7 @@
 # 0010 — One explicit `Config` object; no import-time environment reads
 
 **Status:** Approved (2026-10-23) — implemented in Phase 1
-**Related:** [ROADMAP.md](../ROADMAP.md) Phase 1, [ASSESSMENT.md](../ASSESSMENT.md) A-5
+**Related:** [Phase 0 assessment and completed phases](../ARCHIVE.md#phase-0-assessment)
 
 ## Context
 

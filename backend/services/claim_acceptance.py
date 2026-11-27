@@ -23,7 +23,7 @@ import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 import yaml
 
@@ -34,10 +34,20 @@ logger = logging.getLogger(__name__)
 
 APPROACH_TARGETED = "targeted-insert"
 APPROACH_FULL_DUMP = "full-dump"
+MAX_CONFIRMED_TEXT = 1600
 
 
 class ClaimError(ValueError):
     """The request cannot be carried out; nothing was changed (or it was rolled back)."""
+
+
+def confirmed_claim_text(text: str, kind: str) -> str:
+    """Validate an editable statement before previewing or storing it."""
+    text = " ".join(text.split())
+    limit = claims.MAX_SKILL_CHARS if kind == "skill" else MAX_CONFIRMED_TEXT
+    if not text or len(text) > limit or claims._is_question(text):
+        raise ClaimError(f"Enter a factual statement of 1–{limit} characters.")
+    return text
 
 
 @dataclass
@@ -195,6 +205,7 @@ def _backup_path(profile_path: Path, now: datetime) -> Path:
 def plan_acceptance(
     content_path, profile_path, numbers: Sequence[int], *, category: Optional[str] = None,
     expected_profile_id: Optional[str] = None,
+    edits: Optional[Mapping[int, str]] = None,
 ) -> AcceptanceResult:
     """What accepting ``numbers`` would change, without writing anything."""
     from services.profile_loader import load_profile
@@ -221,8 +232,10 @@ def plan_acceptance(
         if suggestion.get("status") == "accepted":
             result.skipped.append((number, "already accepted"))
             continue
-        text = suggestion["proposed_text"]
         attach_to = dict(suggestion["attach_to"])
+        text = confirmed_claim_text(
+            (edits or {}).get(number, suggestion["proposed_text"]), attach_to["type"],
+        )
         try:
             path, new_category = _resolve(expected, attach_to, category if attach_to["type"] == "skill" else None)
         except ClaimError as error:
@@ -271,7 +284,7 @@ def plan_acceptance(
 def accept_suggestions(
     content_path, profile_path, numbers: Sequence[int], *, category: Optional[str] = None,
     expected_profile_id: Optional[str] = None, dry_run: bool = False,
-    now: Optional[datetime] = None,
+    now: Optional[datetime] = None, edits: Optional[Mapping[int, str]] = None,
 ) -> AcceptanceResult:
     """Write the chosen suggestions into the profile and record the decision.
 
@@ -283,7 +296,7 @@ def accept_suggestions(
 
     result = plan_acceptance(
         content_path, profile_path, numbers, category=category,
-        expected_profile_id=expected_profile_id,
+        expected_profile_id=expected_profile_id, edits=edits,
     )
     result.dry_run = dry_run
     if dry_run or not result.changes:
@@ -344,6 +357,7 @@ def _record(content_path, result: AcceptanceResult, backup: Path, now: datetime,
             suggestion["status"] = status
             suggestion["decided_at"] = stamp
             suggestion["accepted_attach_to"] = change.attach_to
+            suggestion["accepted_text"] = change.text
             suggestion["write"] = {"approach": result.approach, "backup": backup.name}
         claims.write_suggestions(content_path, record)
     except OSError:

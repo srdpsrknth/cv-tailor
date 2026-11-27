@@ -2,7 +2,7 @@
 
 **Status:** Approved (2026-10-23) — **implemented in Phase 2**; see [0011](0011-private-store-location.md)
 for the store's location and the history question
-**Related:** [ASSESSMENT.md](../ASSESSMENT.md) §6, [0004](0004-storage.md), [0006](0006-remote-profile-access.md), [0011](0011-private-store-location.md)
+**Related:** [Phase 0 assessment](../ARCHIVE.md#phase-0-assessment), [0004](0004-storage.md), [0006](0006-remote-profile-access.md), [0011](0011-private-store-location.md)
 
 ## Context
 
