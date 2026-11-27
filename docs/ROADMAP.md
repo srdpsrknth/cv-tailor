@@ -51,6 +51,45 @@ combined changes before advancing to standalone projects and section ordering.
   - [ ] Verify the synthetic two-way round trip, partial arrival, and conflict recovery.
   - [ ] Inventory and back up both real stores before agreeing the seed and shared candidate folders.
 
+## Multi-candidate cleanup (PR #1, `arundhathi/backlog`) — done 2026-11-27
+
+A second candidate's first real applications exposed one-candidate assumptions, missing CV
+sections and OS gaps. All work packages below are complete; results and the verified baseline
+are in [PROJECT_STATE.md](PROJECT_STATE.md#2026-11-27--multi-candidate-cross-os-cleanup-arundhathibacklog)
+and [TESTING.md](TESTING.md). Windows verification: [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md).
+
+- [x] **WP1** green test baseline, marker registry, three-OS CI, `.gitattributes`.
+- [x] **WP2** LaTeX and encoding robustness.
+- [x] **WP3** no gap statements, correct tense ([ADR 0026](DECISIONS/0026-profile-grounded-tailoring.md)).
+- [x] **WP5** tailorable standalone projects and `standalone_projects_policy` ([ADR 0027](DECISIONS/0027-richer-profile-sections.md)).
+- [x] **WP6** richer optional sections (project metadata, publication/activity bullets, education highlights, structured certifications, optional roles).
+- [x] **WP7** heading orphan fix, PDF/DOCX/TXT parity, locale-free dates, letter timezone and `letter` preferences.
+- [x] **WP9** confirm-first suggested claims ([ADR 0028](DECISIONS/0028-confirm-first-suggested-claims.md)).
+- [x] **WP10** skills and numbers grounded in the profile; pipeline fingerprint in the cache key ([ADR 0029](DECISIONS/0029-pipeline-fingerprint-cache-key.md)).
+- [x] **WP11** generic, OS-neutral skill, docs and agent instructions.
+- [x] **WP12** setup and script hygiene, `start.py --status/--stop`, TeX Live discovery.
+- [x] **WP13** OpenRouter default, lazy `google-genai`, no implicit profile path, stale lock entries pruned.
+- [x] **Leftovers A** short months in the upload CV, CV file-name year in `CVTAILOR_TIMEZONE`, nested sub-bullets, custom-template compatibility, check marks, per-candidate `acronyms`.
+- [x] **Leftovers B** validator source in the cache key, UI **Dismiss selected**, the `generate` hint, bullets-key insertion, `applications check`, neutral curation-skill wording.
+- [ ] **Merge and verify:** merge PR #1 into `refactor/architecture-v2`; the original owner then pulls and runs the Windows handoff.
+
+## Next milestone: job-search redesign (open, [ADR 0030](DECISIONS/0030-job-search-redesign.md))
+
+Deferred on purpose: the current job search is not patched further. Write the design as a new
+ADR first. Requirements from the audit:
+
+- [ ] Per-profile job sources used by both the UI and the CLI (sample boards must not appear as real results); validate tenant and token strings.
+- [ ] Eligibility that respects `country_overrides` instead of treating `home_countries` as a filter, and shows excluded counts.
+- [ ] Country-less postings (Personio, some Arbeitnow and Greenhouse) inferred or marked uncertain, not silently dropped.
+- [ ] Rank before applying `limit`; one failing board must not abort its source; 429/Retry-After handling.
+- [ ] Language proficiency levels and an "English postings only" option.
+- [ ] Keyword modes (OR, phrase, title-only) and entry-level seniority (Werkstudent, Praktikum, Intern, Junior, Graduate; "lead" over-matches).
+- [ ] Hybrid vs onsite, Greenhouse descriptions, Lever company names, same-source duplicates, expiry reporting on filtered runs, `jobs search --profile`.
+- [ ] Document or design a compliant connector for Workday-based employers (most CROs and large medtech).
+
+**Also open:** localisation of UI labels (centralised, not yet translated), and the pipeline's
+work-authorization checks, which `applications check` does not cover.
+
 **CV layout follow-up (2026-11-18):** implemented deterministic readable typography
 and employer-boundary selection in the shared renderer, two-parser content checks,
 page-balance advisories and selected-layout provenance. Existing shortening applies

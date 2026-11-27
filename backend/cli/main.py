@@ -39,6 +39,8 @@ cvtailor -- tailor a CV and cover letter from the terminal
     cvtailor claims list --content <app>/source/content.json
                                         Numbered claims the model asks about
     cvtailor claims accept 1 3          Add TRUE ones to your private profile
+    cvtailor applications check         Re-check saved applications against the
+                                        current rules (free, offline)
 
   Discover jobs (Phase 4):
 

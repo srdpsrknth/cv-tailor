@@ -137,6 +137,44 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > [`ROADMAP.md`](ROADMAP.md) §Phase 3 and [`PROJECT_STATE.md`](PROJECT_STATE.md) §"Phase 3,
 > item 6".
 
+> **Architecture update (2026-11-27, multi-candidate cleanup, PR #1).** Current facts; older
+> statements below remain as the historical record.
+>
+> *New modules (under `backend/` unless noted):*
+> - `services/fact_checks.py` — gap-phrase, tense, skill-support and number-support validators (ADR 0026).
+> - `services/pipeline_fingerprint.py` — hash of the pipeline's own code and settings for the cache key (ADR 0029).
+> - `services/cv_structure.py` — structural checks on a tailored CV (which roles and standalone projects it contains), split out of `validation.py`.
+> - `services/suggested_claims.py` — validates, stores (`source/suggested_claims.json`) and leak-guards the model's suggestions (ADR 0028).
+> - `services/claim_acceptance.py` — accept / reject / dismiss, with timestamped backup, re-validation and rollback.
+> - `services/profile_text_edit.py` — comment-preserving targeted YAML insertion (bullets or skills), full-dump fallback with a warning.
+> - `services/application_check.py` — offline re-validation (and optional temporary re-render) of saved applications.
+> - `renderers/cv_sections.py` — one source of section titles ("Professional Experience"), fixed English short month names, en-dash ranges and "Present" for PDF, DOCX and TXT.
+> - `cli/commands/claims.py` and `cli/commands/applications.py` — `cvtailor claims list|accept|reject` and `cvtailor applications check [--render]`; `scripts/check_saved_applications.py` is the script form.
+> - `ui/claims_panel.py` — the review page's "Suggested claims" panel ("Add selected to my profile", "Dismiss selected").
+> - `backend/python_floor.py` — the Python 3.12 floor shared by `scripts/setup.py` and `doctor`.
+>
+> *Renderer parameters.* `LaTeXRenderer` (and its `render_cv_pdf`-style helpers) and `render_upload_cv`
+> take `timezone_name` (the CV file-name year) and `extra_acronyms` (the candidate's
+> `candidate_guidance.json` acronyms, kept upper case in skill headings). The DOCX renderer
+> takes `timezone_name` for the cover-letter date. Callers pass `config.timezone_name`; there
+> is no module-level state.
+>
+> *Cache key (supersedes the key described in the Phase 3 note below).* In addition to the
+> serialized profile, posting, schema, provider and routed models, the key now includes a
+> pipeline fingerprint: the prompt-building code and `EDITORIAL_REQUIREMENTS`, the layout
+> budget and attempt constants, the CV template bytes and the validation modules' source
+> (line endings normalised, so the key matches on Windows and macOS). Cache hits are still
+> re-validated. See ADR 0015 (amended) and ADR 0029.
+>
+> *Provider and profile loading.* The provider default is **openrouter**; `google-genai` is
+> imported lazily and is needed only for the optional Gemini provider (this supersedes
+> "keep Gemini's latest Flash as default" in §11 and the Gemini-first wording in older
+> sections). `profile_loader.load_profile()` requires an explicit path; there is no implicit
+> default profile.
+>
+> *Profile and output model.* New optional profile fields (ADR 0027) and the confirm-first
+> claims flow (ADR 0028) change no storage layout: all state stays in the private store.
+
 ---
 
 ## 1. What CV Tailor currently does
@@ -854,7 +892,7 @@ Full records in [`DECISIONS/`](DECISIONS/README.md). Summary of what was decided
 | **4** | **Storage** | **Approved** — files keyed by `profile_id`, **local first**, no database server; remote store later ([0004](DECISIONS/0004-storage.md)). |
 | **5** | **CLI framework** | **Approved** — `argparse` + a friendliness layer (guided default, interactive prompts, `doctor`, `--json`) ([0007](DECISIONS/0007-cli-framework.md)). |
 | **6** | **FastAPI + Streamlit** | **Approved** — keep both as thin adapters over the service layer; reassess at Phase 6. |
-| **7** | **LLM providers** | **Approved** — provider interface; **benchmark cost, performance and output quality before switching**; keep Gemini's latest Flash as default. |
+| **7** | **LLM providers** | **Approved** — provider interface; **benchmark cost, performance and output quality before switching**; keep Gemini's latest Flash as default. *(Historical: the default has since moved to OpenRouter; see the 2026-11-27 update at the top.)* |
 | **8** | **Job sources** | **Approved in principle** — ToS-compliant APIs researched first; scraping only if permitted and necessary; full scope determined at Phase 4. |
 | **9** | **`applications/` archive** | **Approved** — read-only reference until Phase 2, then migrate to the new schema. |
 

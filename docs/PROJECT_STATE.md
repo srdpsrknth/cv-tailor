@@ -1,6 +1,6 @@
 # Project state
 
-**Last updated:** 2026-11-27
+**Last updated:** 2026-11-27 (final documentation pass for PR #1)
 **Branch:** `refactor/architecture-v2` (integration branch for the multi-candidate cleanup: `arundhathi/backlog`)
 **Stable branch:** `master` at `1416177` — **usable for real applications**
 **Machines:** used on Windows and macOS; paths in older entries below refer to the original Windows development machine.
@@ -38,14 +38,44 @@ see the final count in docs/TESTING.md. CI now runs on Ubuntu, Windows and macOS
   `services/profile_text_edit.py`, with a timestamped backup and rollback. See
   `docs/HOW_TO_GENERATE.md`.
 
+- **Leftovers A:** the upload CV (DOCX/TXT) now uses the PDF's short month names ("Apr 2023");
+  the CV file-name year follows `CVTAILOR_TIMEZONE` (`LaTeXRenderer(timezone_name=...)`);
+  publication and activity detail bullets are nested second-level bullets in DOCX and TXT;
+  older custom templates without the `*_entries` keys still compile (headlines only); check marks
+  (U+2713/U+2714) print as `\checkmark`, with `amssymb` added to the shipped preambles; and
+  `candidate_guidance.json` v1 gained an optional `acronyms` list (render only, per candidate).
+- **Leftovers B:** the validation modules' source is part of the pipeline fingerprint (cache key);
+  the review panel has **Dismiss selected**; `generate` prints a hint when it stored suggestions;
+  claim acceptance inserts into an existing `bullets:` key safely; `cvtailor applications check
+  [--render]` and `scripts/check_saved_applications.py` re-validate saved applications offline;
+  curation-skill wording made neutral.
+- **ADRs 0026-0030** (all Proposed except 0030, Deferred) record the decisions: profile-grounded
+  tailoring, richer sections, confirm-first claims, the pipeline fingerprint, and the job-search
+  redesign. Docs: `HOW_TO_GENERATE.md`, the setup skill, the application skill, `ROADMAP.md`,
+  `ASSESSMENT.md`, `TESTING.md`, README and the setup guides were brought up to date.
+- **Verified baseline:** 1786 passed, 3 skipped on macOS with MacTeX (see `TESTING.md`).
+  Not yet run: the Windows verification in [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md).
+
 **Deferred:** the job-search feature is to be **redesigned** rather than patched. The audit findings
 (per-profile sources used by the UI, eligibility vs. `country_overrides`, country-less postings,
 limit before ranking, per-board failures, language level, keyword modes, entry-level seniority,
 `--profile` for `jobs search`) are requirements for that redesign.
 
-**Known follow-ups:** the upload CV uses full month names while the PDF uses short ones; validator
-source is not part of the cache key (cache hits are re-validated, so stricter rules still apply);
-per-candidate acronym lists have no hook yet.
+**Still open:**
+
+- The **job-search redesign** ([ADR 0030](DECISIONS/0030-job-search-redesign.md)): write the design
+  as a new ADR first; see the requirement list in `ROADMAP.md`.
+- **Localisation of UI labels:** labels and section titles are centralised (`renderers/cv_sections.py`
+  and the UI) but untranslated.
+- **Work-authorization checks:** the pipeline validates work-authorization wording during
+  generation, but `applications check` does not cover it.
+
+(Resolved in the leftovers: short months in the upload CV, validator source in the cache key,
+per-candidate acronyms.)
+
+**Next action:** merge PR #1 into `refactor/architecture-v2`; the original owner then pulls and
+runs [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md) on Windows (including
+`cvtailor --profile-id <id> applications check`).
 
 ## Earlier state (original development machine)
 

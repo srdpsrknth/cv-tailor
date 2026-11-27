@@ -60,6 +60,9 @@ Before delivering, confirm each item against the profile:
 6. Immigration/work-authorization wording appears only where the selected profile's rules and `country_overrides` establish it (see below).
 7. Manual edits, titles, dates and approved wording are preserved; only requested fields changed.
 8. Rendered pages inspected: no orphan headings, broken bullets, clipping or unresolved fields.
+9. Skills and numbers come from the profile, and spoken languages are not listed as skills (ADR 0026).
+10. Suggested claims (`source/suggested_claims.json`) are confirm-first: never render one, never edit the profile to match one, and accept a suggestion (`claims accept`, or the review page) only after the candidate confirms the statement is TRUE. Dismiss the rest (`claims reject`). Regenerate with `--no-cache` afterwards so confirmed claims can appear.
+11. For saved applications, run `python cvtailor.py --profile-id <profile_id> applications check [--render]` (offline, free, never writes; exit code 1 on any FAIL). A FAIL means the current validators would make the generator retry that draft.
 
 ## Work country and work authorization
 

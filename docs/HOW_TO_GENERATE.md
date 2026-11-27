@@ -191,8 +191,8 @@ markets and filters can return results.
 `.env` and defaults to UTC. To retain the former Berlin calendar for new application
 IDs and upload CV filenames, set `CVTAILOR_TIMEZONE=Europe/Berlin`. Existing IDs
 and files keep their names. Stored timestamps remain in UTC.
-The cover-letter date and filename year follow the same setting; without it the
-letter uses the machine's local date.
+The cover-letter date, and the year in the cover-letter and CV file names, follow the
+same setting; without it they use the machine's local date.
 
 **Cover-letter wording** is optional. A private profile can set its salutation and
 sign-off; `{company}` is the only placeholder. Omitted fields keep the defaults
@@ -296,7 +296,9 @@ activity per line in the private profile, or an object `{text, bullets}` to list
 supporting bullets under it. `text` (the citation) is always printed verbatim and
 never sent for rewording. The standard PDF, Word, and text
 exports use those entries directly. Empty lists produce no headings, and hidden
-sections keep their source entries in the profile.
+sections keep their source entries in the profile. Detail bullets appear as nested
+second-level bullets under the entry (Word "List Bullet 2", indented `-` in the text
+export), in the PDF and in the plain upload CV alike.
 
 ```yaml
 publications:
@@ -308,6 +310,13 @@ activities:
 cv_section_order: [education, publications, experience]
 cv_hidden_sections: [activities]
 ```
+
+**Check marks** (✓ U+2713 and ✔ U+2714) in profile text print as a check symbol in the
+PDF. The shipped CV and cover-letter templates load `amssymb` for this; a custom
+LaTeX template needs `\usepackage{amssymb}` in its preamble to render them (without it
+each mark prints as `?` rather than failing the compile). Older custom
+templates that lack the new `*_entries` template keys keep working and print the
+publication and activity headlines only, without bullets.
 
 For an LLM-guided setup from scratch or from a résumé PDF or Word document, ask
 your coding assistant to follow `skills/cv-tailor-setup/SKILL.md` in the checkout.
@@ -486,9 +495,12 @@ into both the DOCX and PDF headers so the document carries the current submissio
 ## Confirm-first suggestions
 
 Early in a career, true experience is often not written in the posting's vocabulary. The
-CV draft may therefore return up to eight **suggested claims**: questions such as "did you
-apply inclusion/exclusion criteria to define eligible cohorts?", each tied to a profile
-entry it plausibly extends. They are saved beside the application as
+CV draft may therefore return up to eight **suggested claims**: short past-tense
+statements about closely related work, such as "Applied inclusion and exclusion criteria
+to define eligible cohorts", each tied to a profile entry it plausibly extends. They are
+statements for you to confirm or refuse, not questions, and not CV content. When a run
+stores any, `generate` prints a hint such as `3 suggested claims to review: cvtailor
+--profile-id <id> claims list --content ".../source/content.json"`. They are saved beside the application as
 `source/suggested_claims.json`, are **never** rendered, and cannot reach a document: the
 CV is rejected and redrafted if it uses a suggestion's wording that the profile does not
 already contain. Suggestions pointing at a profile entry that does not exist are dropped
@@ -518,10 +530,75 @@ comments) and say so in a warning. The accepted or rejected state is recorded in
 application.
 
 In the web interface, the saved application's page has a **Suggested claims (confirm only
-what is true)** panel with checkboxes, an **Add selected to my profile** button and an
-explicit confirmation step. Either way the existing documents do not change: **regenerate
+what is true)** panel with checkboxes, an **Add selected to my profile** button (with an
+explicit confirmation step) and a **Dismiss selected** button, which marks the chosen
+suggestions as not wanted and never changes your profile (the same as `claims reject`). Either way the existing documents do not change: **regenerate
 the application** (for example `generate --job-file <...>/source/job_description.txt
 --no-cache`) so the confirmed claims can appear in a new CV.
+
+---
+
+## Writing rules the generator enforces
+
+These are checked on every draft, and a violation triggers the automatic retry
+([ADR 0026](DECISIONS/0026-profile-grounded-tailoring.md)):
+
+- **No gap statements.** The documents never say that a requirement, qualification or
+  language is missing ("no direct X experience", "limited experience", "although I lack").
+  Unmatched requirements are simply left out.
+- **Tense follows the profile.** A role that has ended is not described as current.
+- **Skills come from the profile.** A skill must match a profile skill, technology or
+  language, and spoken languages are not listed as skills. Retries cannot add skill categories.
+- **Numbers come from the profile.** Every figure in the summary and bullets must already
+  appear in your profile facts; metrics are never required.
+
+## Candidate guidance (optional)
+
+`<store>/profiles/<profile_id>/candidate_guidance.json` holds drafting constraints that are
+not facts, kept private and loaded only for that candidate. Version 1; unknown keys are
+rejected, and an invalid file stops generation instead of being ignored:
+
+```json
+{
+  "version": 1,
+  "cv": ["Describe the thesis project as completed."],
+  "cover_letter": ["Do not mention language level unless the posting asks for it."],
+  "layout": ["When shortening, keep the two most recent roles intact."],
+  "acronyms": ["FHIR", "CDISC"]
+}
+```
+
+- `cv`, `cover_letter` and `layout` are lists of up to 20 short instructions (2000
+  characters each). Each list **is** added to the matching model call (CV draft, letter
+  draft, layout retry), and changing them changes the cache key. Facts and country rules
+  still take precedence. Never put gaps or missing qualifications here as text for the
+  documents.
+- `acronyms` (optional) is a list of up to 100 single words, at most 32 characters each,
+  that keep their upper case in skill headings when the renderer title-cases them (for
+  example `FHIR`). It affects rendering only, per candidate, with no global state.
+
+See [ADR 0023](DECISIONS/0023-private-writing-voice.md).
+
+## Checking saved applications against the current rules
+
+After pulling a new version, or after editing a profile, re-check every saved application
+of one candidate for free. This runs offline: no network, no model, and it never writes to
+the store.
+
+```bash
+python cvtailor.py --profile-id sample-analyst applications check
+python cvtailor.py --profile-id sample-analyst applications check --render
+# the same check as a script
+python scripts/check_saved_applications.py --profile-id sample-analyst [--store <store>] [--render]
+```
+
+Each application prints `PASS` or `FAIL` with messages, and the command exits with code 1 if
+any application fails. A FAIL on an older application means today's validators would make
+the generator retry that draft (for example a gap phrase or an unsupported number); the saved
+documents are untouched, so decide whether to edit `source/content.json` and re-render, or
+regenerate. `--render` also re-renders each application into a temporary folder and reports
+the CV and cover-letter page counts (needs the PDF engine). The check does not cover the
+pipeline's work-authorization wording checks.
 
 ---
 
@@ -600,7 +677,11 @@ title. Open the preview or run PDF checks when you need them. Other downloads in
 Word and autofill files. To build missing autofill files for an older run, use
 **Create / refresh CV for autofill**. It uses the saved editable text and profile
 snapshot without a model call. For portals like Workday, try the plain `_upload.docx`
-when accepted and verify the extracted form fields.
+when accepted and verify the extracted form fields. The upload CV (DOCX and TXT) uses the
+same headings and dates as the PDF: the section is titled **Professional Experience**,
+months are short (`Apr 2023`), ranges use an en dash (`Apr 2023 – Present`), "Present"
+marks ongoing roles, and publication and activity detail bullets are nested
+sub-bullets.
 
 Open **Details** for the original posting, saved profile comparisons, the model's
 explanation and run history. The run history distinguishes requested models from
@@ -740,6 +821,10 @@ python cvtailor.py --profile-id <profile_id> jobs search --keywords "data engine
 
 # Revise (free)
 python cvtailor.py --profile-id <profile_id> render --content <store>/outputs/<profile_id>/<job_id>/source/content.json
+
+# Review suggested claims, then check saved applications (both free, offline)
+python cvtailor.py --profile-id <profile_id> claims list --content <store>/outputs/<profile_id>/<job_id>/source/content.json
+python cvtailor.py --profile-id <profile_id> applications check
 
 # Help
 python cvtailor.py                  # guided menu

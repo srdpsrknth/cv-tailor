@@ -91,6 +91,12 @@ appear in a dialog; logs are `.runtime/logs/gui.stdout.log` and `gui.stderr.log`
 Run the installer again after moving the checkout. The shortcuts contain local
 paths; they are installed on the machine, never committed.
 
+The shortcuts are a Windows convenience. The cross-platform alternative, from a terminal
+in the checkout, is `.venv\Scripts\python.exe scripts/start.py` to start,
+`.venv\Scripts\python.exe scripts/start.py --status` to see what it started, and
+`.venv\Scripts\python.exe scripts/start.py --stop` to stop it (`.venv/bin/python` on macOS and
+Linux). It starts the API as well as the UI and prints both URLs.
+
 For terminal diagnostics without opening the browser:
 
 ```powershell
@@ -125,6 +131,17 @@ python3.12 scripts/setup.py
 
 `scripts/setup.py` never overwrites an existing `.env`. Never copy a `.venv` between
 operating systems, and never commit one.
+
+**After pulling a new version**, re-run setup if the lock file changed, then re-check the
+saved applications for free (offline, no model call, never writes to the store; exit code 1
+on any FAIL):
+
+```bash
+python cvtailor.py --profile-id <profile_id> applications check [--render]
+```
+
+See [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md#checking-saved-applications-against-the-current-rules)
+and, for the PR #1 pull, [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md).
 
 ### The private profile store
 

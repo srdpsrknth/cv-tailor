@@ -8,6 +8,17 @@ shared service layer.
 **Using it:** read [docs/HOW_TO_GENERATE.md](docs/HOW_TO_GENERATE.md) — a walkthrough for
 Windows and macOS, covering generation, free revision and job search.
 
+**Highlights:** profile-grounded tailoring (no invented skills or numbers, no stated gaps),
+**confirm-first suggested claims** (the model may propose statements; only ones you confirm as
+true enter your profile, via `cvtailor claims` or the review page), richer CV sections
+(tailorable standalone projects, project dates and technologies, publications and activities
+with bullets, education highlights, structured certifications), and a free offline
+`cvtailor applications check` that re-validates saved applications against the current rules.
+
+**Verifying a pull:** after pulling a new version, run `cvtailor --profile-id <id> applications
+check`; for the multi-candidate cleanup (PR #1) follow
+[docs/HANDOFF-PR1-VERIFY.md](docs/HANDOFF-PR1-VERIFY.md).
+
 **Fresh Mac setup:** read [docs/MAC_SETUP.md](docs/MAC_SETUP.md). The assisting LLM should
 read [AGENTS.md](AGENTS.md) and the
 [application skill](.agents/skills/cv-tailor-application/SKILL.md).

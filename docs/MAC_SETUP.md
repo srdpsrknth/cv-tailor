@@ -131,6 +131,14 @@ the local compiler. Run these first; if they work, the installation is sound:
 That render step is the real LaTeX test: it exercises the templates, the compiler and
 the page-count gate without spending anything.
 
+After pulling a new version, also run the free post-pull check. It re-validates every saved
+application against the current rules, offline, never writes to the store, and exits with
+code 1 on any FAIL (add `--render` to re-render into a temporary folder and report page counts):
+
+```bash
+.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" applications check
+```
+
 ## Validate rendering before spending API tokens
 
 Prove the whole render path (templates, LaTeX, DOCX) on your Mac without an API key or any spend. Use either your own profile or the synthetic sample that ships with the tests.
