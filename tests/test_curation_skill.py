@@ -98,7 +98,7 @@ def test_it_says_the_cap_is_per_run_and_not_to_be_raised_unilaterally(skill_text
     lowered = skill_text.lower()
 
     assert "per run" in lowered
-    assert "do not raise it" in lowered or "owner's decision" in lowered
+    assert "do not raise it" in lowered or "maintainer's decision" in lowered
 
 
 def test_it_does_not_instruct_an_agent_to_switch_the_default(skill_text):
@@ -113,7 +113,7 @@ def test_it_does_not_instruct_an_agent_to_switch_the_default(skill_text):
     assert "never switch the default autonomously" in lowered
     # And the switch is still described as a thing a person does, so the file is not
     # simply silent about it.
-    assert "owner's call" in lowered or "owner's decision" in lowered
+    assert "maintainer's call" in lowered or "maintainer's decision" in lowered
 
 
 def test_it_says_the_report_applies_nothing(skill_text):

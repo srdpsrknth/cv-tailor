@@ -5,7 +5,8 @@ hand-maintained profile that way is destructive. These helpers instead locate a 
 PyYAML's composer (which records line and column marks) and insert one line of text, so
 every other byte of the file is untouched.
 
-Only shapes this module understands are edited: block sequences of single-line scalars,
+Only shapes this module understands are edited: a missing list key (for example an entry
+without ``bullets:``) added after the entry's last key, block sequences of single-line scalars,
 single-line flow sequences, an empty ``[]``, and a new key at the end of a block mapping.
 Anything else raises :class:`Unsupported`, and the caller decides on a fallback. The
 caller is also expected to verify the result by reloading it; nothing here is trusted
@@ -115,9 +116,37 @@ def _join(lines: list[str]) -> str:
     return "\n".join(lines)
 
 
+def _insert_missing_list(text: str, mapping: MappingNode, key: str, value: str) -> str:
+    """Add ``key:`` with one item after the last line of a block mapping that lacks it.
+
+    This is the case of an experience entry or project with no ``bullets:`` yet. The new
+    key is aligned with the mapping's other keys (also inside a ``- company: X`` list item).
+    """
+    if mapping.flow_style or not mapping.value:
+        raise Unsupported("target is not a non-empty block mapping")
+    lines = text.split("\n")
+    cr = "\r" if lines and lines[0].endswith("\r") else ""
+    first_key = mapping.value[0][0]
+    indent = " " * first_key.start_mark.column
+    if any(k.start_mark.column != first_key.start_mark.column for k, _ in mapping.value):
+        raise Unsupported("inconsistent key indentation")
+    last = _last_line(mapping)
+    lines[last + 1:last + 1] = [
+        f"{indent}{render_scalar(key, None)}:{cr}",
+        f"{indent}  - {render_scalar(value, None)}{cr}",
+    ]
+    return _join(lines)
+
+
 def insert_list_item(text: str, path: Sequence[PathPart], value: str) -> str:
     """Append ``value`` to the list at ``path``, touching nothing else."""
     root = _compose(text)
+    if path and isinstance(path[-1], str):
+        _, parent = _locate(root, path[:-1])
+        if isinstance(parent, MappingNode) and not any(
+            isinstance(k, ScalarNode) and k.value == path[-1] for k, _ in parent.value
+        ):
+            return _insert_missing_list(text, parent, path[-1], value)
     key, seq = _locate(root, path)
     if not isinstance(seq, SequenceNode):
         raise Unsupported("target is not a list")

@@ -10,7 +10,7 @@ curation took a full session. The procedure is here; the tooling is
 `python -m evaluation`, which is offline by default and **cannot spend without an explicit
 `--live` and a cap**.
 
-**The owner's requirement has always been that the tool MAKES the model decision** rather
+**The project maintainer's requirement has always been that the tool MAKES the model decision** rather
 than offering a catalogue. So this is not a menu to widen: it is a measurement that ends in
 one model.
 
@@ -23,10 +23,10 @@ detect  →  screen  →  SHOW THE PLAN  →  ask  →  live run  →  packet  �
 
 The two `HUMAN` steps are not advisory. `evaluation` measures **acceptance, cost and
 correction calls** and nothing else — no prose, no rendering, no layout (ADR 0014). A
-candidate with no verdict from the owner is reported as ineligible *for that reason*, and
+candidate with no verdict from the user running the curation is reported as ineligible *for that reason*, and
 that is enforced in `evaluation/curation_diff.py`, not by convention.
 
-**Never run `--live` without asking the owner in the current conversation and showing them
+**Never run `--live` without asking the user running the curation in the current conversation and showing them
 the dry run's projection.** The cap protects against an overrun, not against a wrong plan.
 
 ## Step 0 — confirm the start state
@@ -68,11 +68,11 @@ re-curation. Do not run a study to confirm that nothing moved.
 ```
 
 Read the **rejections**, not only the slate. Every rejection carries the rule and the value
-that failed, and the owner reviews *those*: "8 of 267, and here are the 259 I dropped". Note
+that failed, and the user running the curation reviews *those*: "8 of 267, and here are the 259 I dropped". Note
 `not-shortlisted` is a shortlisting decision and **not** a defect — it does not mean the
 model is bad.
 
-Then **stop and show the owner**: the proposed slate, the run's projected cost, and the
+Then **stop and show the user running the curation**: the proposed slate, the run's projected cost, and the
 notable rejections. Ask for their go-ahead before anything else.
 
 ## Step 3 — add the slate to the study, then run it (PAID)
@@ -105,7 +105,7 @@ Remove-Item -Recurse -Force .tmp\evaluation-store
 ```
 
 The cap is **per run**, defaults to $5, and is re-checked before every call. Do not raise it
-on your own initiative; a raise is the owner's decision. An over-budget projection is
+on your own initiative; a raise is the project maintainer's decision. An over-budget projection is
 refused before the first call.
 
 ## Step 4 — the reading packet (free)
@@ -116,20 +116,20 @@ refused before the first call.
 .\.venv\Scripts\python.exe -m evaluation --packet .tmp\ranking.json
 ```
 
-Hand the owner the packet path and `VERDICTS.md`. **Do not fill the verdicts in yourself
+Hand the user running the curation the packet path and `VERDICTS.md`. **Do not fill the verdicts in yourself
 and do not ask leading questions about them.** The four questions are already in the file,
 and free-form prose is the expected answer.
 
 ## Step 5 — the proposal (free, and it writes nothing)
 
-After the owner has written their verdicts, merge them into the run's scores and report:
+After the user running the curation has written their verdicts, merge them into the run's scores and report:
 
 ```powershell
 .\.venv\Scripts\python.exe -m evaluation --report .tmp\scores_with_verdicts.json
 ```
 
-The disqualifiers are the owner's settled three: **acceptance below 2/3**, **accepted
-nothing**, and **no owner verdict**. Correction calls are recorded and are *not*
+The disqualifiers are the project maintainer's settled three: **acceptance below 2/3**, **accepted
+nothing**, and **no user verdict**. Correction calls are recorded and are *not*
 disqualifying — a model that needs them is neither cheap nor out, merely more expensive.
 
 **"Keep the current model" is a real and common outcome.** Report it as such.
@@ -142,7 +142,7 @@ disqualifying — a model that needs them is neither cheap nor out, merely more 
    from the run.
 2. Updating the price row and `PRICE_SOURCES` if the winner's route differs.
 3. Setting `cost_per_accepted` and `measured_notes` from the run.
-4. **`verified="measured"` only once the owner's verdict exists** — the marker licenses a
+4. **`verified="measured"` only once the user's verdict exists** — the marker licenses a
    quality claim, and the suite measures none. A test fails on purpose if it is set
    without that judgement.
 5. Updating `DEFAULT_MODEL` in `backend/config.py` **and** `backend/services/pricing.py`,
@@ -150,11 +150,11 @@ disqualifying — a model that needs them is neither cheap nor out, merely more 
 6. One commit, with the measurement recorded. `e53ef8a` is the precedent.
 
 **Never switch the default autonomously.** It changes what every future application is
-generated with, and it is the owner's call.
+generated with, and it is the project maintainer's call.
 
 ## Hard rules
 
-- **`--live` needs the owner's explicit yes in the current conversation**, with the
+- **`--live` needs the user's explicit yes in the current conversation**, with the
   projection shown first. No exceptions, including "the cap is small".
 - **The acceptance bar is identical for every candidate.** Only the *asking* may vary
   (ADR 0016). Editing a profile, a posting, the validation rules or the word-count gate to

@@ -654,3 +654,10 @@ def accept_claims(config, profile_id, job_id, numbers):
         _claims_content(config, profile_id, job_id), config.store.profile_path(profile_id),
         list(numbers), expected_profile_id=profile_id,
     )
+
+
+def reject_claims(config, profile_id, job_id, numbers):
+    """Record the selected suggestions as rejected. The profile is not touched."""
+    from services.claim_acceptance import reject_suggestions
+
+    return reject_suggestions(_claims_content(config, profile_id, job_id), list(numbers))

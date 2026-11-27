@@ -40,6 +40,23 @@ def _accept(config, profile_id, job_id, prefix):
     )
 
 
+def _dismiss(config, profile_id, job_id, prefix, numbers):
+    """Button callback: mark the ticked suggestions rejected. The profile is never touched."""
+    chosen = [n for n in numbers if st.session_state.get(f"{prefix}_claim_{n}")]
+    if not chosen:
+        return
+    try:
+        done = bridge.reject_claims(config, profile_id, job_id, chosen)
+    except ValueError as error:
+        st.session_state[f"{prefix}_claims_error"] = str(error)
+        return
+    for number in chosen:
+        st.session_state.pop(f"{prefix}_claim_{number}", None)
+    st.session_state[f"{prefix}_claims_done"] = (
+        f"Dismissed {len(done)} suggestion(s). Your profile was not changed."
+    )
+
+
 def render_claims_panel(config, profile_id, job_id, prefix):
     """List the model's questions; add the ones the candidate confirms to the profile.
 
@@ -84,11 +101,21 @@ def render_claims_panel(config, profile_id, job_id, prefix):
 
         if not confirming:
             chosen = [i["number"] for i in pending if st.session_state.get(f"{prefix}_claim_{i['number']}")]
-            st.button(
-                "Add selected to my profile", key=f"{prefix}_claims_add",
-                disabled=not chosen, on_click=_begin_confirmation,
-                args=(prefix, [i["number"] for i in pending]),
-            )
+            numbers = [i["number"] for i in pending]
+            add_column, dismiss_column = st.columns(2)
+            with add_column:
+                st.button(
+                    "Add selected to my profile", key=f"{prefix}_claims_add",
+                    disabled=not chosen, on_click=_begin_confirmation,
+                    args=(prefix, numbers),
+                )
+            with dismiss_column:
+                st.button(
+                    "Dismiss selected", key=f"{prefix}_claims_dismiss",
+                    disabled=not chosen, on_click=_dismiss,
+                    args=(config, profile_id, job_id, prefix, numbers),
+                    help="Marks the ticked suggestions as not true. Your profile is not changed.",
+                )
             return
 
         try:

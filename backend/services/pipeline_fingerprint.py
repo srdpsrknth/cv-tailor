@@ -8,7 +8,9 @@ document that is accepted, and were missing, so editing them served stale drafts
 * the wording built in code -- the context block, the CV prompt and the layout-retry brief;
 * the layout budget and retry limits (``LAYOUT_BUDGET_*``, ``MAX_*_ATTEMPTS``), which decide
   how hard a long CV is shortened;
-* the CV template, whose rendered length decides whether a draft passes the page gate.
+* the CV template, whose rendered length decides whether a draft passes the page gate;
+* the source of the validators (validation, fact_checks, cv_structure and the suggested-claims
+  leak guard), which decide whether a draft is accepted.
 
 Like the prompt files these are hashed at call time rather than tracked by a version
 constant a change could forget to bump. Everything is normalised so the digest is the same
@@ -52,7 +54,7 @@ def _source(obj) -> str:
 
 def pipeline_fingerprint(template_path: Optional[Path] = None) -> str:
     """One digest of the editorial text, prompt-building code, budgets and CV template."""
-    from services import pipeline, prompts
+    from services import cv_structure, fact_checks, pipeline, prompts, suggested_claims, validation
 
     wording = [
         prompts.build_context,
@@ -64,6 +66,15 @@ def pipeline_fingerprint(template_path: Optional[Path] = None) -> str:
         prompts.pinned_project_clause,
         prompts.layout_budget,
         prompts.cv_body_words,
+    ]
+    leak_guard = [
+        suggested_claims._norm,
+        suggested_claims._fold,
+        suggested_claims._profile_lines,
+        suggested_claims._cv_lines,
+        suggested_claims._similar,
+        suggested_claims.claim_texts,
+        suggested_claims.reject_suggestion_leak,
     ]
     payload = {
         "editorial_requirements": _lf(prompts.EDITORIAL_REQUIREMENTS),
@@ -77,6 +88,10 @@ def pipeline_fingerprint(template_path: Optional[Path] = None) -> str:
             "MAX_VALIDATION_ATTEMPTS": pipeline.MAX_VALIDATION_ATTEMPTS,
         },
         "template": template_digest(template_path),
+        # Tightening a validator changes which drafts are accepted, so cached drafts
+        # accepted by the old rules must not be served.
+        "validators": [_source(module) for module in (validation, fact_checks, cv_structure)]
+        + [_source(fn) for fn in leak_guard],
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")

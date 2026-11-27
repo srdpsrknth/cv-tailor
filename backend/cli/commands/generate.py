@@ -49,6 +49,29 @@ def read_job_description(args, console: Console) -> str:
     return sys.stdin.read()
 
 
+def _suggestion_hint(result, profile_id, console: Console) -> None:
+    """Point at ``claims list`` when the run stored confirm-first suggestions (never raises)."""
+    try:
+        from services.suggested_claims import load_suggestions
+
+        content = Path(result.source_path)
+        pending = [
+            item for item in load_suggestions(content)["suggestions"]
+            if item.get("status", "pending") == "pending"
+        ]
+    except Exception:  # noqa: BLE001 -- a hint must never fail a finished generation
+        return
+    if not pending:
+        return
+    count = len(pending)
+    noun = "suggested claim" if count == 1 else "suggested claims"
+    console.out("")
+    console.out(
+        f'{count} {noun} to review: cvtailor --profile-id {profile_id or "<id>"} '
+        f'claims list --content "{content}"'
+    )
+
+
 def run(args, console: Console, config) -> int:
     from services.profile_store import (  # noqa: F401
         InvalidProfileIdError,
@@ -177,6 +200,7 @@ def run(args, console: Console, config) -> int:
         if strategy:
             console.out("")
             console.out(f"  Strategy: {strategy}")
+    _suggestion_hint(result, profile_id, console)
     console.out("")
     console.out(
         f'Revise the text in {result.source_path}, then: cvtailor render --content "{result.source_path}"'

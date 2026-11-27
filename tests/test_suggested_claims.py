@@ -459,3 +459,69 @@ def test_question_shaped_suggestions_are_dropped():
     assert _is_question("Coordinated study visits?")
     assert not _is_question("Coordinated study visits with site staff.")
     assert not _is_question("Documented requirements; have results been shared")
+
+
+# --- a missing ``bullets:`` key ----------------------------------------------------------
+
+NO_BULLETS = '''version: "1.0"
+# top comment
+experience:
+  - company: "Acme"   # keep me
+    role: "Analyst"
+    start_date: "2020-01"
+    selected_projects:
+      - name: "Proj"   # project comment
+        description: "A project"   # trailing
+      # a comment between entries
+      - name: "Other"
+        bullets:
+          - Plain bullet
+  - company: "Beta"
+    role: "Engineer"
+standalone_projects:
+  - name: "Solo"
+    tools:
+      - dbt
+      - SQL
+skills:
+  core: ["SQL"]
+'''
+
+
+@pytest.mark.parametrize("path, expected", [
+    (("experience", 0, "bullets"), ("experience", 0, "bullets")),
+    (("experience", 0, "selected_projects", 0, "bullets"), ("experience", 0, "selected_projects", 0, "bullets")),
+    (("experience", 1, "bullets"), ("experience", 1, "bullets")),
+    (("standalone_projects", 0, "bullets"), ("standalone_projects", 0, "bullets")),
+])
+def test_a_missing_bullets_key_is_inserted_in_place_and_comments_survive(path, expected):
+    edited = insert_list_item(NO_BULLETS, path, "New: bullet.")
+    data = yaml.safe_load(edited)
+    node = data
+    for part in expected:
+        node = node[part] if part != "bullets" else node.get("bullets")
+    assert node == ["New: bullet."]
+    for comment in ("# top comment", "# keep me", "# project comment", "# trailing",
+                    "# a comment between entries"):
+        assert comment in edited
+    # Only the two new lines were added; everything else is byte-identical.
+    before, after = NO_BULLETS.split("\n"), edited.split("\n")
+    assert len(after) == len(before) + 2
+    assert [line for line in after if line not in before] == [
+        line for line in after if "bullets:" in line and line not in before
+        or "New: bullet" in line
+    ]
+
+
+def test_the_new_key_is_aligned_with_its_siblings():
+    edited = insert_list_item(NO_BULLETS, ("experience", 0, "selected_projects", 0, "bullets"), "X")
+    assert '        description: "A project"   # trailing\n        bullets:\n          - X\n' in edited
+    edited = insert_list_item(NO_BULLETS, ("experience", 1, "bullets"), "X")
+    assert '    role: "Engineer"\n    bullets:\n      - X\nstandalone_projects:' in edited
+
+
+def test_a_missing_key_after_a_block_scalar_is_still_refused():
+    text = 'experience:\n  - company: "A"\n    summary: |\n      Long\n      text\n'
+    with pytest.raises(Unsupported):
+        insert_list_item(text, ("experience", 0, "bullets"), "x")
+

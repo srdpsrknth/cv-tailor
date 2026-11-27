@@ -751,3 +751,28 @@ def test_confirming_adds_only_the_selected_claim_to_the_profile_with_a_backup(wo
     # The accepted claim is no longer offered again.
     assert f"{prefix}_claim_1" not in [c.key for c in at.checkbox]
     assert f"{prefix}_claim_2" in [c.key for c in at.checkbox]
+
+
+def test_dismissing_selected_claims_records_them_rejected_without_touching_the_profile(workspace):
+    from services import suggested_claims
+
+    job = save_review(workspace)
+    save_claims(workspace, job)
+    prefix = f"review_analyst_a_{job}"
+    before = profile_file(workspace).read_bytes()
+    at = open_saved_application(selected_app(), job)
+
+    assert at.button(key=f"{prefix}_claims_dismiss").disabled
+    at.checkbox(key=f"{prefix}_claim_1").check().run()
+    at.button(key=f"{prefix}_claims_dismiss").click().run()
+    assert not at.exception
+
+    assert profile_file(workspace).read_bytes() == before
+    assert not list(profile_file(workspace).parent.glob("profile.backup-*.yaml"))
+    saved = suggested_claims.load_suggestions(
+        workspace / "outputs" / "analyst_a" / job / "source" / "content.json"
+    )
+    assert [s["status"] for s in saved["suggestions"]] == ["rejected", "pending"]
+    assert any("Dismissed 1 suggestion" in s.value for s in at.success)
+    assert f"{prefix}_claim_1" not in [c.key for c in at.checkbox]
+    assert f"{prefix}_claim_2" in [c.key for c in at.checkbox]

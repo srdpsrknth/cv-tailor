@@ -161,8 +161,24 @@ def build_parser() -> argparse.ArgumentParser:
     claims_reject.add_argument("numbers", nargs="+", type=int, metavar="<number>")
     claims_reject.add_argument("--content", type=str, help=content_help)
 
+    # --- applications -----------------------------------------------------------------
+    applications = subparsers.add_parser(
+        "applications", help="Check saved applications. Offline: no API calls, no writes."
+    )
+    applications_sub = applications.add_subparsers(dest="applications_action", metavar="<action>")
+    applications_check = applications_sub.add_parser(
+        "check",
+        help="Re-validate every saved application with the current rules (PASS/FAIL each).",
+        description="Runs the current CV and cover-letter validators over every saved "
+                    "<store>/outputs/<id>/<job>/source/content.json. Exits non-zero if any "
+                    "fails. Never calls the network or an LLM and never modifies the store.",
+    )
+    applications_check.add_argument(
+        "--render", action="store_true",
+        help="Also re-render each application into a temporary folder and report page counts.")
+
     # --- jobs (Phase 4) ---------------------------------------------------------------
-    jobs = subparsers.add_parser(
+    jobs =subparsers.add_parser(
         "jobs", help="Discover and rank postings. Free: no API key, no LLM call."
     )
     jobs_sub = jobs.add_subparsers(dest="jobs_action", metavar="<action>")
@@ -210,6 +226,9 @@ def _dispatch(args, console: Console, config) -> int:
     if command == "claims":
         from cli.commands import claims
         return claims.run(args, console, config)
+    if command == "applications":
+        from cli.commands import applications
+        return applications.run(args, console, config)
     if command == "jobs":
         from cli.commands import jobs
         return jobs.run(args, console, config)

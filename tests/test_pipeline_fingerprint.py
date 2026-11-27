@@ -101,3 +101,38 @@ def test_a_missing_template_does_not_raise(tmp_path):
 
 def test_the_service_passes_the_fingerprint_to_the_key():
     assert "pipeline_version=pipeline_fingerprint()" in inspect.getsource(tailor_service)
+
+
+@pytest.mark.parametrize("module_name", ["validation", "fact_checks", "cv_structure"])
+def test_changing_a_validator_module_changes_the_key(monkeypatch, module_name):
+    import services
+
+    module = getattr(services, module_name)
+    before = key_now()
+    real = inspect.getsource
+
+    def patched(obj):
+        text = real(obj)
+        return text + "\n# a stricter rule\n" if obj is module else text
+
+    monkeypatch.setattr(inspect, "getsource", patched)
+    assert key_now() != before
+
+
+def test_changing_the_leak_guard_changes_the_key(monkeypatch):
+    from services import suggested_claims
+
+    before = key_now()
+
+    def reject_suggestion_leak(cv, texts, profile):  # a different guard
+        return None
+
+    monkeypatch.setattr(suggested_claims, "reject_suggestion_leak", reject_suggestion_leak)
+    assert key_now() != before
+
+
+def test_validator_source_line_endings_do_not_change_the_key(monkeypatch):
+    before = key_now()
+    real = inspect.getsource
+    monkeypatch.setattr(inspect, "getsource", lambda obj: real(obj).replace("\n", "\r\n"))
+    assert key_now() == before

@@ -130,3 +130,30 @@ def test_the_help_tells_the_user_to_accept_only_true_statements(capsys):
     with pytest.raises(SystemExit):
         parser.parse_args(["claims", "--help"])
     assert "TRUE" in capsys.readouterr().out
+
+
+def test_generate_hints_at_stored_suggestions(store, monkeypatch, capsys):
+    from types import SimpleNamespace
+    from services import tailor_service
+
+    content = store / "outputs" / "analyst_a" / "job1" / "source" / "content.json"
+    result = SimpleNamespace(
+        job_id="job1", cv_page_count=2, cover_letter_page_count=1, cv_path="cv.pdf",
+        cover_letter_path="cl.pdf", cl_pdf_path=None, source_path=str(content),
+        tailoring_explanation=None,
+        token_usage=SimpleNamespace(total_tokens=10, cv_attempts=1, cl_attempts=1,
+                                    estimated_cost_usd=0.0),
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("CVTAILOR_PROVIDER", "gemini")
+    monkeypatch.setattr(tailor_service, "tailor_documents", lambda **kw: result)
+
+    assert main(["--profile-id", "analyst_a", "generate", "--job", "x" * 200]) == 0
+    out = capsys.readouterr().out
+    assert "2 suggested claims to review: cvtailor --profile-id analyst_a claims list --content" in out
+    assert str(content) in out
+
+    # No suggestions file -> no hint.
+    (content.parent / claims.SUGGESTIONS_FILENAME).unlink()
+    assert main(["--profile-id", "analyst_a", "generate", "--job", "x" * 200]) == 0
+    assert "suggested claim" not in capsys.readouterr().out
