@@ -26,17 +26,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_CV_PATH = PROJECT_ROOT / "backend/prompts/tailor_cv_prompt.md"
 PROMPT_CL_PATH = PROJECT_ROOT / "backend/prompts/tailor_cl_prompt.md"
 
-#: Target CV body length after each failed layout attempt, in words.
-#:
-#: "Body words" has ONE definition, :func:`cv_body_words`: the summary plus the bullets
-#: directly under each role (``exp.bullets``). Project bullets, skills, education and
-#: certifications are not counted. ``tailor_cv_prompt.md`` states its 650-750 guide in the
-#: same terms and the retry brief quotes the same measure, so the draft prompt, the
-#: layout budget and the inventory line all count words the same way. Change the
-#: definition here and in that prompt together.
-LAYOUT_BUDGET_START = 650
-LAYOUT_BUDGET_STEP = 100
-LAYOUT_BUDGET_FLOOR = 400
+#: Suggested reduction in visible, editable CV prose each time the PDF overflows.
+LAYOUT_REDUCTION_PERCENT = 10
 
 
 def build_context(
@@ -152,17 +143,21 @@ def build_cv_prompt(prompt_text: str, context: str) -> str:
     """
     return prompt_text + EDITORIAL_REQUIREMENTS + context
 
-def layout_correction_instruction(page_count: int, budget: int, rules: ProfileRules) -> str:
+def layout_correction_instruction(page_count: int, budget: Optional[int], rules: ProfileRules) -> str:
     """The shortening rules for one layout retry, without a heading.
 
     The heading comes from :func:`layout_retry_instruction`, which is the only caller:
     a retry is no longer a whole-document ``LAYOUT CORRECTION``, and keeping that label
     here would put two names on the same brief.
     """
+    target = (
+        f"Aim for approximately {budget} editable prose words or fewer. "
+        if budget is not None else
+        "There is no visible editable prose to shorten. "
+    )
     return (
-        f"The current CV rendered to {page_count} pages. "
-        f"Reduce its body text to approximately {budget} words or fewer. "
-        "Prioritize concise responsibilities; reduce repetitive bullets and less relevant project detail. "
+        f"The current CV rendered to {page_count} pages. " + target +
+        "Shorten wording first, then cut repeated wording and lower-priority supporting detail. "
         "Keep all employers and exact dates, education and core skills."
         + pinned_project_clause(rules) +
         " Do not change facts, shrink the font, or turn ongoing work into completed work."
@@ -189,24 +184,38 @@ def pinned_project_clause(rules: ProfileRules) -> str:
 #: the old, whole-document contract, and a test must be able to tell the two apart.
 LAYOUT_RETRY_MARKER = "LAYOUT RETRY"
 
-def cv_body_words(cv: TailoredCV) -> int:
-    """Words of body text in the document, measured the way the brief talks about it.
+def _cv_prose_counts(cv: TailoredCV, profile: Optional[Profile]) -> tuple[int, int, int, int]:
+    """Count visible summary, role bullets, editable projects and verbatim projects."""
+    hidden = profile.cv_hidden_sections if profile is not None else ()
+    experience = cv.experience if "experience" not in hidden else ()
+    summary = sum(len(line.split()) for line in cv.summary) if "summary" not in hidden else 0
+    role = sum(len(bullet.split()) for exp in experience for bullet in exp.bullets)
+    project = 0
+    if "employer_projects" not in hidden:
+        project = sum(len(b.split()) for exp in experience for item in exp.projects for b in item.bullets)
+    fixed = 0
+    if "projects" not in hidden:
+        project += sum(
+            len(b.split()) for item in cv.standalone_projects if not isinstance(item, str) for b in item.bullets
+        )
+        if profile is not None and any(isinstance(item, str) for item in cv.standalone_projects):
+            fixed = sum(
+                len(b.split())
+                for item, resolved in zip(cv.standalone_projects, cv.resolve_standalone_projects(profile))
+                if isinstance(item, str) for b in resolved.bullets
+            )
+    return summary, role, project, fixed
 
-    Summary and responsibilities only. Bullets inside a *project* and the skills list
-    are deliberately excluded: they are the units the model consolidates and reorders
-    to make room, so counting them would make the number go up while the document got
-    shorter. Anchoring the budget to text the model may only shorten keeps the two
-    moving in the same direction.
-    """
-    return sum(len(line.split()) for line in cv.summary) + sum(
-        len(bullet.split()) for exp in cv.experience for bullet in exp.bullets
-    )
 
-def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
+def cv_body_words(cv: TailoredCV, profile: Optional[Profile] = None) -> int:
+    """Count the visible summary and role and project bullets a retry can edit."""
+    summary, role, project, _ = _cv_prose_counts(cv, profile)
+    return summary + role + project
+
+def layout_inventory(cv: TailoredCV, attempt: int = 1, *, profile: Optional[Profile] = None) -> str:
     """The current CV's shape in one line: body length, summary and employer sizes.
 
-    Makes the word target readable against the document actually rendered, rather than a
-    bare "approximately 650 words" the model cannot check itself against.
+    Gives the model the measured word count of the draft that overflowed.
 
     The attempt number is included so that a correction loop, which re-sends the same
     CV after an invalid retry, does not present a stale "shortening attempt 1" label.
@@ -214,16 +223,17 @@ def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
     It deliberately does **not** quote the CV's text back: the model wrote it, and
     echoing it would restore the repetition the retry exists to remove.
     """
-    summary_words = sum(len(line.split()) for line in cv.summary)
-    bullet_words = sum(len(bullet.split()) for exp in cv.experience for bullet in exp.bullets)
+    summary_words, bullet_words, project_words, fixed_words = _cv_prose_counts(cv, profile)
+    editable_words = summary_words + bullet_words + project_words
     employers = "; ".join(
         f"{exp.company}: {len(exp.bullets)} bullets"
         + (f", {len(exp.projects)} project(s)" if exp.projects else "")
         for exp in cv.experience
     )
     return (
-        f"Shortening attempt {attempt}. Current body: {cv_body_words(cv)} words "
-        f"({summary_words} summary + {bullet_words} responsibility)."
+        f"Shortening attempt {attempt}. Current body: {editable_words} editable prose words "
+        f"({summary_words} summary + {bullet_words} role bullets + {project_words} editable project bullets)."
+        + (f" Keep {fixed_words} words of verbatim standalone project bullets outside that target." if fixed_words else "")
         + (f" Employers: {employers}." if employers else "")
     )
 
@@ -256,8 +266,8 @@ def _standalone_clause(cv: TailoredCV, policy: str) -> str:
 
 
 def layout_retry_instruction(
-    cv: TailoredCV, page_count: int, budget: int, attempt: int, rules: ProfileRules,
-    *, guidance: str = "", standalone_policy: str = "select",
+    cv: TailoredCV, page_count: int, budget: Optional[int], attempt: int, rules: ProfileRules,
+    *, guidance: str = "", standalone_policy: str = "select", profile: Optional[Profile] = None,
 ) -> str:
     """The targeted brief for one layout retry.
 
@@ -284,21 +294,26 @@ def layout_retry_instruction(
     return (
         f"\n{LAYOUT_RETRY_MARKER}\n"
         + retry
-        + "\nKeep the summary and every responsibility bullet; merge or shorten them "
-        "rather than removing a field. Do not rename, re-employer, re-date, remove an "
-        "achievement or a metric, or drop a supporting claim.\n"
+        + "\nKeep the summary and the strongest role and project evidence. Shorten the prose "
+        "without removing a field required by the output or the profile. Use one main achievement "
+        "per bullet and aim for one or two lines at normal CV width. If folding a relevant project "
+        "into a role would create a paragraph-length bullet, keep the project heading and shorten "
+        "its bullets. For retained claims, keep the method and result tied to the achievement they support, "
+        "and preserve each metric. Do not rename, re-employer, or re-date a role.\n"
         + _standalone_clause(cv, standalone_policy)
-        + layout_inventory(cv, attempt + 1)
+        + layout_inventory(cv, attempt + 1, profile=profile)
         + guidance
         + '\nReturn either the complete shorter CV JSON, or a delta object of only the '
         'units that change, e.g. {"summary": [...], "experience[0].bullets[1]": '
         '"shorter text"}. Units not returned are kept unchanged. '
         'Delta replacements must contain non-empty text; do not use [] or "" to delete '
-        'bullets or projects. To consolidate project content into role bullets and '
-        'remove optional projects, return the complete CV instead; preserve every '
-        'claim and the required project shape.\nCURRENT CV:\n'
+        'bullets or projects. For a structural change, return the complete CV. Fold a secondary '
+        'project into a role bullet only when it fits in a concise bullet with one main achievement. '
+        'Preserve the strongest evidence and the required project shape.\nCURRENT CV:\n'
     )
 
-def layout_budget(attempt: int) -> int:
-    """Body-word budget for a given failed layout attempt."""
-    return max(LAYOUT_BUDGET_FLOOR, LAYOUT_BUDGET_START - attempt * LAYOUT_BUDGET_STEP)
+def layout_budget(current_words: int) -> Optional[int]:
+    """Suggest a shorter target for the draft that just overflowed."""
+    if not current_words:
+        return None
+    return current_words * (100 - LAYOUT_REDUCTION_PERCENT) // 100

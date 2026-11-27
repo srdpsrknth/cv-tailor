@@ -53,10 +53,9 @@ def test_editing_the_editorial_requirements_changes_the_key(monkeypatch):
     assert key_now() != before
 
 
-@pytest.mark.parametrize("name", ["LAYOUT_BUDGET_START", "LAYOUT_BUDGET_STEP", "LAYOUT_BUDGET_FLOOR"])
-def test_changing_a_layout_budget_changes_the_key(monkeypatch, name):
+def test_changing_the_layout_reduction_percentage_changes_the_key(monkeypatch):
     before = key_now()
-    monkeypatch.setattr(prompts, name, getattr(prompts, name) + 1)
+    monkeypatch.setattr(prompts, "LAYOUT_REDUCTION_PERCENT", prompts.LAYOUT_REDUCTION_PERCENT + 1)
     assert key_now() != before
 
 

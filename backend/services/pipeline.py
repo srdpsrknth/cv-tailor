@@ -22,7 +22,7 @@ from services.cv_delta import (
     looks_like_cv_delta,
     parse_json_response,
 )
-from services.prompts import layout_budget, layout_retry_instruction
+from services.prompts import cv_body_words, layout_budget, layout_retry_instruction
 # The gates are called **through their module** rather than imported as bare names, so
 # `services.validation` stays the one place a caller patches to observe them. Rebinding
 # a re-export on the `services.generation` facade would not intercept the call, because
@@ -386,10 +386,11 @@ class DocumentGenerator:
         supersedes the draft's.
         """
         self._status(f"CV is {page_count} pages; shortening content...")
-        budget = layout_budget(attempt)
+        budget = layout_budget(cv_body_words(cv, self.profile))
         cv, data = self.generate(
             layout_retry_instruction(
                 cv, page_count, budget, attempt, self.rules, guidance=self.layout_guidance,
+                profile=self.profile,
                 standalone_policy=self.profile.standalone_projects_policy,
             )
             + cv.model_dump_json(indent=2),

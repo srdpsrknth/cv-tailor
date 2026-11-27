@@ -38,7 +38,8 @@ from pathlib import Path
 
 import pytest
 
-from models.tailored_output import TailoredCV
+from models.profile import Project
+from models.tailored_output import TailoredCV, TailoredProject
 from services import generation
 from services import tailor_service as service
 from services import validation
@@ -131,19 +132,63 @@ def test_the_retry_inventory_lists_every_repeating_unit_with_its_current_length(
     assert str(generation.cv_body_words(rendered)) in inventory
 
 
-def test_the_inventory_reports_the_documents_real_body_length(isolated_service, analyst_session):
-    """The brief must not hand the model the prompt file's 650-750 word ambition.
+def test_draft_and_overflow_retry_ask_for_readable_role_and_project_bullets(
+    isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
+):
+    """A three-page draft should be shortened without packing projects into paragraphs."""
+    offline = offline_service(analyst_session.texts())
+    stub_renderers([3, 2])
 
-    The recorded fixtures are ~80-100 real words: a brief that says "approximately 650
-    words" describes a document three to eight times longer than the one being
-    shortened, which is worse than saying nothing.
-    """
-    rendered = draft_cv(analyst_session)
-    body = generation.cv_body_words(rendered)
+    result = service.tailor_documents(
+        analyst_session.job_description_text, analyst_profile,
+        company_name='Nordwind Analytics GmbH', role_title='Analytical Engineer',
+    )
 
-    assert body == sum(len(b.split()) for e in rendered.experience for b in e.bullets) + sum(
-        len(s.split()) for s in rendered.summary
-    ), 'body words must be the text the renderer lays out, measured on the same CV'
+    draft = offline.prompts[0]
+    retry, _, previous_cv = retry_prompts(offline)[0].partition('CURRENT CV:')
+    for brief in (draft, retry):
+        assert 'one main achievement per bullet' in brief
+        assert 'one or two lines' in brief
+        assert 'keep the project heading' in brief
+    assert 'cut repeated wording and lower-priority supporting detail' in retry
+    assert 'keep the method and result tied to the achievement they support' in retry
+    assert 'merge or shorten them' not in retry
+    assert previous_cv and 'projects' in previous_cv
+    assert result.cv_page_count == 2
+    assert len(offline.prompts) == 3
+
+
+def test_moving_existing_project_prose_into_a_role_keeps_the_measured_length(analyst_session):
+    original = rich_cv(analyst_session)
+    merged = original.model_copy(deep=True)
+    role = next(role for role in merged.experience if role.projects)
+    role.bullets.extend(role.projects.pop().bullets)
+
+    assert generation.cv_body_words(merged) == generation.cv_body_words(original)
+
+
+def test_inventory_counts_visible_editable_prose_and_reports_verbatim_projects_separately(analyst_profile):
+    profile = analyst_profile.model_copy(update={'standalone_projects': [
+        Project(name='Fixed project', bullets=['Published the full results.']),
+        Project(name='Editable project', bullets=['Built a data dashboard.']),
+    ]})
+    cv = TailoredCV(
+        summary=['One summary paragraph.'],
+        experience=[{
+            'company': 'Northwind', 'role': 'Analyst', 'start_date': '2020', 'end_date': '2022',
+            'bullets': ['Built reusable models.'],
+            'projects': [{'name': 'Employer project', 'bullets': ['Shared findings with managers.']}],
+        }],
+        standalone_projects=['Fixed project', TailoredProject(name='Editable project', bullets=['Built a dashboard.'])],
+    )
+    assert generation.cv_body_words(cv, profile) == 13
+    assert '4 words of verbatim standalone project bullets' in generation.layout_inventory(cv, profile=profile)
+
+    compact = profile.model_copy(update={'cv_hidden_sections': ['summary', 'employer_projects']})
+    assert generation.cv_body_words(cv, compact) == 6
+    hidden = profile.model_copy(update={'cv_hidden_sections': ['summary', 'experience', 'projects']})
+    assert generation.cv_body_words(cv, hidden) == 0
+    assert 'verbatim standalone project bullets' not in generation.layout_inventory(cv, profile=hidden)
 
 
 # --- what the retry may return --------------------------------------------------------
@@ -489,14 +534,9 @@ def test_the_retry_brief_keeps_every_constraint_the_old_instruction_carried(
     assert generation.pinned_project_clause(generation.ProfileRules()) == ''
 
 
-def test_the_retry_still_receives_a_word_budget_that_shrinks(
+def test_retry_targets_a_reduction_from_each_overflowing_draft(
     isolated_service, offline_service, stub_renderers, analyst_profile, analyst_session,
 ):
-    """The shrinking budget is unchanged: 650, 550 for the first two retries.
-
-    The *number* stays as it was -- what changed is that the model is now also told how
-    long the document currently is, so the target is readable against reality.
-    """
     offline = offline_service(analyst_session.texts())
     stub_renderers([4, 3, 2])
 
@@ -507,5 +547,16 @@ def test_the_retry_still_receives_a_word_budget_that_shrinks(
 
     retries = retry_prompts(offline)
     assert len(retries) == 2
-    assert 'approximately 650 words' in retries[0]
-    assert 'approximately 550 words' in retries[1]
+    for retry in retries:
+        draft = TailoredCV.model_validate_json(retry.split('CURRENT CV:\n', 1)[1])
+        words = generation.cv_body_words(draft, analyst_profile)
+        assert f'approximately {words * 90 // 100} editable prose words' in retry
+
+
+def test_retry_omits_the_prose_target_when_no_editable_words_are_visible(analyst_profile):
+    profile = analyst_profile.model_copy(update={'cv_hidden_sections': ['summary', 'experience', 'projects']})
+    instruction = generation.layout_retry_instruction(
+        TailoredCV(summary=['Hidden prose']), 3, None, 0, generation.ProfileRules(), profile=profile,
+    )
+    assert 'no visible editable prose' in instruction
+    assert 'approximately' not in instruction

@@ -6,7 +6,7 @@ document that is accepted, and were missing, so editing them served stale drafts
 
 * the editorial requirements injected into the CV prompt (``prompts.EDITORIAL_REQUIREMENTS``);
 * the wording built in code -- the context block, the CV prompt and the layout-retry brief;
-* the layout budget and retry limits (``LAYOUT_BUDGET_*``, ``MAX_*_ATTEMPTS``), which decide
+* the layout reduction percentage and retry limits, which decide
   how hard a long CV is shortened;
 * the CV template, whose rendered length decides whether a draft passes the page gate;
 * the source of the validators (validation, fact_checks, cv_structure and the suggested-claims
@@ -66,6 +66,7 @@ def pipeline_fingerprint(template_path: Optional[Path] = None) -> str:
         prompts.pinned_project_clause,
         prompts.layout_budget,
         prompts.cv_body_words,
+        prompts._cv_prose_counts,
     ]
     leak_guard = [
         suggested_claims._norm,
@@ -81,9 +82,7 @@ def pipeline_fingerprint(template_path: Optional[Path] = None) -> str:
         "layout_retry_marker": prompts.LAYOUT_RETRY_MARKER,
         "wording": [_source(fn) for fn in wording],
         "budget": {
-            "LAYOUT_BUDGET_START": prompts.LAYOUT_BUDGET_START,
-            "LAYOUT_BUDGET_STEP": prompts.LAYOUT_BUDGET_STEP,
-            "LAYOUT_BUDGET_FLOOR": prompts.LAYOUT_BUDGET_FLOOR,
+            "LAYOUT_REDUCTION_PERCENT": prompts.LAYOUT_REDUCTION_PERCENT,
             "MAX_LAYOUT_ATTEMPTS": pipeline.MAX_LAYOUT_ATTEMPTS,
             "MAX_VALIDATION_ATTEMPTS": pipeline.MAX_VALIDATION_ATTEMPTS,
         },

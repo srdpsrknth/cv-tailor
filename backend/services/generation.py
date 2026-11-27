@@ -45,9 +45,7 @@ from services.pipeline import (  # noqa: F401
 # --- prompt construction ---------------------------------------------------------------
 from services.prompts import (  # noqa: F401
     EDITORIAL_REQUIREMENTS,
-    LAYOUT_BUDGET_FLOOR,
-    LAYOUT_BUDGET_START,
-    LAYOUT_BUDGET_STEP,
+    LAYOUT_REDUCTION_PERCENT,
     LAYOUT_RETRY_MARKER,
     PROMPT_CL_PATH,
     PROMPT_CV_PATH,
@@ -97,9 +95,7 @@ __all__ = [
     "DIALECT_STRICT",
     "DocumentGenerator",
     "EDITORIAL_REQUIREMENTS",
-    "LAYOUT_BUDGET_FLOOR",
-    "LAYOUT_BUDGET_START",
-    "LAYOUT_BUDGET_STEP",
+    "LAYOUT_REDUCTION_PERCENT",
     "LAYOUT_RETRY_MARKER",
     "MAX_LAYOUT_ATTEMPTS",
     "MAX_VALIDATION_ATTEMPTS",

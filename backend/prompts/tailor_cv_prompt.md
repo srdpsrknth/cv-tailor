@@ -60,17 +60,16 @@ STRUCTURE AND LENGTH
   skills, and languages. The CV must fit two readable pages; that is a ceiling, not a
   minimum, and never a reason to pad.
 - For a full career (several roles over many years) aim for roughly 18-24 bullets in
-  total (responsibility and project bullets together) and 650-750 body words. These are
-  guides for filling two pages well. An early-career candidate or a short history will
-  have fewer bullets and words, and should: use what the profile supports and stop.
-  Relevance and readable layout take priority over reaching the range.
-- Body words means the summary plus the responsibility bullets written directly under
-  each role. Project bullets, skills, education and certifications are not counted. This
-  is the same count used later if you are asked to shorten the CV, so a word figure here
-  and a retry's word target mean the same thing. Bullets should be concise, usually one or two lines, without arbitrary
-  character-count restrictions.
+  total (responsibility and project bullets together) as a guide. For a shorter history,
+  use the strongest evidence the profile supports. Relevance and readable layout take
+  priority over reaching the range.
+- Use one main achievement per bullet in roles and projects. Aim for one or two lines
+  at normal CV width. Keep a method and its result with the work they describe, and use
+  separate bullets for distinct achievements.
 - Do not include every source project as a separate heading. Select or consolidate
-  useful evidence. Never repeat the same achievement in both a role and a project.
+  useful evidence. If folding meaningful project detail into a role would create a
+  paragraph-length bullet, keep the project heading with short bullets. Never repeat
+  the same achievement in both a role and a project.
 - Select optional personal, academic or other independent work from BASE PROFILE
   standalone_projects. List either the exact project name (the renderer then uses the
   profile's original bullets verbatim) or an object {"name": exact name, "bullets": [...]}
@@ -85,8 +84,8 @@ STRUCTURE AND LENGTH
   most relevant EXISTING skills, not every available skill or target-job tool.
 - Keep all career roles even during length reduction, except roles the profile marks
   "optional": true, which may be left out when irrelevant to the posting or to save
-  space. Shorten wording, remove duplicated content, and merge less relevant projects
-  into regular bullets first.
+  space. Shorten wording and cut repeated or lower-priority supporting detail first.
+  Fold secondary projects into role bullets when the result is concise.
 
 SUGGESTED CLAIMS (questions for the candidate, never CV content)
 Beside "cv", return a top-level "suggested_claims" list of at most 8 items. Each item is a
