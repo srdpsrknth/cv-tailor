@@ -29,7 +29,14 @@ see the final count in docs/TESTING.md. CI now runs on Ubuntu, Windows and macOS
   OpenRouter as the provider default; lazy `google-genai`; Python 3.12 floor shared by setup and doctor;
   `.venv` version and architecture check; `start.py --status/--stop`; TeX Live discovery; fonts check;
   `.gitignore` gaps; stale lock entries pruned.
-- **WP9 confirm-first suggestions:** see the branch log; landed after this entry was first written.
+- **WP9 confirm-first suggestions:** the CV response may carry a top-level `suggested_claims`
+  list (max 8; the CV response schema digest was re-pinned). Items are validated against the
+  profile, stored as `source/suggested_claims.json`, never rendered, and kept out of the CV
+  by `services/suggested_claims.reject_suggestion_leak`. `services/claim_acceptance.py`
+  (CLI `cvtailor claims list|accept|reject`, and the review page's "Suggested claims" panel)
+  writes confirmed claims into the private profile via the comment-preserving
+  `services/profile_text_edit.py`, with a timestamped backup and rollback. See
+  `docs/HOW_TO_GENERATE.md`.
 
 **Deferred:** the job-search feature is to be **redesigned** rather than patched. The audit findings
 (per-profile sources used by the UI, eligibility vs. `country_overrides`, country-less postings,
@@ -48,15 +55,6 @@ per-candidate acronym lists have no hook yet.
 **Active milestone: legacy profile and saved export verification.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new
 milestone. Update the checklist and record verification here after each increment.
-
-WP9 confirm-first suggestions: the CV response may carry a top-level `suggested_claims`
-list (max 8; the CV response schema digest was re-pinned). Items are validated against the
-profile, stored as `source/suggested_claims.json`, never rendered, and kept out of the CV
-by `services/suggested_claims.reject_suggestion_leak`. `services/claim_acceptance.py`
-(CLI `cvtailor claims list|accept|reject`, and the review page's "Suggested claims" panel)
-writes confirmed claims into the private profile via the comment-preserving
-`services/profile_text_edit.py`, with a timestamped backup and rollback. See
-`docs/HOW_TO_GENERATE.md`.
 
 Saved autofill exports now record freshness against the original saved JSON
 data. Previously, model defaults inserted during
