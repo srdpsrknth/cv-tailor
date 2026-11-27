@@ -539,7 +539,9 @@ def tailor_documents(
     applications.save_drafts(drafts)
 
     latex = create_latex_renderer(outputs_dir=str(applications.job_folder))
-    docx = create_docx_renderer(outputs_dir=str(applications.job_folder))
+    docx = create_docx_renderer(
+        outputs_dir=str(applications.job_folder), timezone_name=config.timezone_name
+    )
     position = role_title or cl.role_title
     page_count = 0
     history = []

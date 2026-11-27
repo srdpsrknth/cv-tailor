@@ -80,7 +80,7 @@ def configure(monkeypatch, tmp_path, profile, pages, responses):
         renderer = Mock()
         renderer.render_cv.side_effect = lambda *a, **kw: write_pdf(Path(outputs_dir) / 'CV.pdf', next(page_counts))
         return renderer
-    def docx_factory(outputs_dir):
+    def docx_factory(outputs_dir, **_kwargs):
         def render(*a, **kw):
             docx = Path(outputs_dir) / 'cover_letter.docx'
             docx.write_bytes(b'docx')

@@ -683,7 +683,7 @@ def test_a_cold_cache_does_not_write_an_entry_before_the_gate_passes(
         renderer.render_cv.side_effect = render
         return renderer
 
-    def docx_factory(outputs_dir):
+    def docx_factory(outputs_dir, **_kwargs):
         def render(*args, **kwargs):
             folder = Path(outputs_dir)
             docx = folder / 'cover_letter.docx'
