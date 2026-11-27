@@ -27,6 +27,13 @@ PROMPT_CV_PATH = PROJECT_ROOT / "backend/prompts/tailor_cv_prompt.md"
 PROMPT_CL_PATH = PROJECT_ROOT / "backend/prompts/tailor_cl_prompt.md"
 
 #: Target CV body length after each failed layout attempt, in words.
+#:
+#: "Body words" has ONE definition, :func:`cv_body_words`: the summary plus the bullets
+#: directly under each role (``exp.bullets``). Project bullets, skills, education and
+#: certifications are not counted. ``tailor_cv_prompt.md`` states its 650-750 guide in the
+#: same terms and the retry brief quotes the same measure, so the draft prompt, the
+#: layout budget and the inventory line all count words the same way. Change the
+#: definition here and in that prompt together.
 LAYOUT_BUDGET_START = 650
 LAYOUT_BUDGET_STEP = 100
 LAYOUT_BUDGET_FLOOR = 400
@@ -81,6 +88,13 @@ def build_context(
             "omit immigration status and sponsorship wording from both documents. "
             "Follow tailoring_guidance using only profile-backed experience; do not invent "
             "international clients, leadership, outcomes, or relocation availability.\n"
+        )
+    if profile.standalone_projects and profile.standalone_projects_policy == "all":
+        country_context += (
+            "\nSTANDALONE PROJECTS POLICY: all. Include every standalone project from the "
+            "profile in standalone_projects, in profile order, even if it is only loosely "
+            "relevant. Reword their bullets toward the posting where useful, but never "
+            "omit a project.\n"
         )
     return (
         f"\nCOMPANY: {company_name or 'Infer from job description'}\n"
@@ -213,9 +227,37 @@ def layout_inventory(cv: TailoredCV, attempt: int = 1) -> str:
         + (f" Employers: {employers}." if employers else "")
     )
 
+def _standalone_clause(cv: TailoredCV, policy: str) -> str:
+    """What a layout retry may do to the selected standalone projects.
+
+    Projects are never dropped or reordered by a retry. A project the CV already
+    rewords (``{name, bullets}``) may have its bullets shortened, addressed as
+    ``standalone_projects[i].bullets``; one selected by name is kept as it is.
+    """
+    if not cv.standalone_projects:
+        return ""
+    clause = (
+        "Keep the same standalone_projects in the same order"
+        + (" (the profile requires every standalone project)" if policy == "all" else "")
+        + "; never drop a project. "
+    )
+    reworded = [
+        f"standalone_projects[{index}] ({item.name!r}, {len(item.bullets)} bullets)"
+        for index, item in enumerate(cv.standalone_projects) if not isinstance(item, str)
+    ]
+    if reworded:
+        clause += (
+            "You may shorten the bullets of " + "; ".join(reworded)
+            + " (keep at least one bullet, add no facts); other projects stay unchanged."
+        )
+    else:
+        clause += "Leave them unchanged."
+    return clause + "\n"
+
+
 def layout_retry_instruction(
     cv: TailoredCV, page_count: int, budget: int, attempt: int, rules: ProfileRules,
-    *, guidance: str = "",
+    *, guidance: str = "", standalone_policy: str = "select",
 ) -> str:
     """The targeted brief for one layout retry.
 
@@ -245,7 +287,7 @@ def layout_retry_instruction(
         + "\nKeep the summary and every responsibility bullet; merge or shorten them "
         "rather than removing a field. Do not rename, re-employer, re-date, remove an "
         "achievement or a metric, or drop a supporting claim.\n"
-        + ("Keep standalone_projects unchanged.\n" if cv.standalone_projects else "")
+        + _standalone_clause(cv, standalone_policy)
         + layout_inventory(cv, attempt + 1)
         + guidance
         + '\nReturn either the complete shorter CV JSON, or a delta object of only the '

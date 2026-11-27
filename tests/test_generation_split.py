@@ -134,7 +134,11 @@ def test_the_response_schemas_are_unchanged_by_the_split():
         for kind, s in generation.RESPONSE_SCHEMAS.items()
     }
     assert digests == {
-        'cv': 'd08062c622fb9321c73d628854a453955400d7778ef130eaa7b900b8f40654cb',
+        # 'cv' re-pinned deliberately: a6f5758 added `standalone_projects`, and WP5+6 made its items name-or-{name, bullets}
+        # (the only change; cover_letter is untouched).
+        # WP9: 'cv' re-pinned again, deliberately: the envelope gained the top-level `suggested_claims`
+        # list (confirm-first questions, never CV content), required-but-nullable like tailoring_explanation; the dialect converter also now converts a field literally named `type`. cover_letter and the CV body are untouched.
+        'cv': 'c4eeae61aca1a1fa323f4a31d959572fc7eab9c56e166529541579341428da87',
         'cover_letter': 'e259b8d12006eda91cabe6beae70e8d4b8f8ecfd3081a307677092379241f844',
     }, f'the split changed the shipped response schemas: {digests}'
 

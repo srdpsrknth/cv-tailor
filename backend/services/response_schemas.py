@@ -124,12 +124,72 @@ def _cv_document_schema():
             ),
             "include_education": types.Schema(type="BOOLEAN"),
             "include_certifications": types.Schema(type="BOOLEAN"),
-            "standalone_projects": types.Schema(type="ARRAY", items=types.Schema(type="STRING")),
+            # Either a profile project name (the profile's bullets render verbatim) or
+            # {name, bullets} with the bullets reworded toward the posting.
+            "standalone_projects": types.Schema(
+                type="ARRAY",
+                items=types.Schema(
+                    any_of=[
+                        types.Schema(type="STRING"),
+                        types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "name": types.Schema(type="STRING"),
+                                "bullets": types.Schema(
+                                    type="ARRAY", items=types.Schema(type="STRING")
+                                ),
+                            },
+                        ),
+                    ]
+                ),
+            ),
             # extract_explanation reads a nested explanation too, so it must stay legal
             # here. Forbidding it would decide, on the model's behalf, which of the two
             # shapes it may return -- the thing `extract_explanation` exists not to do.
             "tailoring_explanation": _tailoring_explanation_schema(),
         },
+    )
+
+def _suggested_claims_schema():
+    """Questions for the candidate, beside the CV and never part of it.
+
+    ``attach_to``'s three target fields are nullable because the strict dialect requires
+    every declared property; which of them is meaningful depends on ``type``. The cap of
+    eight is stated in the prompt and enforced when the list is parsed
+    (``services.suggested_claims``) rather than here, because ``maxItems`` is not
+    accepted by every provider's strict mode.
+    """
+    from google.genai import types
+
+    return types.Schema(
+        type="ARRAY",
+        description=(
+            "Up to 8 QUESTIONS for the candidate about plausible, unconfirmed experience. "
+            "Never used in the CV. Use [] when there is nothing worth asking."
+        ),
+        items=types.Schema(
+            type="OBJECT",
+            properties={
+                "requirement": types.Schema(type="STRING"),
+                "proposed_text": types.Schema(type="STRING"),
+                "attach_to": types.Schema(
+                    type="OBJECT",
+                    properties={
+                        "type": types.Schema(
+                            type="STRING",
+                            description=(
+                                "One of: experience, experience_project, "
+                                "standalone_project, skill."
+                            ),
+                        ),
+                        "company": types.Schema(type="STRING", nullable=True),
+                        "project": types.Schema(type="STRING", nullable=True),
+                        "category": types.Schema(type="STRING", nullable=True),
+                    },
+                ),
+                "rationale": types.Schema(type="STRING"),
+            },
+        ),
     )
 
 def _cover_letter_document_schema():
@@ -160,6 +220,7 @@ def _document_response_schema(envelope_key: str, document):
     properties = {envelope_key: document}
     if envelope_key == "cv":
         properties["tailoring_explanation"] = _tailoring_explanation_schema()
+        properties["suggested_claims"] = _suggested_claims_schema()
     return types.Schema(
         type="OBJECT",
         description=(

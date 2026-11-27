@@ -58,6 +58,7 @@ def run(args, console: Console, config) -> int:
     from models.tailored_output import TailoredCV, TailoredCoverLetter
     from renderers import create_latex_renderer, create_docx_renderer
     from services.artifact_provenance import record_artifact_provenance
+    from services.candidate_guidance import load_candidate_acronyms
     from services.profile_store import (
         InvalidProfileIdError,
         UnknownProfileError,
@@ -97,13 +98,19 @@ def run(args, console: Console, config) -> int:
         raise CliError(f"Could not read {content_path}: {error}", EXIT_NOT_FOUND)
 
     role = data.get("role_title") or cl.role_title
+    # This candidate's own skill-heading acronyms (none for a loose --profile file).
+    try:
+        extra_acronyms = load_candidate_acronyms(config, profile_id) if profile_id else ()
+    except ValueError as error:
+        raise CliError(str(error), EXIT_USAGE, hint="Fix or remove candidate_guidance.json.")
     only = getattr(args, "only", None)
     result = {"content": str(content_path), "folder": str(folder), "job_id": folder.name}
     generated = []
     generated_scopes = []
 
     if only != "cover-letter":
-        renderer = create_latex_renderer(outputs_dir=str(folder))
+        renderer = create_latex_renderer(outputs_dir=str(folder), timezone_name=config.timezone_name,
+                                       extra_acronyms=extra_acronyms)
         preset = getattr(args, "layout_preset", "auto")
         layout_options = {"layout_preset": preset} if preset != "auto" else {}
         pdf = Path(renderer.render_cv(cv, profile, job_position=role, **layout_options))
@@ -114,7 +121,8 @@ def run(args, console: Console, config) -> int:
         generated_scopes.append((pdf, "cv"))
         from renderers.upload_cv import render_upload_cv
 
-        upload_paths = render_upload_cv(cv, profile, folder, role, timezone_name=config.timezone_name)
+        upload_paths = render_upload_cv(cv, profile, folder, role, timezone_name=config.timezone_name,
+                                         extra_acronyms=extra_acronyms)
         result.update(upload_paths)
         generated.extend(Path(p) for p in upload_paths.values())
         generated_scopes.extend((Path(p), "cv") for p in upload_paths.values())
@@ -127,7 +135,9 @@ def run(args, console: Console, config) -> int:
             )
 
     if only != "cv":
-        docx, pdf = create_docx_renderer(outputs_dir=str(folder)).render_cover_letter(
+        docx, pdf = create_docx_renderer(
+            outputs_dir=str(folder), timezone_name=config.timezone_name
+        ).render_cover_letter(
             cl, profile, job_position=role
         )
         words = sum(len(p.split()) for p in cl.paragraphs)

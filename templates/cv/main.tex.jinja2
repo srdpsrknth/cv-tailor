@@ -9,7 +9,7 @@
 \usepackage[protrusion=false,expansion=false]{microtype}
 \DisableLigatures[f]{encoding = *, family = *}
 \usepackage[a4paper,left=1.6cm,right=1.6cm,top=1.5cm,bottom=1.5cm]{geometry}
-\usepackage{xcolor,enumitem,needspace,hyperref,refcount}
+\usepackage{xcolor,enumitem,needspace,hyperref,refcount,amssymb}
 \definecolor{accent}{HTML}{00004D}
 \definecolor{bodytext}{HTML}{2E2E2E}
 \definecolor{muted}{HTML}{526070}
@@ -25,11 +25,19 @@
 \renewcommand{\normalsize}{\fontsize{{ '{' }}{{ layout.body_size }}{{ '}{' }}{{ layout.leading }}{{ '}' }}\selectfont}
 \newcommand{\metadata}{\fontsize{9.5}{11}\selectfont}
 \newcommand{\sectiongap}{{ '{' }}{{ layout.section_spacing }}pt{{ '}' }}
+% Fixed English labels come from backend/renderers/cv_sections.py (LABELS).
+\newcommand{\lbltechnologies}{{ '{' }}{{ labels.technologies }}{{ '}' }}
+\newcommand{\lblselectedprojects}{{ '{' }}{{ labels.selected_projects }}{{ '}' }}
+\newcommand{\lblcontinued}{{ '{' }}{{ labels.continued }}{{ '}' }}
+\newcommand{\lblworkauthorization}{{ '{' }}{{ labels.work_authorization }}{{ '}' }}
 \newsavebox{\candidateNameBox}
 \setlist[itemize]{leftmargin=1.2em,label=\textbullet,itemsep={{ layout.item_spacing }}pt,topsep=3pt,parsep=0pt,partopsep=0pt}
 {% raw %}
-\newcommand{\cvsection}[1]{\needspace{4\baselineskip}\par\vspace{\sectiongap}{\fontsize{12.5}{15}\selectfont\bfseries\color{accent}\MakeUppercase{#1}\par}\vspace{3pt}{\color{accent}\hrule height 0.6pt}\vspace{6pt}}
-\newcommand{\projectheading}[4]{\needspace{3\baselineskip}\vspace{3pt}{\metadata\bfseries\color{accent}Selected Projects:}\enspace {\itshape #1}\label{project-#3-#4}\enspace {\metadata\color{muted}(#2\ifnum\getpagerefnumber{project-#3-#4}>\getpagerefnumber{employer-#3}\relax{} - continued\fi)}\par\nopagebreak}
+% The heading must stay with its first entry: 7 baselines cover the heading block
+% (about 2.7 baselines) plus the first entry title and its first two lines.
+\newcommand{\cvsection}[1]{\needspace{7\baselineskip}\par\vspace{\sectiongap}{\fontsize{12.5}{15}\selectfont\bfseries\color{accent}\MakeUppercase{#1}\par}\vspace{3pt}{\color{accent}\hrule height 0.6pt}\vspace{6pt}}
+\newcommand{\projectheading}[4]{\needspace{3\baselineskip}\vspace{3pt}{\metadata\bfseries\color{accent}\lblselectedprojects}\enspace {\itshape #1}\label{project-#3-#4}\enspace {\metadata\color{muted}(#2\ifnum\getpagerefnumber{project-#3-#4}>\getpagerefnumber{employer-#3}\relax{} - \lblcontinued\fi)}\par\nopagebreak}
+\newcommand{\projectsubheading}[1]{\needspace{3\baselineskip}\vspace{3pt}{\itshape #1}\par\nopagebreak}
 {% endraw %}
 \begin{document}
 \normalsize\color{bodytext}
@@ -50,11 +58,11 @@
 \begin{minipage}[t]{0.495\linewidth}
 \vspace{0pt}
 \raggedleft\metadata\color{muted}
-{{ location }}{% if phone %} | {{ phone }}{% endif %}{% if email %} | \href{{ '{' }}mailto:{{ email }}{{ '}' }}{{ '{' }}{{ email }}{{ '}' }}{% endif %}\par
+{{ location }}{% if phone %} | {{ phone_display }}{% endif %}{% if email %} | \href{{ '{' }}{{ email_url }}{{ '}' }}{{ '{' }}{{ email_display }}{{ '}' }}{% endif %}\par
 
-{% if linkedin %}\href{{ '{' }}{{ linkedin }}{{ '}' }}{{ '{' }}{{ linkedin|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}\par{}{% endif %}
-{% if github %}\href{{ '{' }}{{ github }}{{ '}' }}{{ '{' }}{{ github|replace('https://www.', '')|replace('https://', '') }}{{ '}' }}\par{}{% endif %}
-{% if work_authorization %}Work authorization: {{ work_authorization }}\par{}{% endif %}
+{% if linkedin %}\href{{ '{' }}{{ linkedin_url }}{{ '}' }}{{ '{' }}{{ linkedin_display }}{{ '}' }}\par{}{% endif %}
+{% if github %}\href{{ '{' }}{{ github_url }}{{ '}' }}{{ '{' }}{{ github_display }}{{ '}' }}\par{}{% endif %}
+{% if work_authorization %}\lblworkauthorization\ {{ work_authorization }}\par{}{% endif %}
 \end{minipage}\par
 \vspace{4pt}{\fontsize{11}{13}\selectfont\bfseries\color{accent}{{ tagline }}\par}
 {% if summary %}
@@ -63,7 +71,7 @@
 {% endif %}
 {% for section in cv_section_order %}
 {% if section == 'experience' and experience %}
-\cvsection{Professional Experience}
+\cvsection{{ '{' }}{{ section_titles.experience }}{{ '}' }}
 {% for exp in experience %}
 {% set employer_index = loop.index0 %}
 {% set split_role = split_before and split_before[0] == employer_index %}
@@ -75,7 +83,7 @@
 \needspace{4\baselineskip}
 \begin{samepage}
 {\fontsize{11.5}{13.5}\selectfont\bfseries {{ exp.company }}\label{employer-{{ employer_index }}}\par}\nopagebreak
-\vspace{2pt}{\bfseries\color{accent}{{ exp.role }}}\hfill {\metadata\color{muted}{{ exp.start_date }} -- {{ exp.end_date }}{% if exp.location %} | {{ exp.location }}{% endif %}}\par\nopagebreak
+\vspace{2pt}{\bfseries\color{accent}{{ exp.role }}}\hfill {\metadata\color{muted}{{ exp.start_date }}{{ date_separator }}{{ exp.end_date }}{% if exp.location %} | {{ exp.location }}{% endif %}}\par\nopagebreak
 {% if exp.bullets %}
 \begin{itemize}
 {% for bullet in exp.bullets %}
@@ -84,7 +92,7 @@
 \end{samepage}
 \newpage
 \begin{samepage}
-{\metadata\bfseries\color{accent}{{ exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
+{\metadata\bfseries\color{accent}{{ exp.project_company or exp.company }} | {{ exp.role }} (\lblcontinued)\par}\nopagebreak
 \begin{itemize}
 {% endif %}
 \item {{ bullet }}
@@ -93,7 +101,7 @@
 {% endif %}
 {% if split_role and not exp.projects and exp.technologies %}
 \nopagebreak
-\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
+\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 \end{samepage}
 {% if exp.projects %}
@@ -102,30 +110,40 @@
 {% if split_here %}\newpage{% endif %}
 \begin{samepage}
 {% if split_here %}
-{\metadata\bfseries\color{accent}{{ exp.company }} | {{ exp.role }} (continued)\par}\nopagebreak
+{\metadata\bfseries\color{accent}{{ exp.project_company or exp.company }} | {{ exp.role }} (\lblcontinued)\par}\nopagebreak
 {% endif %}
-\projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.company }}{{ "}" }}{{ '{' }}{{ employer_index }}{{ '}{' }}{{ loop.index0 }}{{ '}' }}
+{% if exp.project_as_subheading %}
+\projectsubheading{{ "{" }}{{ project.name }}{{ "}" }}
+{% else %}
+\projectheading{{ "{" }}{{ project.name }}{{ "}" }}{{ "{" }}{{ exp.project_company or exp.company }}{{ "}" }}{{ '{' }}{{ employer_index }}{{ '}{' }}{{ loop.index0 }}{{ '}' }}
+{% endif %}
+{% if project.meta %}
+\nopagebreak{\metadata\color{muted}{{ project.meta }}\par}
+{% endif %}
 \begin{itemize}
 {% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}
 \end{itemize}
+{% if project.technologies_line %}
+\nopagebreak\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ project.technologies_line }}\par}
+{% endif %}
 {% if split_role and loop.last and exp.technologies %}
 \nopagebreak
-\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
+\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 \end{samepage}
 {% endfor %}
 {% endif %}
 {% if exp.technologies and not split_role %}
-\vspace{2pt}{\metadata\textbf{\textcolor{muted}{Technologies: }}{{ exp.technologies|join(', ') }}\par}
+\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 {% if not loop.last %}\vspace{3pt}{\color{divider}\hrule height 0.35pt}\vspace{5pt}{% endif %}
 {% endfor %}
 {% elif section == 'projects' and standalone_projects %}
-\cvsection{Projects}
+\cvsection{{ '{' }}{{ section_titles.projects }}{{ '}' }}
 {% for project in standalone_projects %}
 \needspace{3\baselineskip}
-{\bfseries {{ project.name }}\par}
+{\bfseries {{ project.name }}}{% if project.meta %} {\metadata\color{muted}{{ project.meta }}}{% endif %}\par
 {% if project.bullets %}
 \nopagebreak
 \begin{itemize}
@@ -133,35 +151,52 @@
 {% endfor %}
 \end{itemize}
 {% endif %}
+{% if project.technologies_line %}
+\nopagebreak\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ project.technologies_line }}\par}
+{% endif %}
 {% endfor %}
 {% elif section == 'education' and education %}
-\cvsection{Education}
+\cvsection{{ '{' }}{{ section_titles.education }}{{ '}' }}
 {% for edu in education %}
 \needspace{3\baselineskip}
 {\bfseries {{ edu.degree }}\par}\nopagebreak
 {\metadata {{ edu.institution }} | {{ edu.dates }}{% if edu.location %} | {{ edu.location }}{% endif %}\par}
+{% if edu.highlights %}\nopagebreak{\metadata\color{muted}{{ edu.highlights }}\par}
+{% endif %}
 {% if not loop.last %}\vspace{4pt}{% endif %}
 {% endfor %}
 {% elif section == 'certifications' and certifications %}
-\cvsection{Certifications}
+\cvsection{{ '{' }}{{ section_titles.certifications }}{{ '}' }}
 {\metadata {{ certifications|join('; ') }}\par}
 {% elif section == 'skills' and skills %}
-\cvsection{Skills}
+\cvsection{{ '{' }}{{ section_titles.skills }}{{ '}' }}
 {% for category, skill_list in skills.items() %}
 \needspace{2\baselineskip}
 \textbf{{ '{' }}{{ category }}:{{ '}' }} {{ skill_list|join(', ') }}\par
 {% if not loop.last %}\vspace{2pt}{% endif %}
 {% endfor %}
 {% elif section == 'languages' and languages %}
-\cvsection{Languages}
+\cvsection{{ '{' }}{{ section_titles.languages }}{{ '}' }}
 {% for lang in languages %}{{ lang.name }}: {{ lang.proficiency }}{% if not loop.last %} | {% endif %}{% endfor %}\par
 {% elif section == 'publications' and publications %}
-\cvsection{Publications}
-{% for entry in publications %}{\metadata {{ entry }}\par}
+\cvsection{{ '{' }}{{ section_titles.publications }}{{ '}' }}
+{% for entry in publication_entries %}{\metadata {{ entry.text }}\par}
+{% if entry.bullets %}\nopagebreak
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
 {% endfor %}
 {% elif section == 'activities' and activities %}
-\cvsection{Activities}
-{% for entry in activities %}{\metadata {{ entry }}\par}
+\cvsection{{ '{' }}{{ section_titles.activities }}{{ '}' }}
+{% for entry in activity_entries %}{\metadata {{ entry.text }}\par}
+{% if entry.bullets %}\nopagebreak
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet }}
+{% endfor %}
+\end{itemize}
+{% endif %}
 {% endfor %}
 {% endif %}
 {% endfor %}

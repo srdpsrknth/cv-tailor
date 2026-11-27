@@ -38,6 +38,8 @@ from services.cache_store import (
     serialize_profile_bytes,
 )
 from services.candidate_guidance import load_candidate_guidance
+from services import suggested_claims
+from services.pipeline_fingerprint import pipeline_fingerprint
 from services.llm_service import LLMService
 from services.profile_store import (
     ProfileMismatchError,
@@ -432,6 +434,7 @@ def tailor_documents(
         model_cl=config.model_for("cover_letter"),
         rules_fingerprint=rules_fingerprint(generator.rules),
         format_version=CACHE_FORMAT_VERSION,
+        pipeline_version=pipeline_fingerprint(),
     )
     cache = GenerationCache(_cache_root(config) / resolved_profile_id)
     entry = None
@@ -535,9 +538,19 @@ def tailor_documents(
     # chosen, so the folder is written identically either way.
     drafts = entry.drafts if entry is not None else generator.drafts
     applications.save_drafts(drafts)
+    suggested_claims.store_from_response(
+        applications.source_folder, profile,
+        generator.suggested_claims_raw if entry is None
+        else suggested_claims.suggestions_from_drafts(entry.drafts),
+    )
 
-    latex = create_latex_renderer(outputs_dir=str(applications.job_folder))
-    docx = create_docx_renderer(outputs_dir=str(applications.job_folder))
+    latex = create_latex_renderer(
+        outputs_dir=str(applications.job_folder), timezone_name=config.timezone_name,
+        extra_acronyms=guidance.acronyms,
+    )
+    docx = create_docx_renderer(
+        outputs_dir=str(applications.job_folder), timezone_name=config.timezone_name
+    )
     position = role_title or cl.role_title
     page_count = 0
     history = []
@@ -591,7 +604,8 @@ def tailor_documents(
         from renderers.upload_cv import render_upload_cv
 
         upload_paths = render_upload_cv(
-            cv, profile, applications.job_folder, position, timezone_name=config.timezone_name
+            cv, profile, applications.job_folder, position, timezone_name=config.timezone_name,
+            extra_acronyms=guidance.acronyms,
         )
     except Exception as error:
         # Preserve everything editable, then mark the folder failed explicitly (D-14).

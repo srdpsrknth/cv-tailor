@@ -239,13 +239,22 @@ def _expected_cv_text(content, *, section_order=None, summary_visible=None, empl
                 row["name"]: row for row in source_projects
                 if isinstance(row, dict) and isinstance(row.get("name"), str)
             }
-            for name in selected_projects:
+            for selected in selected_projects:
+                # A name shows the profile's bullets; {name, bullets} shows its own.
+                name = selected.get("name") if isinstance(selected, dict) else selected
                 if not isinstance(name, str) or name not in project_rows:
                     continue
                 project_paragraphs.append(name)
-                bullets = project_rows[name].get("bullets")
+                bullets = (selected if isinstance(selected, dict) else project_rows[name]).get("bullets")
                 if isinstance(bullets, list):
                     project_paragraphs.extend(bullet for bullet in bullets if isinstance(bullet, str))
+                row = project_rows[name]
+                for key in ("context", "dates"):
+                    if isinstance(row.get(key), str) and row[key].strip():
+                        fields[f"Project {name} {key}"] = row[key]
+                if isinstance(row.get("technologies"), list) and row["technologies"]:
+                    fields[f"Project {name} technologies"] = ", ".join(
+                        str(item) for item in row["technologies"])
     prose_by_section = {"experience": experience_paragraphs, "projects": project_paragraphs}
     for section in sections:
         paragraphs.extend(prose_by_section.get(section, ()))
@@ -258,15 +267,31 @@ def _expected_cv_text(content, *, section_order=None, summary_visible=None, empl
                 value = education.get(key)
                 if isinstance(value, str) and value.strip():
                     fields[f"Education {len(fields) + 1}"] = value
+            highlights = education.get("highlights")
+            if isinstance(highlights, list) and highlights:
+                fields[f"Education {len(fields) + 1}"] = " · ".join(str(item) for item in highlights)
     if "certifications" in sections and cv.get("include_certifications") is not False:
         certifications = snapshot.get("certifications")
         for certification in certifications if isinstance(certifications, list) else []:
+            if isinstance(certification, dict):
+                details = ", ".join(
+                    str(certification[key]) for key in ("issuer", "year") if certification.get(key)
+                )
+                certification = (
+                    f"{certification.get('name', '')} ({details})" if details
+                    else str(certification.get("name", ""))
+                )
             if isinstance(certification, str) and certification.strip():
                 fields[f"Certification {len(fields) + 1}"] = certification
     for section in ("publications", "activities"):
         entries = snapshot.get(section)
         if section in sections and isinstance(entries, list):
             for index, entry in enumerate(entries):
+                if isinstance(entry, dict):
+                    for bullet_index, bullet in enumerate(entry.get("bullets") or []):
+                        if isinstance(bullet, str) and bullet.strip():
+                            fields[f"{section.title()} {index} bullet {bullet_index}"] = bullet
+                    entry = entry.get("text")
                 if isinstance(entry, str) and entry.strip():
                     fields[f"{section.title()} {index}"] = entry
     return paragraphs, fields

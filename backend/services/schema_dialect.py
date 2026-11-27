@@ -95,6 +95,14 @@ def _dumped_schema(schema) -> dict:
             to_json_dict = getattr(schema, "to_json_dict", None)
             dumped = to_json_dict() if callable(to_json_dict) else schema
 
+    def properties_map(value):
+        """A ``properties`` mapping: its keys are field NAMES, never schema keywords.
+
+        A field may legitimately be called ``type`` (``attach_to.type``); treating the map
+        as a schema node would skip converting that field's schema entirely.
+        """
+        return {name: to_standard(sub) for name, sub in value.items()}
+
     def to_standard(node):
         if isinstance(node, list):
             return [to_standard(item) for item in node]
@@ -104,13 +112,20 @@ def _dumped_schema(schema) -> dict:
             # Still recurse: a mapping without keywords at this level can hold objects
             # and arrays below it that do carry them.
             if isinstance(node, dict):
-                return {key: to_standard(value) for key, value in node.items()}
+                return {("anyOf" if key == "any_of" else key):
+                        properties_map(value) if key == "properties" and isinstance(value, dict)
+                        else to_standard(value)
+                        for key, value in node.items()}
             return node
 
         result = {}
         nullable = bool(node.get("nullable", False))
         for key, value in node.items():
             if key in _GEMINI_ONLY_KEYWORDS:
+                continue
+            if key == "any_of":
+                # The SDK dumps snake_case; JSON Schema, and every endpoint, says anyOf.
+                result["anyOf"] = to_standard(value)
                 continue
             if key == "type":
                 if isinstance(value, list):
@@ -120,7 +135,10 @@ def _dumped_schema(schema) -> dict:
                 else:
                     result[key] = value
                 continue
-            result[key] = to_standard(value)
+            result[key] = (
+                properties_map(value) if key == "properties" and isinstance(value, dict)
+                else to_standard(value)
+            )
 
         if nullable and "type" in result:
             existing = result["type"]
@@ -165,7 +183,7 @@ def _strip_additional_properties(node):
 #: after the fact: these are declared ``nullable=True`` where they are built. The rule is
 #: kept because a schema handed in from elsewhere must not silently become stricter than
 #: intended.
-_REQUIRED_BUT_NULLABLE = ("tailoring_explanation",)
+_REQUIRED_BUT_NULLABLE = ("tailoring_explanation", "suggested_claims")
 
 def _require_every_property(node):
     """Every object's declared properties become ``required``, and it is closed.

@@ -89,7 +89,7 @@ def run_one_case(case: EvaluationCase, model: CuratedModel) -> CaseResult:
     #
     # ``profile_id`` is overridden **away from whatever ``.env`` names**, and this is
     # the privacy fix rather than tidiness. A developer's ``.env`` carries their own
-    # ``CVTAILOR_PROFILE_ID`` (this machine's says ``sreedeep``), and ``tailor_documents``
+    # ``CVTAILOR_PROFILE_ID`` (set to a real candidate's id on a developer machine), and ``tailor_documents``
     # files its output under that id. Left alone, an evaluation of *synthetic* fixtures
     # would write job folders -- accepted documents included -- under a real candidate's
     # profile, which is exactly the boundary ADR 0002/0011 exist to hold. The synthetic

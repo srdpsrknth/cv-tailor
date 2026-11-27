@@ -22,26 +22,25 @@ profile in the sidebar, then use Generate or Find jobs. Closing the browser leav
 the app running; **Stop CV Tailor** shuts it down. To install these shortcuts, see
 [DEVELOPMENT.md](DEVELOPMENT.md#windows-gui-shortcuts).
 
-**This guide works on Windows and macOS.** The only difference is how you write the
-*interpreter path* — everything else, including every option, is identical:
+**This guide works on Windows, macOS and Linux.** Activate the project's virtual
+environment once per terminal, then every command is written `python cvtailor.py ...`:
 
-| | Windows | macOS / Linux |
-|---|---|---|
-| Python | `.\.venv\Scripts\python.exe` | `.venv/bin/python` |
-| Line continuation | `` ` `` (backtick) | `\` (backslash) |
-| Store path example | `..\cv-tailor-data` | `~/cv-tailor-data` |
-
-Throughout this guide the Windows form is used. **On a Mac, substitute
-`.venv/bin/python`** for `.\.venv\Scripts\python.exe`, and use `\` instead of a
-backtick to continue a line. For example, the same command on each:
-
-```powershell
-# Windows
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
-```
 ```bash
-# macOS
-.venv/bin/python cvtailor.py --profile-id sample-analyst generate --job-file job.txt
+# macOS / Linux (bash, zsh)
+source .venv/bin/activate
+```
+```powershell
+# Windows (PowerShell)
+.\.venv\Scripts\Activate.ps1
+```
+
+Without activating, call the interpreter directly: `.venv/bin/python` on macOS/Linux,
+`.venv\Scripts\python.exe` on Windows. Examples that span lines use the bash/zsh
+backslash (`\`); in PowerShell use a backtick (`` ` ``) instead. Store paths are shown as
+`<store>` (your `CVTAILOR_STORE`, for example `~/cv-tailor-data` or `..\cv-tailor-data`).
+
+```bash
+python cvtailor.py --profile-id <profile_id> generate --job-file job.txt
 ```
 
 > **Setting up on a Mac for the first time?** Read
@@ -63,8 +62,8 @@ is job search.
 
 You need three things. The `doctor` command checks all of them:
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py doctor
+```bash
+python cvtailor.py doctor
 ```
 
 | Check | What "ok" means |
@@ -81,7 +80,7 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 > that location explicitly, so a script or IDE terminal finds it anyway. If it still
 > fails, set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in `.env`.
 
-> **Do not ignore `outputs ... Permission denied`.** On this Windows checkout,
+> **Windows only: do not ignore `outputs ... Permission denied`.** On a Windows checkout where
 > `.venv` inherited a Low integrity label, so its Python runs at Low integrity even
 > from a normal terminal and cannot write to the private store. PowerShell being
 > able to write there does not prove Python can. See the targeted repair in
@@ -89,14 +88,14 @@ If any line says `FAIL`, fix that before continuing — the message tells you ho
 
 List available profiles and substitute your chosen ID for the synthetic example `sample-analyst`.
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py profile list
+```bash
+python cvtailor.py profile list
 ```
 
 > **Where does `--profile-id` go?** It is a *global* option, so it goes **before**
 > the command name, not after it:
 >
-> ```powershell
+> ```bash
 > # right
 > cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 > cvtailor.py --profile-id sample-analyst profile show
@@ -119,16 +118,26 @@ plain text file. For example `job.txt`.
 Include the job URL and today's date at the top if you have them; it makes the saved
 record easier to trace later.
 
-On a Mac, save the clipboard **while it contains the posting**, then inspect the file:
+Or save the clipboard **while it contains the posting**, then inspect the file:
 
 ```bash
-pbpaste > ../cv-tailor-data/jobs/sample-analyst/job.txt
-head -5 ../cv-tailor-data/jobs/sample-analyst/job.txt
+# macOS
+pbpaste > <store>/jobs/sample-analyst/job.txt
+# Linux (X11: xclip; Wayland: wl-paste)
+xclip -selection clipboard -o > <store>/jobs/sample-analyst/job.txt
+wl-paste > <store>/jobs/sample-analyst/job.txt
+head -5 <store>/jobs/sample-analyst/job.txt
+```
+```powershell
+# Windows (PowerShell)
+Get-Clipboard | Set-Content -Encoding utf8 <store>\jobs\sample-analyst\job.txt
+Get-Content <store>\jobs\sample-analyst\job.txt -TotalCount 5
 ```
 
 Use your actual private store and profile directory; create the directory first if
 needed. Check that the first lines name the role and employer. Copying the generation
-command replaces the clipboard, so `--job "$(pbpaste)"` can accidentally submit the
+command replaces the clipboard, so passing the clipboard inline (for example
+`--job "$(pbpaste)"`) can accidentally submit the
 command itself. A saved file makes the input inspectable and repeatable. The CLI
 rejects input starting with a CV Tailor invocation before any paid call and prints
 the posting's length and first line before generation.
@@ -139,15 +148,15 @@ the posting's length and first line before generation.
 
 ### 2. Generate
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
+```bash
+python cvtailor.py --profile-id sample-analyst generate --job-file job.txt
 ```
 
-For the saved Mac file, for example:
+For a posting saved in the store, for example:
 
 ```bash
-.venv/bin/python cvtailor.py --profile-id sample-analyst generate \
-  --job-file ../cv-tailor-data/jobs/sample-analyst/job.txt \
+python cvtailor.py --profile-id sample-analyst generate \
+  --job-file <store>/jobs/sample-analyst/job.txt \
   --company "Northwind Analytics" --role "Analytics Engineer" --country Germany
 ```
 
@@ -182,11 +191,39 @@ markets and filters can return results.
 `.env` and defaults to UTC. To retain the former Berlin calendar for new application
 IDs and upload CV filenames, set `CVTAILOR_TIMEZONE=Europe/Berlin`. Existing IDs
 and files keep their names. Stored timestamps remain in UTC.
+The cover-letter date, and the year in the cover-letter and CV file names, follow the
+same setting; without it they use the machine's local date.
+
+**Cover-letter wording** is optional. A private profile can set its salutation and
+sign-off; `{company}` is the only placeholder. Omitted fields keep the defaults
+(`Dear {company} Hiring Team,` and the letter's own closing, normally
+`Warm regards,`). The DOCX and PDF letters always match, and the profile value wins
+over wording the model wrote. The recipient line stays `Hiring Team`.
+
+```yaml
+letter:
+  salutation: "Dear {company} recruiting team,"
+  sign_off: "With best wishes,"
+```
 
 **Ongoing education** uses `ongoing: true` in a private profile's education
 entry. Omit `end_year` if completion is unknown, or set it to the expected year
 to show, for example, `Present (expected 2028)`. Completed degrees use the
-existing `start_year` and `end_year` fields.
+existing `start_year` and `end_year` fields. An optional `highlights` list
+(coursework, thesis title, focus) prints as one compact line under the degree,
+joined with ` · `, in the PDF, Word and text exports:
+
+```yaml
+education:
+  - degree: MSc Synthetic Analytics
+    institution: Sampletown Institute of Technology
+    start_year: 2018
+    end_year: 2020
+    highlights: ["Thesis: Synthetic Forecasting", "Focus: causal inference"]
+```
+
+**Certifications** may be plain strings or `{name, issuer, year}` objects (`issuer`
+and `year` optional); the latter prints as `name (issuer, year)`.
 
 **Standalone projects** go in the private profile's top-level
 `standalone_projects` list. Each entry has a unique `name` and a `bullets` list.
@@ -199,13 +236,36 @@ standalone_projects:
       - Mapped public transport gaps with open data.
 ```
 
-CV generation selects relevant projects by exact name. The Projects section
-appears after work experience and uses the profile's bullets verbatim. Saved
+A project may also carry `dates` (free text), `technologies` (a list, printed as a
+`Technologies:` line like an employer role) and `context` (for example
+`University team project`). They print as `Name — context | dates`. Employer
+projects under `experience[].selected_projects` use the same fields and ignore them
+unless set.
+
+CV generation selects relevant projects by exact name and may also reword a
+project's bullets toward the posting. Selecting a name renders the profile's
+bullets verbatim; an object `{name, bullets}` renders the model's bullets, which
+must use only facts already in that project's profile bullets (no new tools,
+numbers, outcomes or responsibilities), number between one and one more than the
+profile's, and pass the same banned-tool and gap checks as employer bullets. A
+project with no profile bullets can only be selected by name. Metadata (`dates`,
+`context`, `technologies`) always comes from the profile. Set
+`standalone_projects_policy: all` (default `select`) to require every standalone
+project, in profile order; layout retries may shorten reworded bullets but never
+drop a project. The Projects section appears after work experience. Saved
 application previews and autofill exports use the saved profile snapshot.
 For a manual edit to `content.json`, set `cv.standalone_projects` to an ordered
-list of names from the profile used for rendering. Omit the field or use an
+list of names (or `{name, bullets}` objects) from the profile used for rendering. Omit the field or use an
 empty list to leave the section out. Keep employer-specific projects under the
 corresponding experience entry.
+
+**Experience entries** accept two more optional fields. `optional: true` lets the
+model leave that role out when it is irrelevant or to save space; every other
+role is still required. `display_name` is a short company name used in compact
+places (the project parenthetical and continuation headers) while the heading
+keeps the full employer. A role with no regular `bullets` and exactly one project
+prints the project name as an italic subheading, without the `Selected Projects:`
+label or company parenthetical.
 
 **CV section choices** are optional. Set `cv_section_order` in the private profile
 to move sections to the front of the CV body, in the order listed:
@@ -225,24 +285,38 @@ source data. The contact header stays at the top.
 These preferences apply to the standard PDF and autofill DOCX and text. Saved
 application exports from review use the saved profile snapshot. Older custom
 LaTeX templates with a fixed layout continue to use their original layout.
+
 For a one-off layout, copy the profile to a private YAML file, adjust the display
 settings in that copy, then use `cvtailor --profile <private-copy.yaml> render
 --content <application>/source/content.json --cv-only`. Render in a copy of the
 application folder if you want to keep both versions.
 
 **Publications and activities** are optional. Add one plain-text citation or
-activity per line in the private profile. The standard PDF, Word, and text
+activity per line in the private profile, or an object `{text, bullets}` to list
+supporting bullets under it. `text` (the citation) is always printed verbatim and
+never sent for rewording. The standard PDF, Word, and text
 exports use those entries directly. Empty lists produce no headings, and hidden
-sections keep their source entries in the profile.
+sections keep their source entries in the profile. Detail bullets appear as nested
+second-level bullets under the entry (Word "List Bullet 2", indented `-` in the text
+export), in the PDF and in the plain upload CV alike.
 
 ```yaml
 publications:
   - "A. Sample (2025). Mapping Transit Access. Example Journal."
+  - text: "A. Sample (2024). Second Paper. Example Press."
+    bullets: ["Peer-reviewed by two referees."]
 activities:
   - "Volunteer mentor, Community Data Club (2025–present)."
 cv_section_order: [education, publications, experience]
 cv_hidden_sections: [activities]
 ```
+
+**Check marks** (✓ U+2713 and ✔ U+2714) in profile text print as a check symbol in the
+PDF. The shipped CV and cover-letter templates load `amssymb` for this; a custom
+LaTeX template needs `\usepackage{amssymb}` in its preamble to render them (without it
+each mark prints as `?` rather than failing the compile). Older custom
+templates that lack the new `*_entries` template keys keep working and print the
+publication and activity headlines only, without bullets.
 
 For an LLM-guided setup from scratch or from a résumé PDF or Word document, ask
 your coding assistant to follow `skills/cv-tailor-setup/SKILL.md` in the checkout.
@@ -273,17 +347,17 @@ applications are not rewritten automatically.
 
 Useful variations:
 
-```powershell
+```bash
 # Give the company and role explicitly, instead of letting it infer them
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt `
+python cvtailor.py --profile-id sample-analyst generate --job-file job.txt \
     --company "Northwind Analytics GmbH" --role "Analytical Engineer"
 
 # Say which country the job is actually in (not the company headquarters)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt `
+python cvtailor.py --profile-id sample-analyst generate --job-file job.txt \
     --country Germany
 
 # Paste the posting inline instead of using a file
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job "We are looking for..."
+python cvtailor.py --profile-id sample-analyst generate --job "We are looking for..."
 ```
 
 **`--profile-id` is required and has no default.** That is deliberate: it makes it
@@ -306,15 +380,14 @@ Expect a minute or two. You will see progress in the terminal.
 Everything lands in your private store, **not** in this repository:
 
 ```
-Windows:  ..\cv-tailor-data\outputs\sample-analyst\<job_id>\
-macOS:    ~/cv-tailor-data/outputs/<profile_id>/<job_id>/
+<store>/outputs/<profile_id>/<job_id>/
 
     2026_CV_<your_name>_<role>.pdf          <- formatted CV with searchable text; parser behavior varies
     2026_CV_<your_name>_<role>_upload.docx  <- plain single-column Word CV for portal autofill
     2026_CV_<your_name>_<role>_upload.txt   <- plain-text copy for manual portal paste
     2026_cover_letter_<company>_<role>.pdf  <- the cover letter
     2026_cover_letter_<company>_<role>.docx <- Word version, if a form wants it
-    source\
+    source/
         content.json          <- the editable text (see revisions below)
         job_description.txt   <- the posting it worked from
         generation_result.json<- what was produced and whether it passed
@@ -325,12 +398,12 @@ date:
 
 ```powershell
 # Windows
-Get-ChildItem ..\cv-tailor-data\outputs\sample-analyst |
+Get-ChildItem <store>\outputs\<profile_id> |
     Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name, LastWriteTime
 ```
 ```bash
-# macOS
-ls -lt ~/cv-tailor-data/outputs/"$CVTAILOR_PROFILE_ID" | head -4
+# macOS / Linux
+ls -lt <store>/outputs/"$CVTAILOR_PROFILE_ID" | head -4
 ```
 
 ### 5. Read them before you send them
@@ -398,18 +471,18 @@ the generator does not load them automatically or treat them as new profile fact
 If you want to change wording yourself, edit the text and re-render. This costs
 nothing and does not touch the AI.
 
-1. Open `source\content.json` in the application folder.
+1. Open `source/content.json` in the application folder.
 2. Edit the text — `cv` and `cover_letter` sections.
 3. Re-render:
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst render `
-    --content "..\cv-tailor-data\outputs\sample-analyst\<job_id>\source\content.json"
+```bash
+python cvtailor.py --profile-id sample-analyst render \
+    --content "<store>/outputs/sample-analyst/<job_id>/source/content.json"
 ```
 
 Narrow it to one document if you only changed one:
 
-```powershell
+```bash
 # ...append --cv-only, or --cover-letter-only
 ```
 
@@ -419,13 +492,123 @@ into both the DOCX and PDF headers so the document carries the current submissio
 
 ---
 
+## Confirm-first suggestions
+
+Early in a career, true experience is often not written in the posting's vocabulary. The
+CV draft may therefore return up to eight **suggested claims**: short past-tense
+statements about closely related work, such as "Applied inclusion and exclusion criteria
+to define eligible cohorts", each tied to a profile entry it plausibly extends. They are
+statements for you to confirm or refuse, not questions, and not CV content. When a run
+stores any, `generate` prints a hint such as `3 suggested claims to review: cvtailor
+--profile-id <id> claims list --content ".../source/content.json"`. They are saved beside the application as
+`source/suggested_claims.json`, are **never** rendered, and cannot reach a document: the
+CV is rejected and redrafted if it uses a suggestion's wording that the profile does not
+already contain. Suggestions pointing at a profile entry that does not exist are dropped
+(with a log note) rather than failing the run. Older applications simply have none.
+
+Review them, and accept **only statements that are true of you**:
+
+```bash
+python cvtailor.py --profile-id sample-analyst claims list \
+    --content <store>/outputs/sample-analyst/<job_id>/source/content.json
+python cvtailor.py --profile-id sample-analyst claims accept 1 3 \
+    --content <store>/outputs/sample-analyst/<job_id>/source/content.json
+python cvtailor.py --profile-id sample-analyst claims reject 2 \
+    --content <store>/outputs/sample-analyst/<job_id>/source/content.json
+```
+
+`accept` shows the exact profile changes and asks for confirmation (`--yes` skips the
+prompt, so use it only after checking the list). Numbers are the 1-based numbers `list`
+prints. Accepting adds the text to your **private** profile: a bullet on the named
+experience or project, or an item in the named skills category. A new skills category is
+created only if you name it with `--category <name>`. Before writing, a timestamped
+`profile.backup-<timestamp>.yaml` is saved beside the profile, the profile is
+re-validated afterwards, and the backup is restored automatically if that fails. The
+edit is a targeted text insertion that keeps your comments and formatting; only for a
+layout it cannot edit safely does it fall back to rewriting the whole file (which drops
+comments) and say so in a warning. The accepted or rejected state is recorded in the
+application.
+
+In the web interface, the saved application's page has a **Suggested claims (confirm only
+what is true)** panel with checkboxes, an **Add selected to my profile** button (with an
+explicit confirmation step) and a **Dismiss selected** button, which marks the chosen
+suggestions as not wanted and never changes your profile (the same as `claims reject`). Either way the existing documents do not change: **regenerate
+the application** (for example `generate --job-file <...>/source/job_description.txt
+--no-cache`) so the confirmed claims can appear in a new CV.
+
+---
+
+## Writing rules the generator enforces
+
+These are checked on every draft, and a violation triggers the automatic retry
+([ADR 0026](DECISIONS/0026-profile-grounded-tailoring.md)):
+
+- **No gap statements.** The documents never say that a requirement, qualification or
+  language is missing ("no direct X experience", "limited experience", "although I lack").
+  Unmatched requirements are simply left out.
+- **Tense follows the profile.** A role that has ended is not described as current.
+- **Skills come from the profile.** A skill must match a profile skill, technology or
+  language, and spoken languages are not listed as skills. Retries cannot add skill categories.
+- **Numbers come from the profile.** Every figure in the summary and bullets must already
+  appear in your profile facts; metrics are never required.
+
+## Candidate guidance (optional)
+
+`<store>/profiles/<profile_id>/candidate_guidance.json` holds drafting constraints that are
+not facts, kept private and loaded only for that candidate. Version 1; unknown keys are
+rejected, and an invalid file stops generation instead of being ignored:
+
+```json
+{
+  "version": 1,
+  "cv": ["Describe the thesis project as completed."],
+  "cover_letter": ["Do not mention language level unless the posting asks for it."],
+  "layout": ["When shortening, keep the two most recent roles intact."],
+  "acronyms": ["FHIR", "CDISC"]
+}
+```
+
+- `cv`, `cover_letter` and `layout` are lists of up to 20 short instructions (2000
+  characters each). Each list **is** added to the matching model call (CV draft, letter
+  draft, layout retry), and changing them changes the cache key. Facts and country rules
+  still take precedence. Never put gaps or missing qualifications here as text for the
+  documents.
+- `acronyms` (optional) is a list of up to 100 single words, at most 32 characters each,
+  that keep their upper case in skill headings when the renderer title-cases them (for
+  example `FHIR`). It affects rendering only, per candidate, with no global state.
+
+See [ADR 0023](DECISIONS/0023-private-writing-voice.md).
+
+## Checking saved applications against the current rules
+
+After pulling a new version, or after editing a profile, re-check every saved application
+of one candidate for free. This runs offline: no network, no model, and it never writes to
+the store.
+
+```bash
+python cvtailor.py --profile-id sample-analyst applications check
+python cvtailor.py --profile-id sample-analyst applications check --render
+# the same check as a script
+python scripts/check_saved_applications.py --profile-id sample-analyst [--store <store>] [--render]
+```
+
+Each application prints `PASS` or `FAIL` with messages, and the command exits with code 1 if
+any application fails. A FAIL on an older application means today's validators would make
+the generator retry that draft (for example a gap phrase or an unsupported number); the saved
+documents are untouched, so decide whether to edit `source/content.json` and re-render, or
+regenerate. `--render` also re-renders each application into a temporary folder and reports
+the CV and cover-letter page counts (needs the PDF engine). The check does not cover the
+pipeline's work-authorization wording checks.
+
+---
+
 ## Re-running an application after a profile update
 
 If you have updated your profile and want the documents regenerated from scratch:
 
-```powershell
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate `
-    --job-file "..\cv-tailor-data\outputs\sample-analyst\<job_id>\source\job_description.txt" `
+```bash
+python cvtailor.py --profile-id sample-analyst generate \
+    --job-file "<store>/outputs/sample-analyst/<job_id>/source/job_description.txt" \
     --no-cache
 ```
 
@@ -439,12 +622,12 @@ the stored result and costs nothing — useful to know if you re-run by accident
 The tool can search public job boards for you. This is **free** — no API key and no
 AI call.
 
-```powershell
+```bash
 # See which sources are available and what each can do
-.\.venv\Scripts\python.exe cvtailor.py jobs sources
+python cvtailor.py jobs sources
 
 # Search
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search `
+python cvtailor.py --profile-id sample-analyst jobs search \
     --keywords "data engineer" --country DE --limit 10
 ```
 
@@ -455,9 +638,9 @@ machine-readable output.
 Sources currently wired: softgarden, Personio, Lever/Greenhouse/Ashby boards, and
 Arbeitnow. Some need configuration:
 
-```powershell
+```bash
 # Read a specific employer's board (repeatable)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search `
+python cvtailor.py --profile-id sample-analyst jobs search \
     --ats lever:somecompany:"Some Company" --only ats
 ```
 
@@ -465,20 +648,14 @@ Arbeitnow. Some need configuration:
 
 ## Using the web interface
 
-```powershell
-# Windows
-.\.venv\Scripts\python.exe scripts\start.py
-```
 ```bash
-# macOS
-.venv/bin/python scripts/start.py
+python scripts/start.py
 ```
 
 It prints two addresses; open the **UI** one. Keep the terminal open — Ctrl+C stops
 the services. Logs go to `.runtime/logs/`.
 
-> **The port is whatever `UI_PORT` in `.env` says** — 8501 for a fresh clone, but this
-> machine uses 8502 (and `BACKEND_PORT=8001`). Read the URL `start.py` prints rather
+> **The port is whatever `UI_PORT` in `.env` says** — 8501 for a fresh clone, but your `.env` may differ (for example 8502 and `BACKEND_PORT=8001`). Read the URL `start.py` prints rather
 > than assuming; it is printed precisely because it varies.
 >
 > If a port is already in use, startup **refuses** rather than killing whatever is
@@ -500,7 +677,11 @@ title. Open the preview or run PDF checks when you need them. Other downloads in
 Word and autofill files. To build missing autofill files for an older run, use
 **Create / refresh CV for autofill**. It uses the saved editable text and profile
 snapshot without a model call. For portals like Workday, try the plain `_upload.docx`
-when accepted and verify the extracted form fields.
+when accepted and verify the extracted form fields. The upload CV (DOCX and TXT) uses the
+same headings and dates as the PDF: the section is titled **Professional Experience**,
+months are short (`Apr 2023`), ranges use an en dash (`Apr 2023 – Present`), "Present"
+marks ongoing roles, and publication and activity detail bullets are nested
+sub-bullets.
 
 Open **Details** for the original posting, saved profile comparisons, the model's
 explanation and run history. The run history distinguishes requested models from
@@ -598,6 +779,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 > a writable folder, or concurrent LaTeX runs collide. Set them and retry:
 >
 > ```powershell
+> # Windows
 > $env:TEMP = (Join-Path $PWD ".tmp"); $env:TMP = $env:TEMP
 > ```
 >
@@ -611,7 +793,7 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 * **It never picks a profile for you.** No default, no "the only one".
 * **Your data never enters the repository.** Profiles, applications and generated
-  documents live in `..\cv-tailor-data`. This repo is public.
+  documents live in your private store (`CVTAILOR_STORE`), outside this checkout. This repo is public.
 * **It does not invent facts.** It tailors wording and emphasis from your real
   profile; it will not add a skill or employer you do not have.
 * **Sponsorship and permit wording goes only in cover letters, never the CV.**
@@ -623,43 +805,28 @@ clearer errors. `python cvtailor.py doctor` diagnoses most setup problems.
 
 ## Quick reference
 
-Windows uses `.\.venv\Scripts\python.exe`; **on macOS use `.venv/bin/python`**.
-
-```powershell
-# Setup
-.\.venv\Scripts\python.exe cvtailor.py doctor
-.\.venv\Scripts\python.exe cvtailor.py profile list
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst profile show
-
-# Generate (costs ~$0.003)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst generate --job-file job.txt
-
-# Find jobs (free)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst jobs search --keywords "data engineer"
-
-# Revise (free)
-.\.venv\Scripts\python.exe cvtailor.py --profile-id sample-analyst render --content <job_id>\source\content.json
-
-# Help
-.\.venv\Scripts\python.exe cvtailor.py                  # guided menu
-.\.venv\Scripts\python.exe cvtailor.py <command> --help
-```
-
-The macOS equivalents differ only in the interpreter and the line-continuation
-character:
+With the venv activated (see the top of this guide) the commands are identical on every OS; without activating, replace `python` with `.venv/bin/python` (macOS/Linux) or `.venv\Scripts\python.exe` (Windows).
 
 ```bash
 # Setup
-.venv/bin/python cvtailor.py doctor
-.venv/bin/python cvtailor.py profile list
+python cvtailor.py doctor
+python cvtailor.py profile list
+python cvtailor.py --profile-id <profile_id> profile show
 
 # Generate (costs ~$0.003)
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" generate --job-file job.txt
+python cvtailor.py --profile-id <profile_id> generate --job-file job.txt
 
 # Find jobs (free)
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" jobs search --keywords "data engineer"
+python cvtailor.py --profile-id <profile_id> jobs search --keywords "data engineer"
 
 # Revise (free)
-.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" render \
-    --content "$CVTAILOR_STORE/outputs/$CVTAILOR_PROFILE_ID/<job_id>/source/content.json"
+python cvtailor.py --profile-id <profile_id> render --content <store>/outputs/<profile_id>/<job_id>/source/content.json
+
+# Review suggested claims, then check saved applications (both free, offline)
+python cvtailor.py --profile-id <profile_id> claims list --content <store>/outputs/<profile_id>/<job_id>/source/content.json
+python cvtailor.py --profile-id <profile_id> applications check
+
+# Help
+python cvtailor.py                  # guided menu
+python cvtailor.py <command> --help
 ```

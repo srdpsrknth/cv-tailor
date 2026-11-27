@@ -4,7 +4,8 @@ Read-only: it fetches public endpoints and prints what actually came back.
 Nothing is written, nothing is stored. Run it to reproduce the ADR 0008 §1
 findings rather than trusting a summary.
 
-    .venv\\Scripts\\python.exe tools\\probe_job_sources.py
+    .venv/bin/python tools/probe_job_sources.py          (macOS/Linux)
+    .venv\\Scripts\\python.exe tools\\probe_job_sources.py   (Windows)
 """
 from __future__ import annotations
 

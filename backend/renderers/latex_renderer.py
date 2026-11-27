@@ -8,15 +8,49 @@ import subprocess
 import shutil
 import json
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from models.tailored_output import TailoredCV
 from models.profile import Profile
-from utils.text import escape_latex, format_skill_category, slugify
+from models.profile import certification_label, entry_bullets, entry_text
+from renderers.cv_sections import (
+    DATE_RANGE_SEPARATOR, DATE_RANGE_SEPARATOR_LATEX, LABELS, SECTION_TITLES,
+    education_highlights_line, find_profile_project, find_role, format_month_year,
+    project_as_subheading, project_heading, project_meta, project_technologies_line,
+    role_company_label,
+)
+from utils.calendar import calendar_today, configured_timezone_name
+from utils.text import escape_latex, format_skill_category, latex_url, slugify
+
+
+def discover_texlive_pdflatex(
+    windows_roots: Optional[list] = None, unix_roots: Optional[list] = None
+) -> list:
+    """Find ``pdflatex`` in per-year TeX Live directories, newest year first.
+
+    TeX Live installs to ``<root>/<year>/bin/<platform>/pdflatex``:
+    ``C:\\texlive\\2025\\bin\\windows`` or ``bin\\win64`` on Windows and
+    ``/usr/local/texlive/2025/bin/<arch>-<os>/pdflatex`` on Linux and macOS. The year
+    is a wildcard, so a new release needs no code change. The roots are parameters
+    so tests can point them at a temporary directory.
+    """
+    if windows_roots is None:
+        system_drive = os.getenv("SystemDrive", "C:")
+        windows_roots = [Path(system_drive + "/texlive")]
+    if unix_roots is None:
+        unix_roots = [Path("/usr/local/texlive")]
+
+    found: list = []
+    for root in windows_roots:
+        for pattern in ("*/bin/windows/pdflatex.exe", "*/bin/win64/pdflatex.exe"):
+            found.extend(Path(root).glob(pattern))
+    for root in unix_roots:
+        found.extend(Path(root).glob("*/bin/*/pdflatex"))
+    # Year directories are four digits, so a reverse string sort is newest first.
+    return [str(path) for path in sorted(found, key=lambda path: str(path), reverse=True)]
 
 
 class LaTeXRendererError(Exception):
@@ -30,7 +64,9 @@ class LaTeXRenderer:
     def __init__(
         self,
         templates_dir: Optional[str] = None,
-        outputs_dir: Optional[str] = None
+        outputs_dir: Optional[str] = None,
+        timezone_name: Optional[str] = None,
+        extra_acronyms: Iterable[str] = (),
     ):
         """
         Initialize LaTeX renderer.
@@ -38,7 +74,12 @@ class LaTeXRenderer:
         Args:
             templates_dir: Path to templates directory
             outputs_dir: Path to outputs directory
+            timezone_name: IANA zone for the file-name year (default: ``CVTAILOR_TIMEZONE``,
+                else the machine's local clock), like the DOCX renderer.
         """
+        self.timezone_name = timezone_name or configured_timezone_name()
+        # One candidate's own skill-heading acronyms; per instance, never global.
+        self.extra_acronyms = tuple(extra_acronyms)
         if templates_dir is None:
             templates_dir = Path(__file__).parent.parent.parent / "templates" / "cv"
         if outputs_dir is None:
@@ -69,11 +110,12 @@ class LaTeXRenderer:
             "/opt/homebrew/bin/pdflatex",
             # Linux conventions.
             "/usr/bin/pdflatex",
-            "/usr/local/texlive/bin/pdflatex",
             # Windows -- MiKTeX and TeX Live.
             str(Path(os.getenv("ProgramFiles", "C:/Program Files")) / "MiKTeX/miktex/bin/x64/pdflatex.exe"),
             str(Path(os.getenv("ProgramFiles(x86)", "C:/Program Files (x86)")) / "MiKTeX/miktex/bin/x64/pdflatex.exe"),
             str(local_app_data / "Programs/MiKTeX/miktex/bin/x64/pdflatex.exe"),
+            # TeX Live installs into a per-year directory (newest year first).
+            *discover_texlive_pdflatex(),
         ]
 
         # Ensure directories exist
@@ -102,7 +144,9 @@ class LaTeXRenderer:
         source prose. The returned PDF is a preview, with no save side effect.
         """
         with tempfile.TemporaryDirectory(prefix="cvtailor-layout-preview-") as scratch:
-            renderer = LaTeXRenderer(templates_dir=self.templates_dir, outputs_dir=scratch)
+            renderer = LaTeXRenderer(templates_dir=self.templates_dir, outputs_dir=scratch,
+                                     timezone_name=self.timezone_name,
+                                     extra_acronyms=self.extra_acronyms)
             path = renderer._render_cv(
                 tailored_cv, profile, job_position, layout_preset=layout_preset,
                 explore_breaks=True,
@@ -148,7 +192,7 @@ class LaTeXRenderer:
     ) -> str:
         job_pos = job_position or tailored_cv.title or "role"
         safe_job = self._slugify(job_pos)
-        year = datetime.now().year
+        year = calendar_today(self.timezone_name).year
 
         try:
             # Load template
@@ -176,6 +220,18 @@ class LaTeXRenderer:
                        if f"section == '{section}'" not in template_source]
         if unsupported:
             profile = profile.model_copy(update={"cv_hidden_sections": [*profile.cv_hidden_sections, *unsupported]})
+        # Compatibility: a custom template that predates ``publication_entries`` /
+        # ``activity_entries`` prints headlines only, so the text-preservation check must
+        # not expect detail bullets it cannot show (see _prepare_template_data).
+        legacy_entries = {
+            section: [entry_text(entry) for entry in getattr(profile, section)]
+            for section, key in (("publications", "publication_entries"),
+                                 ("activities", "activity_entries"))
+            if key not in template_source
+            and any(entry_bullets(entry) for entry in getattr(profile, section))
+        }
+        if legacy_entries:
+            profile = profile.model_copy(update=legacy_entries)
         template_data = self._prepare_template_data(tailored_cv, profile)
         name_slug = self._slugify(profile.identity.full_name or "applicant")
         base_name = f"{year}_CV_{name_slug}_{safe_job}"
@@ -328,9 +384,16 @@ class LaTeXRenderer:
             fields[f"Start {index}"] = self._format_date(exp.start_date)
             fields[f"End {index}"] = self._format_date(exp.end_date)
             experience_paragraphs.extend(exp.bullets)
-            for project in (exp.projects if "employer_projects" not in profile.cv_hidden_sections else []):
+            role = find_role(profile, exp.company)
+            for project_index, project in enumerate(
+                exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
+            ):
                 experience_paragraphs.append(project.name)
                 experience_paragraphs.extend(project.bullets)
+                self._project_fields(
+                    fields, f"Role {index} project {project_index}",
+                    find_profile_project(role, project.name), with_name=False,
+                )
             for item_index, item in enumerate(self._get_technologies_for_company(exp.company, profile)):
                 fields[f"Technology {index}/{item_index}"] = item
         prose_by_section = {
@@ -340,30 +403,49 @@ class LaTeXRenderer:
                 for line in (project.name, *project.bullets)
             ],
         }
+        if "projects" in sections:
+            for index, project in enumerate(cv.resolve_standalone_projects(profile)):
+                self._project_fields(fields, f"Project {index}", project)
         paragraphs = list(cv.summary) if "summary" not in profile.cv_hidden_sections else []
         for section in sections:
             paragraphs.extend(prose_by_section.get(section, ()))
         for category, items in (cv.skills.items() if "skills" in sections else ()):
-            fields[f"Skill category {category}"] = format_skill_category(category)
+            fields[f"Skill category {category}"] = format_skill_category(category, self.extra_acronyms)
             for index, item in enumerate(items):
                 fields[f"Skill {category}/{index}"] = item
         if cv.include_education and "education" in sections:
             for index, edu in enumerate(profile.education):
                 fields[f"Degree {index}"] = edu.degree
                 fields[f"Institution {index}"] = edu.institution
-                fields[f"Education dates {index}"] = edu.date_range(" -- ")
+                fields[f"Education dates {index}"] = edu.date_range(DATE_RANGE_SEPARATOR)
                 if edu.location:
                     fields[f"Education location {index}"] = edu.location
+                if education_highlights_line(edu):
+                    fields[f"Education highlights {index}"] = education_highlights_line(edu)
         if cv.include_certifications and "certifications" in sections:
             for index, item in enumerate(profile.certifications):
-                fields[f"Certification {index}"] = item
+                fields[f"Certification {index}"] = certification_label(item)
         for index, language in enumerate(profile.languages if "languages" in sections else []):
             fields[f"Language {index}"] = f"{language.name}: {language.proficiency}"
         for section in ("publications", "activities"):
             if section in sections:
                 for index, entry in enumerate(getattr(profile, section)):
-                    fields[f"{section.title()} {index}"] = entry
+                    fields[f"{section.title()} {index}"] = entry_text(entry)
+                    for bullet_index, bullet in enumerate(entry_bullets(entry)):
+                        fields[f"{section.title()} {index} bullet {bullet_index}"] = bullet
         return paragraphs, fields
+
+    @staticmethod
+    def _project_fields(fields, label, project, with_name=True) -> None:
+        """Visible metadata of a project, checked in the extracted PDF text."""
+        if project is None:
+            return
+        meta = project_meta(project)
+        if meta:
+            fields[f"{label} heading"] = project_heading(project) if with_name else meta
+        line = project_technologies_line(project)
+        if line:
+            fields[f"{label} technologies"] = line
 
     def _prepare_template_data(
         self,
@@ -395,18 +477,24 @@ class LaTeXRenderer:
                 "bullets": [self._escape_latex(b) for b in exp.bullets],
                 "technologies": [self._escape_latex(t) for t in self._get_technologies_for_company(exp.company, profile)]
             }
+            role = find_role(profile, exp.company)
+            # The short name is for compact places only; the heading keeps the employer.
+            exp_data["project_company"] = self._escape_latex(role_company_label(role, exp.company))
 
             # Handle new projects structure
             if exp.projects and "employer_projects" not in profile.cv_hidden_sections:
                 exp_data["projects"] = [
                     {
                         "name": self._escape_latex(proj.name),
-                        "bullets": [self._escape_latex(b) for b in proj.bullets]
+                        "bullets": [self._escape_latex(b) for b in proj.bullets],
+                        **self._project_extras(find_profile_project(role, proj.name)),
                     }
                     for proj in exp.projects
                 ]
             else:
                 exp_data["projects"] = []
+            exp_data["project_as_subheading"] = project_as_subheading(
+                exp, show_projects=bool(exp_data["projects"]))
 
             experiences.append(exp_data)
 
@@ -425,15 +513,27 @@ class LaTeXRenderer:
             "phone": identity.phone or "",
             "linkedin": identity.linkedin or "",
             "github": identity.github or "",
+            **self._contact_context(identity),
             "summary": [self._escape_latex(s) for s in tailored_cv.summary]
             if "summary" not in profile.cv_hidden_sections else [],
             "experience": experiences,
             "cv_section_order": profile.visible_cv_sections(),
-            "publications": [self._escape_latex(entry) for entry in profile.publications],
-            "activities": [self._escape_latex(entry) for entry in profile.activities],
+            "section_titles": dict(SECTION_TITLES),
+            "labels": {key: self._escape_latex(value) for key, value in LABELS.items()},
+            "date_separator": DATE_RANGE_SEPARATOR_LATEX,
+            # Template compatibility: older custom templates only know the plain
+            # ``publications`` / ``activities`` text lists, so they print each entry's
+            # headline but not its detail bullets. The shipped template uses the
+            # ``*_entries`` keys (text + bullets). Keep both keys: do not remove or
+            # rename the plain lists, and add new data under new keys instead.
+            "publications": [self._escape_latex(entry_text(entry)) for entry in profile.publications],
+            "activities": [self._escape_latex(entry_text(entry)) for entry in profile.activities],
+            "publication_entries": self._entries(profile.publications),
+            "activity_entries": self._entries(profile.activities),
             "standalone_projects": [
                 {"name": self._escape_latex(project.name),
-                 "bullets": [self._escape_latex(bullet) for bullet in project.bullets]}
+                 "bullets": [self._escape_latex(bullet) for bullet in project.bullets],
+                 **self._project_extras(project)}
                 for project in tailored_cv.resolve_standalone_projects(profile)
             ],
             "education": [
@@ -441,16 +541,17 @@ class LaTeXRenderer:
                     "degree": self._escape_latex(edu.degree),
                     "institution": self._escape_latex(edu.institution),
                     "location": self._escape_latex(edu.location or ""),
-                    "dates": edu.date_range(" -- "),
+                    "dates": edu.date_range(DATE_RANGE_SEPARATOR_LATEX),
+                    "highlights": self._escape_latex(education_highlights_line(edu) or ""),
                     # Keep these keys for historical/custom templates.
                     "start_year": edu.start_year,
                     "end_year": edu.end_date_label() if edu.ongoing else edu.end_year,
                 }
                 for edu in profile.education
             ] if tailored_cv.include_education else [],
-            "certifications": [self._escape_latex(c) for c in profile.certifications] if tailored_cv.include_certifications else [],
+            "certifications": [self._escape_latex(certification_label(c)) for c in profile.certifications] if tailored_cv.include_certifications else [],
             "skills": {
-                self._escape_latex(format_skill_category(category)): [self._escape_latex(s) for s in skills]
+                self._escape_latex(format_skill_category(category, self.extra_acronyms)): [self._escape_latex(s) for s in skills]
                 for category, skills in tailored_cv.skills.items()
             },
             "languages": [
@@ -460,6 +561,48 @@ class LaTeXRenderer:
                 }
                 for lang in profile.languages
             ]
+        }
+
+    def _entries(self, entries) -> list:
+        return [
+            {"text": self._escape_latex(entry_text(entry)),
+             "bullets": [self._escape_latex(bullet) for bullet in entry_bullets(entry)]}
+            for entry in entries
+        ]
+
+    def _project_extras(self, project) -> Dict[str, Any]:
+        """Optional metadata of a profile project, empty when none is set."""
+        if project is None:
+            return {"meta": "", "technologies_line": ""}
+        return {
+            "meta": self._escape_latex(project_meta(project)),
+            "technologies_line": self._escape_latex(", ".join(
+                item.strip() for item in project.technologies if item.strip())),
+        }
+
+    @staticmethod
+    def _contact_context(identity) -> Dict[str, str]:
+        """LaTeX-safe display text and ``\\href`` targets for the contact fields.
+
+        ``*_display`` is escaped body text; ``*_url`` is safe inside ``\\href{...}``.
+        """
+        email = (identity.email or "").strip()
+        phone = (identity.phone or "").strip()
+        linkedin = (identity.linkedin or "").strip()
+        github = (identity.github or "").strip()
+
+        def short(url: str) -> str:
+            return re.sub(r"^https?://(?:www\.)?", "", url)
+
+        return {
+            "email_display": escape_latex(email),
+            "email_url": latex_url("mailto:" + email) if email else "",
+            "phone_display": escape_latex(phone),
+            "phone_url": latex_url("tel:" + re.sub(r"\s+", "", phone)) if phone else "",
+            "linkedin_display": escape_latex(short(linkedin)),
+            "linkedin_url": latex_url(linkedin),
+            "github_display": escape_latex(short(github)),
+            "github_url": latex_url(github),
         }
 
     def _get_location_for_company(self, company: str, profile: Profile) -> str:
@@ -497,7 +640,7 @@ class LaTeXRenderer:
 
     def _compile_pdf_pdflatex(self, tex_path: Path, pdf_path: Path) -> Path:
         """
-        Compile LaTeX to PDF using pdflatex (fallback if tectonic unavailable).
+        Compile LaTeX to PDF using pdflatex.
 
         Args:
             tex_path: Path to .tex file
@@ -531,6 +674,8 @@ class LaTeXRenderer:
                     ],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=120,
                     env=env
                 )
@@ -622,32 +767,19 @@ class LaTeXRenderer:
 
     @staticmethod
     def _format_date(date_str: str) -> str:
+        """``YYYY-MM`` -> ``Aug 2025``; blank or ``present`` -> ``Present``.
+
+        Uses a fixed English month table, so the result never depends on the OS locale.
+        Anything unparsable is returned unchanged.
         """
-        Format date from YYYY-MM to 'Aug 2025' format.
-        Handles 'present' as-is.
-
-        Args:
-            date_str: Date in YYYY-MM format or 'present'
-
-        Returns:
-            Formatted date string like 'Aug 2025' or 'present'
-        """
-        if not date_str or date_str.lower() == 'present':
-            return 'present'
-
-        try:
-            # Parse YYYY-MM format
-            date_obj = datetime.strptime(date_str, '%Y-%m')
-            # Format as 'Aug 2025'
-            return date_obj.strftime('%b %Y')
-        except ValueError:
-            # If parsing fails, return original string
-            return date_str
+        return format_month_year(date_str)
 
 
 def create_latex_renderer(
     templates_dir: Optional[str] = None,
-    outputs_dir: Optional[str] = None
+    outputs_dir: Optional[str] = None,
+    timezone_name: Optional[str] = None,
+    extra_acronyms: Iterable[str] = (),
 ) -> LaTeXRenderer:
     """
     Create and return a LaTeXRenderer instance.
@@ -659,4 +791,5 @@ def create_latex_renderer(
     Returns:
         Initialized LaTeXRenderer
     """
-    return LaTeXRenderer(templates_dir=templates_dir, outputs_dir=outputs_dir)
+    return LaTeXRenderer(templates_dir=templates_dir, outputs_dir=outputs_dir,
+                         timezone_name=timezone_name, extra_acronyms=extra_acronyms)

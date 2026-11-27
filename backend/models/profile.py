@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from typing import Annotated, List, Dict, Literal, Optional
-from pydantic import BaseModel, Field, ConfigDict, StringConstraints, field_validator, model_validator
+import re
+from typing import Annotated, Any, ClassVar, List, Dict, Literal, Optional, Union
+from pydantic import (
+    BaseModel, Field, ConfigDict, StringConstraints, field_validator, model_serializer,
+    model_validator,
+)
 
 
 CVSection = Literal["experience", "projects", "education", "certifications", "skills", "languages",
@@ -9,6 +13,30 @@ CVSection = Literal["experience", "projects", "education", "certifications", "sk
 DEFAULT_CV_SECTION_ORDER = ("experience", "projects", "education", "certifications", "skills", "languages",
                             "publications", "activities")
 CVEntry = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, pattern=r"^[^\r\n]+$")]
+
+
+class _OmitDefaultsWhenNew(BaseModel):
+    """Serialise newer optional fields only when they carry a value.
+
+    Fields added after profiles already existed (dates, highlights, ``optional`` ...)
+    are dropped from ``model_dump`` while they hold their default. That keeps the
+    profile bytes shown to the model, and therefore the generation cache key and the
+    saved profile snapshot, identical for every profile that does not use them, and
+    changes them as soon as one is set.
+    """
+
+    _omit_when_default: ClassVar[tuple] = ()
+
+    @model_serializer(mode="wrap")
+    def _serialise_without_unused_new_fields(self, handler) -> Any:
+        data = handler(self)
+        if isinstance(data, dict):
+            for name in self._omit_when_default:
+                if name in data and data[name] == self.__class__.model_fields[name].get_default(
+                    call_default_factory=True
+                ):
+                    del data[name]
+        return data
 
 
 def resolve_cv_section_order(preferred, hidden=()):
@@ -40,17 +68,28 @@ class Identity(BaseModel):
 # Experience sub-structures
 # -------------------------
 
-class Project(BaseModel):
+class Project(_OmitDefaultsWhenNew):
     model_config = ConfigDict(extra="forbid")
+    _omit_when_default = ("dates", "technologies", "context")
 
     name: str
     bullets: List[str] = Field(default_factory=list)
+    #: Free-text period, e.g. "2024" or "Mar 2024 - Jun 2024". Shown, never parsed.
+    dates: Optional[str] = None
+    technologies: List[str] = Field(default_factory=list)
+    #: What kind of work this was, e.g. "University team project".
+    context: Optional[str] = None
 
 
-class Experience(BaseModel):
+class Experience(_OmitDefaultsWhenNew):
     model_config = ConfigDict(extra="forbid")
+    _omit_when_default = ("optional", "display_name")
 
     company: str
+    #: Short company name for compact places (the project parenthetical).
+    display_name: Optional[str] = None
+    #: An optional role may be left out of a tailored CV when irrelevant or for space.
+    optional: bool = False
     location: Optional[str] = None
     role: str
     start_date: str          # YYYY-MM
@@ -64,8 +103,9 @@ class Experience(BaseModel):
 # Education & languages
 # -------------------------
 
-class Education(BaseModel):
+class Education(_OmitDefaultsWhenNew):
     model_config = ConfigDict(extra="forbid")
+    _omit_when_default = ("highlights",)
 
     degree: str
     institution: str
@@ -73,6 +113,8 @@ class Education(BaseModel):
     start_year: int
     end_year: Optional[int] = None
     ongoing: bool = False
+    #: Coursework, thesis title, focus. Rendered as one compact line under the degree.
+    highlights: List[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_completion(self):
@@ -87,6 +129,49 @@ class Education(BaseModel):
 
     def date_range(self, separator: str = " - ") -> str:
         return f"{self.start_year}{separator}{self.end_date_label()}"
+
+
+class Certification(BaseModel):
+    """A certification with provenance; a bare string stays valid."""
+    model_config = ConfigDict(extra="forbid")
+
+    name: CVEntry
+    issuer: Optional[str] = None
+    year: Optional[str] = None
+
+    @field_validator("year", mode="before")
+    @classmethod
+    def _year_may_be_a_number(cls, value):
+        return str(value) if isinstance(value, int) and not isinstance(value, bool) else value
+
+    def label(self) -> str:
+        details = ", ".join(part.strip() for part in (self.issuer, self.year) if part and part.strip())
+        return f"{self.name} ({details})" if details else self.name
+
+
+class CVEntryWithBullets(BaseModel):
+    """A publication or activity with supporting bullets.
+
+    ``text`` is the citation or headline and is always rendered verbatim.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    text: CVEntry
+    bullets: List[str] = Field(default_factory=list)
+
+
+def entry_text(entry) -> str:
+    """The headline text of a publication/activity, whichever spelling it uses."""
+    return entry if isinstance(entry, str) else entry.text
+
+
+def entry_bullets(entry) -> List[str]:
+    return [] if isinstance(entry, str) else list(entry.bullets)
+
+
+def certification_label(entry) -> str:
+    """``name (issuer, year)`` for a structured certification; a string verbatim."""
+    return entry if isinstance(entry, str) else entry.label()
 
 
 class Language(BaseModel):
@@ -157,6 +242,44 @@ class ProfileRules(BaseModel):
 # Root profile model
 # -------------------------
 
+class LetterPreferences(BaseModel):
+    """Optional cover-letter wording preferences of this candidate.
+
+    Both fields are optional; an unset field keeps the built-in wording
+    (``Dear {company} Hiring Team,`` and the letter's own closing line, normally
+    ``Warm regards,``). ``{company}`` is the only placeholder the salutation accepts.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    salutation: Optional[str] = None
+    sign_off: Optional[str] = None
+
+    @field_validator("salutation", "sign_off")
+    @classmethod
+    def _single_nonblank_line(cls, value):
+        if value is None:
+            return value
+        if not value or "\n" in value or "\r" in value:
+            raise ValueError("must be one non-empty line of text.")
+        return value
+
+    @field_validator("salutation")
+    @classmethod
+    def _only_company_placeholder(cls, value):
+        if value is not None and re.search(r"[{}]", value.replace("{company}", "")):
+            raise ValueError("the only placeholder allowed is {company}.")
+        return value
+
+    def salutation_for(self, company: str) -> Optional[str]:
+        """The salutation for ``company``, or ``None`` to use the built-in one."""
+        if not self.salutation:
+            return None
+        company = (company or "").strip()
+        text = self.salutation.replace("{company} ", f"{company} " if company else "")
+        return " ".join(text.replace("{company}", company).split())
+
+
 class JobSearchDefaults(BaseModel):
     """Optional starting filters for this candidate's job searches."""
 
@@ -168,22 +291,28 @@ class JobSearchDefaults(BaseModel):
     remote_only: bool = False
 
 
-class Profile(BaseModel):
+class Profile(_OmitDefaultsWhenNew):
     model_config = ConfigDict(extra="forbid")
+    _omit_when_default = ("standalone_projects_policy", "letter")
 
     version: str
     identity: Identity
     summary_base: List[str] = Field(default_factory=list)
     experience: List[Experience] = Field(default_factory=list)
     education: List[Education] = Field(default_factory=list)
-    certifications: List[str] = Field(default_factory=list)
+    certifications: List[Union[str, Certification]] = Field(default_factory=list)
     skills: Dict[str, List[str]] = Field(default_factory=dict)
     languages: List[Language] = Field(default_factory=list)
     rules: Optional[ProfileRules] = None
     job_search: Optional[JobSearchDefaults] = None
+    #: Optional private cover-letter wording (salutation, sign-off).
+    letter: Optional[LetterPreferences] = None
     standalone_projects: List[Project] = Field(default_factory=list)
-    publications: List[CVEntry] = Field(default_factory=list)
-    activities: List[CVEntry] = Field(default_factory=list)
+    publications: List[Union[CVEntry, CVEntryWithBullets]] = Field(default_factory=list)
+    activities: List[Union[CVEntry, CVEntryWithBullets]] = Field(default_factory=list)
+    #: "select": the model chooses which standalone projects to show.
+    #: "all": every one appears, in profile order.
+    standalone_projects_policy: Literal["select", "all"] = "select"
     cv_section_order: List[CVSection] = Field(default_factory=list)
     cv_hidden_sections: List[CVSection | Literal["summary", "employer_projects"]] = Field(default_factory=list)
 

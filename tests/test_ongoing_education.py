@@ -25,8 +25,8 @@ def test_education_validation_and_legacy_snapshot(analyst_profile):
 
 
 @pytest.mark.parametrize(('end_year', 'expected'), [
-    (None, '2025 - Present'),
-    (2028, '2025 - Present (expected 2028)'),
+    (None, '2025 – Present'),
+    (2028, '2025 – Present (expected 2028)'),
 ])
 def test_ongoing_education_in_exports(tmp_path, analyst_profile, end_year, expected):
     education = Education(degree='MSc', institution='College', start_year=2025,
@@ -41,10 +41,10 @@ def test_ongoing_education_in_exports(tmp_path, analyst_profile, end_year, expec
 
     renderer = LaTeXRenderer(outputs_dir=str(tmp_path))
     data = renderer._prepare_template_data(cv, profile)
-    latex_dates = expected.replace(' - ', ' -- ')
+    latex_dates = expected.replace(' – ', ' -- ')
     assert data['education'][0]['dates'] == latex_dates
     assert data['education'][0]['end_year'] == latex_dates.split(' -- ', 1)[1]
-    assert renderer._extraction_contract(cv, profile)[1]['Education dates 0'] == latex_dates
+    assert renderer._extraction_contract(cv, profile)[1]['Education dates 0'] == expected
     from renderers.cv_layout import PRESETS
     source = renderer.jinja_env.get_template('main.tex.jinja2').render(
         **data, layout=PRESETS[0], break_before_employer_index=None, split_before=None

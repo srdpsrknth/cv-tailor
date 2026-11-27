@@ -1,6 +1,6 @@
 # 0015 — A validated-generation cache keyed by the bytes the model was shown
 
-**Status:** Approved (2026-10-26) — implemented in Phase 3, item 5
+**Status:** Approved (2026-10-26) — implemented in Phase 3, item 5. **Amended by ADR 0029 (2026-11-27).**
 **Related:** [0004](0004-storage.md) (the store layout this extends),
 [0011](0011-private-store-location.md) (derived data stays out of the public
 repository), [0012](0012-structured-output-scope.md) (the per-call schema that
@@ -159,3 +159,12 @@ profile block that was sent.
 | Put the cache inside `<store>/outputs/` | Anything listing a candidate's applications would start returning cache entries |
 | Put the cache beside the outputs when the caller named a loose `--profile <path>` | `<repo>/outputs/` is gitignored but a sibling `<repo>/cache/` is not, so this wrote real accepted documents into the public repository's working tree. `evaluation/live.py` takes exactly this branch, so it was reachable by the paid live run. The store root is available either way, so the fallback bought nothing |
 | Evict by LRU or by age | Real complexity (a policy, a clock, a size budget) for a single-user tool where the whole directory is safe to delete. Deferred, and recorded as an open follow-up |
+
+## Amended by ADR 0029
+
+[ADR 0029](0029-pipeline-fingerprint-cache-key.md) adds a `pipeline_version` ingredient to the key,
+produced by `services/pipeline_fingerprint.py`. It hashes the prompt-building functions' source and
+`EDITORIAL_REQUIREMENTS`, the layout budget and attempt constants (read at call time), the CV
+template bytes and the validation modules' source, with line endings normalised so Windows and
+macOS agree. The text above describes the original key and remains the history. Hits are still
+re-validated on read.

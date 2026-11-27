@@ -20,18 +20,19 @@ tool-independent.
 4. **[`docs/ROADMAP.md`](../docs/ROADMAP.md)** — proposed phases, MVP and dependencies.
 5. **[`docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md)** — worktrees, environment isolation,
    ports, Git workflow, cross-machine sync.
-6. **[`docs/TESTING.md`](../docs/TESTING.md)** — test baseline, the Windows sandbox caveat,
+6. **[`docs/TESTING.md`](../docs/TESTING.md)** — test baseline, the sandbox caveat,
    and the regression strategy.
 7. **[`docs/DECISIONS/`](../docs/DECISIONS/)** — settled architecture decisions.
-8. **[`docs/MAC_SETUP.md`](../docs/MAC_SETUP.md)** — fresh macOS setup.
+8. **[`docs/MAC_SETUP.md`](../docs/MAC_SETUP.md)** — fresh macOS setup (Windows: `DEVELOPMENT.md`).
 9. **[`.agents/skills/cv-tailor-application/SKILL.md`](../.agents/skills/cv-tailor-application/SKILL.md)** —
-   generating and revising real applications.
+   generating and revising real applications; entry point for onboarding and user workflows is
+   **[`skills/cv-tailor-setup/SKILL.md`](../skills/cv-tailor-setup/SKILL.md)**.
 
 ## Quick reference
 
-- Development branch: `refactor/architecture-v2` (worktree `cv-tailor-next`).
-  Stable branch: `master` (worktree `cv-tailor`) — keep it usable, never merge without approval.
-- Interpreter: `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (macOS).
+- Stable branch: `master` — keep it usable, never merge without approval. Development
+  branches and worktrees: see `docs/DEVELOPMENT.md`.
+- Interpreter: `.venv/bin/python` (macOS/Linux) or `.venv\Scripts\python.exe` (Windows).
 - Tests: `python -m pytest -q`.
 - Never commit credentials, `.env`, virtual environments, logs, or generated PDFs/DOCX.
 - Never commit real candidate data into fixtures — use synthetic profiles.

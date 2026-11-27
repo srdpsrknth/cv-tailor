@@ -5,7 +5,8 @@ against *recorded* payloads; only this proves the recorded payloads still match
 what the sources serve. It is read-only, free, and makes a handful of requests
 against public endpoints with an honest User-Agent and a small budget.
 
-    .venv\\Scripts\\python.exe tools\\smoke_job_connectors.py [--limit N]
+    .venv/bin/python tools/smoke_job_connectors.py [--limit N]          (macOS/Linux)
+    .venv\\Scripts\\python.exe tools\\smoke_job_connectors.py [--limit N]   (Windows)
 """
 from __future__ import annotations
 

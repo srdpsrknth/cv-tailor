@@ -34,6 +34,14 @@ cvtailor -- tailor a CV and cover letter from the terminal
     cvtailor render                     Re-render the last saved content
                                         (no API calls, no cost)
 
+  Confirm-first suggestions:
+
+    cvtailor claims list --content <app>/source/content.json
+                                        Numbered claims the model asks about
+    cvtailor claims accept 1 3          Add TRUE ones to your private profile
+    cvtailor applications check         Re-check saved applications against the
+                                        current rules (free, offline)
+
   Discover jobs (Phase 4):
 
     cvtailor jobs sources               Which job sources are available
@@ -122,8 +130,57 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--mirror-configured", action="store_true",
                         help="Also copy artifacts to OUTPUTS_DIR.")
 
+    # --- claims (confirm-first suggestions) --------------------------------------------
+    claims = subparsers.add_parser(
+        "claims",
+        help="Review the model's suggested claims for an application (confirm-first).",
+        description="The model may ask whether plausible, unconfirmed statements are true of "
+                    "you. They never appear in a document by themselves. Accept ONLY "
+                    "statements that are TRUE: accepting writes them into your private "
+                    "profile (after a timestamped backup), and a regeneration may then use "
+                    "them. No API calls are made.",
+    )
+    claims_sub = claims.add_subparsers(dest="claims_action", metavar="<action>")
+    content_help = "Path to <application>/source/content.json (default: newest application)."
+    claims_list = claims_sub.add_parser("list", help="Show the numbered suggestions.")
+    claims_list.add_argument("--content", type=str, help=content_help)
+    claims_accept = claims_sub.add_parser(
+        "accept",
+        help="Add the chosen suggestions to your profile. Accept only TRUE statements.",
+        description="Shows the exact profile changes and asks for confirmation. Add only "
+                    "statements that are TRUE of you; an accepted claim becomes a profile "
+                    "fact that generated documents may use.",
+    )
+    claims_accept.add_argument("numbers", nargs="+", type=int, metavar="<number>",
+                               help="Suggestion numbers from `claims list` (1-based).")
+    claims_accept.add_argument("--content", type=str, help=content_help)
+    claims_accept.add_argument("--category", metavar="<name>",
+                               help="For skill suggestions: add to this skills category "
+                                    "instead, creating it if it does not exist.")
+    claims_accept.add_argument("--yes", action="store_true",
+                               help="Confirm without prompting: you state these are TRUE.")
+    claims_reject = claims_sub.add_parser("reject", help="Mark suggestions as not true or not wanted.")
+    claims_reject.add_argument("numbers", nargs="+", type=int, metavar="<number>")
+    claims_reject.add_argument("--content", type=str, help=content_help)
+
+    # --- applications -----------------------------------------------------------------
+    applications = subparsers.add_parser(
+        "applications", help="Check saved applications. Offline: no API calls, no writes."
+    )
+    applications_sub = applications.add_subparsers(dest="applications_action", metavar="<action>")
+    applications_check = applications_sub.add_parser(
+        "check",
+        help="Re-validate every saved application with the current rules (PASS/FAIL each).",
+        description="Runs the current CV and cover-letter validators over every saved "
+                    "<store>/outputs/<id>/<job>/source/content.json. Exits non-zero if any "
+                    "fails. Never calls the network or an LLM and never modifies the store.",
+    )
+    applications_check.add_argument(
+        "--render", action="store_true",
+        help="Also re-render each application into a temporary folder and report page counts.")
+
     # --- jobs (Phase 4) ---------------------------------------------------------------
-    jobs = subparsers.add_parser(
+    jobs =subparsers.add_parser(
         "jobs", help="Discover and rank postings. Free: no API key, no LLM call."
     )
     jobs_sub = jobs.add_subparsers(dest="jobs_action", metavar="<action>")
@@ -168,6 +225,12 @@ def _dispatch(args, console: Console, config) -> int:
     if command == "render":
         from cli.commands import render
         return render.run(args, console, config)
+    if command == "claims":
+        from cli.commands import claims
+        return claims.run(args, console, config)
+    if command == "applications":
+        from cli.commands import applications
+        return applications.run(args, console, config)
     if command == "jobs":
         from cli.commands import jobs
         return jobs.run(args, console, config)

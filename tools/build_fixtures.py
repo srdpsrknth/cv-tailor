@@ -2,7 +2,8 @@
 
 Not part of the test suite. Run from the repository root:
 
-    .venv\\Scripts\\python.exe tools/build_fixtures.py
+    .venv/bin/python tools/build_fixtures.py             (macOS/Linux)
+    .venv\\Scripts\\python.exe tools/build_fixtures.py   (Windows)
 
 It writes synthetic, schema-valid recorded provider responses and refuses to write a
 cover letter that would not pass the real validators (4 paragraphs, 290-310 words).

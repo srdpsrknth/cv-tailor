@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from cli.context import CliError, Console, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE
+from models.profile import certification_label, entry_text
 from services.profile_store import (  # noqa: E402  (backend is on sys.path by now)
     InvalidProfileIdError,
     ProfileStoreError,
@@ -185,7 +186,7 @@ def _show_loaded(console: Console, path: Path, label: str, profile=None, source=
         console.out("")
         console.out(f"Certifications ({len(profile.certifications)}):")
         for cert in profile.certifications:
-            console.out(f"  {cert}")
+            console.out(f"  {certification_label(cert)}")
 
     if profile.skills:
         total = sum(len(values) for values in profile.skills.values())
@@ -198,7 +199,7 @@ def _show_loaded(console: Console, path: Path, label: str, profile=None, source=
             console.out("")
             console.out(f"{section.title()} ({len(entries)}):")
             for entry in entries:
-                console.out(f"  {entry}")
+                console.out(f"  {entry_text(entry)}")
 
     rules = profile.rules
     console.out("")

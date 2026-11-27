@@ -15,6 +15,7 @@ from support import (  # noqa: E402
     OfflineGemini,
     copy_content_json,
     job_description,
+    latex_available,
     load_profile,
     make_blank_pdf,
     recorded_session,
@@ -42,6 +43,28 @@ def synthetic_store(tmp_path_factory) -> Path:
         directory.mkdir(parents=True)
         shutil.copy2(PROFILES / f'{fixture}.yaml', directory / 'profile.yaml')
     return root
+
+
+@pytest.fixture(autouse=True, scope='session')
+def _never_read_the_real_dotenv():
+    """No test may read the repository's real ``.env`` (it holds a developer's keys).
+
+    ``Config.from_env`` loads ``<project_root>/.env`` into ``os.environ``; skip exactly
+    that file. Tests that pass an explicit temporary ``env_file`` are unaffected.
+    """
+    import config
+
+    real = (ROOT / '.env').resolve()
+    original = config.load_dotenv
+
+    def guarded(dotenv_path=None, *args, **kwargs):
+        if dotenv_path is not None and Path(dotenv_path).resolve() == real:
+            return False
+        return original(dotenv_path, *args, **kwargs)
+
+    config.load_dotenv = guarded
+    yield
+    config.load_dotenv = original
 
 
 @pytest.fixture(autouse=True)
@@ -154,7 +177,7 @@ def stub_renderers(monkeypatch, tmp_path):
         pages.extend(page_sequence)
         remaining = iter(pages)
 
-        def latex_factory(outputs_dir):
+        def latex_factory(outputs_dir, **_kwargs):
             renderer = Mock()
 
             def render(cv, profile, job_position=None):
@@ -165,7 +188,7 @@ def stub_renderers(monkeypatch, tmp_path):
             renderer.render_cv.side_effect = render
             return renderer
 
-        def docx_factory(outputs_dir):
+        def docx_factory(outputs_dir, **_kwargs):
             def render(*args, **kwargs):
                 folder = Path(outputs_dir)
                 docx = folder / 'cover_letter.docx'
@@ -224,9 +247,15 @@ def source_folder(tmp_path):
     return build
 
 
-def pytest_configure(config):
-    config.addinivalue_line(
-        'markers',
-        'requires_latex: slow test that compiles a document with pdflatex; '
-        'deselect with -m "not requires_latex"',
-    )
+def pytest_collection_modifyitems(config, items):
+    """Skip ``requires_latex`` tests cleanly when no usable pdflatex exists.
+
+    Centralised here so a LaTeX test needs only the marker; per-test skipifs are
+    redundant but harmless. The probe runs once, and only if such a test is collected.
+    """
+    latex_items = [item for item in items if item.get_closest_marker('requires_latex')]
+    if not latex_items or latex_available():
+        return
+    skip = pytest.mark.skip(reason='pdflatex unavailable')
+    for item in latex_items:
+        item.add_marker(skip)

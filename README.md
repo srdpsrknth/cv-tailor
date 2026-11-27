@@ -8,13 +8,24 @@ shared service layer.
 **Using it:** read [docs/HOW_TO_GENERATE.md](docs/HOW_TO_GENERATE.md) — a walkthrough for
 Windows and macOS, covering generation, free revision and job search.
 
+**Highlights:** profile-grounded tailoring (no invented skills or numbers, no stated gaps),
+**confirm-first suggested claims** (the model may propose statements; only ones you confirm as
+true enter your profile, via `cvtailor claims` or the review page), richer CV sections
+(tailorable standalone projects, project dates and technologies, publications and activities
+with bullets, education highlights, structured certifications), and a free offline
+`cvtailor applications check` that re-validates saved applications against the current rules.
+
+**Verifying a pull:** after pulling a new version, run `cvtailor --profile-id <id> applications
+check`; for the multi-candidate cleanup (PR #1) follow
+[docs/HANDOFF-PR1-VERIFY.md](docs/HANDOFF-PR1-VERIFY.md).
+
 **Fresh Mac setup:** read [docs/MAC_SETUP.md](docs/MAC_SETUP.md). The assisting LLM should
 read [AGENTS.md](AGENTS.md) and the
 [application skill](.agents/skills/cv-tailor-application/SKILL.md).
 
 ## Quick start
 
-Install Python 3.11+ (3.12 recommended), Git, and a full pdflatex distribution: MacTeX on
+Install Python 3.12+, Git, and a full pdflatex distribution: MacTeX on
 Mac, MiKTeX on Windows, or TeX Live on Linux. Tectonic is not used.
 
 ```bash
@@ -65,10 +76,11 @@ letter PDF with four body paragraphs and 290–310 words. Review the factual cla
 layouts before applying; these checks do not guarantee screening outcomes.
 
 The profile lives in a **private store**, not in this repository: `CVTAILOR_STORE`
-(default `./storage`, on the Windows development machine `D:\coding\cv-tailor-data`), at
+(default `./storage`; point it at a private directory outside the checkout), at
 `<store>/profiles/<profile_id>/profile.yaml`. Never commit a real profile here. Country
-context overrides inferred location. Overseas CVs show German-issued Blue Card status;
-employer permit support belongs only in the cover letter.
+context overrides inferred location. Work-authorization wording follows the selected profile's
+`rules` and `country_overrides`; employer permit support, where a profile requires it,
+belongs only in the cover letter.
 
 Every command needs an explicit candidate: pass `--profile-id <id>` or set
 `CVTAILOR_PROFILE_ID`. There is no default and no "the only one" fallback, so a missing id
@@ -117,7 +129,8 @@ from new commits: API credentials, virtual environments, duplicate profile backu
 QA images and generated PDF/DOCX outputs. The three adjoe documents that were tracked
 before Phase 2 were removed from the branch tip; they remain in the repository's history.
 
-GitHub Actions runs unit tests on Python 3.12. Tests do not require API calls or LaTeX.
+GitHub Actions runs the unit tests on Python 3.12 on Ubuntu, Windows and macOS, plus a separate
+Ubuntu job with TeX Live for the LaTeX tests. Tests need no API key, network or `.env`.
 Full validation also requires rendering and inspecting both CV pages and letter PDF; render
 DOCX separately with LibreOffice because its layout differs. Fonts, dates, TeX versions,
 and model output can vary across environments. The exact Windows outputs are not a

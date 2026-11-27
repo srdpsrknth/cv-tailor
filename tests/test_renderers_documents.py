@@ -270,7 +270,7 @@ def test_cv_pdf_text_layer_preserves_separate_fields(rendered_cv, analyst_profil
     assert analyst_profile.experience[0].company in flat_raw
     assert 'Analytical Engineer' in flat_raw
     assert 'Apr 2023' in flat_raw
-    assert 'present | Sampletown, Germany' in flat_raw
+    assert 'Present | Sampletown, Germany' in flat_raw
     assert '2018 – 2020 | Sampletown, Germany' in flat_raw
 
     # Skills and certifications use visible delimiters in the extracted text layer.
@@ -653,9 +653,9 @@ def test_missing_template_is_reported_clearly(tmp_path, content):
 
 @pytest.mark.parametrize('raw,expected', [
     ('2023-04', 'Apr 2023'),
-    ('present', 'present'),
-    ('PRESENT', 'present'),
-    ('', 'present'),
+    ('present', 'Present'),
+    ('PRESENT', 'Present'),
+    ('', 'Present'),
     ('not-a-date', 'not-a-date'),
 ])
 def test_date_formatting_is_stable(raw, expected):

@@ -35,6 +35,13 @@ and country overrides retain precedence. The migration command reads the archive
 sources as data, verifies the current profile rules, and installs only the selected
 clauses. Generation reads the scoped sidecar directly.
 
+*Amended 2026-11-27 (PR #1).* The version 1 file also accepts an optional `acronyms` list (up to
+100 single words, at most 32 characters each) naming acronyms that keep their upper case in that
+candidate's skill headings. It is a render-only setting, threaded to the renderers as
+`extra_acronyms`, with no global state; unknown keys are still rejected. The `cv`, `cover_letter`
+and `layout` lists are used in the matching prompts (see ADR 0026 for what belongs there). Syntax
+and examples: [HOW_TO_GENERATE.md](../HOW_TO_GENERATE.md#candidate-guidance-optional).
+
 ## Verification boundary
 
 Tone cannot be certified by word counts, phrase tests or an AI detector. Use human

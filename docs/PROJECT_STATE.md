@@ -1,10 +1,86 @@
 # Project state
 
-**Last updated:** 2026-11-25
-**Branch:** `refactor/architecture-v2`
-**Worktree:** `D:\coding\cv-tailor-next` (Windows)
+**Last updated:** 2026-11-27 (final documentation pass for PR #1)
+**Branch:** `refactor/architecture-v2` (integration branch for the multi-candidate cleanup: `arundhathi/backlog`)
+**Stable branch:** `master` at `1416177` — **usable for real applications**
+**Machines:** used on Windows and macOS; paths in older entries below refer to the original Windows development machine.
+
+## 2026-11-27 — Multi-candidate, cross-OS cleanup (`arundhathi/backlog`)
+
+A second candidate onboarded on macOS. Her setup and first real applications exposed
+one-candidate assumptions, missing CV sections, and OS gaps. The work is on `arundhathi/backlog`,
+one commit per work package. Verified with the full suite on macOS (pdflatex installed):
+see the final count in docs/TESTING.md. CI now runs on Ubuntu, Windows and macOS.
+
+- **WP1 tests/CI:** schema digest pins, `requires_latex` auto-skip, CI matrix (3 OS) plus a TeX Live job,
+  `.gitattributes`, strict markers. Tests no longer read the real `.env` or need an API key.
+- **WP2 LaTeX robustness:** single-pass `escape_latex`, unicode sanitising, safe contact links,
+  utf-8 subprocess decoding.
+- **WP3 no gap statements:** prompt rules and validators reject stated gaps or missing qualifications,
+  and ended roles described as current.
+- **WP5+6 sections:** `standalone_projects_policy`, tailorable standalone project bullets
+  (`{name, bullets}`), project dates/technologies/context, publications and activities with bullets,
+  education highlights, structured certifications, optional roles, `display_name`.
+- **WP7 layout/parity:** no orphaned section headings, consistent PDF/DOCX/TXT titles and dates,
+  locale-free month names, letter date in `CVTAILOR_TIMEZONE`, optional `letter` salutation/sign-off.
+- **WP10 fact safety:** skills and numbers must be supported by the profile; spoken languages stay out
+  of skills; `cv_delta` cannot add skill categories; a pipeline fingerprint completes the cache key.
+- **WP11-13 neutrality/OS/deps:** generic OS-neutral application skill and docs (no previous-owner data);
+  OpenRouter as the provider default; lazy `google-genai`; Python 3.12 floor shared by setup and doctor;
+  `.venv` version and architecture check; `start.py --status/--stop`; TeX Live discovery; fonts check;
+  `.gitignore` gaps; stale lock entries pruned.
+- **WP9 confirm-first suggestions:** the CV response may carry a top-level `suggested_claims`
+  list (max 8; the CV response schema digest was re-pinned). Items are validated against the
+  profile, stored as `source/suggested_claims.json`, never rendered, and kept out of the CV
+  by `services/suggested_claims.reject_suggestion_leak`. `services/claim_acceptance.py`
+  (CLI `cvtailor claims list|accept|reject`, and the review page's "Suggested claims" panel)
+  writes confirmed claims into the private profile via the comment-preserving
+  `services/profile_text_edit.py`, with a timestamped backup and rollback. See
+  `docs/HOW_TO_GENERATE.md`.
+
+- **Leftovers A:** the upload CV (DOCX/TXT) now uses the PDF's short month names ("Apr 2023");
+  the CV file-name year follows `CVTAILOR_TIMEZONE` (`LaTeXRenderer(timezone_name=...)`);
+  publication and activity detail bullets are nested second-level bullets in DOCX and TXT;
+  older custom templates without the `*_entries` keys still compile (headlines only); check marks
+  (U+2713/U+2714) print as `\checkmark`, with `amssymb` added to the shipped preambles; and
+  `candidate_guidance.json` v1 gained an optional `acronyms` list (render only, per candidate).
+- **Leftovers B:** the validation modules' source is part of the pipeline fingerprint (cache key);
+  the review panel has **Dismiss selected**; `generate` prints a hint when it stored suggestions;
+  claim acceptance inserts into an existing `bullets:` key safely; `cvtailor applications check
+  [--render]` and `scripts/check_saved_applications.py` re-validate saved applications offline;
+  curation-skill wording made neutral.
+- **ADRs 0026-0030** (all Proposed except 0030, Deferred) record the decisions: profile-grounded
+  tailoring, richer sections, confirm-first claims, the pipeline fingerprint, and the job-search
+  redesign. Docs: `HOW_TO_GENERATE.md`, the setup skill, the application skill, `ROADMAP.md`,
+  `ASSESSMENT.md`, `TESTING.md`, README and the setup guides were brought up to date.
+- **Verified baseline:** 1786 passed, 3 skipped on macOS with MacTeX (see `TESTING.md`).
+  Not yet run: the Windows verification in [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md).
+
+**Deferred:** the job-search feature is to be **redesigned** rather than patched. The audit findings
+(per-profile sources used by the UI, eligibility vs. `country_overrides`, country-less postings,
+limit before ranking, per-board failures, language level, keyword modes, entry-level seniority,
+`--profile` for `jobs search`) are requirements for that redesign.
+
+**Still open:**
+
+- The **job-search redesign** ([ADR 0030](DECISIONS/0030-job-search-redesign.md)): write the design
+  as a new ADR first; see the requirement list in `ROADMAP.md`.
+- **Localisation of UI labels:** labels and section titles are centralised (`renderers/cv_sections.py`
+  and the UI) but untranslated.
+- **Work-authorization checks:** the pipeline validates work-authorization wording during
+  generation, but `applications check` does not cover it.
+
+(Resolved in the leftovers: short months in the upload CV, validator source in the cache key,
+per-candidate acronyms.)
+
+**Next action:** merge PR #1 into `refactor/architecture-v2`; the original owner then pulls and
+runs [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md) on Windows (including
+`cvtailor --profile-id <id> applications check`).
+
+## Earlier state (original development machine)
+
+**Worktree:** `<projects>\cv-tailor-next` (Windows)
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
-**Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 **Active milestone: legacy profile and saved export verification.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new

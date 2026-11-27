@@ -176,3 +176,62 @@ def test_archived_clauses_already_in_generation_do_not_change_prompts(
     tailor_documents(posting, analyst_profile, use_cache=False)
     assert offline.call_count == 6
     assert offline.prompts[:3] == offline.prompts[3:]
+
+
+# --- per-candidate acronyms -----------------------------------------------------------
+
+def test_acronyms_are_loaded_trimmed_deduplicated_and_scoped(setup_store):
+    store, config = setup_store
+    write_guidance(store, "one", {"version": 1, "acronyms": [" RWE ", "HEOR", "RWE"]})
+    assert load_candidate_guidance(config, "one").acronyms == ("RWE", "HEOR")
+    assert load_candidate_guidance(config, "two").acronyms == ()
+
+
+@pytest.mark.parametrize("acronyms", [
+    "RWE", [""], [" "], ["two words"], [1], ["x" * 33], ["A"] * 101,
+])
+def test_invalid_acronyms_fail_closed(setup_store, acronyms):
+    store, config = setup_store
+    write_guidance(store, "one", {"version": 1, "acronyms": acronyms})
+    with pytest.raises(ValueError, match="candidate_guidance.json"):
+        load_candidate_guidance(config, "one")
+
+
+def test_extra_acronyms_reach_the_skill_heading_without_leaking():
+    from utils.text import format_skill_category
+
+    assert format_skill_category("rwe and heor") == "Rwe And Heor"
+    assert format_skill_category("rwe and heor", ["RWE", "heor"]) == "RWE And HEOR"
+    assert format_skill_category("rwe/heor, rwe", ("RWE", "HEOR")) == "RWE/HEOR, RWE"
+    # Nothing was remembered from the call above (no global mutable state).
+    assert format_skill_category("rwe and heor") == "Rwe And Heor"
+
+
+def test_each_renderer_uses_only_its_own_candidates_acronyms(analyst_profile, tmp_path):
+    from docx import Document
+
+    from models.tailored_output import TailoredCV
+    from renderers import create_latex_renderer
+    from renderers.upload_cv import render_upload_cv
+    from support import read_json
+
+    cv = TailoredCV.model_validate(read_json("content", "valid_content.json")["cv"])
+    cv = cv.model_copy(update={"skills": {"rwe studies": ["SQL"]}})
+    for name, extra, expected in (("one", ("RWE",), "RWE Studies"), ("two", (), "Rwe Studies")):
+        renderer = create_latex_renderer(outputs_dir=str(tmp_path / name), extra_acronyms=extra)
+        data = renderer._prepare_template_data(cv, analyst_profile)
+        assert list(data["skills"]) == [expected]
+        _, fields = renderer._extraction_contract(cv, analyst_profile)
+        assert fields["Skill category rwe studies"] == expected
+        paths = render_upload_cv(cv, analyst_profile, tmp_path / f"up-{name}", extra_acronyms=extra)
+        words = [p.text for p in Document(paths["cv_upload_docx_path"]).paragraphs]
+        assert f"{expected}: SQL" in words
+
+
+def test_acronym_loader_is_empty_for_a_profile_no_longer_in_the_store(setup_store):
+    from services.candidate_guidance import load_candidate_acronyms
+
+    store, config = setup_store
+    write_guidance(store, "one", {"version": 1, "acronyms": ["RWE"]})
+    assert load_candidate_acronyms(config, "one") == ("RWE",)
+    assert load_candidate_acronyms(config, "gone") == ()

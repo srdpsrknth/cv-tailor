@@ -111,7 +111,14 @@ def test_the_app_offers_all_four_pages(app):
     )
 
 
-def test_the_store_path_is_shown_so_the_user_knows_where_data_goes(app):
+def test_the_store_path_is_shown_so_the_user_knows_where_data_goes(app, monkeypatch):
+    # The readiness panel says "Available" only when pdflatex is installed; CI
+    # runners without TeX would otherwise fail this UI test for an unrelated reason.
+    from cli.commands import doctor
+
+    monkeypatch.setattr(
+        doctor, "check_pdflatex", lambda: doctor.Check("pdflatex", doctor.OK, "stub")
+    )
     at = app()
     rendered = " ".join(str(block.value) for block in at.markdown)
     rendered += " ".join(str(c.value) for c in at.caption)

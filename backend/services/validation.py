@@ -15,6 +15,8 @@ from typing import Optional
 from models.profile import Profile
 from models.job import normalise_country
 from models.tailored_output import TailoredCV, TailoredCoverLetter
+from services.cv_structure import validate_role_set, validate_standalone_projects
+from services.fact_checks import validate_cv_numbers, validate_cv_skills
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +88,9 @@ DEFAULT_PROFILE_RULES = ProfileRules()
 
 def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
     """Check a CV against the profile and the candidate-specific rules."""
-    cv.resolve_standalone_projects(profile)
+    validate_standalone_projects(cv, profile)
     expected = {exp.company: exp for exp in profile.experience}
-    companies = [exp.company for exp in cv.experience]
-    if len(companies) != len(set(companies)) or set(companies) != set(expected):
-        raise ValueError("Include each profile employer exactly once, including older roles.")
+    validate_role_set(cv, profile)
     cv.experience.sort(key=lambda exp: list(expected).index(exp.company))
     for exp in cv.experience:
         base = expected[exp.company]
@@ -101,6 +101,10 @@ def validate_cv(cv: TailoredCV, profile: Profile, rules: ProfileRules) -> None:
         _apply_employer_rules(exp, rules)
     _validate_summary(cv, rules)
     _validate_no_banned_tools(cv, profile, rules)
+    validate_cv_skills(cv, profile)
+    validate_cv_numbers(cv, profile)
+    _validate_cv_has_no_gap_statements(cv)
+    _validate_cv_tense(cv, profile)
 
 def _validate_employer_prose_rules(
     paragraphs: list[str],
@@ -271,3 +275,146 @@ def validate_cover_letter(
     active_rules = rules or ProfileRules.from_profile(profile)
     _check_banned_tools_in_text(" ".join(cl.paragraphs), profile, active_rules)
     _validate_employer_prose_rules(cl.paragraphs, active_rules)
+    _validate_no_gap_statements(cl.paragraphs, "cover-letter paragraph")
+    _validate_letter_tense(cl.paragraphs, profile)
+
+
+# ---------------------------------------------------------------------------
+# Gap statements and tense
+# ---------------------------------------------------------------------------
+
+_QUAL_NOUN = (
+    r"(?:experience|exposure|knowledge|background|qualifications?|fluency|"
+    r"proficiency|certifications?|credentials?|command)"
+)
+_QUALIFIER = r"(?:direct|prior|previous|formal|hands-on|professional|relevant|practical|specific)"
+
+#: Phrases that state, imply or apologise for something the candidate lacks.
+#: ``lack`` is only a gap statement before a qualification noun, so ordinary
+#: engineering prose such as "reduced lack of data" is deliberately not matched.
+_GAP_PATTERNS = tuple(
+    re.compile(pattern, re.I)
+    for pattern in (
+        rf"\bno\s+{_QUALIFIER}\b(?:\s+[\w/&-]+){{0,6}}?\s+(?:experience|exposure)\b",
+        r"\blimited\s+(?:[\w-]+\s+)?(?:experience|exposure|proficiency|fluency|knowledge)\b",
+        rf"\black(?:s|ed|ing)?\s+(?:of\s+)?(?:(?:{_QUALIFIER}|the|any)\s+)*{_QUAL_NOUN}\b",
+        r"\bI\s+lack\b",
+        r"\bnot\s+listed\b",
+        rf"\b(?:I|candidate|he|she|they)\s+(?:do|does|did)(?:\s+not|n't)\s+(?:yet\s+)?(?:have|hold|possess)\b",
+        rf"\b(?:do|does)\s+not\s+(?:yet\s+)?(?:have|hold|possess)\s+(?:(?:{_QUALIFIER}|the|any|a|an)\s+)*{_QUAL_NOUN}\b",
+        rf"\bwithout\s+{_QUALIFIER}\b(?:\s+[\w/&-]+){{0,4}}?\s+(?:experience|exposure)\b",
+        r"\b(?:although|while|though)\s+I\s+(?:have\s+not|haven't|do\s+not|don't)\b",
+        r"\bI\s+(?:have\s+not|haven't)\s+(?:yet|had)\b",
+        r"\bdespite\s+(?:not\s+(?:having|holding|possessing|yet)|lacking)\b",
+    )
+)
+
+_GAP_MESSAGE = (
+    "Remove the gap statement (%r) in %s %d. Never state, imply, summarise or apologise "
+    "for missing qualifications, experience, languages or requirements; omit unmatched "
+    "requirements silently and present the candidate's supported strengths instead."
+)
+
+
+def find_gap_statement(text: str) -> Optional[str]:
+    """Return the first phrase in ``text`` that states a missing qualification."""
+    for pattern in _GAP_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return match.group(0)
+    return None
+
+
+def _validate_no_gap_statements(texts: list[str], where: str) -> None:
+    for index, text in enumerate(texts, start=1):
+        phrase = find_gap_statement(text)
+        if phrase:
+            raise ValueError(_GAP_MESSAGE % (phrase, where, index))
+
+
+def _cv_texts(cv: TailoredCV) -> list[tuple[str, list[str]]]:
+    """Every free-prose block of the CV, labelled for error messages."""
+    blocks = [("CV summary line", list(cv.summary))]
+    for exp in cv.experience:
+        blocks.append((f"CV bullet for {exp.company},", list(exp.bullets)))
+        for project in exp.projects:
+            blocks.append((f"CV project bullet for {exp.company},", list(project.bullets)))
+    for item in cv.standalone_projects:
+        if not isinstance(item, str):
+            blocks.append((f"CV standalone project bullet for {item.name},", list(item.bullets)))
+    return blocks
+
+
+def _validate_cv_has_no_gap_statements(cv: TailoredCV) -> None:
+    for where, texts in _cv_texts(cv):
+        _validate_no_gap_statements(texts, where)
+
+
+#: Wording that places a role in the present. ``current`` alone is an ordinary
+#: adjective ("the current process"), so it only counts before a role-like noun or
+#: after "my"/"our".
+_PRESENT_TENSE = re.compile(
+    r"\b(?:currently|presently|at\s+present|to\s+present)\b"
+    r"|\b(?:my|our)\s+current\b"
+    r"|\bcurrent\s+(?:role|position|job|employer|internship|studies|thesis|project|"
+    r"research|work|team|company)\b",
+    re.I,
+)
+
+_COMPANY_STOPWORDS = frozenset({
+    "gmbh", "ltd", "inc", "llc", "corp", "group", "company", "the", "and", "for",
+    "university", "institute", "internship", "labs", "lab", "research", "analytics",
+    "services", "solutions", "systems", "technologies", "limited", "centre", "center",
+})
+
+
+def _ended_experiences(profile: Profile):
+    return [
+        exp for exp in profile.experience
+        if (exp.end_date or "").strip().lower() not in {"present", "current", "ongoing", ""}
+    ]
+
+
+def _company_needles(company: str) -> list[str]:
+    """The full employer name plus its distinctive tokens, lowercased."""
+    needles = {company.lower()}
+    for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9&'-]+", company):
+        if len(token) >= 4 and token.lower() not in _COMPANY_STOPWORDS:
+            needles.add(token.lower())
+    return sorted(needles)
+
+
+def _validate_cv_tense(cv: TailoredCV, profile: Profile) -> None:
+    """A role whose end date has passed must not read as current in its bullets."""
+    ended = {exp.company for exp in _ended_experiences(profile)}
+    for exp in cv.experience:
+        if exp.company not in ended:
+            continue
+        bullets = list(exp.bullets) + [b for project in exp.projects for b in project.bullets]
+        for bullet in bullets:
+            match = _PRESENT_TENSE.search(bullet)
+            if match:
+                raise ValueError(
+                    f"The {exp.company} role ended ({exp.end_date}); remove {match.group(0)!r} "
+                    f"from its bullet {bullet!r} and describe it in the past tense."
+                )
+
+
+def _validate_letter_tense(paragraphs: list[str], profile: Profile) -> None:
+    """A cover-letter sentence naming an ended employer must not call it current."""
+    ended = _ended_experiences(profile)
+    if not ended:
+        return
+    for paragraph in paragraphs:
+        for sentence in re.split(r"(?<=[.!?])\s+", paragraph):
+            match = _PRESENT_TENSE.search(sentence)
+            if not match:
+                continue
+            lowered = sentence.lower()
+            for exp in ended:
+                if any(re.search(rf"\b{re.escape(n)}\b", lowered) for n in _company_needles(exp.company)):
+                    raise ValueError(
+                        f"The {exp.company} role ended ({exp.end_date}); do not describe it with "
+                        f"{match.group(0)!r}. Use the past tense for it, and reserve current "
+                        f"wording for roles marked present. Fix: {sentence!r}"
+                    )

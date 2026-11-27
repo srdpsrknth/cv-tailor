@@ -4,15 +4,17 @@
 
 | Directory | Branch | Purpose |
 |---|---|---|
-| `cv-tailor/` (`D:\coding\cv-tailor`) | `master` | Stable, daily-use application |
-| `cv-tailor-next/` (`D:\coding\cv-tailor-next`) | `refactor/architecture-v2` | Refactoring, experiments, new features |
+| `cv-tailor/` (`<projects>/cv-tailor`) | `master` | Stable, daily-use application |
+| `cv-tailor-next/` (`<projects>/cv-tailor-next`) | `refactor/architecture-v2` | Refactoring, experiments, new features |
 
-Both already exist and are clean. Verify at any time:
+`<projects>` is wherever you keep your checkouts (for example `~/code` on macOS/Linux or
+`C:\code` on Windows). *Historical note:* the original maintainer's Windows machine kept both
+worktrees side by side under one parent directory. Verify at any time (bash, zsh or PowerShell):
 
-```powershell
+```bash
 git worktree list
-git -C D:\coding\cv-tailor        status --short --branch   # expect master
-git -C D:\coding\cv-tailor-next   status --short --branch   # expect refactor/architecture-v2
+git -C <projects>/cv-tailor        status --short --branch   # expect master
+git -C <projects>/cv-tailor-next   status --short --branch   # expect refactor/architecture-v2
 ```
 
 **Never** do substantial redesign on `master`.
@@ -34,7 +36,9 @@ git worktree add -b refactor/architecture-v2 ../cv-tailor-next master
 
 ## Environment isolation
 
-### Windows Python output permission error
+### Windows Python output permission error (Windows only)
+
+macOS and Linux have no equivalent of this integrity-level problem; skip to the next section.
 
 If `doctor` cannot write outputs even from a normal terminal, inspect the Python
 executable with `icacls .venv\Scripts\python.exe`. This checkout inherited a
@@ -44,12 +48,12 @@ store even though its ordinary directory ACL grants Modify. This persists outsid
 the agent; it is not a harmless doctor failure.
 
 The targeted repair restores the two Python launcher executables to Medium
-integrity. Run these in **PowerShell as Administrator**, adjusting the checkout
-path if needed:
+integrity. Run these in **PowerShell as Administrator**, replacing `<checkout>` with
+the path of the affected checkout:
 
 ```powershell
-icacls "D:\coding\cv-tailor-next\.venv\Scripts\python.exe" /setintegritylevel M
-icacls "D:\coding\cv-tailor-next\.venv\Scripts\pythonw.exe" /setintegritylevel M
+icacls "<checkout>\.venv\Scripts\python.exe" /setintegritylevel M
+icacls "<checkout>\.venv\Scripts\pythonw.exe" /setintegritylevel M
 ```
 
 Then run `doctor` from a **normal**, non-administrator terminal. Both commands must
@@ -58,7 +62,10 @@ GUI with the stop/open shortcuts so it uses a fresh Python process. No change to
 the private store's ACL, security software or profile data is needed. Recheck if
 the venv is later recreated under a Low-labelled checkout.
 
-### Windows GUI shortcuts
+### Windows GUI shortcuts (Windows only)
+
+On every OS, `scripts/start.py --status` and `scripts/start.py --stop` report or stop the services that `start.py` started. They use a PID file at `.runtime/services.json` and never stop unrelated listeners on the ports. On macOS and Linux, start the GUI from a terminal with `.venv/bin/python scripts/start.py` and stop it with Ctrl+C or `--stop`; there is no
+shortcut installer.
 
 The review UI requires the added `streamlit-pdf==2.1.0` dependency for inline PDF
 previews. Existing environments should install `requirements.lock.txt` after pulling
@@ -84,6 +91,12 @@ appear in a dialog; logs are `.runtime/logs/gui.stdout.log` and `gui.stderr.log`
 Run the installer again after moving the checkout. The shortcuts contain local
 paths; they are installed on the machine, never committed.
 
+The shortcuts are a Windows convenience. The cross-platform alternative, from a terminal
+in the checkout, is `.venv\Scripts\python.exe scripts/start.py` to start,
+`.venv\Scripts\python.exe scripts/start.py --status` to see what it started, and
+`.venv\Scripts\python.exe scripts/start.py --stop` to stop it (`.venv/bin/python` on macOS and
+Linux). It starts the API as well as the UI and prints both URLs.
+
 For terminal diagnostics without opening the browser:
 
 ```powershell
@@ -102,7 +115,7 @@ another machine:
 
 ```powershell
 # Windows
-cd D:\coding\cv-tailor-next
+cd <checkout>
 python scripts/setup.py            # creates .venv, installs requirements.lock.txt, copies .env.example
 # then edit .env and set OPENROUTER_API_KEY (https://openrouter.ai/settings/keys)
 .venv\Scripts\python.exe scripts/check_setup.py
@@ -110,7 +123,7 @@ python scripts/setup.py            # creates .venv, installs requirements.lock.t
 ```
 
 ```bash
-# macOS
+# macOS / Linux
 python3.12 scripts/setup.py
 .venv/bin/python scripts/check_setup.py
 .venv/bin/python -m pytest -q
@@ -118,6 +131,17 @@ python3.12 scripts/setup.py
 
 `scripts/setup.py` never overwrites an existing `.env`. Never copy a `.venv` between
 operating systems, and never commit one.
+
+**After pulling a new version**, re-run setup if the lock file changed, then re-check the
+saved applications for free (offline, no model call, never writes to the store; exit code 1
+on any FAIL):
+
+```bash
+python cvtailor.py --profile-id <profile_id> applications check [--render]
+```
+
+See [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md#checking-saved-applications-against-the-current-rules)
+and, for the PR #1 pull, [HANDOFF-PR1-VERIFY.md](HANDOFF-PR1-VERIFY.md).
 
 ### The private profile store
 
@@ -135,7 +159,7 @@ are portable when both directories share a parent.
 
 ```
 CVTAILOR_STORE=../cv-tailor-data
-CVTAILOR_PROFILE_ID=sample-analyst
+CVTAILOR_PROFILE_ID=<profile_id>
 ```
 
 `profile_id` is required and fails closed: there is no default profile (ADR 0003). Use
@@ -147,14 +171,21 @@ for exactly that reason — do not commit what ends up there.
 
 ### Known issue: `pip install` hangs on a stale HTTP cache
 
-On this machine, `pip install -r requirements.lock.txt` hung indefinitely — high CPU,
+*Historical note (observed on the original Windows development machine):* `pip install -r requirements.lock.txt` hung indefinitely — high CPU,
 zero packages installed after 30+ minutes — because of a corrupt/contended pip HTTP cache.
 `pyyaml` alone reproduced it, so it is not the dependency set.
 
 **Workaround — bypass the cache:**
 
 ```powershell
+# Windows
 .venv\Scripts\python.exe -m pip install --only-binary=:all: --no-cache-dir `
+    --progress-bar off -r requirements.lock.txt
+```
+
+```bash
+# macOS / Linux
+.venv/bin/python -m pip install --only-binary=:all: --no-cache-dir \
     --progress-bar off -r requirements.lock.txt
 ```
 
@@ -166,20 +197,26 @@ while pip was stuck.
 
 ### Current state of this worktree
 
-Runnable: `.venv` with all locked dependencies, `.env` created from `.env.example`, ports set
+*Historical note (snapshot from the original development worktree; see `PROJECT_STATE.md` for the live baseline):* runnable: `.venv` with all locked dependencies, `.env` created from `.env.example`, ports set
 to 8001/8502. `scripts/check_setup.py` reports profile/timezone/LaTeX/templates OK, and
 `python -m pytest -q` → **1142 passed, 3 skipped** (see [`TESTING.md`](TESTING.md) for the
 current baseline).
 
 The only outstanding item is `OPENROUTER_API_KEY`, which the owner must enter into `.env`
-directly — never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too;
+directly (the user, not an agent) — never paste it into a chat. Set `CVTAILOR_STORE` and `CVTAILOR_PROFILE_ID` too;
 without them every command that touches candidate data fails closed by design (ADR 0003).
 
 > **Run the suite with `TEMP`/`TMP` pointed inside the worktree**, or the LaTeX tests can
 > fail with a spurious `pdflatex compilation failed` even with nothing else running:
 >
 > ```powershell
+> # Windows
 > $env:TEMP = "$PWD\.tmp"; $env:TMP = $env:TEMP
+> ```
+>
+> ```bash
+> # macOS / Linux
+> mkdir -p .tmp && export TMPDIR="$PWD/.tmp"
 > ```
 
 ### Running both versions at once

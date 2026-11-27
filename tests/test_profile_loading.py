@@ -21,44 +21,15 @@ def test_synthetic_profiles_load_and_round_trip():
         assert type(profile).model_validate_json(profile.model_dump_json()) == profile
 
 
-def test_default_path_resolves_to_the_legacy_repository_location(monkeypatch, tmp_path):
-    """With no argument the loader still *addresses* ``storage/profile/profile.yaml``.
-
-    **This asserts a path, not the presence of a file.** It used to assert
-    ``expected.exists()``, which passed only because a stale duplicate of the owner's
-    real profile was sitting in the repository. Phase 2 moved that profile into the
-    private store (ADR 0011), and `tests/test_privacy_boundary.py` asserts it must not be
-    tracked here -- so the file is correctly absent, and the old assertion could only ever
-    have been satisfied by the very privacy violation it was meant to prevent.
-
-    The no-argument form is **legacy**: `load_profile`'s own docstring says it exists "so
-    a migration can still read the old location", and no production caller uses it --
-    every real path goes through `Config.load_profile()` or `ProfileStore`, both of which
-    require an explicit id and fail closed (ADR 0003).
-
-    Resolution is checked by intercepting ``Path.exists``, because the loader tests for
-    the file *before* opening it: a spy on ``open`` never fires when the file is absent,
-    which is now always.
-    """
+def test_loader_has_no_implicit_default_path():
+    """ADR 0003: a profile is never chosen implicitly; the legacy
+    ``storage/profile/profile.yaml`` default is gone."""
     from services import profile_loader
 
-    expected = (
-        profile_loader.Path(profile_loader.__file__).parent.parent.parent
-        / 'storage' / 'profile' / 'profile.yaml'
-    )
-    checked = {}
-
-    def spy_exists(self):
-        checked['path'] = str(self)
-        return False  # so the loader raises, and no read is attempted
-
-    monkeypatch.setattr(profile_loader.Path, 'exists', spy_exists, raising=False)
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(TypeError):
         profile_loader.load_profile()
-
-    assert checked.get('path') == str(expected), (
-        f'the legacy no-argument form resolved to {checked.get("path")!r}, not {expected}'
-    )
+    with pytest.raises(ValueError, match='explicit profile path'):
+        profile_loader.load_profile(None)
 
 
 def test_missing_profile_raises_file_not_found(tmp_path):

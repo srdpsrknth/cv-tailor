@@ -8,6 +8,7 @@ import re
 import streamlit as st
 from ui import services_bridge as bridge
 from ui.answers import render_answers
+from ui.claims_panel import render_claims_panel
 from ui.layout_preview import render_layout_preview
 
 
@@ -139,6 +140,8 @@ def render_application(config, profile_id, job_id):
         render_answers(config, profile_id, job_id, prefix, detail)
     else:
         _render_details(config, profile_id, job_id, detail)
+
+    render_claims_panel(config, profile_id, job_id, prefix)
 
     with st.expander("Application folder"):
         st.code(detail["path"], language=None, wrap_lines=True)

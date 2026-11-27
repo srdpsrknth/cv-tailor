@@ -56,8 +56,8 @@ PRICE_SOURCES = {
 #: bill the long rate for the whole request once the prompt crosses this.
 LONG_CONTEXT_THRESHOLD = 200_000
 
-#: How long a verified price may go unchecked before it is treated as stale. The owner
-#: set this rule on 2026-10-26: re-verify "if the last table update was longer than 2
+#: How long a verified price may go unchecked before it is treated as stale. The project
+#: owner set this rule on 2026-10-26: re-verify "if the last table update was longer than 2
 #: months". It is measured, not assumed -- between two reads of OpenRouter's listing on
 #: the *same day*, four entries had already moved (two halved).
 PRICE_MAX_AGE_DAYS = 62

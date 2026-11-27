@@ -388,7 +388,7 @@ class Config:
 
 #: Environment variables that name a model, per provider. ``GEMINI_MODEL`` is
 #: **Gemini-specific**, and that distinction became load-bearing on 2026-10-27: the
-#: default provider moved to OpenRouter while the owner's ``.env`` still carried
+#: default provider moved to OpenRouter while an existing user's ``.env`` still carried
 #: ``GEMINI_MODEL=gemini-3.8-flash``. Because the variable was read for *any* provider,
 #: it silently overrode the new default and the tool ran the old, ~30x more expensive
 #: model through OpenRouter -- where the bare name ``gemini-3.8-flash`` is not even a

@@ -64,7 +64,7 @@ Two other historical three-page PDFs were inventoried, excluded from this
 cross-check, and left unchanged.
 
 Private reproduction script, metrics, source template copies and comparison PDFs:
-`<store>/reviews/sreedeep/layout-review-2026-11-18/`.
+`<store>/reviews/<profile_id>/layout-review-2026-11-18/`.
 
 ## Recommended next implementation
 

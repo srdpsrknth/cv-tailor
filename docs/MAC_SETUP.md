@@ -1,10 +1,10 @@
 # Initialize CV Tailor on a Mac
 
-This guide is for the owner and the LLM assisting on a fresh Mac. The project was developed on Windows. Recreate its environment on macOS; do not copy `.venv` or use Windows drive paths.
+This guide is for a user (and any LLM assisting them) setting up CV Tailor on a fresh Mac. It is the macOS peer of the Windows instructions in `docs/DEVELOPMENT.md`; Linux works the same way with your package manager in place of Homebrew. Build the environment natively on the Mac: do not copy a `.venv` from another operating system or reuse Windows drive paths.
 
 ## What is included
 
-The repository contains the FastAPI backend, Streamlit UI, templates, prompts, tests, locked Python dependencies and a reusable agent skill. It does **not** contain the real profile or the reviewed application sources — since Phase 2 those live in the **private profile store** (`CVTAILOR_STORE`), which is not this repository. API credentials are likewise never committed. If you are moving the owner's real work to the Mac, transfer the store as well as the clone: either copy the store directory, or clone its own private Git repository (ADR 0011).
+The repository contains the FastAPI backend, Streamlit UI, templates, prompts, tests, locked Python dependencies and a reusable agent skill. It does **not** contain the real profile or the reviewed application sources — since Phase 2 those live in the **private profile store** (`CVTAILOR_STORE`), which is not this repository. API credentials are likewise never committed. If you are moving an existing user's real work to the Mac, transfer the store as well as the clone: either copy the store directory, or clone its own private Git repository (ADR 0011).
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ Install Git, Python 3.12, and **MacTeX**. MacTeX supplies the full TeX Live dist
 > If it still cannot be found, set `LATEX_COMPILER=/Library/TeX/texbin/pdflatex` in
 > `.env` and re-run `cvtailor doctor`.
 
-If Homebrew is already installed, `brew install python@3.12 git` can provide Python/Git. Homebrew's supported prefixes differ on Apple Silicon and Intel; use `brew --prefix` rather than hardcoding `/opt/homebrew` or `/usr/local`. Official Homebrew installation instructions: https://docs.brew.sh/Installation . Ask the owner to complete system installer/password prompts when necessary.
+If Homebrew is already installed, `brew install python@3.12 git` can provide Python/Git. Homebrew's supported prefixes differ on Apple Silicon and Intel; use `brew --prefix` rather than hardcoding `/opt/homebrew` or `/usr/local`. Official Homebrew installation instructions: https://docs.brew.sh/Installation . Ask the user to complete system installer/password prompts when necessary.
 
 Optional visual QA tools: LibreOffice (render DOCX independently) and Poppler (`pdftoppm`, `pdfinfo`). `brew install poppler` and the LibreOffice official installer can provide these. PDF generation itself uses LaTeX and does not need LibreOffice.
 
@@ -32,11 +32,18 @@ python3.12 scripts/setup.py
 
 If `python3.12` is not found after Homebrew installation, use `$(brew --prefix python@3.12)/bin/python3.12`. Setup creates `.venv`, installs `requirements.lock.txt`, and creates `.env` from `.env.example` without overwriting existing settings.
 
+> **Use a native Python on Apple Silicon.** An Intel (x86_64) Python running under Rosetta,
+> for example an old Anaconda install, cannot install some locked wheels (`cryptography` 50.x has
+> no macOS x86_64 wheel). `scripts/setup.py` checks an existing `.venv`'s Python version and CPU
+> architecture and stops with a message if they don't match the machine. Delete `.venv`
+> and rerun setup with a native arm64 Python 3.12 (Homebrew `python@3.12`, the python.org
+> universal installer, or an arm64 conda environment). Setup never deletes `.venv` itself.
+
 ### Credentials and model (current as of Phase 3)
 
 **The default provider is OpenRouter, and the default model is `openai/gpt-6-luna`**
 — the model the curation study selected on measured cost per accepted result
-(ADR 0016). Have the owner put `OPENROUTER_API_KEY` into `.env` directly; get a key
+(ADR 0016). Have the user put `OPENROUTER_API_KEY` into `.env` directly; get a key
 from https://openrouter.ai/settings/keys, and note that the account **needs credit**.
 
 Do not ask them to paste a key into chat or log it.
@@ -51,7 +58,7 @@ Do not ask them to paste a key into chat or log it.
   model through OpenRouter, where the bare name is not even a priced route. Use
   `CVTAILOR_MODEL` for the provider-neutral override.
 * **Do not silently change the model.** If generation fails, inspect the error and ask
-  the owner; a fresh installation needs its own credentials and its own credit.
+  the user; a fresh installation needs its own credentials and its own credit.
 
 A generation costs roughly **$0.003** on the default model. Optional guard:
 `CVTAILOR_MAX_COST_USD` refuses a run whose *estimated* cost exceeds the cap.
@@ -92,6 +99,8 @@ in a terminal appears in the browser and vice versa.
 
 ```bash
 .venv/bin/python scripts/start.py     # prints the UI and API URLs; open the UI one
+.venv/bin/python scripts/start.py --status   # services started by start.py, if any
+.venv/bin/python scripts/start.py --stop     # stops only processes start.py started
 .venv/bin/python cvtailor.py doctor   # command line: the supported path for problems
 ```
 
@@ -102,7 +111,7 @@ in a terminal appears in the browser and vice versa.
 **The UI requires you to choose a candidate explicitly**, even with one profile — the
 choice decides which folder the documents are filed under (ADR 0003). Day-to-day use of
 both is documented in [HOW_TO_GENERATE.md](HOW_TO_GENERATE.md); every command there
-works on macOS with `.venv/bin/python` in place of `.venv\Scripts\python.exe`.
+uses `.venv/bin/python` on macOS (Windows uses `.venv\Scripts\python.exe`).
 
 ### Check the free paths before anything that costs money
 
@@ -122,26 +131,44 @@ the local compiler. Run these first; if they work, the installation is sound:
 That render step is the real LaTeX test: it exercises the templates, the compiler and
 the page-count gate without spending anything.
 
-## Validate rendering before spending API tokens
-
-Restore the reviewed Delivery Hero package from the store:
+After pulling a new version, also run the free post-pull check. It re-validates every saved
+application against the current rules, offline, never writes to the store, and exits with
+code 1 on any FAIL (add `--render` to re-render into a temporary folder and report page counts):
 
 ```bash
-cp -R "$CVTAILOR_STORE"/applications/2026_delivery_hero_senior_analytics_engineer_quick_commerce_1791209030470 "$CVTAILOR_STORE"/outputs/"$CVTAILOR_PROFILE_ID"/
-.venv/bin/python "$CVTAILOR_STORE"/outputs/"$CVTAILOR_PROFILE_ID"/2026_delivery_hero_senior_analytics_engineer_quick_commerce_1791209030470/source/render_application.py
+.venv/bin/python cvtailor.py --profile-id "$CVTAILOR_PROFILE_ID" applications check
 ```
 
-Its application-specific script preserves compact technology lists and the deliberate ecoligo continuation heading. The archived script renders both documents. It derives all repository paths from the restored folder. Other packages can be restored in the same way; when no custom script exists:
+## Validate rendering before spending API tokens
+
+Prove the whole render path (templates, LaTeX, DOCX) on your Mac without an API key or any spend. Use either your own profile or the synthetic sample that ships with the tests.
+
+**Option A: your own profile.** Run one free local render (no AI call) from a `content.json` you already have, as in the previous section. If you have none yet, create a minimal one from your own profile: copy `tests/fixtures/content/valid_content.json` to `<store>/outputs/<profile_id>/first_render_check/source/content.json` and replace the placeholder company, role, summary, experience entries and the cover-letter paragraphs and `signature_name` with text drawn from your own profile (the CV must match the facts in `profile.yaml`; the cover letter needs four paragraphs of 290-310 words in total to avoid a review warning).
+
+**Option B: synthetic sample (no personal data).** Import the synthetic profile into a throwaway store and render its fixture content:
+
+```bash
+export CVTAILOR_STORE="$PWD/.tmp/sample-store"
+.venv/bin/python cvtailor.py --profile-id sample-analyst profile import tests/fixtures/profiles/synthetic_analyst.yaml
+mkdir -p "$CVTAILOR_STORE/outputs/sample-analyst/first_render_check/source"
+cp tests/fixtures/content/valid_content.json "$CVTAILOR_STORE/outputs/sample-analyst/first_render_check/source/content.json"
+.venv/bin/python cvtailor.py --profile-id sample-analyst render \
+    --content "$CVTAILOR_STORE/outputs/sample-analyst/first_render_check/source/content.json"
+```
+
+`render` writes the CV PDF, an autofill DOCX and the cover letter DOCX and PDF beside `source/`, and reports page counts. Expect a one-page CV for this short sample and a four-paragraph, 300-word, one-page letter. `.tmp/` is disposable; reset `CVTAILOR_STORE` afterwards (`unset CVTAILOR_STORE` or re-source your shell profile) so later commands use your real store.
+
+Other saved applications can be restored the same way: copy `<store>/applications/<job_id>/` into `<store>/outputs/<profile_id>/`, then run its own `source/render_application.py` if it has one (it preserves application-specific layout tweaks), or otherwise the generic renderer:
 
 ```bash
 .venv/bin/python scripts/render_application.py --project . --profile-id "$CVTAILOR_PROFILE_ID" --content "$CVTAILOR_STORE"/outputs/"$CVTAILOR_PROFILE_ID"/<job_id>/source/content.json --mirror-configured
 ```
 
-Use `--cv-only` or `--cover-letter-only` for a scoped revision. `content.json` is the reviewed text authority; model drafts are historical evidence, not replacement text. Old result metadata is regenerated locally. Older Booking helper scripts are retained for reference; prefer the current editable JSON and renderer.
+Use `--cv-only` or `--cover-letter-only` for a scoped revision. `content.json` is the reviewed text authority; model drafts are historical evidence, not replacement text. Old result metadata is regenerated locally.
 
 Check the CV has two pages and the letter one page, then visually inspect page breaks, fonts and signatures. If Poppler is installed, `pdftoppm -png <file.pdf> <prefix>` creates page images. Use LibreOffice to separately render the DOCX; its layout is not identical to the LaTeX PDF. Fonts, TeX versions and dates can change rendering, so byte-identical PDFs are not promised.
 
-Only after local rendering succeeds, test one new job through Streamlit. Live AI generation uses internet/API quota and may cost money. Choose actual country of employment. The flow tailors skills and wording, reviews factual claims, and retries oversize documents, but the owner must review each final application.
+Only after local rendering succeeds, test one new job through Streamlit. Live AI generation uses internet/API quota and may cost money. Choose actual country of employment. The flow tailors skills and wording, reviews factual claims, and retries oversize documents, but you must review each final application.
 
 ## Troubleshooting and handoff
 
@@ -152,4 +179,4 @@ Only after local rendering succeeds, test one new job through Streamlit. Live AI
 - Word font differences: the DOCX requests Aptos; availability can vary on Mac. Inspect the actual Word/LibreOffice rendering.
 - API download failure: verify `OUTPUTS_DIR` uses a Mac path and that the generated job folder exists.
 
-Report setup checks, tests and actual render results. Unit tests alone do not prove that Gemini generation, LaTeX or Word work. The Windows environment was tested before push; macOS must run the validation steps above. Preserve existing application edits and do not submit applications or contact employers during setup.
+Report setup checks, tests and actual render results. Unit tests alone do not prove that Gemini generation, LaTeX or Word work. Run the validation steps above on each new machine, whatever its OS. Preserve existing application edits and do not submit applications or contact employers during setup.

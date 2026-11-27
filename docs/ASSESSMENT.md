@@ -137,6 +137,44 @@ and complete; this document is retained as the Phase 0 record of what was found.
 > [`ROADMAP.md`](ROADMAP.md) §Phase 3 and [`PROJECT_STATE.md`](PROJECT_STATE.md) §"Phase 3,
 > item 6".
 
+> **Architecture update (2026-11-27, multi-candidate cleanup, PR #1).** Current facts; older
+> statements below remain as the historical record.
+>
+> *New modules (under `backend/` unless noted):*
+> - `services/fact_checks.py` — gap-phrase, tense, skill-support and number-support validators (ADR 0026).
+> - `services/pipeline_fingerprint.py` — hash of the pipeline's own code and settings for the cache key (ADR 0029).
+> - `services/cv_structure.py` — structural checks on a tailored CV (which roles and standalone projects it contains), split out of `validation.py`.
+> - `services/suggested_claims.py` — validates, stores (`source/suggested_claims.json`) and leak-guards the model's suggestions (ADR 0028).
+> - `services/claim_acceptance.py` — accept / reject / dismiss, with timestamped backup, re-validation and rollback.
+> - `services/profile_text_edit.py` — comment-preserving targeted YAML insertion (bullets or skills), full-dump fallback with a warning.
+> - `services/application_check.py` — offline re-validation (and optional temporary re-render) of saved applications.
+> - `renderers/cv_sections.py` — one source of section titles ("Professional Experience"), fixed English short month names, en-dash ranges and "Present" for PDF, DOCX and TXT.
+> - `cli/commands/claims.py` and `cli/commands/applications.py` — `cvtailor claims list|accept|reject` and `cvtailor applications check [--render]`; `scripts/check_saved_applications.py` is the script form.
+> - `ui/claims_panel.py` — the review page's "Suggested claims" panel ("Add selected to my profile", "Dismiss selected").
+> - `backend/python_floor.py` — the Python 3.12 floor shared by `scripts/setup.py` and `doctor`.
+>
+> *Renderer parameters.* `LaTeXRenderer` (and its `render_cv_pdf`-style helpers) and `render_upload_cv`
+> take `timezone_name` (the CV file-name year) and `extra_acronyms` (the candidate's
+> `candidate_guidance.json` acronyms, kept upper case in skill headings). The DOCX renderer
+> takes `timezone_name` for the cover-letter date. Callers pass `config.timezone_name`; there
+> is no module-level state.
+>
+> *Cache key (supersedes the key described in the Phase 3 note below).* In addition to the
+> serialized profile, posting, schema, provider and routed models, the key now includes a
+> pipeline fingerprint: the prompt-building code and `EDITORIAL_REQUIREMENTS`, the layout
+> budget and attempt constants, the CV template bytes and the validation modules' source
+> (line endings normalised, so the key matches on Windows and macOS). Cache hits are still
+> re-validated. See ADR 0015 (amended) and ADR 0029.
+>
+> *Provider and profile loading.* The provider default is **openrouter**; `google-genai` is
+> imported lazily and is needed only for the optional Gemini provider (this supersedes
+> "keep Gemini's latest Flash as default" in §11 and the Gemini-first wording in older
+> sections). `profile_loader.load_profile()` requires an explicit path; there is no implicit
+> default profile.
+>
+> *Profile and output model.* New optional profile fields (ADR 0027) and the confirm-first
+> claims flow (ADR 0028) change no storage layout: all state stays in the private store.
+
 ---
 
 ## 1. What CV Tailor currently does
@@ -146,8 +184,8 @@ cover letter (DOCX + PDF), grounded in one authoritative YAML profile.
 
 **Verified end-to-end workflow**
 
-> **Superseded by Phase 2 (2026-10-24) and Phase 2 close-out (2026-10-26).** The diagram below is
-> the *pre-Phase-2* flow, kept as the Phase 0 record. The profile is no longer read from
+> **Historical; superseded by Phase 2 (2026-10-24) and Phase 2 close-out (2026-10-26), ADR 0002/0011.** The diagram below is
+> the *pre-Phase-2* flow, kept as the Phase 0 record (`PROFILE_PATH` and `storage/profile/profile.yaml` no longer describe current behaviour). The profile is no longer read from
 > `storage/profile/profile.yaml`: it is resolved by `profile_id` through `ProfileStore`
 > (ADR 0003, ADR 0011), and outputs are written to `<store>/outputs/<profile_id>/<job_id>/`.
 > As of 2026-10-26 the FastAPI adapter resolves the same way — it no longer calls
@@ -318,7 +356,7 @@ Ranked by impact × confidence. All items **VERIFIED** unless marked.
 
 ## 4. Testing and regression baseline
 
-**Measured baseline (this machine, 2026-10-23):**
+**Measured baseline (measured on the original development machine, Windows, 2026-10-23):**
 
 ```
 python -m pytest -q   →   12 passed, 1 warning   (2.45 s)
@@ -369,7 +407,7 @@ budget-capped suite.
 
 ## 5. Performance and cost
 
-**Measured on this machine**
+**Measured on the original development machine (Windows)**
 
 | Metric | Value |
 |---|---|
@@ -487,7 +525,7 @@ repeated input. See the measured effect below.
    application and reused by the CV prompt, the letter prompt and every layout retry
    (`tailor_service.tailor_documents` → `generation.build_context(..., profile_json=...)`).
    The *token* figures were unchanged by that increment, because the bytes sent to the model
-   are byte-identical — it removes repeated work, not content. Measured on this machine:
+   are byte-identical — it removes repeated work, not content. Measured on the original development machine (Windows):
    `model_dump_json(indent=2)` ≈ 0.044 ms and the banned-tool facts block ≈ 0.23 ms per
    call, against a typical run that rebuilt them 3–4 times and up to 8 times at the
    worst (7 banned tools × one scan each). That is single-digit milliseconds per
@@ -671,7 +709,8 @@ two calls rather than merely left unmeasured.
 - **No credential was ever committed.** `.env` never in history; secret-pattern scan over
   all refs found nothing. `.gitignore:2-5` covers `.env*`.
 - **Substantial personal data is committed to a public repo**: name, personal email, mobile,
-  home city, **immigration status**, full employment history, education — `storage/profile/profile.yaml`.
+  home city, **immigration status**, full employment history, education — `storage/profile/profile.yaml`
+  (*historical Phase 0 finding, since resolved for new data by the private store, ADR 0002/0011*).
 - **64 of 112 tracked files are application data**, including `profile_snapshot.json`
   (a full profile copy per application) and `application_answers.json` (free-text answers
   plus two eligibility attestations).
@@ -808,14 +847,14 @@ job desc ───┘                                      │
 
 ### Storage
 
-Start with **YAML/JSON on disk keyed by `profile_id`** (`storage/profiles/<id>/profile.yaml`,
+Start with **YAML/JSON on disk keyed by `profile_id`** (*historical Phase 0 proposal, superseded by the private store, ADR 0002/0011: now `<store>/profiles/<id>/profile.yaml` and `<store>/applications/<job_id>/`*; originally `storage/profiles/<id>/profile.yaml`,
 `storage/profiles/<id>/applications/<job_id>/`). It preserves git-diffability and the current
 editing workflow. Adopt SQLite only when job-discovery volume (Phase 4) makes file scanning
 painful — not before. **No database server.**
 
 > **Implemented in Phase 2**, with two deviations from the sketch above:
-> - The store is **outside the repository** (`CVTAILOR_STORE`, default `./storage`; on this
->   machine `D:\coding\cv-tailor-data`), because ADR 0002 requires real data not to be committed
+> - The store is **outside the repository** (`CVTAILOR_STORE`, default `./storage`; point it at a
+>   private directory outside the checkout), because ADR 0002 requires real data not to be committed
 >   here. The `<store>/profiles/<id>/profile.yaml` shape is as sketched.
 > - Applications are kept **shared** at `<store>/applications/<job_id>/`, not nested under the
 >   profile, because `job_id` is posting-derived and candidate-free. Generated documents go to
@@ -853,7 +892,7 @@ Full records in [`DECISIONS/`](DECISIONS/README.md). Summary of what was decided
 | **4** | **Storage** | **Approved** — files keyed by `profile_id`, **local first**, no database server; remote store later ([0004](DECISIONS/0004-storage.md)). |
 | **5** | **CLI framework** | **Approved** — `argparse` + a friendliness layer (guided default, interactive prompts, `doctor`, `--json`) ([0007](DECISIONS/0007-cli-framework.md)). |
 | **6** | **FastAPI + Streamlit** | **Approved** — keep both as thin adapters over the service layer; reassess at Phase 6. |
-| **7** | **LLM providers** | **Approved** — provider interface; **benchmark cost, performance and output quality before switching**; keep Gemini's latest Flash as default. |
+| **7** | **LLM providers** | **Approved** — provider interface; **benchmark cost, performance and output quality before switching**; keep Gemini's latest Flash as default. *(Historical: the default has since moved to OpenRouter; see the 2026-11-27 update at the top.)* |
 | **8** | **Job sources** | **Approved in principle** — ToS-compliant APIs researched first; scraping only if permitted and necessary; full scope determined at Phase 4. |
 | **9** | **`applications/` archive** | **Approved** — read-only reference until Phase 2, then migrate to the new schema. |
 
@@ -896,8 +935,8 @@ already public. Do not rewrite history or change visibility without explicit app
 
 ## 13. Environment findings
 
-- **Development worktree is correctly isolated:** `D:\coding\cv-tailor-next` on
-  `refactor/architecture-v2`; `D:\coding\cv-tailor` on `master`. Both clean.
+- **Development worktree is correctly isolated** (*historical Phase 0 finding*): `<projects>/cv-tailor-next` on
+  `refactor/architecture-v2`; `<projects>/cv-tailor` on `master`. Both clean.
 - **`refactor/architecture-v2` is currently identical to `master`** (`1416177`, 0 ahead /
   0 behind) — the branch was created but no work has landed yet.
 - **The development worktree has no `.venv` and no `.env`** — it cannot run today. Master has

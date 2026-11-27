@@ -21,7 +21,31 @@ conflicts. `test_private_store_sync.py` simulates replication and conflict recov
 using disposable stores. See [PROJECT_STATE.md](PROJECT_STATE.md#milestone-continuation-2026-11-24)
 for the latest results.
 
-**Current baseline (2026-11-24, workspace continuation):** **1,357 passed, 3 skipped**
+**Current baseline (2026-11-27, `arundhathi/backlog` after the leftovers, PR #1, macOS with MacTeX):** `python -m pytest -q` gives
+**1786 passed, 3 skipped**, with and without a `.env` present. `python -m pytest -q tests/test_cli.py` is the quick check for CLI menu text.
+
+*History within this PR:* 1742 passed, 3 skipped (after WP1-WP13, about 184 s); 1450 at WP1 on 2026-11-25.
+The marker and CI notes below still apply. `pytest.ini`
+registers the `requires_latex`, `slow` and `network` markers with `--strict-markers`.
+`requires_latex` tests skip automatically when `pdflatex` is missing (hook in
+`tests/conftest.py`); run only them with `-m requires_latex`, or exclude them with
+`-m "not requires_latex"`. No test reads the repository's real `.env`. CI runs the
+non-TeX suite on Ubuntu, Windows and macOS, and the TeX suite on Ubuntu.
+
+**Test files added or substantially extended in PR #1** (`git diff --stat 42f75a4..HEAD -- tests/`):
+`test_fact_checks.py` and `test_gap_and_tense_validation.py` (gap, tense, skill and number checks);
+`test_richer_sections.py` and `test_cv_publications_activities.py` (new optional sections, nested bullets);
+`test_suggested_claims.py`, `test_claims_cli.py` and `test_ui_review.py` (confirm-first claims, CLI, panel and dismiss);
+`test_pipeline_fingerprint.py` (cache-key fingerprint, validator source);
+`test_check_saved_applications.py` (`applications check` and the script);
+`test_candidate_guidance.py` (including `acronyms`);
+`test_output_parity.py` and `test_section_heading_orphans.py` (PDF/DOCX/TXT parity, orphan headings, short months);
+`test_latex_robustness.py` (escaping, check marks, custom templates);
+`test_provider_without_google.py` (lazy `google-genai`);
+`test_setup_scripts.py`, `test_start_script.py` and `test_pdflatex_discovery.py` (setup, `start.py`, TeX Live discovery);
+`test_skills_spelling.py`; plus `conftest.py` (`requires_latex` auto-skip, `.env` isolation).
+
+**Previous baseline (2026-11-24, workspace continuation):** **1,357 passed, 3 skipped**
 across the non-TeX run and isolated TeX groups. The Windows verification used a
 process-local portable MiKTeX configuration and writable temporary folders. No paid
 provider calls were needed.
@@ -585,7 +609,7 @@ Remove-Item -Recurse -Force "$env:CVTAILOR_STORE\cache"
 .venv\Scripts\python.exe cvtailor.py generate --profile-id <id> --job-file posting.txt --no-cache
 ```
 
-`<store>` defaults to `./storage`; on this machine it is `D:\coding\cv-tailor-data`.
+`<store>` defaults to `./storage`; set `CVTAILOR_STORE` to a private directory outside the checkout.
 **There is no eviction policy** — the directory grows by one small JSON file per distinct
 generation — so clearing it by hand is the documented mechanism rather than a fallback.
 
