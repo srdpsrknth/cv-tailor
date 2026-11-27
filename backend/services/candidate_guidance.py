@@ -19,13 +19,15 @@ class CandidateGuidance:
     cv: tuple[str, ...] = ()
     cover_letter: tuple[str, ...] = ()
     layout: tuple[str, ...] = ()
+    #: Extra upper-case acronyms for this candidate's skill headings (render only).
+    acronyms: tuple[str, ...] = ()
 
 
 def parse_candidate_guidance(data) -> CandidateGuidance:
     """Validate a decoded versioned sidecar for loading or migration."""
     if not isinstance(data, dict) or type(data.get("version")) is not int or data["version"] != 1:
         raise ValueError("expected an object with version 1")
-    keys = {"version", "cv", "cover_letter", "layout"}
+    keys = {"version", "cv", "cover_letter", "layout", "acronyms"}
     if data.keys() - keys:
         raise ValueError("unknown guidance fields")
     fields = {}
@@ -38,6 +40,15 @@ def parse_candidate_guidance(data) -> CandidateGuidance:
         ):
             raise ValueError(f"{key} must be a list of up to 20 non-empty short strings")
         fields[key] = tuple(value.strip() for value in values)
+    acronyms = data.get("acronyms", [])
+    if (
+        not isinstance(acronyms, list)
+        or len(acronyms) > 100
+        or any(not isinstance(value, str) or not value.strip() or len(value.strip()) > 32
+               or len(value.split()) != 1 for value in acronyms)
+    ):
+        raise ValueError("acronyms must be a list of up to 100 single words of at most 32 characters")
+    fields["acronyms"] = tuple(dict.fromkeys(value.strip() for value in acronyms))
     return CandidateGuidance(**fields)
 
 
@@ -68,3 +79,15 @@ def load_candidate_guidance(config, profile_id) -> CandidateGuidance:
         return parse_candidate_guidance(data)
     except (OSError, UnicodeError, ValueError) as error:
         raise ValueError(f"Cannot load candidate_guidance.json for {candidate}: {error}") from error
+
+
+def load_candidate_acronyms(config, profile_id) -> tuple[str, ...]:
+    """The candidate's extra skill-heading acronyms for a render.
+
+    Re-rendering a saved application works from its profile snapshot, so a profile that
+    is no longer in the store simply has no extra acronyms; a malformed guidance file
+    still fails closed.
+    """
+    if config.profile_path is None and not config.store.exists(validate_profile_id(profile_id)):
+        return ()
+    return load_candidate_guidance(config, profile_id).acronyms

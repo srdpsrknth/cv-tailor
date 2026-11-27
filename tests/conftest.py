@@ -177,7 +177,7 @@ def stub_renderers(monkeypatch, tmp_path):
         pages.extend(page_sequence)
         remaining = iter(pages)
 
-        def latex_factory(outputs_dir):
+        def latex_factory(outputs_dir, **_kwargs):
             renderer = Mock()
 
             def render(cv, profile, job_position=None):

@@ -8,6 +8,7 @@ filenames and escaping consistent across every renderer.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 import re
 import unicodedata
 
@@ -65,6 +66,11 @@ _LATEX_UNICODE = {
     "\u200b": None, "\u200c": None, "\u200d": None, "\u2060": None, "\ufeff": None,
     "\u200e": None, "\u200f": None, "\u2061": None, "\u2062": None, "\u2063": None,
     "\ufe0f": None, "\ufe0e": None,
+    # Check marks need ``\checkmark`` from amssymb (loaded by the shipped CV and cover
+    # letter preambles). The guard keeps an older custom template that does not load it
+    # compiling, with the previous "?" in place of the mark.
+    "\u2713": r"\ifdefined\checkmark\ensuremath{\checkmark}\else?\fi{}",
+    "\u2714": r"\ifdefined\checkmark\ensuremath{\checkmark}\else?\fi{}",
 }
 
 #: Unicode ranges pdflatex (inputenc utf8 + T1) typesets without help: Latin-1 Supplement
@@ -155,31 +161,37 @@ def latex_url(value: str) -> str:
     return "".join(out)
 
 
-def _format_category_token(token: str, shouting: bool = False) -> str:
+def _format_category_token(token: str, shouting: bool = False, extra: frozenset = frozenset()) -> str:
     if not token:
         return token
     word = token.rstrip(",;:.")
     if word != token and word:  # "sop," -> format "sop", keep the punctuation
-        return _format_category_token(word, shouting) + token[len(word):]
+        return _format_category_token(word, shouting, extra) + token[len(word):]
     upper = token.upper()
-    if upper in _UPPERCASE_ACRONYMS:
+    if upper in _UPPERCASE_ACRONYMS or upper in extra:
         return upper
     if token.lower() == "dbt":
         return "dbt"
     if len(token) >= 2 and token.isalpha() and token.isupper() and not shouting:
         return token  # an acronym the author already wrote in capitals ("DICOM", "PROMS")
     if "/" in token:
-        return "/".join(_format_category_token(part, shouting) for part in token.split("/"))
+        return "/".join(_format_category_token(part, shouting, extra) for part in token.split("/"))
     if any(ch.islower() for ch in token) and any(ch.isupper() for ch in token[1:]):
         return token
     return token.capitalize()
 
 
-def format_skill_category(category: str) -> str:
-    """Format a skill category heading while preserving known uppercase acronyms."""
+def format_skill_category(category: str, extra_acronyms: Iterable[str] = ()) -> str:
+    """Format a skill category heading while preserving known uppercase acronyms.
+
+    ``extra_acronyms`` adds one candidate's own acronyms (from the private
+    ``candidate_guidance.json``) for this call only; the built-in list is never mutated,
+    so nothing leaks from one candidate's render into another's.
+    """
+    extra = frozenset(str(item).strip().upper() for item in extra_acronyms if str(item).strip())
     cleaned = " ".join((category or "").replace("_", " ").split())
     if not cleaned:
         return ""
     # A heading typed entirely in capitals is shouting, not acronyms, so it is title-cased.
     shouting = cleaned.isupper()
-    return " ".join(_format_category_token(token, shouting) for token in cleaned.split(" "))
+    return " ".join(_format_category_token(token, shouting, extra) for token in cleaned.split(" "))

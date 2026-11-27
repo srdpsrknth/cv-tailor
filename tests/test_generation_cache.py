@@ -673,7 +673,7 @@ def test_a_cold_cache_does_not_write_an_entry_before_the_gate_passes(
 
     from support import make_blank_pdf
 
-    def latex_factory(outputs_dir):
+    def latex_factory(outputs_dir, **_kwargs):
         renderer = Mock()
 
         def render(cv, profile, job_position=None):

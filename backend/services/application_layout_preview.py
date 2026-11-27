@@ -8,6 +8,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from models.profile import Profile
 from models.tailored_output import TailoredCV
 from renderers import create_latex_renderer
+from services.candidate_guidance import load_candidate_acronyms
 from services.application_review import application_folder, read_json
 
 
@@ -31,7 +32,8 @@ def preview_saved_cv_layout(config, profile_id, job_id) -> tuple[bytes, dict]:
     cv = TailoredCV.model_validate(content["cv"])
     profile = Profile.model_validate(snapshot)
     with TemporaryDirectory(prefix="cvtailor-saved-layout-") as scratch:
-        renderer = create_latex_renderer(outputs_dir=scratch)
+        renderer = create_latex_renderer(
+            outputs_dir=scratch, extra_acronyms=load_candidate_acronyms(config, profile_id))
         preview = getattr(renderer, "preview_cv_layout", None)
         if preview is None:
             raise ValueError("Restart CV Tailor to load the updated PDF renderer.")

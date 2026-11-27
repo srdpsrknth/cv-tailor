@@ -227,3 +227,13 @@ def test_docx_and_pdf_letters_show_the_same_preferred_wording(tmp_path):
         assert f"Dear {letter.company_name} recruiting team," in " ".join(text.split())
         assert "With best wishes," in text
         assert "Hiring Team" in text
+
+
+def test_upload_cv_uses_the_pdfs_short_month_form(tmp_path, analyst_profile):
+    paths = render_upload_cv(_cv(), analyst_profile, tmp_path)
+    text = Path(paths["cv_upload_text_path"]).read_text(encoding="utf-8")
+    full = "|".join(("January", "February", "March", "April", "June", "July", "August",
+                    "September", "October", "November", "December"))
+    import re
+    assert not re.search(rf"\b({full}) \d{{4}}", text)
+    assert re.search(r"\b[A-Z][a-z]{2} \d{4}\b", text)

@@ -474,7 +474,7 @@ def test_layout_preview_uses_saved_revision_without_replacing_the_pdf(review_con
     artifact = folder / "cv.pdf"
     artifact.write_bytes(b"existing CV")
 
-    def create_renderer(*, outputs_dir):
+    def create_renderer(*, outputs_dir, **_kwargs):
         assert Path(outputs_dir).is_dir()
         assert not Path(outputs_dir).is_relative_to(folder)
 

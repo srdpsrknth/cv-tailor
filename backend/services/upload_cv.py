@@ -7,6 +7,7 @@ from models.profile import Profile
 from models.tailored_output import TailoredCV
 from renderers.upload_cv import render_upload_cv
 from services.artifact_provenance import record_artifact_provenance
+from services.candidate_guidance import load_candidate_acronyms
 from services.application_review import application_folder, read_json
 
 
@@ -31,6 +32,7 @@ def export_saved_upload_cv(config, profile_id, job_id):
     profile = Profile.model_validate(snapshot)
     paths = render_upload_cv(
         cv, profile, folder, content.get('role_title'), timezone_name=config.timezone_name,
+        extra_acronyms=load_candidate_acronyms(config, profile_id),
     )
     rows = record_artifact_provenance(
         config.project_root,

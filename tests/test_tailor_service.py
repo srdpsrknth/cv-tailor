@@ -76,7 +76,7 @@ def configure(monkeypatch, tmp_path, profile, pages, responses):
     fake.calculate_token_usage.side_effect = lambda **kw: TokenUsage(**kw, model_name='test')
     monkeypatch.setattr(service, 'LLMService', lambda: fake)
     page_counts = iter(pages)
-    def latex_factory(outputs_dir):
+    def latex_factory(outputs_dir, **_kwargs):
         renderer = Mock()
         renderer.render_cv.side_effect = lambda *a, **kw: write_pdf(Path(outputs_dir) / 'CV.pdf', next(page_counts))
         return renderer

@@ -300,7 +300,11 @@ def test_every_new_field_reaches_upload_docx_and_txt(rich_profile, tmp_path):
     check(cv, rich_profile)
     paths = render_upload_cv(cv, rich_profile, tmp_path)
     word = [p.text for p in Document(paths["cv_upload_docx_path"]).paragraphs]
-    assert Path(paths["cv_upload_text_path"]).read_text(encoding="utf-8").splitlines() == word
+    document = Document(paths["cv_upload_docx_path"])
+    # The text copy is the DOCX paragraphs; second-level bullets are indented "  - ".
+    expected = [f"  - {p.text}" if p.style.name == "List Bullet 2" else p.text for p in document.paragraphs]
+    assert Path(paths["cv_upload_text_path"]).read_text(encoding="utf-8").splitlines() == expected
+    assert "  - Peer-reviewed by two referees." in expected and "  - Ran monthly SQL clinics." in expected
     text = "\n".join(word)
     assert "Transit Map — University team project | 2024\nMapped public transport gaps in 12 areas." in text
     assert "Technologies: Python, Leaflet" in word
@@ -321,7 +325,7 @@ def test_employer_project_metadata_and_display_name(rich_profile, tmp_path):
     word = [p.text for p in Document(paths["cv_upload_docx_path"]).paragraphs]
     assert "Project: Attribution Rebuild (Northwind)" in word       # display_name, not the full company
     assert "— Internal rebuild | 2023" in word and "Technologies: dbt" in word
-    assert "Northwind Analytics GmbH | April 2023 – Present | Sampletown, Germany" in word  # heading keeps it
+    assert "Northwind Analytics GmbH | Apr 2023 – Present | Sampletown, Germany" in word  # heading keeps it
 
 
 def test_a_role_that_is_one_project_prints_an_italic_subheading(analyst_profile, tmp_path):

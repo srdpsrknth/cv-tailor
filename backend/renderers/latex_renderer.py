@@ -8,9 +8,8 @@ import subprocess
 import shutil
 import json
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
@@ -23,6 +22,7 @@ from renderers.cv_sections import (
     project_as_subheading, project_heading, project_meta, project_technologies_line,
     role_company_label,
 )
+from utils.calendar import calendar_today, configured_timezone_name
 from utils.text import escape_latex, format_skill_category, latex_url, slugify
 
 
@@ -64,7 +64,9 @@ class LaTeXRenderer:
     def __init__(
         self,
         templates_dir: Optional[str] = None,
-        outputs_dir: Optional[str] = None
+        outputs_dir: Optional[str] = None,
+        timezone_name: Optional[str] = None,
+        extra_acronyms: Iterable[str] = (),
     ):
         """
         Initialize LaTeX renderer.
@@ -72,7 +74,12 @@ class LaTeXRenderer:
         Args:
             templates_dir: Path to templates directory
             outputs_dir: Path to outputs directory
+            timezone_name: IANA zone for the file-name year (default: ``CVTAILOR_TIMEZONE``,
+                else the machine's local clock), like the DOCX renderer.
         """
+        self.timezone_name = timezone_name or configured_timezone_name()
+        # One candidate's own skill-heading acronyms; per instance, never global.
+        self.extra_acronyms = tuple(extra_acronyms)
         if templates_dir is None:
             templates_dir = Path(__file__).parent.parent.parent / "templates" / "cv"
         if outputs_dir is None:
@@ -137,7 +144,9 @@ class LaTeXRenderer:
         source prose. The returned PDF is a preview, with no save side effect.
         """
         with tempfile.TemporaryDirectory(prefix="cvtailor-layout-preview-") as scratch:
-            renderer = LaTeXRenderer(templates_dir=self.templates_dir, outputs_dir=scratch)
+            renderer = LaTeXRenderer(templates_dir=self.templates_dir, outputs_dir=scratch,
+                                     timezone_name=self.timezone_name,
+                                     extra_acronyms=self.extra_acronyms)
             path = renderer._render_cv(
                 tailored_cv, profile, job_position, layout_preset=layout_preset,
                 explore_breaks=True,
@@ -183,7 +192,7 @@ class LaTeXRenderer:
     ) -> str:
         job_pos = job_position or tailored_cv.title or "role"
         safe_job = self._slugify(job_pos)
-        year = datetime.now().year
+        year = calendar_today(self.timezone_name).year
 
         try:
             # Load template
@@ -211,6 +220,18 @@ class LaTeXRenderer:
                        if f"section == '{section}'" not in template_source]
         if unsupported:
             profile = profile.model_copy(update={"cv_hidden_sections": [*profile.cv_hidden_sections, *unsupported]})
+        # Compatibility: a custom template that predates ``publication_entries`` /
+        # ``activity_entries`` prints headlines only, so the text-preservation check must
+        # not expect detail bullets it cannot show (see _prepare_template_data).
+        legacy_entries = {
+            section: [entry_text(entry) for entry in getattr(profile, section)]
+            for section, key in (("publications", "publication_entries"),
+                                 ("activities", "activity_entries"))
+            if key not in template_source
+            and any(entry_bullets(entry) for entry in getattr(profile, section))
+        }
+        if legacy_entries:
+            profile = profile.model_copy(update=legacy_entries)
         template_data = self._prepare_template_data(tailored_cv, profile)
         name_slug = self._slugify(profile.identity.full_name or "applicant")
         base_name = f"{year}_CV_{name_slug}_{safe_job}"
@@ -389,7 +410,7 @@ class LaTeXRenderer:
         for section in sections:
             paragraphs.extend(prose_by_section.get(section, ()))
         for category, items in (cv.skills.items() if "skills" in sections else ()):
-            fields[f"Skill category {category}"] = format_skill_category(category)
+            fields[f"Skill category {category}"] = format_skill_category(category, self.extra_acronyms)
             for index, item in enumerate(items):
                 fields[f"Skill {category}/{index}"] = item
         if cv.include_education and "education" in sections:
@@ -500,7 +521,11 @@ class LaTeXRenderer:
             "section_titles": dict(SECTION_TITLES),
             "labels": {key: self._escape_latex(value) for key, value in LABELS.items()},
             "date_separator": DATE_RANGE_SEPARATOR_LATEX,
-            # Text-only lists keep the historical key; the entries carry their bullets.
+            # Template compatibility: older custom templates only know the plain
+            # ``publications`` / ``activities`` text lists, so they print each entry's
+            # headline but not its detail bullets. The shipped template uses the
+            # ``*_entries`` keys (text + bullets). Keep both keys: do not remove or
+            # rename the plain lists, and add new data under new keys instead.
             "publications": [self._escape_latex(entry_text(entry)) for entry in profile.publications],
             "activities": [self._escape_latex(entry_text(entry)) for entry in profile.activities],
             "publication_entries": self._entries(profile.publications),
@@ -526,7 +551,7 @@ class LaTeXRenderer:
             ] if tailored_cv.include_education else [],
             "certifications": [self._escape_latex(certification_label(c)) for c in profile.certifications] if tailored_cv.include_certifications else [],
             "skills": {
-                self._escape_latex(format_skill_category(category)): [self._escape_latex(s) for s in skills]
+                self._escape_latex(format_skill_category(category, self.extra_acronyms)): [self._escape_latex(s) for s in skills]
                 for category, skills in tailored_cv.skills.items()
             },
             "languages": [
@@ -752,7 +777,9 @@ class LaTeXRenderer:
 
 def create_latex_renderer(
     templates_dir: Optional[str] = None,
-    outputs_dir: Optional[str] = None
+    outputs_dir: Optional[str] = None,
+    timezone_name: Optional[str] = None,
+    extra_acronyms: Iterable[str] = (),
 ) -> LaTeXRenderer:
     """
     Create and return a LaTeXRenderer instance.
@@ -764,4 +791,5 @@ def create_latex_renderer(
     Returns:
         Initialized LaTeXRenderer
     """
-    return LaTeXRenderer(templates_dir=templates_dir, outputs_dir=outputs_dir)
+    return LaTeXRenderer(templates_dir=templates_dir, outputs_dir=outputs_dir,
+                         timezone_name=timezone_name, extra_acronyms=extra_acronyms)

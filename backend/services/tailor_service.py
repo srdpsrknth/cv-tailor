@@ -544,7 +544,10 @@ def tailor_documents(
         else suggested_claims.suggestions_from_drafts(entry.drafts),
     )
 
-    latex =create_latex_renderer(outputs_dir=str(applications.job_folder))
+    latex = create_latex_renderer(
+        outputs_dir=str(applications.job_folder), timezone_name=config.timezone_name,
+        extra_acronyms=guidance.acronyms,
+    )
     docx = create_docx_renderer(
         outputs_dir=str(applications.job_folder), timezone_name=config.timezone_name
     )
@@ -601,7 +604,8 @@ def tailor_documents(
         from renderers.upload_cv import render_upload_cv
 
         upload_paths = render_upload_cv(
-            cv, profile, applications.job_folder, position, timezone_name=config.timezone_name
+            cv, profile, applications.job_folder, position, timezone_name=config.timezone_name,
+            extra_acronyms=guidance.acronyms,
         )
     except Exception as error:
         # Preserve everything editable, then mark the folder failed explicitly (D-14).

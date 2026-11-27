@@ -18,6 +18,12 @@ from utils.calendar import calendar_year
 from utils.text import format_skill_category, slugify
 
 
+#: Word list style for detail bullets under a publication or activity entry, and the
+#: matching indent in the plain-text copy.
+NESTED_BULLET_STYLE = 'List Bullet 2'
+TEXT_NESTED_PREFIX = '  - '
+
+
 def _use_unicode_bullets(doc: Document, font_name: str = 'Arial') -> None:
     """Use a Unicode bullet in the body font instead of Symbol PUA (U+F0B7)."""
     try:
@@ -36,10 +42,10 @@ def _use_unicode_bullets(doc: Document, font_name: str = 'Arial') -> None:
 
 def readable_date(value: str) -> str:
     """Expand unambiguous ISO months (locale independent); preserve other dates verbatim."""
-    return format_month_year(value, short=False)
+    return format_month_year(value)
 
 
-def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position=None, *, timezone_name="UTC") -> dict:
+def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position=None, *, timezone_name="UTC", extra_acronyms=()) -> dict:
     """Render the accepted CV wording into one-column body paragraphs.
 
     The text companion is the exact paragraph text of the DOCX. No facts are
@@ -60,11 +66,11 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
     section.page_width, section.page_height = Cm(21), Cm(29.7)
     section.top_margin = section.bottom_margin = Cm(1.5)
     section.left_margin = section.right_margin = Cm(1.7)
-    for name in ('Normal', 'Title', 'Heading 1', 'Heading 2', 'List Bullet'):
+    for name in ('Normal', 'Title', 'Heading 1', 'Heading 2', 'List Bullet', 'List Bullet 2'):
         style = doc.styles[name]
         style.font.name = 'Arial'
         style.font.color.rgb = RGBColor(0, 0, 0)
-        style.font.size = Pt(10.5 if name in ('Normal', 'List Bullet') else 11)
+        style.font.size = Pt(10.5 if name in ('Normal', 'List Bullet', 'List Bullet 2') else 11)
         style.paragraph_format.space_after = Pt(2)
         style.paragraph_format.space_before = Pt(0)
     for name in ('Heading 1', 'Heading 2'):
@@ -176,7 +182,7 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
             if cv.skills:
                 add_heading(SECTION_TITLES['skills'])
                 for category, skills in cv.skills.items():
-                    add(format_skill_category(category) + ': ' + ', '.join(skills))
+                    add(format_skill_category(category, extra_acronyms) + ': ' + ', '.join(skills))
         elif section == 'languages':
             if profile.languages:
                 add_heading(SECTION_TITLES['languages'])
@@ -189,8 +195,11 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                 for entry in entries:
                     add(entry_text(entry), 'List Bullet')
                     for bullet in entry_bullets(entry):
-                        add(bullet, 'List Bullet')
+                        add(bullet, NESTED_BULLET_STYLE)
     doc.save(paths['cv_upload_docx_path'])
+    # The text copy is the paragraph text of the DOCX; a second-level bullet keeps its
+    # nesting as an indented plain "  - " (no symbols an ATS parser could drop or garble).
     Path(paths['cv_upload_text_path']).write_text(
-        '\n'.join(p.text for p in doc.paragraphs) + '\n', encoding='utf-8')
+        '\n'.join(TEXT_NESTED_PREFIX + p.text if p.style.name == NESTED_BULLET_STYLE else p.text
+                  for p in doc.paragraphs) + '\n', encoding='utf-8')
     return paths
