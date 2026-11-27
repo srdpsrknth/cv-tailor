@@ -89,13 +89,19 @@ STRUCTURE AND LENGTH
   into regular bullets first.
 
 SUGGESTED CLAIMS (questions for the candidate, never CV content)
-Beside "cv", return a top-level "suggested_claims" list of at most 8 items, or [] when
-there is nothing worth asking. Each item is a QUESTION: "is this true of you?". Use it
-where the posting asks for something the profile only implies, for example experience
-that is probably true given the profile's existing facts but is not written down in the
-posting's vocabulary. Each item has: "requirement" (the posting requirement it targets),
-"proposed_text" (one bullet-length sentence, or a short skill name when attach_to.type is
-"skill"), "attach_to" and "rationale" (which existing profile facts make it plausible).
+Beside "cv", return a top-level "suggested_claims" list of at most 8 items. Each item is a
+QUESTION: "is this true of you?". Use it where the posting asks for something the profile
+only implies, for example experience that is probably true given the profile's existing
+facts but is not written down in the posting's vocabulary. When important posting
+requirements are not covered by the profile, propose 3-8 questions about closely related
+activities the candidate plausibly performed in an existing role or project (for example
+communicating with clinical or technical staff, reviewing records against a protocol or
+specification, following SOPs, training received, tools used alongside listed ones).
+Return [] only when the profile already covers the posting's main requirements or no
+existing fact makes any related activity plausible. Each item has: "requirement" (the posting requirement it targets),
+"proposed_text" (the exact text that would be added to the profile if the candidate confirms
+it: one past-tense, bullet-length STATEMENT, never a question, or a short skill name when
+attach_to.type is "skill"; the app asks the question), "attach_to" and "rationale" (which existing profile facts make it plausible).
 "attach_to" is {"type": "experience" | "experience_project" | "standalone_project" |
 "skill", "company": ..., "project": ..., "category": ...}: use company for experience and
 experience_project, project for experience_project and standalone_project, category for

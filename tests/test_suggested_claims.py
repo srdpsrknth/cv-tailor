@@ -448,3 +448,14 @@ def test_accepted_text_becomes_citable_by_the_cv_guard(workspace):
 
     profile = load(str(profile_path))
     claims.reject_suggestion_leak(cv_with_bullet(profile, PROJECT_TEXT), [PROJECT_TEXT], profile)
+
+
+def test_question_shaped_suggestions_are_dropped():
+    """The model must return the statement to add, never the question itself."""
+    from services.suggested_claims import _is_question
+
+    assert _is_question("Have you completed GCP training?")
+    assert _is_question("Did you coordinate study visits")
+    assert _is_question("Coordinated study visits?")
+    assert not _is_question("Coordinated study visits with site staff.")
+    assert not _is_question("Documented requirements; have results been shared")

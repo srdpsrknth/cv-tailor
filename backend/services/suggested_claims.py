@@ -46,6 +46,17 @@ def _fold(text: Any) -> str:
 # --------------------------------------------------------------------------- targets
 
 
+_QUESTION_START = re.compile(
+    r"^(have|has|did|do|does|were|was|are|is|could|can|would)\s+(you|the candidate)\b", re.I
+)
+
+
+def _is_question(text: str) -> bool:
+    """True for question-shaped text, which must never be written into a profile."""
+    stripped = text.strip()
+    return stripped.endswith("?") or bool(_QUESTION_START.match(stripped))
+
+
 def find_target(profile, attach_to: dict) -> tuple[Optional[dict], str]:
     """Resolve ``attach_to`` against a loaded profile.
 
@@ -180,6 +191,8 @@ def validate_suggestions(raw: Any, profile) -> tuple[list[dict], list[dict]]:
                 reason = "requirement and proposed_text are required"
             elif not reason and len(text) > limit:
                 reason = f"proposed_text is longer than {limit} characters"
+            elif not reason and _is_question(text):
+                reason = "proposed_text must be the statement to add, not a question"
             elif not reason and any(_norm(text) == _norm(t) for t in target_texts(profile, target)):
                 reason = "the profile already states this at the target"
             elif not reason and (target["type"], tuple(sorted(target.items())), _norm(text)) in seen:
