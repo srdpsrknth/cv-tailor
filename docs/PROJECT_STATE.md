@@ -1,10 +1,49 @@
 # Project state
 
-**Last updated:** 2026-11-25
-**Branch:** `refactor/architecture-v2`
-**Worktree:** `D:\coding\cv-tailor-next` (Windows)
+**Last updated:** 2026-11-27
+**Branch:** `refactor/architecture-v2` (integration branch for the multi-candidate cleanup: `arundhathi/backlog`)
+**Stable branch:** `master` at `1416177` — **usable for real applications**
+**Machines:** used on Windows and macOS; paths in older entries below refer to the original Windows development machine.
+
+## 2026-11-27 — Multi-candidate, cross-OS cleanup (`arundhathi/backlog`)
+
+A second candidate onboarded on macOS. Her setup and first real applications exposed
+one-candidate assumptions, missing CV sections, and OS gaps. The work is on `arundhathi/backlog`,
+one commit per work package. Verified with the full suite on macOS (pdflatex installed):
+see the final count in docs/TESTING.md. CI now runs on Ubuntu, Windows and macOS.
+
+- **WP1 tests/CI:** schema digest pins, `requires_latex` auto-skip, CI matrix (3 OS) plus a TeX Live job,
+  `.gitattributes`, strict markers. Tests no longer read the real `.env` or need an API key.
+- **WP2 LaTeX robustness:** single-pass `escape_latex`, unicode sanitising, safe contact links,
+  utf-8 subprocess decoding.
+- **WP3 no gap statements:** prompt rules and validators reject stated gaps or missing qualifications,
+  and ended roles described as current.
+- **WP5+6 sections:** `standalone_projects_policy`, tailorable standalone project bullets
+  (`{name, bullets}`), project dates/technologies/context, publications and activities with bullets,
+  education highlights, structured certifications, optional roles, `display_name`.
+- **WP7 layout/parity:** no orphaned section headings, consistent PDF/DOCX/TXT titles and dates,
+  locale-free month names, letter date in `CVTAILOR_TIMEZONE`, optional `letter` salutation/sign-off.
+- **WP10 fact safety:** skills and numbers must be supported by the profile; spoken languages stay out
+  of skills; `cv_delta` cannot add skill categories; a pipeline fingerprint completes the cache key.
+- **WP11-13 neutrality/OS/deps:** generic OS-neutral application skill and docs (no previous-owner data);
+  OpenRouter as the provider default; lazy `google-genai`; Python 3.12 floor shared by setup and doctor;
+  `.venv` version and architecture check; `start.py --status/--stop`; TeX Live discovery; fonts check;
+  `.gitignore` gaps; stale lock entries pruned.
+- **WP9 confirm-first suggestions:** see the branch log; landed after this entry was first written.
+
+**Deferred:** the job-search feature is to be **redesigned** rather than patched. The audit findings
+(per-profile sources used by the UI, eligibility vs. `country_overrides`, country-less postings,
+limit before ranking, per-board failures, language level, keyword modes, entry-level seniority,
+`--profile` for `jobs search`) are requirements for that redesign.
+
+**Known follow-ups:** the upload CV uses full month names while the PDF uses short ones; validator
+source is not part of the cache key (cache hits are re-validated, so stricter rules still apply);
+per-candidate acronym lists have no hook yet.
+
+## Earlier state (original development machine)
+
+**Worktree:** `<projects>\cv-tailor-next` (Windows)
 **Audited implementation:** `2f784b2` - *select readable CV layouts before shortening*
-**Stable branch:** `master` (`D:\coding\cv-tailor`) at `1416177` — **usable for real applications**
 
 **Active milestone: legacy profile and saved export verification.** Review the [current milestone checklist](ROADMAP.md#current-milestone-checklist)
 before starting work and again before closing a session or moving to a new

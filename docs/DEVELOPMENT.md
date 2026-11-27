@@ -64,7 +64,7 @@ the venv is later recreated under a Low-labelled checkout.
 
 ### Windows GUI shortcuts (Windows only)
 
-On macOS and Linux, start the GUI from a terminal with `.venv/bin/python scripts/start.py` and stop it with Ctrl+C; there is no
+On every OS, `scripts/start.py --status` and `scripts/start.py --stop` report or stop the services that `start.py` started. They use a PID file at `.runtime/services.json` and never stop unrelated listeners on the ports. On macOS and Linux, start the GUI from a terminal with `.venv/bin/python scripts/start.py` and stop it with Ctrl+C or `--stop`; there is no
 shortcut installer.
 
 The review UI requires the added `streamlit-pdf==2.1.0` dependency for inline PDF

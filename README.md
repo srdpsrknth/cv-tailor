@@ -14,7 +14,7 @@ read [AGENTS.md](AGENTS.md) and the
 
 ## Quick start
 
-Install Python 3.11+ (3.12 recommended), Git, and a full pdflatex distribution: MacTeX on
+Install Python 3.12+, Git, and a full pdflatex distribution: MacTeX on
 Mac, MiKTeX on Windows, or TeX Live on Linux. Tectonic is not used.
 
 ```bash
@@ -118,7 +118,8 @@ from new commits: API credentials, virtual environments, duplicate profile backu
 QA images and generated PDF/DOCX outputs. The three adjoe documents that were tracked
 before Phase 2 were removed from the branch tip; they remain in the repository's history.
 
-GitHub Actions runs unit tests on Python 3.12. Tests do not require API calls or LaTeX.
+GitHub Actions runs the unit tests on Python 3.12 on Ubuntu, Windows and macOS, plus a separate
+Ubuntu job with TeX Live for the LaTeX tests. Tests need no API key, network or `.env`.
 Full validation also requires rendering and inspecting both CV pages and letter PDF; render
 DOCX separately with LibreOffice because its layout differs. Fonts, dates, TeX versions,
 and model output can vary across environments. The exact Windows outputs are not a

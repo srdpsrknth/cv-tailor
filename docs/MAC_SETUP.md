@@ -32,6 +32,13 @@ python3.12 scripts/setup.py
 
 If `python3.12` is not found after Homebrew installation, use `$(brew --prefix python@3.12)/bin/python3.12`. Setup creates `.venv`, installs `requirements.lock.txt`, and creates `.env` from `.env.example` without overwriting existing settings.
 
+> **Use a native Python on Apple Silicon.** An Intel (x86_64) Python running under Rosetta,
+> for example an old Anaconda install, cannot install some locked wheels (`cryptography` 50.x has
+> no macOS x86_64 wheel). `scripts/setup.py` checks an existing `.venv`'s Python version and CPU
+> architecture and stops with a message if they don't match the machine. Delete `.venv`
+> and rerun setup with a native arm64 Python 3.12 (Homebrew `python@3.12`, the python.org
+> universal installer, or an arm64 conda environment). Setup never deletes `.venv` itself.
+
 ### Credentials and model (current as of Phase 3)
 
 **The default provider is OpenRouter, and the default model is `openai/gpt-6-luna`**
@@ -92,6 +99,8 @@ in a terminal appears in the browser and vice versa.
 
 ```bash
 .venv/bin/python scripts/start.py     # prints the UI and API URLs; open the UI one
+.venv/bin/python scripts/start.py --status   # services started by start.py, if any
+.venv/bin/python scripts/start.py --stop     # stops only processes start.py started
 .venv/bin/python cvtailor.py doctor   # command line: the supported path for problems
 ```
 
