@@ -31,10 +31,10 @@ Only the owner can move a decision to **Approved**.
 
 | [0024](0024-document-quality-and-artifact-freshness.md) | Readable document layouts, independent PDF diagnostics and per-artifact freshness | **Approved** — owner instruction, 2026-11-17 |
 | [0025](0025-adaptive-cv-layout.md) | Compare readable CV layouts deterministically before shortening, with content retention and recorded preset/measurements | **Approved** — owner instruction, 2026-11-18 |
-| [0026](0026-profile-grounded-tailoring.md) | Omit unmatched requirements silently; correct tense; skills and numbers must be supported by the profile | **Proposed** — PR #1, 2026-11-27 |
-| [0027](0027-richer-profile-sections.md) | Optional richer profile sections; standalone projects can be required and reworded from their own facts | **Proposed** — PR #1, 2026-11-27 |
-| [0028](0028-confirm-first-suggested-claims.md) | Confirm-first suggested claims: statements stored with the application, never rendered, added to the profile only when confirmed | **Proposed** — PR #1, 2026-11-27 |
-| [0029](0029-pipeline-fingerprint-cache-key.md) | Pipeline fingerprint (prompt code, budgets, template, validators) in the generation cache key | **Proposed** — PR #1, 2026-11-27 |
+| [0026](0026-profile-grounded-tailoring.md) | Omit unmatched requirements, use correct tense, and ground skills, transferable methods, and numbers in profile evidence | **Approved** — owner decision, 2026-11-27 |
+| [0027](0027-richer-profile-sections.md) | Optional richer profile sections; standalone projects can be required and reworded from their own facts | **Approved** — owner decision, 2026-11-27 |
+| [0028](0028-confirm-first-suggested-claims.md) | Confirm-first suggested claims: statements stored with the application, never rendered, added to the profile only when confirmed | **Approved** — owner decision, 2026-11-27 |
+| [0029](0029-pipeline-fingerprint-cache-key.md) | Pipeline fingerprint (prompt code, budgets, template, validators) in the generation cache key | **Approved** — owner decision, 2026-11-27 |
 | [0030](0030-job-search-redesign.md) | Redesign job search rather than patch it; audit findings recorded as requirements | **Deferred** — 2026-11-27 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be

@@ -1,6 +1,6 @@
 # ADR 0029 — Pipeline fingerprint in the generation cache key
 
-**Status:** Proposed, 2026-11-27 (multi-candidate cleanup, PR #1). Awaiting owner approval.
+**Status:** Approved, 2026-11-27 (multi-candidate cleanup, PR #1).
 **Related:** ADR 0015 (generation cache), ADR 0025.
 
 ## Context

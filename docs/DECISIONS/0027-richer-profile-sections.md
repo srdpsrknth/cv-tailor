@@ -1,6 +1,6 @@
 # ADR 0027 — Richer, optional profile sections and tailorable standalone projects
 
-**Status:** Proposed, 2026-11-27 (multi-candidate cleanup, PR #1). Awaiting owner approval.
+**Status:** Approved, 2026-11-27 (multi-candidate cleanup, PR #1).
 **Related:** ADR 0012, ADR 0015, ADR 0025.
 
 ## Context

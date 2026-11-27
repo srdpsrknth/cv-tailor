@@ -1,6 +1,6 @@
 # ADR 0028 — Confirm-first suggested claims
 
-**Status:** Proposed, 2026-11-27 (multi-candidate cleanup, PR #1). Awaiting owner approval.
+**Status:** Approved, 2026-11-27 (multi-candidate cleanup, PR #1).
 **Related:** ADR 0002 (privacy), ADR 0003, ADR 0026.
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR 0026 — Profile-grounded tailoring: no gap statements, correct tense, skills and numbers from the profile
 
-**Status:** Proposed, 2026-11-27 (multi-candidate cleanup, PR #1). Awaiting owner approval.
+**Status:** Approved, 2026-11-27 (multi-candidate cleanup, PR #1).
 **Related:** ADR 0003 (profile identity), ADR 0012 (structured output), ADR 0015 (cache), ADR 0016.
 
 ## Context
@@ -32,6 +32,11 @@ adding skills or metrics that are not in the profile.
    `rules` are excluded, so a banned tool stays an invention. Spoken languages are rejected
    from skills when the profile has a languages section. `cv_delta` retries may not add skill
    categories.
+   Use relevant transferable methods demonstrated in project or experience evidence, even when
+   the skills list does not name them. For a Databricks posting, Snowflake work can demonstrate
+   transferable SQL transformation, data modelling, or data quality methods. A claim of direct
+   Databricks experience requires evidence of Databricks use. Confirm any additional experience
+   with the candidate before adding it to the profile.
 4. **Numbers must come from the profile.** Every number in the summary, experience bullets and
    project bullets must appear in the profile facts, compared by value: 1,200 = 1.2k. Ordinals,
    names containing digits (GA4, Q3), labels (Phase 2), tool versions and dates within the
