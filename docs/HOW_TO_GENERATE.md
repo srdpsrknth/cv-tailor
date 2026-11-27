@@ -483,6 +483,48 @@ into both the DOCX and PDF headers so the document carries the current submissio
 
 ---
 
+## Confirm-first suggestions
+
+Early in a career, true experience is often not written in the posting's vocabulary. The
+CV draft may therefore return up to eight **suggested claims**: questions such as "did you
+apply inclusion/exclusion criteria to define eligible cohorts?", each tied to a profile
+entry it plausibly extends. They are saved beside the application as
+`source/suggested_claims.json`, are **never** rendered, and cannot reach a document: the
+CV is rejected and redrafted if it uses a suggestion's wording that the profile does not
+already contain. Suggestions pointing at a profile entry that does not exist are dropped
+(with a log note) rather than failing the run. Older applications simply have none.
+
+Review them, and accept **only statements that are true of you**:
+
+```bash
+python cvtailor.py --profile-id sample-analyst claims list \
+    --content <store>/outputs/sample-analyst/<job_id>/source/content.json
+python cvtailor.py --profile-id sample-analyst claims accept 1 3 \
+    --content <store>/outputs/sample-analyst/<job_id>/source/content.json
+python cvtailor.py --profile-id sample-analyst claims reject 2 \
+    --content <store>/outputs/sample-analyst/<job_id>/source/content.json
+```
+
+`accept` shows the exact profile changes and asks for confirmation (`--yes` skips the
+prompt, so use it only after checking the list). Numbers are the 1-based numbers `list`
+prints. Accepting adds the text to your **private** profile: a bullet on the named
+experience or project, or an item in the named skills category. A new skills category is
+created only if you name it with `--category <name>`. Before writing, a timestamped
+`profile.backup-<timestamp>.yaml` is saved beside the profile, the profile is
+re-validated afterwards, and the backup is restored automatically if that fails. The
+edit is a targeted text insertion that keeps your comments and formatting; only for a
+layout it cannot edit safely does it fall back to rewriting the whole file (which drops
+comments) and say so in a warning. The accepted or rejected state is recorded in the
+application.
+
+In the web interface, the saved application's page has a **Suggested claims (confirm only
+what is true)** panel with checkboxes, an **Add selected to my profile** button and an
+explicit confirmation step. Either way the existing documents do not change: **regenerate
+the application** (for example `generate --job-file <...>/source/job_description.txt
+--no-cache`) so the confirmed claims can appear in a new CV.
+
+---
+
 ## Re-running an application after a profile update
 
 If you have updated your profile and want the documents regenerated from scratch:

@@ -38,6 +38,7 @@ from services.cache_store import (
     serialize_profile_bytes,
 )
 from services.candidate_guidance import load_candidate_guidance
+from services import suggested_claims
 from services.pipeline_fingerprint import pipeline_fingerprint
 from services.llm_service import LLMService
 from services.profile_store import (
@@ -537,8 +538,13 @@ def tailor_documents(
     # chosen, so the folder is written identically either way.
     drafts = entry.drafts if entry is not None else generator.drafts
     applications.save_drafts(drafts)
+    suggested_claims.store_from_response(
+        applications.source_folder, profile,
+        generator.suggested_claims_raw if entry is None
+        else suggested_claims.suggestions_from_drafts(entry.drafts),
+    )
 
-    latex = create_latex_renderer(outputs_dir=str(applications.job_folder))
+    latex =create_latex_renderer(outputs_dir=str(applications.job_folder))
     docx = create_docx_renderer(
         outputs_dir=str(applications.job_folder), timezone_name=config.timezone_name
     )

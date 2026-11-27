@@ -647,3 +647,107 @@ def test_search_results_survive_reruns_and_handoff_does_not_generate(
     assert not at.exception
     assert at.session_state["pending_handoff"]["role"] == "Reporting analyst"
     assert at.session_state["pending_handoff"]["job_description"] == job.description
+
+
+# --- confirm-first suggested claims (WP9) ------------------------------------------------
+
+CLAIM_TEXT = "Applied inclusion and exclusion criteria to define eligible cohorts from source records."
+
+
+def save_claims(store, job):
+    from services import suggested_claims
+    from support import load_profile
+
+    kept, _ = suggested_claims.validate_suggestions(
+        [
+            {
+                "requirement": "Cohort definition",
+                "proposed_text": CLAIM_TEXT,
+                "rationale": "The project validates a rebuilt model.",
+                "attach_to": {
+                    "type": "experience_project",
+                    "company": "Northwind Analytics GmbH",
+                    "project": "Attribution Rebuild",
+                },
+            },
+            {
+                "requirement": "Cohorts",
+                "proposed_text": "Cohort definition",
+                "rationale": "Same.",
+                "attach_to": {"type": "skill", "category": "core_analytics"},
+            },
+        ],
+        load_profile("synthetic_analyst"),
+    )
+    suggested_claims.save_suggestions(store / "outputs" / "analyst_a" / job / "source", kept, [])
+
+
+def profile_file(store):
+    return store / "profiles" / "analyst_a" / "profile.yaml"
+
+
+def claims_titles(at):
+    return [e.label for e in at.expander]
+
+
+def test_review_without_suggestions_shows_no_claims_panel(workspace):
+    job = save_review(workspace)
+    at = open_saved_application(selected_app(), job)
+    assert not any("Suggested claims" in label for label in claims_titles(at))
+
+
+def test_claims_panel_requires_a_selection_and_an_explicit_confirmation(workspace):
+    job = save_review(workspace)
+    save_claims(workspace, job)
+    before = profile_file(workspace).read_bytes()
+    at = open_saved_application(selected_app(), job)
+    prefix = f"review_analyst_a_{job}"
+
+    assert "Suggested claims (confirm only what is true)" in claims_titles(at)
+    assert at.checkbox(key=f"{prefix}_claim_1").label == CLAIM_TEXT
+    assert not [c for c in at.checkbox if c.value]
+    assert at.button(key=f"{prefix}_claims_add").disabled
+    assert any("TRUE" in c.value for c in at.caption)
+    assert any("Regenerate" in c.value or "regenerate" in c.value for c in at.caption)
+
+    at.checkbox(key=f"{prefix}_claim_1").check().run()
+    at.button(key=f"{prefix}_claims_add").click().run()
+    assert not at.exception
+    # Selecting and pressing the button only reaches the confirmation step.
+    assert profile_file(workspace).read_bytes() == before
+    assert any("Confirm: these statements" in w.value for w in at.warning)
+    assert any(CLAIM_TEXT in m.value for m in at.markdown)
+
+    at.button(key=f"{prefix}_claims_cancel").click().run()
+    assert profile_file(workspace).read_bytes() == before
+    assert not [b for b in at.button if b.key == f"{prefix}_claims_yes"]
+
+
+def test_confirming_adds_only_the_selected_claim_to_the_profile_with_a_backup(workspace):
+    import yaml
+
+    job = save_review(workspace)
+    save_claims(workspace, job)
+    prefix = f"review_analyst_a_{job}"
+    at = open_saved_application(selected_app(), job)
+
+    at.checkbox(key=f"{prefix}_claim_1").check().run()
+    at.button(key=f"{prefix}_claims_add").click().run()
+    at.button(key=f"{prefix}_claims_yes").click().run()
+    assert not at.exception
+
+    data = yaml.safe_load(profile_file(workspace).read_text(encoding="utf-8"))
+    assert data["experience"][0]["selected_projects"][0]["bullets"][-1] == CLAIM_TEXT
+    assert "Cohort definition" not in data["skills"]["core_analytics"]
+    assert len(list(profile_file(workspace).parent.glob("profile.backup-*.yaml"))) == 1
+    assert any("Regenerate this application" in s.value for s in at.success)
+
+    from services import suggested_claims
+
+    saved = suggested_claims.load_suggestions(
+        workspace / "outputs" / "analyst_a" / job / "source" / "content.json"
+    )
+    assert [s["status"] for s in saved["suggestions"]] == ["accepted", "pending"]
+    # The accepted claim is no longer offered again.
+    assert f"{prefix}_claim_1" not in [c.key for c in at.checkbox]
+    assert f"{prefix}_claim_2" in [c.key for c in at.checkbox]

@@ -103,6 +103,8 @@ class DocumentGenerator:
         self.layout_guidance = layout_guidance
         self.counts = {"cv": TokenCounts(), "cover_letter": TokenCounts()}
         self.drafts: list = []
+        #: Raw ``suggested_claims`` of the first CV draft (questions, never CV content).
+        self.suggested_claims_raw: list = []
 
     # --- one document ------------------------------------------------------------------
 
@@ -237,6 +239,7 @@ class DocumentGenerator:
                 raise ValueError("Keep immigration and work authorization out of CV prose.")
             self._apply_visa_label(model, work_country)
             validation.validate_cv(model, self.profile, self.rules)
+            self._guard_suggested_claims(model, data)
         else:
             model = TailoredCoverLetter.model_validate(data.get("cover_letter", data))
             validation.validate_cover_letter(model, self.profile, self.rules)
@@ -246,6 +249,17 @@ class DocumentGenerator:
             if role_title:
                 model.role_title = role_title
         return model
+
+    def _guard_suggested_claims(self, cv: TailoredCV, data: dict) -> None:
+        """Keep unconfirmed suggestions out of the CV (see ``services.suggested_claims``)."""
+        from services import suggested_claims
+
+        # A layout-retry delta never carries the key, so it keeps the draft's suggestions.
+        if "suggested_claims" in data or "suggested_claims" in (data.get("cv") or {}):
+            self.suggested_claims_raw = suggested_claims.raw_suggestions(data)
+        suggested_claims.reject_suggestion_leak(
+            cv, suggested_claims.claim_texts(self.suggested_claims_raw), self.profile
+        )
 
     def _apply_visa_label(self, cv: TailoredCV, work_country: Optional[str]) -> None:
         """Keep immigration status separate from sponsorship wording."""

@@ -88,6 +88,23 @@ STRUCTURE AND LENGTH
   space. Shorten wording, remove duplicated content, and merge less relevant projects
   into regular bullets first.
 
+SUGGESTED CLAIMS (questions for the candidate, never CV content)
+Beside "cv", return a top-level "suggested_claims" list of at most 8 items, or [] when
+there is nothing worth asking. Each item is a QUESTION: "is this true of you?". Use it
+where the posting asks for something the profile only implies, for example experience
+that is probably true given the profile's existing facts but is not written down in the
+posting's vocabulary. Each item has: "requirement" (the posting requirement it targets),
+"proposed_text" (one bullet-length sentence, or a short skill name when attach_to.type is
+"skill"), "attach_to" and "rationale" (which existing profile facts make it plausible).
+"attach_to" is {"type": "experience" | "experience_project" | "standalone_project" |
+"skill", "company": ..., "project": ..., "category": ...}: use company for experience and
+experience_project, project for experience_project and standalone_project, category for
+skill, exact profile names only, and null for the fields that do not apply.
+Rules: suggestions must be plausible extensions of existing profile facts, never new
+employers, titles, dates, credentials or invented numbers. NEVER use a suggestion's text
+anywhere in the CV: the CV may state only facts already in the profile, and a suggestion
+becomes citable only after the candidate confirms it and it is added to the profile.
+
 OUTPUT
 Return a complete JSON object only. No markdown, commentary, or LaTeX. Standard
 JSON escaping permits apostrophes in prose; do not remove grammar to avoid them.
@@ -117,5 +134,13 @@ JSON escaping permits apostrophes in prose; do not remove grammar to avoid them.
     "skill_reordering": "Brief explanation",
     "project_selection": "Brief explanation",
     "overall_strategy": "Brief explanation"
-  }
+  },
+  "suggested_claims": [
+    {
+      "requirement": "Posting requirement targeted",
+      "proposed_text": "One bullet-length sentence the candidate may confirm",
+      "attach_to": {"type": "experience_project", "company": "Exact profile company", "project": "Exact profile project", "category": null},
+      "rationale": "Existing profile facts that make this plausible"
+    }
+  ]
 }

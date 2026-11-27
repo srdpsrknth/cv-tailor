@@ -91,9 +91,11 @@ def test_the_cv_schema_requires_the_document_and_nothing_else():
 
     assert schema['type'] == 'object'
     # Required, because strict mode demands it...
-    assert set(schema['required']) == {'cv', 'tailoring_explanation'}
+    assert set(schema['required']) == {'cv', 'tailoring_explanation', 'suggested_claims'}
     # ...but nullable, because it is optional in meaning.
     assert 'null' in schema['properties']['tailoring_explanation']['type']
+    # WP9: the confirm-first list is the same: required by strict mode, nullable in meaning.
+    assert 'null' in schema['properties']['suggested_claims']['type']
 
 
 def test_the_letter_schema_requires_the_cover_letter():

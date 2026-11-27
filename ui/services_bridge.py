@@ -617,3 +617,40 @@ def remember_gui_profile(config, profile_id):
     from services.gui_preferences import remember_profile
 
     return remember_profile(config, profile_id)
+
+
+# --- confirm-first suggested claims (WP9) -------------------------------------------------
+
+
+def _claims_content(config, profile_id, job_id) -> Path:
+    from services.application_review import application_folder
+
+    return application_folder(config, profile_id, job_id) / "source" / "content.json"
+
+
+def claims_for(config, profile_id, job_id) -> List[dict]:
+    """The application's suggested claims with 1-based ``number``; empty for older runs."""
+    from services.suggested_claims import load_suggestions
+
+    record = load_suggestions(_claims_content(config, profile_id, job_id))
+    return [{"number": n, **item} for n, item in enumerate(record["suggestions"], 1)]
+
+
+def plan_claims(config, profile_id, job_id, numbers):
+    """Exactly what accepting ``numbers`` would change in the profile. Writes nothing."""
+    from services.claim_acceptance import accept_suggestions
+
+    return accept_suggestions(
+        _claims_content(config, profile_id, job_id), config.store.profile_path(profile_id),
+        list(numbers), expected_profile_id=profile_id, dry_run=True,
+    )
+
+
+def accept_claims(config, profile_id, job_id, numbers):
+    """Write the confirmed suggestions into the private profile (after a backup)."""
+    from services.claim_acceptance import accept_suggestions
+
+    return accept_suggestions(
+        _claims_content(config, profile_id, job_id), config.store.profile_path(profile_id),
+        list(numbers), expected_profile_id=profile_id,
+    )
