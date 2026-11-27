@@ -99,7 +99,7 @@
 {% endfor %}
 \end{itemize}
 {% endif %}
-{% if split_role and not exp.projects and exp.technologies %}
+{% if not exp.projects and exp.technologies %}
 \nopagebreak
 \vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
@@ -124,18 +124,12 @@
 {% for bullet in project.bullets %}\item {{ bullet }}
 {% endfor %}
 \end{itemize}
-{% if project.technologies_line %}
-\nopagebreak\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ project.technologies_line }}\par}
-{% endif %}
-{% if split_role and loop.last and exp.technologies %}
+{% if loop.last and exp.technologies %}
 \nopagebreak
 \vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 \end{samepage}
 {% endfor %}
-{% endif %}
-{% if exp.technologies and not split_role %}
-\vspace{2pt}{\metadata\textbf{\textcolor{muted}{\lbltechnologies\ }}{{ exp.technologies|join(', ') }}\par}
 {% endif %}
 {% if not loop.last %}\vspace{3pt}{\color{divider}\hrule height 0.35pt}\vspace{5pt}{% endif %}
 {% endfor %}

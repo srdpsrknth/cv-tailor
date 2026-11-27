@@ -8,7 +8,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 
-def _pdf(path, lines):
+def _pdf(path, lines, *, positioned=False):
     writer = PdfWriter()
     page = writer.add_blank_page(width=612, height=792)
     font = DictionaryObject(
@@ -16,6 +16,7 @@ def _pdf(path, lines):
             NameObject("/Type"): NameObject("/Font"),
             NameObject("/Subtype"): NameObject("/Type1"),
             NameObject("/BaseFont"): NameObject("/Helvetica"),
+            NameObject("/Encoding"): NameObject("/WinAnsiEncoding"),
         }
     )
     page[NameObject("/Resources")] = DictionaryObject(
@@ -29,13 +30,44 @@ def _pdf(path, lines):
     stream.set_data(
         (
             "BT /F1 12 Tf 40 740 Td 18 TL\n"
-            + "\n".join(f"({line}) Tj T*" for line in lines)
+            + "\n".join(lines if positioned else [f"({line}) Tj T*" for line in lines])
             + "\nET"
         ).encode("ascii")
     )
     page[NameObject("/Contents")] = writer._add_object(stream)
     writer.write(path)
     return path
+
+
+def test_cv_bullet_check_uses_drawn_lines_and_stops_at_headings(tmp_path):
+    from services.document_quality import inspect_cv_bullets
+
+    path = _pdf(tmp_path / "cv.pdf", [
+        r"1 0 0 1 40 740 Tm (\225) Tj 1 0 0 1 52 740 Tm (A three-line bullet) Tj",
+        "1 0 0 1 52 726 Tm (that wraps once) Tj",
+        "1 0 0 1 52 712 Tm (and wraps again.) Tj",
+        r"1 0 0 1 40 696 Tm (\225) Tj 1 0 0 1 52 696 Tm (A two-line bullet) Tj",
+        "1 0 0 1 52 682 Tm (with one wrap.) Tj",
+        "1 0 0 1 40 668 Tm (TECHNOLOGIES) Tj",
+        "1 0 0 1 40 654 Tm (A long unbulleted passage follows.) Tj",
+        "1 0 0 1 40 640 Tm (Second unbulleted line.) Tj",
+        "1 0 0 1 40 626 Tm (Third unbulleted line.) Tj",
+    ], positioned=True)
+    report = inspect_cv_bullets(path)
+    assert report == {
+        "checked": 2,
+        "long_bullets": [
+            {"page": 1, "end_page": 1, "lines": 3, "excerpt": "A three-line bullet"},
+        ],
+    }
+
+
+def test_cv_bullet_check_distinguishes_unreadable_and_markerless_pdfs(tmp_path):
+    from services.document_quality import inspect_cv_bullets
+
+    assert inspect_cv_bullets(tmp_path / "missing.pdf")["checked"] is None
+    report = inspect_cv_bullets(_pdf(tmp_path / "cv.pdf", ["Text without markers."]))
+    assert report == {"checked": 0, "long_bullets": []}
 
 
 def test_two_independent_default_engines_retain_words_fields_and_order(tmp_path):

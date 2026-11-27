@@ -322,7 +322,7 @@ def _expected_letter_text(content):
 
 def inspect_application_pdfs(folder, content, snapshot, manifest):
     """Run local advisory extraction checks on saved PDFs, without invoking Office."""
-    from services.document_quality import inspect_document
+    from services.document_quality import inspect_cv_bullets, inspect_document
 
     identity = snapshot.get("identity") if isinstance(snapshot, dict) else {}
     identity = identity if isinstance(identity, dict) else {}
@@ -364,6 +364,7 @@ def inspect_application_pdfs(folder, content, snapshot, manifest):
         )
         if scope == "cv":
             report["layout"] = layout
+            report["bullet_lines"] = inspect_cv_bullets(path)
         limit = 1 if scope == "cover_letter" else 2
         if isinstance(report.get("page_count"), int) and report["page_count"] > limit:
             report["warnings"].append(

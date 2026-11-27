@@ -18,7 +18,7 @@ from models.profile import Profile
 from models.profile import certification_label, entry_bullets, entry_text
 from renderers.cv_sections import (
     DATE_RANGE_SEPARATOR, DATE_RANGE_SEPARATOR_LATEX, LABELS, SECTION_TITLES,
-    education_highlights_line, find_profile_project, find_role, format_month_year,
+    education_highlights_line, experience_technologies, find_profile_project, find_role, format_month_year,
     project_as_subheading, project_heading, project_meta, project_technologies_line,
     role_company_label,
 )
@@ -384,17 +384,15 @@ class LaTeXRenderer:
             fields[f"Start {index}"] = self._format_date(exp.start_date)
             fields[f"End {index}"] = self._format_date(exp.end_date)
             experience_paragraphs.extend(exp.bullets)
-            role = find_role(profile, exp.company)
-            for project_index, project in enumerate(
-                exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
-            ):
+            role = find_role(profile, exp)
+            projects = exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
+            extras = [find_profile_project(role, project.name) for project in projects]
+            for project_index, (project, original) in enumerate(zip(projects, extras)):
                 experience_paragraphs.append(project.name)
                 experience_paragraphs.extend(project.bullets)
-                self._project_fields(
-                    fields, f"Role {index} project {project_index}",
-                    find_profile_project(role, project.name), with_name=False,
-                )
-            for item_index, item in enumerate(self._get_technologies_for_company(exp.company, profile)):
+                if original is not None and project_meta(original):
+                    fields[f"Role {index} project {project_index} heading"] = project_meta(original)
+            for item_index, item in enumerate(experience_technologies(role, extras)):
                 fields[f"Technology {index}/{item_index}"] = item
         prose_by_section = {
             "experience": experience_paragraphs,
@@ -436,13 +434,13 @@ class LaTeXRenderer:
         return paragraphs, fields
 
     @staticmethod
-    def _project_fields(fields, label, project, with_name=True) -> None:
+    def _project_fields(fields, label, project) -> None:
         """Visible metadata of a project, checked in the extracted PDF text."""
         if project is None:
             return
         meta = project_meta(project)
         if meta:
-            fields[f"{label} heading"] = project_heading(project) if with_name else meta
+            fields[f"{label} heading"] = project_heading(project)
         line = project_technologies_line(project)
         if line:
             fields[f"{label} technologies"] = line
@@ -468,31 +466,29 @@ class LaTeXRenderer:
         # Prepare experience data
         experiences = []
         for exp in tailored_cv.experience:
+            role = find_role(profile, exp)
+            projects = exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
+            extras = [find_profile_project(role, project.name) for project in projects]
             exp_data = {
                 "company": self._escape_latex(exp.company),
                 "role": self._escape_latex(exp.role),
                 "start_date": self._format_date(exp.start_date),
                 "end_date": self._format_date(exp.end_date),
-                "location": self._escape_latex(self._get_location_for_company(exp.company, profile)),
+                "location": self._escape_latex((role.location or "") if role else ""),
                 "bullets": [self._escape_latex(b) for b in exp.bullets],
-                "technologies": [self._escape_latex(t) for t in self._get_technologies_for_company(exp.company, profile)]
+                "technologies": [self._escape_latex(t) for t in experience_technologies(role, extras)],
             }
-            role = find_role(profile, exp.company)
             # The short name is for compact places only; the heading keeps the employer.
             exp_data["project_company"] = self._escape_latex(role_company_label(role, exp.company))
 
-            # Handle new projects structure
-            if exp.projects and "employer_projects" not in profile.cv_hidden_sections:
-                exp_data["projects"] = [
-                    {
-                        "name": self._escape_latex(proj.name),
-                        "bullets": [self._escape_latex(b) for b in proj.bullets],
-                        **self._project_extras(find_profile_project(role, proj.name)),
-                    }
-                    for proj in exp.projects
-                ]
-            else:
-                exp_data["projects"] = []
+            exp_data["projects"] = [
+                {
+                    "name": self._escape_latex(project.name),
+                    "bullets": [self._escape_latex(b) for b in project.bullets],
+                    "meta": self._escape_latex(project_meta(original)) if original else "",
+                }
+                for project, original in zip(projects, extras)
+            ]
             exp_data["project_as_subheading"] = project_as_subheading(
                 exp, show_projects=bool(exp_data["projects"]))
 
@@ -604,20 +600,6 @@ class LaTeXRenderer:
             "github_display": escape_latex(short(github)),
             "github_url": latex_url(github),
         }
-
-    def _get_location_for_company(self, company: str, profile: Profile) -> str:
-        """Get location for a specific company from profile."""
-        for exp in profile.experience:
-            if exp.company == company:
-                return exp.location or ""
-        return ""
-
-    def _get_technologies_for_company(self, company: str, profile: Profile) -> list:
-        """Get technologies for a specific company from profile."""
-        for exp in profile.experience:
-            if exp.company == company:
-                return exp.technologies
-        return []
 
     def _compile_pdf(self, tex_path: Path, base_name: str) -> Path:
         """

@@ -9,8 +9,8 @@ from docx.shared import Cm, Pt, RGBColor
 
 from models.profile import Profile, certification_label, entry_bullets, entry_text
 from renderers.cv_sections import (
-    DATE_RANGE_SEPARATOR, LABELS, SECTION_TITLES, education_highlights_line,
-    find_profile_project, format_month_year, project_as_subheading, project_heading,
+    DATE_RANGE_SEPARATOR, LABELS, SECTION_TITLES, education_highlights_line, experience_technologies,
+    find_profile_project, find_role, format_month_year, project_as_subheading, project_heading,
     project_meta, project_technologies_line, role_company_label,
 )
 from models.tailored_output import TailoredCV
@@ -121,26 +121,18 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                 add_heading(SECTION_TITLES['experience'])
             for exp in cv.experience:
                 add_heading(exp.role, 'Heading 2')
-                # Exact identity avoids borrowing location/tools from another role at
-                # the same employer. Ambiguous matches contribute no inferred metadata.
-                matches = [row for row in profile.experience if
-                           (row.company, row.role, row.start_date, row.end_date) ==
-                           (exp.company, exp.role, exp.start_date, exp.end_date)]
-                if not matches:
-                    company_matches = [row for row in profile.experience if row.company == exp.company]
-                    matches = company_matches if len(company_matches) == 1 else []
-                original = matches[0] if len(matches) == 1 else None
+                original = find_role(profile, exp)
                 dates = DATE_RANGE_SEPARATOR.join(readable_date(d) for d in (exp.start_date, exp.end_date) if d)
                 metadata = [exp.company, dates, original.location if original else None]
                 p = doc.add_paragraph(' | '.join(value for value in metadata if value))
                 employer_projects = exp.projects if "employer_projects" not in profile.cv_hidden_sections else []
+                project_details = [find_profile_project(original, project.name) for project in employer_projects]
                 p.paragraph_format.keep_with_next = bool(exp.bullets or employer_projects or (original and original.location))
                 for bullet in exp.bullets:
                     add(bullet, 'List Bullet')
                 company_label = role_company_label(original, exp.company)
                 subheading = project_as_subheading(exp, show_projects=bool(employer_projects))
-                for project in employer_projects:
-                    extras = find_profile_project(original, project.name)
+                for project, extras in zip(employer_projects, project_details):
                     if subheading:
                         heading = add(project.name, keep=True)
                         for run in heading.runs:
@@ -151,10 +143,9 @@ def render_upload_cv(cv: TailoredCV, profile: Profile, outputs_dir, job_position
                         add(project_meta(extras), keep=True)
                     for bullet in project.bullets:
                         add(bullet, 'List Bullet')
-                    if extras is not None:
-                        add(project_technologies_line(extras))
-                if original and original.technologies:
-                    add(f"{LABELS['technologies']} " + ', '.join(original.technologies))
+                technologies = experience_technologies(original, project_details)
+                if technologies:
+                    add(f"{LABELS['technologies']} " + ", ".join(technologies))
         elif section == 'projects':
             standalone_projects = cv.resolve_standalone_projects(profile)
             if standalone_projects:

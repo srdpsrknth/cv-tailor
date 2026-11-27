@@ -8,9 +8,10 @@ escape or style it for their own medium.
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Iterable, Optional
 
-from models.profile import Education, Experience, Project
+from models.profile import Education, Experience, Profile, Project
+from models.tailored_output import TailoredExperience
 
 #: Section titles, decided once. The PDF upper-cases them; DOCX/TXT show them as written.
 #: ``summary`` is deliberately DOCX/TXT only: the PDF shows the summary as an unlabelled
@@ -104,9 +105,13 @@ def role_company_label(role: Optional[Experience], company: str) -> str:
     return short or company
 
 
-def find_role(profile, company: str) -> Optional[Experience]:
-    """The profile role for ``company`` when it is unambiguous."""
-    matches = [row for row in profile.experience if row.company == company]
+def find_role(profile: Profile, experience: TailoredExperience) -> Optional[Experience]:
+    """Find the profile role without borrowing metadata from another role."""
+    matches = [row for row in profile.experience if row.company == experience.company]
+    if len(matches) <= 1:
+        return matches[0] if matches else None
+    identity = (experience.role, experience.start_date, experience.end_date)
+    matches = [row for row in matches if (row.role, row.start_date, row.end_date) == identity]
     return matches[0] if len(matches) == 1 else None
 
 
@@ -116,6 +121,21 @@ def find_profile_project(role: Optional[Experience], name: str) -> Optional[Proj
         return None
     wanted = name.strip().casefold()
     return next((p for p in role.selected_projects if p.name.strip().casefold() == wanted), None)
+
+
+def experience_technologies(
+    role: Optional[Experience], visible_projects: Iterable[Optional[Project]],
+) -> list[str]:
+    """Combine role tools with tools from the employer projects shown in the CV."""
+    technology_lists = [role.technologies] if role is not None else []
+    technology_lists.extend(project.technologies for project in visible_projects if project is not None)
+    unique = {}
+    for items in technology_lists:
+        for item in items:
+            label = " ".join(item.split())
+            if label:
+                unique.setdefault(label.casefold(), label)
+    return list(unique.values())
 
 
 def project_as_subheading(exp, show_projects: bool = True) -> bool:

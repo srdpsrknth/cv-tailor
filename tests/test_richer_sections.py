@@ -318,14 +318,59 @@ def test_every_new_field_reaches_upload_docx_and_txt(rich_profile, tmp_path):
 
 def test_employer_project_metadata_and_display_name(rich_profile, tmp_path):
     data = json.loads(rich_profile.model_dump_json())
+    data["experience"][0]["technologies"] = ["Python"]
     data["experience"][0]["selected_projects"][0].update(
         dates="2023", context="Internal rebuild", technologies=["dbt"])
     profile = Profile.model_validate(data)
     paths = render_upload_cv(base_cv(), profile, tmp_path)
     word = [p.text for p in Document(paths["cv_upload_docx_path"]).paragraphs]
     assert "Project: Attribution Rebuild (Northwind)" in word       # display_name, not the full company
-    assert "— Internal rebuild | 2023" in word and "Technologies: dbt" in word
+    assert "— Internal rebuild | 2023" in word and "Technologies: Python, dbt" in word
     assert "Northwind Analytics GmbH | Apr 2023 – Present | Sampletown, Germany" in word  # heading keeps it
+
+
+@pytest.mark.parametrize("hide_projects", [False, True])
+def test_employer_technologies_are_consolidated_in_all_cv_outputs(analyst_profile, tmp_path, hide_projects):
+    data = json.loads(analyst_profile.model_dump_json())
+    role = data["experience"][0]
+    role["technologies"] = ["SQL", "Python"]
+    role["selected_projects"][0]["technologies"] = [" sql ", "dbt", " "]
+    role["selected_projects"].append({"name": "Unselected project", "technologies": ["Scala"]})
+    if hide_projects:
+        data["cv_hidden_sections"] = ["employer_projects"]
+    profile = Profile.model_validate(data)
+    cv = base_cv(standalone_projects=["Transit Map"])
+    profile = with_profile(profile, standalone_projects=PROJECTS)
+    expected = "SQL, Python" if hide_projects else "SQL, Python, dbt"
+
+    renderer = LaTeXRenderer(outputs_dir=tmp_path)
+    context = renderer._prepare_template_data(cv, profile)
+    assert context["experience"][0]["technologies"] == expected.split(", ")
+    splits = [None, (0, "bullet", 1)]
+    if not hide_projects:
+        splits.append((0, "project", 0))
+    for split in splits:
+        source = renderer.jinja_env.get_template("main.tex.jinja2").render(
+            **context, layout=PRESETS[0], break_before_employer_index=None, split_before=split,
+        )
+        label = r"\lbltechnologies\ "
+        technology_lists = [
+            line.split(label, 1)[1].lstrip("}").split(r"\par", 1)[0]
+            for line in source.splitlines() if label in line
+        ]
+        assert technology_lists.count(expected) == 1
+        assert "sql, dbt" not in technology_lists
+        assert "Python, Leaflet" in technology_lists
+        assert "Scala" not in source
+
+    paths = render_upload_cv(cv, profile, tmp_path)
+    word = "\n".join(p.text for p in Document(paths["cv_upload_docx_path"]).paragraphs)
+    plain = Path(paths["cv_upload_text_path"]).read_text(encoding="utf-8")
+    for rendered in (word, plain):
+        assert rendered.splitlines().count(f"Technologies: {expected}") == 1
+        assert "Technologies: sql, dbt" not in rendered
+        assert "Technologies: Python, Leaflet" in rendered
+        assert "Scala" not in rendered
 
 
 def test_a_role_that_is_one_project_prints_an_italic_subheading(analyst_profile, tmp_path):

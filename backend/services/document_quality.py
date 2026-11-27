@@ -4,7 +4,8 @@ Both engines use their normal extraction settings independently. Word retention
 uses a case-insensitive NFKC token multiset, so missing repeated words and merged
 words reduce retention. Paragraph order is checked only when every supplied
 paragraph survives as a contiguous token sequence. No OCR or layout inference is
-attempted. Reports omit extracted text and expected field values.
+attempted for extraction retention. The separate CV bullet check uses PDF
+positions and includes short excerpts so reviewers can find flagged bullets.
 """
 
 from collections import Counter
@@ -109,6 +110,51 @@ def _extract_pdfplumber(path: Path) -> tuple[int, str]:
         return len(document.pages), "\n".join(
             page.extract_text() or "" for page in document.pages
         )
+
+
+def inspect_cv_bullets(path: str | Path) -> dict:
+    """Find bullets of three or more drawn lines in the single-column CV PDF."""
+    bullets = []
+    current = None
+    try:
+        import pdfplumber
+
+        with pdfplumber.open(path) as document:
+            for page in document.pages:
+                for line in page.extract_text_lines():
+                    chars = [char for char in line["chars"] if char["text"].strip()]
+                    if not chars:
+                        continue
+                    if chars[0]["text"] == "\u2022" and len(chars) > 1:
+                        # Wrapped lines align with the text, while the marker and
+                        # unindented headings are further left. Allow rounding
+                        # and small font-position differences in PDF coordinates.
+                        body_x = chars[1]["x0"]
+                        excerpt = line["text"].lstrip("\u2022 ").strip()
+                        if len(excerpt) > 80:
+                            excerpt = excerpt[:77].rstrip() + "..."
+                        current = {
+                            "page": page.page_number,
+                            "end_page": page.page_number,
+                            "lines": 1,
+                            "excerpt": excerpt,
+                        }
+                        bullets.append(current)
+                    elif current is not None and abs(chars[0]["x0"] - body_x) <= 0.75:
+                        current["lines"] += 1
+                        current["end_page"] = page.page_number
+                    else:
+                        current = None
+    except Exception as exc:
+        return {
+            "checked": None,
+            "long_bullets": [],
+            "warning": f"CV bullet lines could not be checked ({type(exc).__name__}).",
+        }
+    return {
+        "checked": len(bullets),
+        "long_bullets": [bullet for bullet in bullets if bullet["lines"] >= 3],
+    }
 
 
 def inspect_document(

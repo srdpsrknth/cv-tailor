@@ -35,6 +35,7 @@ def _dependencies(project_root: Path, scope: str) -> list[Path]:
         fixed = (
             "backend/renderers/latex_renderer.py",
             "backend/renderers/cv_layout.py",
+            "backend/renderers/cv_sections.py",
             "backend/services/document_quality.py",
             "backend/renderers/upload_cv.py",
             "backend/utils/text.py",

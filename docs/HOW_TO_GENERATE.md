@@ -440,9 +440,12 @@ while preserving your facts and approved project structure.
 
 The Documents tab flags stale files when saved content, profile context, rendering
 files or artifact bytes have changed. Older files without a render record show
-unknown freshness. Existing downloads remain available. Open **PDF text extraction
-checks · advisory** to compare two local parsers with the saved text. These are
-extraction diagnostics, not ATS or AI-authorship scores. Newly rendered CVs also
+unknown freshness. Existing downloads remain available.
+In **Documents**, expand **More downloads and document checks** and click
+**Check PDFs**. Two local parsers compare extraction with the saved text.
+The CV check also flags bullets that span three or more rendered lines and
+shows the page, line count and opening words. The check is local and read-only.
+Newly rendered CVs also
 show their selected typography and printable-height usage there. Page balance is
 a visual preference, not a minimum word count or a screening score. The Word
 companion uses its separate sequential layout; check its pagination independently.

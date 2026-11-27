@@ -450,11 +450,23 @@ def test_failed_generation_links_to_saved_attempt(workspace, monkeypatch):
 
 
 def test_pdf_checks_are_explicit_and_cached_for_same_revision(workspace, monkeypatch):
+    from services import document_quality
+
     job = save_review(workspace)
     folder = workspace / "outputs" / "analyst_a" / job
     (folder / "cv.pdf").write_bytes(b"synthetic CV")
     calls = []
     load = bridge.load_application
+    monkeypatch.setattr(
+        document_quality,
+        "inspect_cv_bullets",
+        lambda path: {
+            "checked": 2,
+            "long_bullets": [
+                {"page": 1, "end_page": 1, "lines": 3, "excerpt": "Built useful reports."}
+            ],
+        },
+    )
 
     def observe(*args, **kwargs):
         if kwargs.get("include_quality"):
@@ -469,6 +481,8 @@ def test_pdf_checks_are_explicit_and_cached_for_same_revision(workspace, monkeyp
     assert not at.exception
     assert calls == [job]
     assert any("Two local PDF parsers" in message.value for message in at.caption)
+    assert any("1 of 2 CV bullets" in message.value for message in at.warning)
+    assert any("Page 1, 3 lines" in message.value for message in at.text)
     at.run()
     assert calls == [job]
     assert any("Two local PDF parsers" in message.value for message in at.caption)
@@ -476,6 +490,7 @@ def test_pdf_checks_are_explicit_and_cached_for_same_revision(workspace, monkeyp
     at.run()
     assert calls == [job]
     assert not any("Two local PDF parsers" in message.value for message in at.caption)
+    assert not any("1 of 2 CV bullets" in message.value for message in at.warning)
 
 
 def test_answers_only_works_without_tex_or_provider_key(workspace, monkeypatch):

@@ -256,7 +256,7 @@ def _render_pdf_checks(config, profile_id, job_id, prefix, detail):
     cached_revision, reports = st.session_state.get(cache_key, (None, {}))
     if not fingerprint or cached_revision != revision:
         reports = {}
-    if st.button("Check PDF text extraction", key=f"{prefix}_check_pdfs"):
+    if st.button("Check PDFs", key=f"{prefix}_check_pdfs"):
         try:
             checked = bridge.load_application(
                 config, profile_id, job_id, include_quality=True
@@ -265,7 +265,7 @@ def _render_pdf_checks(config, profile_id, job_id, prefix, detail):
             if fingerprint and checked.get("quality_fingerprint") == fingerprint:
                 st.session_state[cache_key] = (revision, reports)
             if not reports:
-                st.info("No PDF text extraction results are available.")
+                st.info("No PDF check results are available.")
         except (ValueError, OSError) as error:
             st.warning(str(error))
     if reports:
@@ -297,6 +297,23 @@ def _render_pdf_reports(quality_reports):
                     )
             for warning in layout.get("warnings", []):
                 st.caption(warning)
+        bullet_check = report.get("bullet_lines")
+        if bullet_check:
+            long_bullets = bullet_check["long_bullets"]
+            if long_bullets:
+                st.warning(
+                    f"{len(long_bullets)} of {bullet_check['checked']} CV bullets "
+                    "span three or more lines. Review them for readability."
+                )
+                for bullet in long_bullets:
+                    page = str(bullet["page"])
+                    if bullet["end_page"] != bullet["page"]:
+                        page += f"–{bullet['end_page']}"
+                    st.text(f"Page {page}, {bullet['lines']} lines · {bullet['excerpt']}")
+            elif bullet_check["checked"]:
+                st.caption(f"All {bullet_check['checked']} detected CV bullets fit within two lines.")
+            else:
+                st.caption(bullet_check.get("warning") or "No CV bullets could be detected in the PDF.")
         for engine, result in report.get("engines", {}).items():
             retention = result.get("word_retention")
             retention_label = (
