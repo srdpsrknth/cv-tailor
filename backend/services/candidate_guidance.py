@@ -2,7 +2,8 @@
 
 This loader is intentionally separate from writing voice: guidance may describe
 candidate-specific factual constraints and must not be inferred from old letters.
-Generation does not yet consume these fields.
+Generation uses the cv, cover_letter and layout lists in the matching prompts,
+and the optional acronyms list in rendering and validation.
 """
 from __future__ import annotations
 
