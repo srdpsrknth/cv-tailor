@@ -34,6 +34,7 @@ Only the owner can move a decision to **Approved**.
 | [0028](0028-confirm-first-suggested-claims.md) | Confirm-first suggested claims: suggestions stored with the application, with profile confirmation and an explicit CV revision | **Approved** — owner decision, 2026-11-27 |
 | [0029](0029-pipeline-fingerprint-cache-key.md) | Pipeline fingerprint (prompt code, budgets, template, validators) in the generation cache key | **Approved** — owner decision, 2026-11-27 |
 | [0030](0030-job-search-redesign.md) | Redesign job search rather than patch it; audit findings recorded as requirements | **Deferred** — 2026-11-27 |
+| [0031](0031-web-ui.md) | Replace the Streamlit UI with a Svelte web UI served by FastAPI over a versioned API, migrated alongside Streamlit | **Approved** — owner decision, 2026-11-28 |
 
 **Decisions approved 2026-10-23.** Decisions marked "in principle" or "deferred" are to be
 re-confirmed when their phase begins. [0010](0010-config-object.md) was recorded during Phase 1

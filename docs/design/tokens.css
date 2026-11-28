@@ -1,0 +1,89 @@
+/*
+  CV Tailor design tokens: the source of truth for the web UI (ADR 0031).
+  Direction: "Bench" layout with the Proof Desk palette. See DESIGN_SYSTEM.md.
+
+  Rules:
+  - Components use these tokens only. No literal colours, font stacks or spacing in components.
+  - Light is the default; dark redefines colour tokens only. The document "sheet" stays paper in both themes.
+  - Every text pair below has a computed WCAG 2.x contrast of at least 4.5:1, and control borders at least 3:1.
+    The ratios are recorded in DESIGN_SYSTEM.md. Re-check them whenever a colour changes.
+  - Fonts are self-hosted in the build (no request to Google or any other host at runtime).
+*/
+
+:root {
+  /* Surfaces */
+  --desk: #E3E7E6;          /* app background */
+  --chrome: #EEF1F0;        /* header and status line */
+  --panel: #F7F9F8;         /* panels, cards, inputs */
+  --sheet: #FDFDFB;         /* document page (paper) */
+  --sheet-ink: #1B2023;
+  --sheet-muted: #4A5459;
+  --sheet-rule: #C9CFCF;
+  --sheet-signal: #1C5E86;  /* signal colour and focus ring on the paper, in both themes */
+  --sheet-wash: rgba(28, 94, 134, .09);
+
+  /* Text and lines */
+  --ink: #1B2023;
+  --muted: #4E585E;
+  --line: #C3CACB;          /* decorative separators only */
+  --ctl: #717B80;           /* every control edge (3:1 or better) */
+
+  /* Signal: the single accent. Focus, primary action, suggestion balloons, leader lines. */
+  --signal: #1C5E86;
+  --signal-wash: #D3ECF4;
+  --on-signal: #F7F9F8;
+  --focus: #1C5E86;
+
+  /* Semantic state (never colour alone: always paired with text or a shape) */
+  --ok: #24693F;
+  --warn: #7E5400;
+  --warn-wash: #F3E6C8;
+  --bad: #A3291D;
+
+  --shadow: 0 1px 2px rgba(27, 32, 35, .10), 0 8px 24px rgba(27, 32, 35, .08);
+
+  /* Type */
+  --ui: "Archivo", "Helvetica Neue", Arial, sans-serif;            /* interface; width axis 62–125 */
+  --num: "Martian Mono", ui-monospace, Menlo, monospace;           /* ids, figures, keys, costs */
+  --doc: "Source Serif 4", Georgia, "Times New Roman", serif;      /* document previews only */
+  --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 16px; --text-xl: 20px; --text-2xl: 28px;
+  --leading: 1.5;
+
+  /* Space, shape, motion */
+  --u: 8px;                 /* 8px grid: use multiples (4px allowed for optical tweaks) */
+  --radius: 2px;
+  --header-h: 56px;         /* one-row header; the stacked header height is measured at runtime into --top-h */
+  --dur-fast: 120ms; --dur: 180ms; --ease: cubic-bezier(.2, .0, .0, 1);
+
+  /* Layout limits */
+  --content-max: 3600px;    /* ultrawide cap; extra width becomes more pages, never longer lines */
+  --page-min: 520px; --page-max: 820px;
+  --claims-min: 340px; --claims-max: 380px;
+  --inspector-min: 300px; --inspector-max: 480px;
+  --gutter-leader: 56px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #131719; --chrome: #191E20; --panel: #1F2528;
+    --sheet: #D8DDDA; --sheet-rule: #B4BBB8; --sheet-wash: rgba(28, 94, 134, .12);
+    --ink: #E3E8E6; --muted: #A2ACB0; --line: #343C40; --ctl: #6E797E;
+    --signal: #8FCDE6; --signal-wash: #1D3440; --on-signal: #131719; --focus: #8FCDE6;
+    --ok: #7DC598; --warn: #E2B65A; --warn-wash: #33291A; --bad: #F28E80;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #131719; --chrome: #191E20; --panel: #1F2528;
+  --sheet: #D8DDDA; --sheet-rule: #B4BBB8; --sheet-wash: rgba(28, 94, 134, .12);
+  --ink: #E3E8E6; --muted: #A2ACB0; --line: #343C40; --ctl: #6E797E;
+  --signal: #8FCDE6; --signal-wash: #1D3440; --on-signal: #131719; --focus: #8FCDE6;
+  --ok: #7DC598; --warn: #E2B65A; --warn-wash: #33291A; --bad: #F28E80;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur: 0ms; }
+}

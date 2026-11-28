@@ -1,6 +1,6 @@
 # Project state
 
-- **Updated** 2026-11-27
+- **Updated** 2026-11-28
 - **Integration branch** `refactor/architecture-v2`
 - **Stable branch** `master`
 
@@ -10,6 +10,12 @@
 - The integration branch includes shorter-bullet guidance, an overflow retry budget based on visible editable prose, a PDF warning for bullets spanning three or more lines, and one combined Technologies list per role across PDF, Word and text.
 - Editable suggested claims and same-application CV revisions are in the Windows working tree. Claim confirmation is local. Optional paid drafting previews wording for review. Saving a confirmed claim to the profile and approving a CV revision are separate actions.
 - The owner reviewed the pre-PR #1 stash and decided to proceed without restoring it. The stash is still available locally.
+- **UI redesign (branch `ui/redesign`, cut from `refactor/architecture-v2`).** Research and mock-ups are complete. The owner chose:
+  - the "Bench" layout with the Proof Desk palette
+  - Svelte 5 served by FastAPI, with a version 1 scope
+  - the UI labels "Suggested additions", "Profile changes", "Cost and model" and "Tailoring"
+
+  [ADR 0031](DECISIONS/0031-web-ui.md) and the [build plan](UI_REDESIGN_PLAN.md) are **Approved** (2026-11-28). The [design system](design/DESIGN_SYSTEM.md) is written. No code has changed yet, and Streamlit is unchanged. **Next:** wave 1 of the build plan, which waits on the owner's go-ahead. To resume on another device or with another model, read the [handoff](HANDOFF-UI-REDESIGN.md).
 
 ## Verification
 

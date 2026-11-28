@@ -1,0 +1,1657 @@
+<title>CV Tailor Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&family=Martian+Mono:wdth,wght@75..112.5,400..500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400&display=swap">
+<!--
+  BENCH, CV Tailor mock-up (synthetic data only)
+  Idea: a calibrated instrument for checking a document against its source. Source on the left, output on the right, measured as it changes.
+  Signature: technical-drawing balloons (S1 to S4) with leader lines from each suggested addition to the exact place in the CV it would change, plus a page-fit scale ruled in document lines along the page edge.
+  Why only this product: the measurements are its own (two-page limit, lines spare, 290 to 310 letter words), and claims are confirm-first parts with ids, never auto-applied.
+
+  v2: Proof Desk palette (galley neutrals, proof blue as the single signal colour), fluid width-driven layout from 360px to 5120px.
+  Layout zones by workspace width: <720 one column | 720-1023 claims + document | 1024-1599 claims, leader gutter, document | >=1600 adds an Inspector rail | spreads appear when two or three pages fit at >=520px each.
+  Pages scale as a whole (transform on a fixed 600px sheet), so line breaks and "lines spare" are identical at every width.
+
+  Contrast (WCAG 2.x, computed; desk / chrome / panel / sheet):
+  light  ink #1B2023 13.18 / 14.46 / 15.55 / 16.14 | muted #4E585E 5.84 / 6.41 / 6.89 | signal #1C5E86 5.62 / 6.17 / 6.63 / 6.89 | ok #24693F 5.32 / 6.27 | warn #7E5400 5.34 / 6.29 | bad #A3291D 5.82 / 6.87 | control border #717B80 3.47 / 3.81 / 4.10 / 4.25 | signal on wash #D3ECF4 5.70 | text on signal fill 6.63 | warn on warn-wash 5.38
+  dark   ink #E3E8E6 14.56 / 13.58 / 12.52 | muted #A2ACB0 7.79 / 6.70 | signal #8FCDE6 10.34 / 8.90 | ok #7DC598 8.86 / 7.62 | warn #E2B65A 9.51 / 8.18 | bad #F28E80 7.69 / 6.62 | control border #6E797E 4.04 / 3.47 | signal on wash #1D3440 7.45 | fill text 10.34 | page stays paper #D8DDDA: page ink 11.96, page muted 5.65, page blue #1C5E86 5.10, page control edge 3.15
+  Hairline rules (#C3CACB / #343C40) are decorative separators only; every control edge uses the control border token.
+-->
+<style>
+/* Layout: chrome bar; a fluid bench of up to four zones (claims | leader gutter | measured pages | inspector) driven by container queries on the workspace; an editor status line pinned to the bottom. 8px grid throughout. */
+:root {
+  --desk: #E3E7E6; --chrome: #EEF1F0; --panel: #F7F9F8; --sheet: #FDFDFB; --sheet-ink: #1B2023; --sheet-muted: #4A5459; --sheet-rule: #C9CFCF;
+  --ink: #1B2023; --muted: #4E585E; --line: #C3CACB; --ctl: #717B80;
+  --signal: #1C5E86; --signal-wash: #D3ECF4; --on-signal: #F7F9F8; --sheet-signal: #1C5E86; --sheet-wash: rgba(28, 94, 134, .09);
+  --ok: #24693F; --warn: #7E5400; --bad: #A3291D; --warn-wash: #F3E6C8;
+  --focus: #1C5E86;
+  --shadow: 0 1px 2px rgba(27,32,35,.10), 0 8px 24px rgba(27,32,35,.08);
+  --ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --num: "Martian Mono", ui-monospace, Menlo, monospace;
+  --doc: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --u: 8px; --pitch: 18px; --doc-size: 12px;
+  --sheet-w: 600px; --sheet-h: 849px; --pad-y: 48px; --pad-x: 56px;
+  --k: 1; --kl: 1;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --desk: #131719; --chrome: #191E20; --panel: #1F2528; --sheet: #D8DDDA; --sheet-ink: #1B2023; --sheet-muted: #4A5459; --sheet-rule: #B4BBB8;
+  --ink: #E3E8E6; --muted: #A2ACB0; --line: #343C40; --ctl: #6E797E;
+  --signal: #8FCDE6; --signal-wash: #1D3440; --on-signal: #131719; --sheet-signal: #1C5E86; --sheet-wash: rgba(28, 94, 134, .12);
+  --ok: #7DC598; --warn: #E2B65A; --bad: #F28E80; --warn-wash: #33291A; --focus: #8FCDE6;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --desk: #131719; --chrome: #191E20; --panel: #1F2528; --sheet: #D8DDDA; --sheet-ink: #1B2023; --sheet-muted: #4A5459; --sheet-rule: #B4BBB8;
+  --ink: #E3E8E6; --muted: #A2ACB0; --line: #343C40; --ctl: #6E797E;
+  --signal: #8FCDE6; --signal-wash: #1D3440; --on-signal: #131719; --sheet-signal: #1C5E86; --sheet-wash: rgba(28, 94, 134, .12);
+  --ok: #7DC598; --warn: #E2B65A; --bad: #F28E80; --warn-wash: #33291A; --focus: #8FCDE6;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+html, body { margin: 0 }
+body { background: var(--desk); color: var(--ink); font: 14px/1.5 var(--ui); font-stretch: 100%; padding-bottom: 40px }
+button, input, select, textarea { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }
+html { scroll-padding-top: calc(var(--top-h, 56px) + 8px) }
+.confirm:focus { outline: 2px solid var(--focus); outline-offset: 2px }
+.num { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; font-stretch: 87.5% }
+.muted { color: var(--muted) }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+
+/* chrome */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--chrome); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 24px; height: 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--chrome) }
+.mark { font-weight: 700; font-stretch: 125%; letter-spacing: -.01em; font-size: 16px; display: flex; align-items: center; gap: 8px; white-space: nowrap }
+.mark svg { flex: none }
+nav.main { display: flex; gap: 4px; min-width: 0; overflow-x: clip; overflow-y: visible; overflow-clip-margin: 6px }
+nav.main a { color: var(--muted); text-decoration: none; padding: 8px 12px; border-radius: 2px; white-space: nowrap; position: relative }
+nav.main a:hover { color: var(--ink) }
+nav.main a[aria-current="page"] { color: var(--ink); font-weight: 600 }
+nav.main a[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -9px; height: 2px; background: var(--signal) }
+.top .right { margin-left: auto; display: flex; align-items: center; gap: 8px }
+/* When the nav does not fit beside the candidate switcher, a script adds .stacked: the nav takes its own full-width row and wraps rather than hiding links. */
+.top.stacked { flex-wrap: wrap; height: auto; min-height: 56px; padding-block: 8px; row-gap: 4px; column-gap: 16px }
+.top.stacked nav.main { order: 3; flex: 1 0 100%; flex-wrap: wrap; overflow: visible; margin-inline: -12px; border-top: 1px solid var(--line); padding-top: 4px }
+.top.stacked nav.main a[aria-current="page"]::after { bottom: 0 }
+.top.stacked .right { flex-wrap: wrap; justify-content: flex-end }
+.cand { display: flex; align-items: center; gap: 8px; border: 1px solid var(--ctl); padding: 0 4px 0 12px; height: 32px; border-radius: 2px; background: var(--panel); min-width: 0; max-width: 100% }
+.cand select { border: 0; background: transparent; height: 30px; font-weight: 600; cursor: pointer; padding-right: 4px }
+.cand .num { color: var(--muted); white-space: nowrap; min-width: 0 }
+.top .right { min-width: 0 }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--ctl); background: var(--panel); border-radius: 2px; cursor: pointer; white-space: nowrap }
+.btn:hover { border-color: var(--ink) }
+.btn.primary { background: var(--signal); border-color: var(--signal); color: var(--on-signal); font-weight: 600 }
+.btn.primary:hover { filter: brightness(1.08) }
+.btn.quiet { border-color: transparent; background: transparent; color: var(--muted); padding: 0 8px }
+.btn.quiet:hover { color: var(--ink); border-color: var(--ctl) }
+.btn:disabled { opacity: .55; cursor: not-allowed }
+kbd { font-family: var(--num); font-size: 11px; font-stretch: 87.5%; border: 1px solid var(--ctl); border-bottom-width: 2px; padding: 0 4px; border-radius: 2px; color: var(--muted); background: var(--panel) }
+
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; max-width: 3600px; margin: 0 auto }
+.view[hidden] { display: none !important }
+h1, h2, h3 { font-family: var(--ui); margin: 0; text-wrap: balance }
+h1 { font-size: 24px; line-height: 32px; font-weight: 600; font-stretch: 112% }
+h2 { font-size: 16px; line-height: 24px; font-weight: 600; font-stretch: 106% }
+p { margin: 0 }
+
+/* status line */
+.status { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 32px; background: var(--chrome); border-top: 1px solid var(--line); display: flex; align-items: stretch;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: env(safe-area-inset-bottom, 0px); overflow: hidden; white-space: nowrap }
+.status > span { display: flex; align-items: center; gap: 8px; padding: 0 16px; border-right: 1px solid var(--line); font-size: 12px }
+.status > span:first-child { padding-left: 0 }
+.status > span:last-child { border-right: 0; margin-left: auto }
+.status b { font-weight: 600 }
+.status .live::before { content: ""; width: 8px; height: 8px; background: var(--signal); display: inline-block }
+
+/* workspace header */
+.wshead { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 32px; align-items: end; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 24px }
+/* Ultrawide: keep the document switch next to the title instead of thousands of pixels away. */
+@container ws (min-width: 2300px) { .wshead { grid-template-columns: minmax(0, max-content) auto; justify-content: start; column-gap: 48px } }
+.crumb { font-size: 13px; color: var(--muted); margin-bottom: 4px }
+.crumb a { color: inherit }
+.wshead .sub { color: var(--muted); margin-top: 4px; max-width: 80ch }
+.seg { display: inline-flex; border: 1px solid var(--ctl); border-radius: 2px; overflow: hidden; background: var(--panel) }
+.seg button { border: 0; background: transparent; height: 32px; padding: 0 12px; cursor: pointer; color: var(--muted); border-right: 1px solid var(--line) }
+.seg button:last-child { border-right: 0 }
+.seg button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); font-weight: 600 }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end }
+.field-inline { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted) }
+.field-inline select { height: 32px; border: 1px solid var(--ctl); background: var(--panel); border-radius: 2px; padding: 0 8px; color: var(--ink) }
+
+/* bench */
+.view { container-type: inline-size }
+#v-workspace { container-name: ws }
+#v-new { container-name: newapp }
+#v-library { container-name: lib }
+#v-desk { container-name: desk }
+.bench { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 24px 0 }
+.leaders { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 2; display: none }
+.gutter, .inspector { display: none }
+.src-h { display: none; padding: 16px 16px 0 }
+@container ws (min-width: 720px) {
+  .bench { grid-template-columns: clamp(300px, 34%, 360px) minmax(0, 1fr); column-gap: 24px }
+}
+@container ws (min-width: 1024px) {
+  .bench { grid-template-columns: clamp(340px, 28%, 380px) 56px minmax(0, 1fr); column-gap: 0 }
+  .gutter, .leaders { display: block }
+}
+@container ws (min-width: 1600px) {
+  .bench { grid-template-columns: clamp(320px, 20%, 380px) 56px minmax(0, 1fr) clamp(300px, 18%, 380px) }
+  .inspector { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 480px; gap: 16px; align-content: start; margin-left: 24px; position: sticky; top: calc(var(--top-h, 56px) + 16px); max-height: calc(100vh - var(--top-h, 56px) - 64px); overflow: auto; align-self: start }
+  /* One page at its 820px cap cannot use the whole document zone, so the inspector takes the rest and lays its sections out in columns. */
+  .bench[data-mode="four"][data-capped="true"] { grid-template-columns: clamp(320px, 20%, 380px) 56px minmax(0, var(--doc-max, 924px)) minmax(clamp(300px, 18%, 380px), 504px); justify-content: center }
+  .bench[data-mode="four"] .src > .tabs { display: none }
+  .bench[data-mode="four"] .src-h { display: block }
+}
+.insp-sec { background: var(--panel); border: 1px solid var(--line); border-radius: 2px }
+.insp-sec > h2 { padding: 12px 16px 0; font-size: 14px }
+.insp-sec .pane { padding-top: 8px }
+.mini { width: 100%; min-width: 0; font-size: 12px }
+.mini td, .mini th { height: 32px; padding: 0 8px; white-space: normal }
+.mini td:first-child, .mini th:first-child { padding-left: 0 }
+.gutter { align-self: stretch; background-image: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 8px); background-size: 8px 100%; background-repeat: repeat-y; background-position: center top }
+.src { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; container: src / inline-size }
+@container src (max-width: 400px) {
+  .claim header { grid-template-columns: 32px minmax(0, 1fr) }
+  .claim header .state { grid-column: 2; justify-content: flex-start; text-align: left }
+}
+.tabs { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto }
+.tabs button { flex: 1; border: 0; background: transparent; height: 40px; padding: 0 8px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; font-size: 13px }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--signal); font-weight: 600 }
+.tabs .count { font-family: var(--num); font-size: 11px; font-stretch: 87.5%; margin-left: 4px }
+/* Review tabs never hide behind a scroll: below 400px of panel width they become a 2x2 grid. */
+@container src (max-width: 399px) {
+  .src > .tabs { display: grid; grid-template-columns: 1fr 1fr; overflow: visible }
+  .src > .tabs button { border-bottom: 1px solid var(--line); }
+  .src > .tabs button[aria-selected="true"] { border-bottom: 2px solid var(--signal) }
+}
+.pane { padding: 16px }
+.progress-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; font-size: 13px; color: var(--muted) }
+.progress-line strong { color: var(--ink); font-weight: 600 }
+.meter { height: 8px; border: 1px solid var(--ctl); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--ctl); margin-bottom: 16px }
+.meter i { background: var(--panel) }
+.meter i.on { background: var(--signal) }
+
+.claims { display: grid; gap: 16px }
+.claim { position: relative; border: 1px solid var(--line); border-radius: 2px; padding: 16px; background: var(--panel) }
+.claim:focus-visible { outline-offset: -1px }
+.claim.is-focus { border-color: var(--ctl) }
+.claim header { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 8px 12px; align-items: start; margin-bottom: 12px }
+.balloon { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--signal); color: var(--signal); display: grid; place-items: center; font-family: var(--num); font-size: 11px; font-weight: 500; font-stretch: 87.5%; background: var(--panel) }
+.claim[data-status="dismissed"] .balloon { border-color: var(--ctl); color: var(--muted); border-style: dashed }
+.claim[data-status="incv"] .balloon { background: var(--signal); color: var(--on-signal) }
+.req { font-size: 13px; line-height: 20px }
+.req .from { color: var(--muted); display: block }
+.req .what { font-weight: 600 }
+.state { font-size: 12px; line-height: 20px; color: var(--muted); text-align: right; display: flex; align-items: center; gap: 6px; white-space: nowrap }
+.state svg { flex: none }
+.state.ok { color: var(--ok) }
+.proposed { font-family: var(--doc); font-size: 15px; line-height: 22px; margin: 0 0 12px; padding-left: 12px; border-left: 2px dashed var(--signal) }
+.proposed .tag { display: block; font-family: var(--ui); font-size: 12px; color: var(--signal); margin-bottom: 2px }
+.claim[data-status="inprofile"] .proposed, .claim[data-status="cvedit"] .proposed, .claim[data-status="incv"] .proposed { border-left-style: solid; border-left-color: var(--ok) }
+.claim[data-status="inprofile"] .proposed .tag, .claim[data-status="cvedit"] .proposed .tag, .claim[data-status="incv"] .proposed .tag { color: var(--ok) }
+dl.facts { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 4px 12px; margin: 0 0 16px; font-size: 13px }
+dl.facts dt { color: var(--muted) }
+dl.facts dd { margin: 0; min-width: 0 }
+.acts { display: flex; flex-wrap: wrap; gap: 8px }
+.step { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; display: grid; gap: 12px }
+.step p { font-size: 13px; color: var(--muted) }
+.step .label { font-size: 13px; color: var(--ink); font-weight: 600 }
+.confirm { background: var(--desk); border: 1px solid var(--ctl); border-radius: 2px; padding: 12px; display: grid; gap: 12px; margin-bottom: 16px }
+.confirm p { font-size: 13px }
+pre.diff { margin: 0; font-family: var(--num); font-size: 11.5px; font-stretch: 87.5%; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); padding: 8px }
+pre.diff .add { color: var(--ok); display: block }
+.editor { display: grid; gap: 8px; margin-bottom: 12px }
+.editor label { font-size: 13px; font-weight: 600 }
+.editor textarea { width: 100%; min-height: 88px; resize: vertical; border: 1px solid var(--ctl); border-radius: 2px; padding: 8px; background: var(--panel); font-family: var(--doc); font-size: 15px; line-height: 22px }
+.editor .hint { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted) }
+.editor .hint .over { color: var(--bad); font-weight: 600 }
+.radio-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px }
+.radio-row label { display: inline-flex; gap: 6px; align-items: center; min-height: 24px }
+.undo-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 8px }
+.linkbtn { border: 0; background: transparent; color: var(--signal); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 4px 0; min-height: 24px }
+
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0 }
+.checks li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; font-size: 13px }
+.checks li:last-child { border-bottom: 0 }
+.checks .t { font-weight: 600 }
+.checks .d { color: var(--muted) }
+.change { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; display: grid; gap: 4px }
+.change:last-child { border-bottom: 0 }
+.change .k { color: var(--muted) }
+.change del { color: var(--muted); text-decoration-color: var(--bad) }
+.change ins { text-decoration: none; background: var(--signal-wash) }
+.fresh { display: grid; gap: 12px; font-size: 13px }
+.fresh .warnbox { border-left: 3px solid var(--warn); background: var(--warn-wash); padding: 12px }
+
+/* measured page */
+.out { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; justify-items: start }
+.readout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; width: 100% }
+.readout .big { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; font-stretch: 87.5% }
+.readout .big.over { color: var(--bad) }
+.readout .note { font-size: 13px; color: var(--muted); min-width: 0; flex: 1 1 200px }
+.readout .edits { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center }
+.dismissed-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--muted) }
+.dismissed-line .balloon { width: 24px; height: 24px; font-size: 9.5px }
+.dismissed-line .what { color: var(--ink) }
+.claim[data-status="dismissed"] { padding: 8px 16px }
+.done-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 13px; color: var(--muted); margin-top: 8px }
+/* Each page is a fixed 600px sheet plus a 64px ruler, scaled as one unit by --k. Layout inside never changes, so measurement is width-independent. */
+.pages { display: flex; flex-direction: column; gap: 24px; max-width: 100%; padding: 8px 0 8px 8px }
+.pages[data-view="spread"], .pages[data-view="cvletter"] { flex-direction: row; align-items: flex-start }
+.leaf { position: relative; flex: none; width: calc(664px * var(--k)); height: calc(849px * var(--k)) }
+.leaf[hidden] { display: none !important }
+.unit { width: 664px; height: 849px; display: grid; grid-template-columns: 600px 64px; transform: scale(var(--k)); transform-origin: 0 0 }
+#doc-letter .leaf { width: calc(664px * var(--kl)); height: calc(849px * var(--kl)) }
+#doc-letter .unit { transform: scale(var(--kl)) }
+.sheet { position: relative; width: var(--sheet-w); height: var(--sheet-h); box-shadow: var(--shadow); background: var(--sheet); color: var(--sheet-ink); padding: var(--pad-y) var(--pad-x); border: 1px solid var(--line) }
+.sheet::before, .sheet::after { content: ""; position: absolute; width: 16px; height: 16px; border-color: var(--ctl); border-style: solid; pointer-events: none }
+.sheet::before { top: -9px; left: -9px; border-width: 0 1px 1px 0 }
+.sheet::after { bottom: -9px; right: -9px; border-width: 1px 0 0 1px }
+.sheet .folio { position: absolute; bottom: 16px; right: var(--pad-x); font-family: var(--num); font-size: 10px; font-stretch: 87.5%; color: var(--sheet-muted) }
+.body { position: relative; height: 100%; overflow-x: visible; overflow-y: clip; font-family: var(--doc); font-size: var(--doc-size); line-height: var(--pitch) }
+.spare { position: absolute; left: 0; right: 0; bottom: 0; background-image: repeating-linear-gradient(135deg, rgba(28,94,134,.18) 0 2px, transparent 2px 7px); border-top: 1px dashed var(--sheet-signal); pointer-events: none }
+.spare span { position: absolute; right: 0; top: 4px; font-family: var(--num); font-size: 10px; font-stretch: 87.5%; color: var(--sheet-signal); background: var(--sheet); padding: 0 4px }
+.ruler { position: relative; height: var(--sheet-h); border-left: 1px solid var(--ctl); margin-left: 12px;
+  background-image: repeating-linear-gradient(to bottom, var(--ctl) 0 1px, transparent 1px var(--pitch)), repeating-linear-gradient(to bottom, var(--ctl) 0 1px, transparent 1px calc(var(--pitch) * 5));
+  background-size: 6px calc(100% - var(--pad-y) * 2), 12px calc(100% - var(--pad-y) * 2); background-position: 0 var(--pad-y), 0 var(--pad-y); background-repeat: no-repeat }
+.ruler .lbl { position: absolute; left: 16px; font-family: var(--num); font-size: 10px; font-stretch: 87.5%; color: var(--muted); line-height: 14px; white-space: nowrap }
+.ruler .lim { position: absolute; left: -6px; width: 40px; border-top: 2px solid var(--ink) }
+.ruler .sp { position: absolute; left: -1px; width: 8px; background: var(--signal) }
+
+/* CV typography inside the sheet */
+.cv-name { font-size: 26px; line-height: 36px; font-weight: 600; letter-spacing: -.01em; font-variation-settings: "opsz" 48 }
+.cv-contact { color: var(--sheet-muted); margin-bottom: var(--pitch) }
+.cv-h { font-family: var(--ui); font-size: 11px; font-weight: 700; font-stretch: 112%; letter-spacing: .02em; color: var(--sheet-ink); border-bottom: 1px solid var(--sheet-rule); margin-top: calc(var(--pitch) * .5); margin-bottom: calc(var(--pitch) * .25); padding-bottom: 1px }
+.cv-role { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; margin-top: calc(var(--pitch) * .25) }
+.cv-role span:last-child { font-weight: 400; color: var(--sheet-muted); white-space: nowrap }
+.cv-b { position: relative; padding-left: 14px; border-radius: 1px }
+.cv-b::before { content: ""; position: absolute; left: 2px; top: calc(var(--pitch) / 2 - 2px); width: 4px; height: 4px; background: var(--sheet-ink) }
+.cv-b[data-editable] { cursor: text }
+.cv-b[data-editable]:hover { background: var(--sheet-wash) }
+.cv-b[contenteditable="true"] { background: var(--sheet-wash); outline: 1px solid var(--sheet-signal); outline-offset: 1px }
+.cv-b.edited::after { content: "M"; position: absolute; left: -40px; top: 0; width: 18px; height: 18px; display: grid; place-items: center; font-family: var(--num); font-size: 9px; color: var(--sheet-ink); border: 1px solid var(--sheet-ink) }
+.cv-b.rev { background: var(--sheet-wash) }
+.cv-b.long-warn { box-shadow: inset 0 -1px 0 #7E5400 }
+.cv-tech, .cv-sk { padding-left: 14px; color: var(--sheet-ink) }
+.cv-tech b, .cv-sk b { font-weight: 600 }
+.cv-p { margin-bottom: calc(var(--pitch) * .25) }
+.cmark { position: absolute; left: -44px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px dashed var(--sheet-signal); color: var(--sheet-signal); background: var(--sheet); font-family: var(--num); font-size: 9.5px; font-stretch: 87.5%; display: grid; place-items: center; line-height: 1 }
+.cmark.solid { border-style: solid; background: var(--sheet-signal); color: #FFFFFF }
+.anchor { position: relative }
+.cv-flash { animation: flash 1.2s ease-out 1 }
+@keyframes flash { from { background: rgba(126,84,0,.28) } to { background: transparent } }
+
+/* letter + answers + details */
+.single { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "rules" "page"; gap: 24px 32px; align-items: start }
+.single > .rules { grid-area: rules }
+.single > .out { grid-area: page }
+.single > .posting-ref { grid-area: post; display: none }
+@container ws (min-width: 720px) {
+  .single { grid-template-columns: clamp(300px, 34%, 360px) minmax(0, 1fr); grid-template-areas: "rules page" }
+}
+@container ws (min-width: 1600px) {
+  .single { grid-template-columns: clamp(320px, 20%, 380px) minmax(0, 1fr) clamp(300px, 18%, 380px); grid-template-areas: "post page rules" }
+  .single > .posting-ref { display: block }
+}
+.rules, .posting-ref { background: var(--panel); border: 1px solid var(--line); padding: 16px; border-radius: 2px }
+.rules h2, .posting-ref h2 { margin-bottom: 8px }
+.posting-ref pre { margin: 0; font-family: var(--doc); font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere }
+.posting-ref mark { background: var(--signal-wash); color: inherit; padding: 0 2px }
+.letter .body p { margin-bottom: var(--pitch); text-align: left; hyphens: auto }
+.answers { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) }
+.qlist, .evidence { display: none }
+@container ws (min-width: 1024px) {
+  .answers { grid-template-columns: clamp(240px, 20%, 320px) minmax(0, 1fr) clamp(300px, 24%, 400px); align-items: start }
+  .answers > .lede { grid-column: 1 / -1 }
+  .qlist, .evidence { display: grid }
+  .qa[data-sel="false"] { display: none }
+}
+.qlist { gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; align-content: start }
+.qlist button { all: unset; box-sizing: border-box; display: grid; gap: 2px; padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px; min-height: 44px }
+.qlist button:last-child { border-bottom: 0 }
+.qlist button[aria-current="true"] { box-shadow: inset 3px 0 0 var(--signal); background: var(--desk) }
+.qlist button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px }
+.qlist .qn { font-family: var(--num); font-size: 11px; font-stretch: 87.5%; color: var(--muted) }
+.evidence { gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 16px; align-content: start; font-size: 13px }
+.evidence blockquote { margin: 0; padding-left: 12px; border-left: 2px solid var(--line); font-family: var(--doc); font-size: 14px; line-height: 21px }
+.evidence .src-l { color: var(--muted); font-size: 12px }
+.details { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) }
+@container ws (min-width: 1600px) {
+  .details { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start }
+  .details > .lede { grid-column: 1 / -1 }
+}
+.qa { background: var(--panel); border: 1px solid var(--line); padding: 16px; border-radius: 2px; display: grid; gap: 12px }
+.qa .q { font-weight: 600 }
+.qa .meta { font-size: 13px; color: var(--muted) }
+.qa textarea { width: 100%; min-height: 136px; border: 1px solid var(--ctl); padding: 8px; border-radius: 2px; background: var(--panel); font-family: var(--doc); font-size: 15px; line-height: 22px; resize: vertical }
+.qa .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between }
+.manual { border-left: 3px solid var(--warn); padding-left: 12px; font-size: 13px }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 2px;
+  /* Scroll-edge cue: a shadow appears only on the side that has more columns. */
+  background: linear-gradient(to right, var(--panel) 40%, transparent) left / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--panel) 40%, transparent) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--shadow-cue), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--shadow-cue), transparent) right / 12px 100% no-repeat scroll,
+    var(--panel) }
+:root { --shadow-cue: rgb(27 32 35 / .22) }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-cue: rgb(0 0 0 / .6) } }
+:root[data-theme="dark"] { --shadow-cue: rgb(0 0 0 / .6) }
+@media (max-width: 999px) {
+  #lib :is(th, td):nth-child(3), #lib :is(th, td):nth-child(4) { display: none }
+  #lib { min-width: 520px }
+}
+@media (max-width: 560px) { .recent :is(th, td):nth-child(2) { display: none } }
+table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 720px }
+th, td { text-align: left; padding: 0 16px; height: 40px; border-bottom: 1px solid var(--line); white-space: nowrap }
+th { font-weight: 600; color: var(--muted); font-size: 12px; height: 40px }
+td.n, th.n { text-align: right; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; font-stretch: 87.5% }
+tbody tr:last-child td { border-bottom: 0 }
+tfoot td { font-weight: 600; border-top: 1px solid var(--ctl); border-bottom: 0 }
+th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center }
+th button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }
+tbody tr[tabindex] { cursor: pointer }
+tbody tr[tabindex]:hover td { background: var(--desk) }
+tbody tr[tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px }
+.st { display: inline-flex; align-items: center; gap: 8px }
+tbody tr[aria-selected="true"] td { background: var(--signal-wash) }
+tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--signal) }
+.lib-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start }
+.lib-prev { display: none }
+@container lib (min-width: 1600px) {
+  .lib-grid { grid-template-columns: minmax(0, 1fr) clamp(340px, 22%, 440px) }
+  .lib-prev { display: grid; gap: 16px; position: sticky; top: calc(var(--top-h, 56px) + 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 16px }
+}
+.lib-prev dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 13px }
+.lib-prev dt { color: var(--muted) }
+.lib-prev dd { margin: 0 }
+.lib-prev .files { display: grid; gap: 4px; font-size: 13px }
+
+/* new application */
+.newgrid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "post" "fields" "run"; gap: 24px 32px; align-items: start }
+.newgrid > .ng-post { grid-area: post }
+.newgrid > .ng-fields { grid-area: fields }
+.newgrid > .ng-run { grid-area: run }
+@container newapp (min-width: 720px) {
+  .newgrid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-areas: "post fields" "post run" }
+}
+@container newapp (min-width: 1600px) {
+  .newgrid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .9fr); grid-template-areas: "post fields run" }
+  .ng-run { position: sticky; top: calc(var(--top-h, 56px) + 16px) }
+}
+.block { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 16px; display: grid; gap: 16px }
+.block + .block { margin-top: 16px }
+.f { display: grid; gap: 6px }
+.f label, .f .lab { font-weight: 600; font-size: 13px }
+.f .help { font-size: 12px; color: var(--muted) }
+.f input, .f select, .f textarea { width: 100%; height: 40px; border: 1px solid var(--ctl); border-radius: 2px; padding: 0 12px; background: var(--panel) }
+.f textarea { height: auto; min-height: 440px; padding: 12px; font-family: var(--doc); font-size: 14px; line-height: 22px; resize: vertical }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px }
+.rule { border-left: 3px solid var(--ctl); padding: 8px 12px; font-size: 13px; background: var(--desk) }
+.rule b { font-weight: 600 }
+.est { display: grid; gap: 8px }
+.scale { position: relative; height: 40px; margin: 8px 0 0 }
+.scale .axis { position: absolute; left: 0; right: 0; top: 12px; height: 8px; border: 1px solid var(--ctl); background-image: repeating-linear-gradient(to right, var(--ctl) 0 1px, transparent 1px 10%) }
+.scale .band { position: absolute; top: 12px; height: 8px; background: var(--signal) }
+.scale .cap { position: absolute; right: 0; top: 4px; height: 24px; border-right: 2px solid var(--ink) }
+.scale .t { position: absolute; top: 24px; font-family: var(--num); font-size: 10px; font-stretch: 87.5%; color: var(--muted); transform: translateX(-50%) }
+.scale .t.r { transform: translateX(-100%) }
+.stages { list-style: none; margin: 0; padding: 0 }
+.stages li { display: grid; grid-template-columns: 24px minmax(0, 1fr) 72px 64px; gap: 12px; align-items: center; min-height: 40px; border-bottom: 1px solid var(--line); font-size: 13px }
+.stages li:last-child { border-bottom: 0 }
+.stages li[data-s="wait"] { color: var(--muted) }
+.stages li[data-s="run"] { font-weight: 600 }
+.stages .n { text-align: right }
+.sq { width: 12px; height: 12px; border: 1.5px solid var(--ctl); display: inline-block }
+li[data-s="done"] .sq { background: var(--ok); border-color: var(--ok) }
+li[data-s="run"] .sq { border-color: var(--signal); background: linear-gradient(var(--signal), var(--signal)) left / var(--fill, 40%) 100% no-repeat }
+@media (prefers-reduced-motion: no-preference) { li[data-s="run"] .sq { animation: fillsq 1.4s linear infinite } }
+@keyframes fillsq { from { --fill: 0% } to { --fill: 100% } }
+@property --fill { syntax: "<percentage>"; inherits: false; initial-value: 40% }
+.timeline { display: flex; height: 8px; border: 1px solid var(--ctl); margin-bottom: 8px }
+.timeline i { flex: 1; border-right: 1px solid var(--ctl) }
+.timeline i:last-child { border-right: 0 }
+.timeline i.done { background: var(--ok) }
+.timeline i.run { background: var(--signal) }
+
+/* desk + stubs */
+.deskgrid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "needs" "recent" "setup"; gap: 32px; align-items: start; max-width: 2400px }
+.deskgrid > .d-needs { grid-area: needs }
+.deskgrid > .d-recent { grid-area: recent }
+.deskgrid > .d-setup { grid-area: setup }
+@container desk (min-width: 720px) {
+  .deskgrid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-template-areas: "needs recent" "setup recent" }
+}
+@container desk (min-width: 1600px) {
+  .deskgrid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "needs recent setup" }
+}
+.todo { list-style: none; margin: 0; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 2px }
+.todo li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; padding: 16px; border-bottom: 1px solid var(--line); align-items: center }
+.todo li:last-child { border-bottom: 0 }
+.todo .t { font-weight: 600 }
+.todo .d { font-size: 13px; color: var(--muted) }
+.stub { max-width: 560px; padding: 48px 0; display: grid; gap: 12px }
+.banner { border-left: 3px solid var(--signal); background: var(--signal-wash); padding: 8px 12px; margin-bottom: 16px; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; align-items: center }
+
+/* dialogs */
+dialog { border: 1px solid var(--ctl); border-radius: 2px; padding: 0; background: var(--panel); color: var(--ink); width: min(560px, calc(100vw - 32px)) }
+dialog::backdrop { background: rgba(20, 24, 26, .45) }
+.pal input { width: 100%; border: 0; border-bottom: 1px solid var(--line); height: 48px; padding: 0 16px; background: transparent; font-size: 15px }
+.pal input:focus-visible { outline: none }
+.pal ul { list-style: none; margin: 0; padding: 8px; max-height: 360px; overflow: auto }
+.pal li { display: flex; justify-content: space-between; align-items: center; padding: 0 8px; height: 36px; border-radius: 2px; cursor: pointer }
+.pal li[aria-selected="true"] { background: var(--desk); outline: 1px solid var(--ctl) }
+.sheetkeys { padding: 16px 24px 24px }
+.sheetkeys h2 { margin-bottom: 12px }
+.sheetkeys dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; margin: 0; font-size: 13px }
+.sheetkeys dd { margin: 0 }
+
+@media (max-width: 720px) {
+  .wshead { grid-template-columns: minmax(0, 1fr) }
+  .tools { justify-content: flex-start }
+  .two { grid-template-columns: 1fr }
+}
+@media (max-width: 560px) {
+  /* Phones: the header scrolls away instead of pinning ~200px; brand shrinks to its mark; theme and palette keep accessible names. */
+  .top, .top.stacked { position: static; column-gap: 8px }
+  .mark .mark-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+  #theme-label, #open-pal { display: none }
+  .seg { display: flex; flex-wrap: wrap; max-width: 100% }
+  .seg button { flex: 1 1 auto; white-space: nowrap; border-bottom: 1px solid var(--line) }
+  .seg[aria-label="Document"] { display: grid; grid-template-columns: 1fr 1fr; width: 100% }
+  .seg[aria-label="Document"] button:nth-child(2n) { border-right: 0 }
+  .seg[aria-label="Document"] button:nth-child(n+3) { border-bottom: 0 }
+  .nav-long { display: none }
+  .top.stacked nav.main { gap: 0 }
+  .top.stacked nav.main a { padding: 8px 7px }
+  .cand { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; height: auto; min-height: 40px; padding: 2px 8px 3px }
+  .cand select { height: 22px; padding: 0 }
+  .cand .num { font-size: 11px; line-height: 14px; white-space: normal; overflow-wrap: anywhere }
+}
+@media (max-height: 699px) { .top.stacked { position: static } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }
+</style>
+
+<div class="top" role="banner">
+  <div class="mark">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5v4M10 14.5v4M1.5 10h4M14.5 10h4" stroke="currentColor" stroke-width="1.5"/></svg>
+    <span class="mark-text">CV Tailor</span>
+  </div>
+  <nav class="main" aria-label="Main">
+    <a href="#desk">Desk</a>
+    <a href="#new" aria-label="New application" title="New application">New<span class="nav-long"> application</span></a>
+    <a href="#jobs">Jobs</a>
+    <a href="#library">Library</a>
+    <a href="#profile">Profile</a>
+    <a href="#settings">Settings</a>
+  </nav>
+  <div class="right">
+    <label class="cand"><span class="vh">Active candidate</span>
+      <select id="candidate" aria-describedby="cand-id">
+        <option value="mira-okafor">Mira Okafor</option>
+        <option value="test-candidate">Test Candidate</option>
+      </select>
+      <span class="num" id="cand-id">mira-okafor</span>
+    </label>
+    <button class="btn quiet" id="open-pal" aria-label="Open command palette" title="Command palette (Ctrl+K)"><kbd id="pal-kbd">Ctrl K</kbd></button>
+    <button class="btn quiet" id="theme" aria-label="Theme: system" title="Switch theme">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg>
+      <span id="theme-label">System</span>
+    </button>
+  </div>
+</div>
+
+<main>
+<div id="cand-banner" class="banner" hidden><span id="cand-banner-text"></span><button class="linkbtn" id="cand-undo">Switch back</button></div>
+
+<!-- ============ WORKSPACE ============ -->
+<section class="view" id="v-workspace" aria-labelledby="ws-title">
+  <div class="wshead">
+    <div>
+      <div class="crumb"><a href="#library">Library</a> / Fernhill Logistics</div>
+      <h1 id="ws-title">Senior Analytics Engineer at Fernhill Logistics</h1>
+      <p class="sub">Rotterdam, Netherlands. Generated 27 Nov 2026 with claude-sonnet-5-5 through OpenRouter for $0.21; the cover letter was reused from the cache.</p>
+    </div>
+    <div class="tools">
+      <div class="seg" role="tablist" aria-label="Document">
+        <button role="tab" aria-selected="true" data-doc="cv" id="tab-cv">CV</button>
+        <button role="tab" aria-selected="false" data-doc="letter" id="tab-letter">Cover letter</button>
+        <button role="tab" aria-selected="false" data-doc="answers" id="tab-answers">Portal answers</button>
+        <button role="tab" aria-selected="false" data-doc="details" id="tab-details">Cost and model</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CV -->
+  <div id="doc-cv" class="bench" role="tabpanel" aria-labelledby="tab-cv" data-mode="one">
+    <svg class="leaders" id="leaders" aria-hidden="true"></svg>
+    <aside class="src" aria-label="Source and checks">
+      <h2 class="src-h">Suggested additions</h2>
+      <div class="tabs" role="tablist" aria-label="Review">
+        <button role="tab" aria-selected="true" data-side="claims" id="st-claims">Additions<span class="count" id="c-open">3</span></button>
+        <button role="tab" aria-selected="false" data-side="checks" id="st-checks">Checks<span class="count">1</span></button>
+        <button role="tab" aria-selected="false" data-side="changes" id="st-changes">Tailoring<span class="count">4</span></button>
+        <button role="tab" aria-selected="false" data-side="fresh" id="st-fresh">Profile changes<span class="count">1</span></button>
+      </div>
+      <div class="pane" id="side-claims" role="tabpanel" aria-labelledby="st-claims">
+        <div class="progress-line"><span>Suggested additions are questions. Nothing enters a document until you say it is true.</span></div>
+        <div class="progress-line"><strong id="rev-count">1 of 4 reviewed</strong><span><kbd>J</kbd> <kbd>K</kbd> move</span></div>
+        <div class="meter" id="rev-meter" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="claims" id="claims"></div>
+        <p class="vh" aria-live="polite" id="claims-live"></p>
+      </div>
+      <div class="pane" id="side-checks" role="tabpanel" aria-labelledby="st-checks" hidden>
+        <ul class="checks">
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">PDF text extracts cleanly</div><div class="d">Both pages read in order with pdftotext and pypdf.</div></div><span class="muted">Pass</span></li>
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">No clipped lines</div><div class="d">Every line ends inside the margins.</div></div><span class="muted">Pass</span></li>
+          <li><svg width="16" height="16" aria-hidden="true"><path d="M8 2 15 14H1z" fill="var(--warn)"/></svg><div><div class="t">One bullet spans 3 lines</div><div class="d">Northwind Freight, bullet 4. Shorter bullets read faster.</div><button class="linkbtn" id="show-long">Show it in the CV</button></div><span style="color:var(--warn)">Warning</span></li>
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">No heading left alone at a page end</div><div class="d">Selected projects starts at the top of page 2.</div></div><span class="muted">Pass</span></li>
+        </ul>
+      </div>
+      <div class="pane" id="side-changes" role="tabpanel" aria-labelledby="st-changes" hidden>
+        <p class="muted" style="font-size:13px;margin-bottom:8px">Compared with your profile. Facts are unchanged; only wording and order differ.</p>
+        <div class="change"><span class="k">Reworded, Northwind Freight</span><div><del>Improved performance of dbt models.</del></div><div><ins>Rebuilt the shipment-margin model in dbt, cutting the nightly run from 3 h 10 min to 48 min.</ins></div></div>
+        <div class="change"><span class="k">Reworded, Northwind Freight</span><div><del>Built a Looker dashboard for Snowflake usage.</del></div><div><ins>Designed a Snowflake cost dashboard in Looker that cut monthly credit spend by 22%.</ins></div></div>
+        <div class="change"><span class="k">Reworded, summary</span><div><del>Data professional with experience in logistics and retail.</del></div><div><ins>Analytics engineer with seven years in freight and retail data.</ins></div></div>
+        <div class="change"><span class="k">Reordered, Skills</span><div>Modelling moved above Analysis to match the posting's emphasis on dbt.</div></div>
+      </div>
+      <div class="pane" id="side-fresh" role="tabpanel" aria-labelledby="st-fresh" hidden>
+        <div class="fresh">
+          <div class="warnbox"><b>Your profile changed after this draft.</b><br>Draft made 27 Nov 2026, 16:40. Profile edited 28 Nov 2026, 09:12 (Skills, Orchestration).</div>
+          <p>The current documents are still valid. Regenerating lets the model use the new facts in a full new draft. Your manual edits and CV revisions stay as separate versions.</p>
+          <div id="regen-area"><button class="btn" id="regen">Regenerate (paid, about $0.20)</button></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="gutter" aria-hidden="true"></div>
+
+    <div class="out">
+      <div class="readout" aria-live="polite">
+        <span class="big" id="fit-big">2 of 2 pages</span>
+        <span class="note" id="fit-note">4 lines spare on page 2</span>
+        <div class="edits">
+          <span class="field-inline"><span>Render</span>
+            <span class="seg" role="group" aria-label="Render format"><button aria-pressed="true" data-fmt="pdf">PDF</button><button aria-pressed="false" data-fmt="word">Word</button></span>
+          </span>
+          <label class="field-inline">Density
+            <select id="density"><option value="comfortable">Comfortable</option><option value="standard" selected>Standard</option><option value="compact">Compact</option></select>
+          </label>
+          <label class="field-inline">View
+            <select id="view-mode" aria-describedby="view-help"><option value="auto">Automatic</option></select>
+          </label>
+          <span class="vh" id="view-help">Only layouts that fit this window are offered.</span>
+        </div>
+      </div>
+      <div class="readout" id="edit-bar" hidden>
+        <span class="note" id="edit-note">1 manual edit not yet rendered</span>
+        <div class="edits"><button class="btn quiet" id="discard-edits">Discard edits</button><button class="btn primary" id="rerender">Re-render (free)</button></div>
+      </div>
+      <p class="note muted" id="fmt-note" style="font-size:13px">PDF rendered with pdflatex. Click any bullet to edit it.</p>
+      <div class="pages" id="pages" data-view="single">
+        <div class="leaf" id="leaf1"><div class="unit"><div class="sheet" id="p1"><div class="body" id="b1"></div><span class="folio">CV 1 / 2</span></div><div class="ruler" id="r1"></div></div></div>
+        <div class="leaf" id="leaf2"><div class="unit"><div class="sheet" id="p2"><div class="body" id="b2"></div><span class="folio">CV 2 / 2</span></div><div class="ruler" id="r2"></div></div></div>
+        <div class="leaf" id="leaf3" hidden><div class="unit"><div class="sheet letter" aria-label="Cover letter"><div class="body" id="letter-body-spread"></div><span class="folio">Letter 1 / 1</span></div><div></div></div></div>
+      </div>
+      <div id="edit-counter" class="num" hidden style="position:absolute"></div>
+    </div>
+
+    <aside class="inspector" id="inspector" aria-label="Inspector">
+      <section class="insp-sec"><h2>Checks</h2><div data-slot="checks"></div></section>
+      <section class="insp-sec"><h2>Tailoring: how this CV differs from your profile</h2><div data-slot="changes"></div></section>
+      <section class="insp-sec"><h2>Profile changes</h2><div data-slot="fresh"></div></section>
+      <section class="insp-sec"><h2>Cost and model</h2><div class="pane">
+        <table class="mini"><tbody>
+          <tr><td>Draft CV</td><td class="n">$0.16</td></tr>
+          <tr><td>Shorten for page fit, attempt 2</td><td class="n">$0.05</td></tr>
+          <tr><td>Cover letter, from cache</td><td class="n">$0.00</td></tr>
+        </tbody><tfoot><tr><td>This run</td><td class="n">$0.21</td></tr></tfoot></table>
+        <p class="muted" style="font-size:12px;margin-top:8px">claude-sonnet-5-5 through OpenRouter. Layout: attempt 1 ran to 3 pages, attempt 2 fit. <button class="linkbtn" data-goto-doc="details">All cost and model details</button></p>
+      </div></section>
+    </aside>
+  </div>
+
+  <!-- Cover letter -->
+  <div id="doc-letter" role="tabpanel" aria-labelledby="tab-letter" hidden>
+    <div class="single">
+      <aside class="posting-ref" aria-label="Saved posting">
+        <h2>The posting</h2>
+        <p class="muted" style="font-size:12px;margin-bottom:8px">Saved 27 Nov 2026. Highlights are the lines the letter answers.</p>
+        <pre>Fernhill moves 1.2 million pallets a year through our Waalhaven and Moerdijk depots. <mark>Our planning teams are moving from spreadsheets to a shared analytics platform</mark>, and we need a senior analytics engineer to lead the modelling layer.
+
+What you will do
+- <mark>Own our dbt project (500+ models)</mark> on Snowflake, including testing and CI
+- Design data models for capacity, route and margin reporting
+- Train planners and operations analysts to self-serve in Looker
+- Work with the platform team on Airflow orchestration
+
+What you bring
+- 5+ years in analytics or data engineering, ideally in logistics
+- Strong SQL and dbt; <mark>experience with Snowflake</mark>
+- Clear communication with non-technical stakeholders
+- Dutch is a plus, not a requirement</pre>
+      </aside>
+      <aside class="rules">
+        <h2>Letter rules</h2>
+        <ul class="checks">
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">1 page</div></div><span class="muted">Pass</span></li>
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">4 paragraphs</div></div><span class="muted">Pass</span></li>
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t"><span id="lw">301</span> words</div><div class="d">Limit 290 to 310 body words.</div></div><span class="muted">Pass</span></li>
+          <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">Work authorization wording</div><div class="d">Netherlands rule from your profile: the letter states the EU Blue Card; the CV carries no permit text. Paragraph 4.</div></div><span class="muted">Pass</span></li>
+        </ul>
+      </aside>
+      <div class="out">
+        <div class="readout"><span class="big">1 of 1 page</span><span class="note">4 paragraphs, <span id="lw2">301</span> words (290 to 310)</span></div>
+        <div class="pages">
+          <div class="leaf"><div class="unit"><div class="sheet letter"><div class="body" id="letter-body"></div><span class="folio">1 / 1</span></div><div></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Portal answers -->
+  <div id="doc-answers" role="tabpanel" aria-labelledby="tab-answers" hidden>
+    <div class="answers">
+      <p class="muted lede">Two questions from the Fernhill application form. Answers are saved with this application; copy each into the portal.</p>
+      <nav class="qlist" aria-label="Questions">
+        <button data-q="1" aria-current="true"><span class="qn">Question 1, drafted</span>Why do you want to work at Fernhill Logistics?</button>
+        <button data-q="2" aria-current="false"><span class="qn">Question 2, enter manually</span>What are your salary expectations?</button>
+      </nav>
+      <div style="display:grid;gap:24px;min-width:0">
+      <div class="qa" data-q="1" data-sel="true">
+        <div class="q">Why do you want to work at Fernhill Logistics?</div>
+        <div class="meta">Limit 1,000 characters. Draft based on your Northwind Freight role and paragraph 2 of the posting.</div>
+        <label class="vh" for="a1">Answer to question 1</label>
+        <textarea id="a1">Fernhill is moving its planning teams from spreadsheets to a shared analytics platform, and that is the work I have done for the last four years at Northwind Freight. I rebuilt our shipment-margin model in dbt so planners start the day with yesterday's numbers, and I set up data contracts so schema changes stop breaking reports. I would like to bring that to a company where depot capacity and route margin are the core questions, and where analytics engineers work directly with the people who plan the freight.</textarea>
+        <div class="row"><span class="num" id="a1c">0 / 1,000</span><span style="display:flex;gap:8px"><button class="btn quiet" data-copy="a1">Copy answer</button><button class="btn">Save answers</button></span></div>
+      </div>
+      <div class="qa" data-q="2" data-sel="false">
+        <div class="q">What are your salary expectations?</div>
+        <div class="manual"><b>Enter manually: salary.</b> CV Tailor does not draft salary, availability or authorization answers.</div>
+        <label class="vh" for="a2">Answer to question 2</label>
+        <textarea id="a2" placeholder="For example: EUR 78,000 to 85,000 gross per year" style="min-height:72px"></textarea>
+        <div class="row"><span class="num" id="a2c">0 / 200</span><span style="display:flex;gap:8px"><button class="btn quiet" data-copy="a2">Copy answer</button><button class="btn">Save answers</button></span></div>
+      </div>
+      </div>
+      <aside class="evidence" aria-label="Evidence for this answer">
+        <h2 style="font-size:14px">What this answer is based on</h2>
+        <div data-ev="1" style="display:grid;gap:12px">
+          <div><div class="src-l">Your profile, Northwind Freight</div><blockquote>Rebuilt the shipment-margin model in dbt, cutting the nightly run from 3 h 10 min to 48 min.</blockquote></div>
+          <div><div class="src-l">Your profile, Northwind Freight</div><blockquote>Introduced data contracts between the transport management team and analytics.</blockquote></div>
+          <div><div class="src-l">The posting, paragraph 2</div><blockquote>Our planning teams are moving from spreadsheets to a shared analytics platform.</blockquote></div>
+          <p class="muted">Nothing in this draft comes from outside your profile and the posting.</p>
+        </div>
+        <div data-ev="2" hidden style="display:grid;gap:12px">
+          <p>CV Tailor does not draft salary, availability or work-authorization answers. Type your own figure.</p>
+          <p class="muted">The posting gives no salary range.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Run details -->
+  <div id="doc-details" role="tabpanel" aria-labelledby="tab-details" hidden>
+    <div class="details">
+      <p class="muted lede">Each model call in this run. Cached calls show what they cost originally and what they cost this time.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Step</th><th>Model</th><th class="n">Input tokens</th><th class="n">Output tokens</th><th class="n">This run</th><th class="n">Original</th></tr></thead>
+        <tbody>
+          <tr><td>Draft CV</td><td>claude-sonnet-5-5</td><td class="n">18,420</td><td class="n">3,110</td><td class="n">$0.16</td><td class="n">$0.16</td></tr>
+          <tr><td>Shorten for page fit, attempt 2</td><td>claude-sonnet-5-5</td><td class="n">4,060</td><td class="n">1,020</td><td class="n">$0.05</td><td class="n">$0.05</td></tr>
+          <tr><td>Draft cover letter</td><td>claude-sonnet-5-5</td><td class="n">11,900</td><td class="n">640</td><td class="n">$0.00</td><td class="n">$0.06</td></tr>
+        </tbody>
+        <tfoot><tr><td>Total</td><td></td><td class="n">34,380</td><td class="n">4,770</td><td class="n">$0.21</td><td class="n">$0.27</td></tr></tfoot>
+      </table></div>
+      <div class="tbl-wrap"><table style="min-width:420px">
+        <thead><tr><th>Layout attempt</th><th>Pages</th><th>Result</th></tr></thead>
+        <tbody><tr><td>1</td><td>3</td><td>Over the 2-page limit; shortened 3 bullets</td></tr><tr><td>2</td><td>2</td><td>Accepted, 4 lines spare</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NEW APPLICATION ============ -->
+<section class="view" id="v-new" aria-labelledby="new-title" hidden>
+  <div class="wshead" style="grid-template-columns:1fr"><div><h1 id="new-title">New application</h1><p class="sub">Paste a posting, check what was read from it, then start a draft. Nothing is sent until you confirm.</p></div></div>
+  <div class="newgrid" id="new-form">
+    <div class="block ng-post">
+      <div class="f"><label for="posting">Job posting</label>
+        <textarea id="posting">Senior Analytics Engineer
+Fernhill Logistics, Rotterdam (hybrid, 3 days in office)
+
+Fernhill moves 1.2 million pallets a year through our Waalhaven and Moerdijk depots. Our planning teams are moving from spreadsheets to a shared analytics platform, and we need a senior analytics engineer to lead the modelling layer.
+
+What you will do
+- Own our dbt project (500+ models) on Snowflake, including testing and CI
+- Design data models for capacity, route and margin reporting
+- Train planners and operations analysts to self-serve in Looker
+- Work with the platform team on Airflow orchestration
+
+What you bring
+- 5+ years in analytics or data engineering, ideally in logistics
+- Strong SQL and dbt; experience with Snowflake
+- Clear communication with non-technical stakeholders
+- Dutch is a plus, not a requirement</textarea>
+        <span class="help">16 lines read. Paste the full text, including requirements.</span>
+      </div>
+    </div>
+    <div class="ng-fields">
+      <div class="block">
+        <h2>Read from the posting</h2>
+        <div class="two">
+          <div class="f"><label for="company">Company</label><input id="company" value="Fernhill Logistics"></div>
+          <div class="f"><label for="role">Role</label><input id="role" value="Senior Analytics Engineer"></div>
+        </div>
+        <div class="f"><label for="country">Country of employment</label>
+          <select id="country"><option selected>Netherlands</option><option>Germany</option><option>Belgium</option><option>Other country</option></select>
+          <span class="help">Where you would work, not where the company is based. The list comes from your profile's country rules.</span>
+        </div>
+        <div class="rule" id="rule-text"><b>Netherlands rule:</b> the cover letter mentions that you hold an EU Blue Card; the CV carries no permit text.</div>
+      </div>
+      <div class="block">
+        <h2>Options</h2>
+        <div class="two">
+          <div class="f"><span class="lab" id="lay-l">CV layout</span>
+            <div class="seg" role="group" aria-labelledby="lay-l"><button aria-pressed="true" data-lay>Automatic</button><button aria-pressed="false" data-lay>Balanced</button></div>
+          </div>
+          <div class="f"><label for="ndensity">Density</label><select id="ndensity"><option>Comfortable</option><option selected>Standard</option><option>Compact</option></select></div>
+        </div>
+        <div class="f"><label for="model">Model</label><select id="model"><option>claude-sonnet-5-5 through OpenRouter, $3.00 in and $15.00 out per 1M tokens</option></select></div>
+      </div>
+    </div>
+    <div class="ng-run">
+      <div class="block" id="before-run">
+        <h2>Before you run</h2>
+        <div class="est">
+          <div><span class="num" style="font-size:14px">$0.18 to $0.24</span> <span class="muted">estimated for this posting and profile</span></div>
+          <div class="scale" aria-label="Estimate against the cap: about $0.18 to $0.24 of $2.00">
+            <div class="axis"></div><div class="band" style="left:9%;width:3%"></div><div class="cap"></div>
+            <span class="t" style="left:0;transform:none">$0</span><span class="t" style="left:50%">$1.00</span><span class="t r" style="left:100%">cap $2.00</span>
+          </div>
+          <p class="muted" style="font-size:13px">Cache: no match, so a fresh draft will be made. The run stops if it would pass the $2.00 cap.</p>
+        </div>
+        <div id="run-area"><button class="btn primary" id="draft">Draft CV and cover letter (paid, about $0.20)</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="progress" hidden style="max-width:760px">
+    <div class="block">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <h2 id="prog-title">Drafting for Fernhill Logistics</h2>
+        <span class="num" id="prog-total">0:00 elapsed, $0.00 spent</span>
+      </div>
+      <div class="timeline" id="timeline" aria-hidden="true"></div>
+      <ol class="stages" id="stages"></ol>
+      <p class="vh" aria-live="polite" id="prog-live"></p>
+      <div id="prog-foot" style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <span class="muted" style="font-size:13px">You can leave this page; the run continues and the Desk shows when it is done.</span>
+        <button class="btn" id="cancel-run">Cancel run</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LIBRARY ============ -->
+<section class="view" id="v-library" aria-labelledby="lib-title" hidden>
+  <div class="wshead">
+    <div><h1 id="lib-title">Library</h1><p class="sub">Every application saved for Mira Okafor. Status is yours to set; health is checked against the current rules.</p></div>
+    <div class="tools">
+      <label class="field-inline" for="lib-filter">Filter <input id="lib-filter" type="search" style="height:32px;border:1px solid var(--ctl);border-radius:2px;padding:0 8px;background:var(--panel);width:200px" placeholder="Company or role"></label>
+      <label class="field-inline">Status <select id="lib-status"><option value="">All</option><option>Draft ready</option><option>Additions to review</option><option>Sent</option><option>Interview</option></select></label>
+    </div>
+  </div>
+  <div class="lib-grid">
+  <div class="tbl-wrap"><table id="lib">
+    <thead><tr>
+      <th aria-sort="none"><button data-sort="company">Company</button></th>
+      <th aria-sort="none"><button data-sort="role">Role</button></th>
+      <th aria-sort="none"><button data-sort="country">Country</button></th>
+      <th aria-sort="descending"><button data-sort="created">Created</button></th>
+      <th aria-sort="none"><button data-sort="status">Status</button></th>
+      <th class="n" aria-sort="none"><button data-sort="pages">Pages</button></th>
+      <th class="n" aria-sort="none"><button data-sort="cost">Cost</button></th>
+      <th aria-sort="none"><button data-sort="health">Health</button></th>
+    </tr></thead>
+    <tbody id="lib-body"></tbody>
+  </table></div>
+  <aside class="lib-prev" id="lib-prev" aria-label="Selected application" aria-live="polite"></aside>
+  </div>
+  <p class="muted" id="lib-empty" hidden style="padding:24px 0">No applications match this filter. <button class="linkbtn" id="lib-clear">Clear the filter</button></p>
+  <p class="muted" style="font-size:13px;margin-top:12px"><kbd>J</kbd> <kbd>K</kbd> or arrow keys move between rows; <kbd>Enter</kbd> opens one.</p>
+</section>
+
+<!-- ============ DESK ============ -->
+<section class="view" id="v-desk" aria-labelledby="desk-title" hidden>
+  <div class="wshead" style="grid-template-columns:1fr"><div><h1 id="desk-title">Desk</h1><p class="sub">What is waiting for you, oldest first.</p></div></div>
+  <div class="deskgrid">
+    <div class="d-needs">
+      <h2 style="margin-bottom:12px">Needs you</h2>
+      <ul class="todo">
+        <li><span class="balloon" style="width:24px;height:24px;font-size:9px">S</span><div><div class="t">Review 3 suggested additions</div><div class="d">Fernhill Logistics, Senior Analytics Engineer. 1 of 4 done.</div></div><a class="btn" href="#workspace">Open claims</a></li>
+        <li><svg width="16" height="16" aria-hidden="true"><path d="M8 2 15 14H1z" fill="var(--warn)"/></svg><div><div class="t">Profile changed after this draft</div><div class="d">Oostkade Energy, Analytics Engineer. Skills, Orchestration was edited.</div></div><a class="btn" href="#workspace">Review changes</a></li>
+        <li><svg width="16" height="16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="var(--ctl)" stroke-width="1.5"/></svg><div><div class="t">Answer 2 portal questions</div><div class="d">Fernhill Logistics. One needs your salary figure.</div></div><a class="btn" href="#workspace" data-goto-doc="answers">Open answers</a></li>
+      </ul>
+    </div>
+    <div class="d-setup">
+      <h2 style="margin-bottom:12px">Setup</h2>
+      <ul class="todo">
+        <li><svg width="16" height="16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="var(--ctl)" stroke-width="1.5"/></svg><div><div class="t" id="key-t">API key is set but not verified</div><div class="d" id="key-d">Checking contacts OpenRouter; it does not generate anything.</div></div><button class="btn" id="verify-key">Verify key (free)</button></li>
+        <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">PDF and Word rendering ready</div><div class="d">pdflatex and LibreOffice found.</div></div><span class="muted" style="font-size:13px">Pass</span></li>
+        <li><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="var(--ok)"/></svg><div><div class="t">Cost cap $2.00 per run</div><div class="d">November so far: $0.82 across 4 runs.</div></div><a class="btn quiet" href="#settings">Change</a></li>
+      </ul>
+    </div>
+    <div class="d-recent">
+      <h2 style="margin-bottom:12px">Recent applications</h2>
+      <div class="tbl-wrap"><table class="recent" style="min-width:0">
+        <tbody>
+          <tr tabindex="0" data-open><td>Fernhill Logistics</td><td class="muted">27 Nov</td><td>Additions to review</td></tr>
+          <tr tabindex="0" data-open><td>Oostkade Energy</td><td class="muted">21 Nov</td><td>Draft ready</td></tr>
+          <tr tabindex="0" data-open><td>Brightwater Health</td><td class="muted">14 Nov</td><td>Sent</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:16px"><a class="btn" href="#new">Start a new application</a></p>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="v-jobs" hidden><div class="stub"><h1>Jobs</h1><p class="muted">Job search uses the employer boards you add for this profile. No boards are set up for Mira Okafor yet, so there is nothing to search.</p><p><button class="btn">Add an employer board</button></p></div></section>
+<section class="view" id="v-profile" hidden><div class="stub"><h1>Profile</h1><p class="muted">Mira Okafor (mira-okafor): 2 roles, 14 skills, 2 languages, 1 country rule for the Netherlands. The structured editor is planned for version 1.</p><p><button class="btn">Open profile file</button></p></div></section>
+<section class="view" id="v-settings" hidden><div class="stub"><h1>Settings</h1><p class="muted">Provider OpenRouter. Cost cap $2.00 per run. pdflatex found; LibreOffice found for Word pagination.</p><p><button class="btn">Run setup checks</button></p></div></section>
+</main>
+
+<div class="status" role="contentinfo" aria-label="Status">
+  <span class="live" id="s-stage" data-pri="3">Workspace, 3 additions open</span>
+  <span data-pri="1">CV <b class="num" id="s-pages">2 / 2</b> pages</span>
+  <span data-pri="2"><b class="num" id="s-spare">4</b> lines spare</span>
+  <span data-pri="4">Letter <b class="num">301</b> words</span>
+  <span data-pri="5">This run <b class="num">$0.21</b></span>
+  <span data-pri="6">November <b class="num" id="s-month">$0.82</b></span>
+  <span class="muted" data-pri="0"><kbd>?</kbd> shortcuts</span>
+</div>
+
+<dialog id="pal" class="pal" aria-label="Command palette">
+  <label class="vh" for="pal-in">Search actions</label>
+  <input id="pal-in" placeholder="Type an action" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-list">
+  <ul id="pal-list" role="listbox"></ul>
+</dialog>
+<dialog id="keys" aria-labelledby="keys-h"><div class="sheetkeys">
+  <h2 id="keys-h">Keyboard shortcuts</h2>
+  <dl>
+    <dt><kbd>Ctrl K</kbd></dt><dd>Command palette</dd>
+    <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next or previous suggested addition, or library row</dd>
+    <dt><kbd>A</kbd></dt><dd>Mark the focused suggestion true and add it to the profile (asks first)</dd>
+    <dt><kbd>E</kbd></dt><dd>Edit the suggestion's wording</dd>
+    <dt><kbd>D</kbd></dt><dd>Dismiss the suggestion</dd>
+    <dt><kbd>U</kbd></dt><dd>Restore a dismissed suggestion, or undo adding it to the profile</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Close, or stop editing a bullet</dd>
+    <dt><kbd>?</kbd></dt><dd>This sheet</dd>
+  </dl>
+  <p class="muted" style="font-size:13px;margin-top:16px">Single-letter keys do nothing while you are typing in a field.</p>
+  <p style="margin-top:16px"><button class="btn" id="keys-close">Close</button></p>
+</div></dialog>
+
+<!-- CV source blocks: paginated into the two sheets by script -->
+<div id="cv-source" hidden>
+  <div class="cv-name">Mira Okafor</div>
+  <div class="cv-contact">Rotterdam, Netherlands &nbsp;|&nbsp; mira@example.com &nbsp;|&nbsp; +31 6 1234 5678</div>
+  <div class="cv-h">Summary</div>
+  <div class="cv-p">Analytics engineer with seven years in freight and retail data. Builds tested dbt models on Snowflake, runs pipelines in Dagster, and turns operational questions into dashboards that planners open every morning. Comfortable owning a modelling layer end to end, from source contracts to the metric definitions people quote in meetings.</div>
+  <div class="cv-h">Experience</div>
+  <div class="cv-role anchor" data-anchor="northwind"><span>Analytics Engineer, Northwind Freight</span><span>Rotterdam, Mar 2022 to present</span></div>
+  <div class="cv-b" data-editable>Rebuilt the shipment-margin model in dbt, cutting the nightly run from 3 h 10 min to 48 min and retiring two legacy SQL jobs that had no tests.</div>
+  <div class="cv-b" data-editable>Designed a Snowflake cost dashboard in Looker that flagged idle warehouses and cut monthly credit spend by 22% within one quarter.</div>
+  <div class="cv-b" data-editable>Introduced data contracts between the transport management team and analytics, catching breaking schema changes before they reached any report.</div>
+  <div class="cv-b" data-editable id="long-bullet">Partnered with route planners at five depots to define on-time delivery and dwell-time metrics, wrote the shared definitions, and built the weekly operations review pack that replaced four separate spreadsheets.</div>
+  <div class="cv-tech" data-ins="northwind-end"><b>Technologies:</b> dbt, Snowflake, Dagster, Python, Looker, GitHub Actions</div>
+  <div class="cv-role"><span>Data Analyst, Calder &amp; Pike Retail</span><span>Amsterdam, Sep 2019 to Feb 2022</span></div>
+  <div class="cv-b" data-editable>Built store-level demand forecasts in Python that informed weekly replenishment for 140 stores and reduced stock-outs on fresh lines.</div>
+  <div class="cv-b" data-editable>Migrated 60 Excel reports to Looker with documented definitions and row-level access for regional managers.</div>
+  <div class="cv-b" data-editable>Analysed A/B tests for loyalty-app promotions and reported uplift with confidence intervals to the commercial team every sprint.</div>
+  <div class="cv-tech"><b>Technologies:</b> Python, SQL, BigQuery, Looker</div>
+  <div class="cv-role"><span>Junior BI Analyst, Halvorsen Market Research</span><span>Utrecht, Jul 2017 to Aug 2019</span></div>
+  <div class="cv-b" data-editable>Automated the monthly panel-survey tables in SQL and R, cutting preparation from four days to one.</div>
+  <div class="cv-b" data-editable>Maintained the client reporting portal and its data dictionary for 25 retail and FMCG accounts.</div>
+  <div class="cv-b" data-editable>Wrote the weighting checks that flagged unbalanced survey waves before results reached clients.</div>
+  <div class="cv-h">Education</div>
+  <div class="cv-role"><span>MSc Business Analytics, Maasstad University</span><span>Rotterdam, 2019</span></div>
+  <div class="cv-p">Thesis: forecasting container dwell time at inland terminals with gradient-boosted models.</div>
+  <div class="cv-role"><span>BSc Econometrics, Maasstad University</span><span>Rotterdam, 2017</span></div>
+  <div class="cv-h">Selected projects</div>
+  <div class="cv-b" data-editable>freight-calendar: a small open-source Python package for Dutch, Belgian and German public-holiday calendars in logistics planning, used by three carriers.</div>
+  <div class="cv-b" data-editable>Depot capacity simulator: a discrete-event model in SimPy used to test peak-season staffing scenarios before the 2025 holiday period.</div>
+  <div class="cv-b" data-editable>Metric definitions handbook: a versioned catalogue of 48 operational metrics with owners, SQL and worked examples, reviewed each quarter with finance and operations and now the single reference for weekly reviews and board reporting.</div>
+  <div class="cv-h">Skills</div>
+  <div class="cv-sk"><b>Modelling:</b> dbt, SQL, dimensional modelling, data contracts, testing</div>
+  <div class="cv-sk anchor" data-anchor="orchestration"><b>Orchestration:</b> <span id="sk-orch">Dagster</span></div>
+  <div class="cv-sk"><b>Warehousing:</b> Snowflake, BigQuery, Postgres</div>
+  <div class="cv-sk"><b>Analysis:</b> Python (pandas, scikit-learn), R, statistics, experiment design</div>
+  <div class="cv-sk"><b>Reporting:</b> Looker, LookML, Metabase</div>
+  <div class="cv-h">Languages</div>
+  <div class="cv-sk anchor" data-anchor="languages"><span id="sk-lang">English (C2), German (B2)</span></div>
+  <div class="cv-h">Certifications</div>
+  <div class="cv-sk">dbt Analytics Engineering Certification, 2023</div>
+  <div class="cv-sk">SnowPro Core Certification, 2022</div>
+  <div class="cv-h">Teaching</div>
+  <div class="cv-b" data-editable>Guest lecturer, Maasstad University minor in supply-chain analytics: two sessions a year on testing data models, with a hands-on lab where students write dbt tests against a sample freight dataset.</div>
+  <div class="cv-h">Volunteering</div>
+  <div class="cv-b" data-editable>Data lead for a Rotterdam food-bank network: built the weekly stock and distribution report used by 11 collection points.</div>
+  <div class="cv-b" data-editable>Organiser of a quarterly dbt meetup in Rotterdam with around 60 regular attendees and talks from local teams.</div>
+</div>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || "");
+$("#pal-kbd").textContent = isMac ? "⌘ K" : "Ctrl K";
+
+/* ---------- theme ---------- */
+const themes = ["system", "light", "dark"];
+let themeIdx = 0;
+try { const t = localStorage.getItem("bench-theme"); if (t && themes.includes(t)) themeIdx = themes.indexOf(t); } catch (e) {}
+function applyTheme() {
+  const t = themes[themeIdx];
+  if (t === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  $("#theme-label").textContent = t[0].toUpperCase() + t.slice(1);
+  $("#theme").setAttribute("aria-label", "Theme: " + t + ". Switch theme");
+  try { localStorage.setItem("bench-theme", t); } catch (e) {}
+}
+$("#theme").addEventListener("click", () => { themeIdx = (themeIdx + 1) % 3; applyTheme(); });
+applyTheme();
+
+/* ---------- routing ---------- */
+const views = ["desk", "new", "jobs", "library", "profile", "settings", "workspace"];
+function route() {
+  let h = (location.hash || "#workspace").slice(1);
+  if (!views.includes(h)) h = "workspace";
+  views.forEach(v => { $("#v-" + v).hidden = v !== h; });
+  $$("nav.main a").forEach(a => {
+    const t = a.getAttribute("href").slice(1);
+    if (t === h || (h === "workspace" && t === "library")) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  const stageText = { workspace: null, desk: "Desk, 3 items need you", new: "New application", library: "Library, 7 applications", jobs: "Jobs", profile: "Profile", settings: "Settings" };
+  if (h === "workspace") {
+    updateCounts();
+    // Lay out synchronously now that the view is visible (a resize may have happened while it was hidden), then again once styles settle.
+    layoutMode = ""; layout(); paginate(); drawLeaders();
+    requestAnimationFrame(() => requestAnimationFrame(() => { layout(); paginate(); drawLeaders(); }));
+  }
+  if (h === "library") requestAnimationFrame(syncLibPreview);
+  else if (!running && stageText[h]) $("#s-stage").textContent = stageText[h];
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+
+/* ---------- document tabs ---------- */
+let doc = "cv";
+function setDoc(d) {
+  doc = d;
+  $$("[data-doc]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.doc === d)));
+  ["cv", "letter", "answers", "details"].forEach(x => { $("#doc-" + x).hidden = x !== d; });
+  requestAnimationFrame(() => { layout(); if (d === "cv") { paginate(); drawLeaders(); } });
+}
+$$("[data-doc]").forEach(b => b.addEventListener("click", () => setDoc(b.dataset.doc)));
+$$("[role=tablist]").forEach(list => list.addEventListener("keydown", e => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const tabs = $$("[role=tab]", list); const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+  const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; n.focus(); n.click(); e.preventDefault();
+}));
+document.addEventListener("click", e => { const g = e.target.closest("[data-goto-doc]"); if (g) setTimeout(() => setDoc(g.dataset.gotoDoc), 0); });
+
+/* side tabs */
+let side = "claims";
+$$("[data-side]").forEach(b => b.addEventListener("click", () => {
+  side = b.dataset.side;
+  $$("[data-side]").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+  ["claims", "checks", "changes", "fresh"].forEach(x => { $("#side-" + x).hidden = x !== side; });
+  drawLeaders();
+}));
+
+/* ---------- claims ---------- */
+const claims = [
+  { id: 1, req: "dbt at scale (500+ models)", text: "Maintained a dbt project of about 600 models with CI tests on every merge", kind: "bullet", target: "Experience, Northwind Freight, Analytics Engineer", anchor: "northwind", why: "Profile mentions dbt and CI but not project size.", has: "Built and maintained the dbt project for freight analytics; added CI checks.", path: "experience > Northwind Freight > Analytics Engineer > achievements", status: "inprofile" },
+  { id: 2, req: "Stakeholder training", text: "Ran monthly SQL clinics for 30+ operations analysts", kind: "bullet", target: "Experience, Northwind Freight, Analytics Engineer", anchor: "northwind", why: "Not in profile; the posting lists it as required.", has: "No matching fact.", path: "experience > Northwind Freight > Analytics Engineer > achievements", status: "pending" },
+  { id: 3, req: "Airflow", text: "Apache Airflow", kind: "skill", target: "Skills, Orchestration", anchor: "orchestration", why: "Profile lists Dagster only.", has: "Orchestration: Dagster", path: "skills > Orchestration", existing: ["Dagster"], status: "pending" },
+  { id: 4, req: "Dutch language (nice to have)", text: "Dutch (B1)", kind: "language", target: "Languages", anchor: "languages", why: "Profile has no entry for Dutch.", has: "English (C2), German (B2)", path: "languages", existing: ["English (C2)", "German (B2)"], status: "pending" }
+];
+const reviewed = s => ["inprofile", "cvedit", "incv", "dismissed"].includes(s);
+const limits = { bullet: 1600, skill: 80, language: 80 };
+let cvRev = 1;
+let dismissedStack = [];
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function stateLabel(c) {
+  const icons = {
+    pending: '<svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+    ok: '<svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="currentColor"/></svg>',
+    off: '<svg width="12" height="12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.5"/></svg>'
+  };
+  switch (c.status) {
+    case "pending": case "editing": return `<span class="state">${icons.pending}Not reviewed</span>`;
+    case "confirming": return `<span class="state">${icons.pending}Confirming</span>`;
+    case "inprofile": case "cvedit": return `<span class="state ok">${icons.ok}In profile</span>`;
+    case "incv": return `<span class="state ok">${icons.ok}In CV revision ${c.rev}</span>`;
+    case "dismissed": return `<span class="state">${icons.off}Dismissed</span>`;
+  }
+}
+function diffFor(c) {
+  if (c.kind === "bullet") return `${esc(c.path)}\n<span class="add">+ - ${esc(c.text)}</span>`;
+  return `${esc(c.path)}\n${c.existing.map(x => "  - " + esc(x)).join("\n")}\n<span class="add">+ - ${esc(c.text)}</span>`;
+}
+function claimHTML(c) {
+  const head = `<header><span class="balloon" aria-hidden="true">S${c.id}</span><div class="req"><span class="from">Posting asks for</span><span class="what">${esc(c.req)}</span></div>${stateLabel(c)}</header>`;
+  if (c.status === "dismissed") {
+    return `<article class="claim" tabindex="0" data-id="${c.id}" data-status="dismissed" aria-label="Suggested addition S${c.id}, ${esc(c.req)}, dismissed. Press U to restore."><div class="dismissed-line"><span class="what">S${c.id} dismissed</span><span>· <button class="linkbtn" data-act="restore">Restore</button></span><span style="flex-basis:100%">${esc(c.req)}. Your profile was not changed.</span></div></article>`;
+  }
+  const proposedTag = reviewed(c.status) ? "Confirmed by you" : "Suggested wording, not yet confirmed";
+  let body = `<p class="proposed"><span class="tag">${proposedTag}</span>${esc(c.text)}</p>
+    <dl class="facts"><dt>Goes to</dt><dd>${esc(c.target)}</dd><dt>Why</dt><dd>${esc(c.why)}</dd><dt>Profile has</dt><dd>${esc(c.has)}</dd></dl>`;
+  if (c.status === "pending") {
+    body += `<div class="acts"><button class="btn primary" data-act="confirm">Mark true and add to profile</button><button class="btn" data-act="edit">Edit wording</button><button class="btn quiet" data-act="dismiss">Dismiss</button></div>`;
+  } else if (c.status === "editing") {
+    const lim = limits[c.kind];
+    body = `<div class="editor"><label for="ed-${c.id}">Wording for your profile</label><textarea id="ed-${c.id}" data-lim="${lim}">${esc(c.draft ?? c.text)}</textarea><div class="hint"><span>Must be true as written. Not a question.</span><span class="num" data-count>0 / ${lim}</span></div></div>
+      <div class="acts"><button class="btn primary" data-act="save-edit">Save wording</button><button class="btn quiet" data-act="cancel-edit">Cancel</button></div>`;
+  } else if (c.status === "confirming") {
+    body += `<div class="confirm" role="group" aria-label="Confirm profile change"><p><b>This changes your profile</b> (mira-okafor). A backup is written first. Existing documents do not change.</p><pre class="diff">${diffFor(c)}</pre>
+      <div class="acts"><button class="btn primary" data-act="accept">Yes, this is true: add to profile</button><button class="btn quiet" data-act="cancel-confirm">Cancel</button></div></div>`;
+  } else if (c.status === "inprofile") {
+    body += `<div class="done-line"><span class="what" style="color:var(--ink)">S${c.id} saved to profile</span><span>· <button class="linkbtn" data-act="undo">Undo</button></span></div><p class="muted" style="font-size:12px">A backup was written first: profile.backup-20261128-1012.yaml</p>
+      <div class="step"><span class="label">Step 2, optional: use it in this CV</span><p>Your current CV stays as it is until you approve a revision. The original draft is always kept.</p><div class="acts"><button class="btn" data-act="use">Use in this CV</button></div></div>`;
+  } else if (c.status === "cvedit") {
+    const isBullet = c.kind === "bullet";
+    body += `<div class="step"><span class="label">Use S${c.id} in this CV</span>
+      ${isBullet ? `<div class="radio-row" role="radiogroup" aria-label="Placement"><label><input type="radio" name="pl-${c.id}" checked> Add as a new bullet</label><label><input type="radio" name="pl-${c.id}"> Replace a bullet</label></div>` : `<p>Adds it to the ${c.kind === "skill" ? "Orchestration skills line" : "Languages line"}.</p>`}
+      <div class="editor"><label for="cv-${c.id}">CV wording</label><textarea id="cv-${c.id}" data-lim="${isBullet ? 320 : 80}">${esc(c.text)}</textarea><div class="hint"><span>Checked against the 2-page limit when saved.</span><span class="num" data-count>0 / ${isBullet ? 320 : 80}</span></div></div>
+      <div class="acts"><button class="btn primary" data-act="approve">Approve wording and save CV revision</button><button class="btn quiet" data-act="cancel-use">Cancel</button></div></div>`;
+  } else if (c.status === "incv") {
+    body += `<div class="undo-note"><span>Saved as CV revision ${c.rev}. The original draft is kept.</span></div>`;
+  }
+  return `<article class="claim" tabindex="0" data-id="${c.id}" data-status="${c.status}" aria-label="Suggested addition S${c.id}: ${esc(c.req)}">${head}${body}</article>`;
+}
+function renderClaims(focusId) {
+  $("#claims").innerHTML = claims.map(claimHTML).join("");
+  $$("#claims textarea").forEach(t => { const upd = () => { const n = t.value.length, lim = +t.dataset.lim; const el = t.closest(".editor").querySelector("[data-count]"); el.textContent = `${n} / ${lim}`; el.classList.toggle("over", n > lim); }; t.addEventListener("input", upd); upd(); });
+  updateCounts();
+  if (focusId) { const el = $(`#claims [data-id="${focusId}"]`); const t = el && el.querySelector("textarea"); (t || el)?.focus({ preventScroll: true }); }
+  updateMarks();
+  requestAnimationFrame(drawLeaders);
+}
+function updateCounts() {
+  const n = claims.filter(c => reviewed(c.status)).length;
+  $("#rev-count").textContent = `${n} of 4 reviewed`;
+  $$("#rev-meter i").forEach((i, k) => i.classList.toggle("on", k < n));
+  const open = 4 - n;
+  $("#c-open").textContent = open;
+  if (!running && !$("#v-workspace").hidden) $("#s-stage").textContent = open ? `Workspace, ${open} addition${open === 1 ? "" : "s"} open` : "Workspace, all additions reviewed";
+}
+const live = m => { $("#claims-live").textContent = m; };
+$("#claims").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const card = b.closest(".claim"); const c = claims.find(x => x.id === +card.dataset.id);
+  act(c, b.dataset.act);
+});
+function act(c, a) {
+  const prev = c.status;
+  switch (a) {
+    case "confirm": if (c.status === "pending") c.status = "confirming"; break;
+    case "cancel-confirm": c.status = "pending"; break;
+    case "edit": if (c.status === "pending") c.status = "editing"; break;
+    case "cancel-edit": c.status = "pending"; break;
+    case "save-edit": { const t = $(`#ed-${c.id}`); if (t.value.trim() && t.value.length <= limits[c.kind]) { c.text = t.value.trim(); c.status = "pending"; live(`S${c.id} wording updated`); } break; }
+    case "dismiss": if (c.status === "pending") { c.status = "dismissed"; dismissedStack.push(c.id); live(`S${c.id} dismissed. Press U or choose Restore to bring it back.`); } break;
+    case "restore": if (c.status === "dismissed") { c.status = "pending"; dismissedStack = dismissedStack.filter(x => x !== c.id); live(`S${c.id} restored to not reviewed`); } break;
+    case "accept": c.status = "inprofile"; live(`S${c.id} added to your profile. A backup was written.`); break;
+    case "undo": if (c.status === "inprofile") { c.status = "pending"; live(`S${c.id} removed from your profile. The backup was restored.`); } break;
+    case "use": c.status = "cvedit"; break;
+    case "cancel-use": c.status = "inprofile"; break;
+    case "approve": {
+      const t = $(`#cv-${c.id}`); const lim = c.kind === "bullet" ? 320 : 80;
+      if (!t.value.trim() || t.value.length > lim) return;
+      c.cvText = t.value.trim(); cvRev += 1; c.rev = cvRev; c.status = "incv"; applyToCv(c); live(`CV revision ${cvRev} saved with S${c.id}`); break;
+    }
+  }
+  if (prev !== c.status || a === "save-edit") renderClaims(c.id);
+}
+
+/* ---------- CV pagination and measurement ---------- */
+const src = $("#cv-source");
+const blocks = [...src.children];
+function applyToCv(c) {
+  if (c.kind === "bullet") {
+    const tech = blocks.find(b => b.dataset.ins === "northwind-end");
+    const nb = document.createElement("div");
+    nb.className = "cv-b rev"; nb.dataset.editable = ""; nb.dataset.claim = c.id; nb.textContent = c.cvText;
+    blocks.splice(blocks.indexOf(tech), 0, nb);
+  } else if (c.kind === "skill") { $("#sk-orch").textContent += ", " + c.cvText; }
+  else { $("#sk-lang").textContent += ", " + c.cvText; }
+  paginate();
+}
+function contentHeight(body) { const last = body.lastElementChild; return last ? last.offsetTop + last.offsetHeight : 0; }
+let fit = { pages: 2, spare: 4 };
+function paginate() {
+  if ($("#v-workspace").hidden || doc !== "cv") return;
+  const b1 = $("#b1"), b2 = $("#b2");
+  [b1, b2].forEach(b => { $$(".spare", b).forEach(s => s.remove()); });
+  blocks.forEach(b => b.remove());
+  const avail = b1.clientHeight;
+  let page = b1, overflow = false;
+  for (const blk of blocks) {
+    page.appendChild(blk);
+    if (contentHeight(page) > avail) {
+      if (page === b1) {
+        blk.remove();
+        const moving = [blk];
+        const isKeep = el => el && (el.classList.contains("cv-h") || el.classList.contains("cv-role"));
+        while (isKeep(b1.lastElementChild)) { const k = b1.lastElementChild; k.remove(); moving.unshift(k); }
+        page = b2; moving.forEach(m => b2.appendChild(m));
+      } else { overflow = true; }
+    }
+  }
+  const pitch = parseFloat(getComputedStyle(b2).lineHeight);
+  const free = avail - contentHeight(b2);
+  const spare = Math.floor(free / pitch);
+  fit = { pages: overflow ? 3 : (b2.children.length ? 2 : 1), spare: overflow ? 0 : spare };
+  if (!overflow && spare > 0) {
+    const s = document.createElement("div"); s.className = "spare"; s.style.height = (spare * pitch) + "px";
+    s.innerHTML = `<span>${spare} lines spare</span>`; s.setAttribute("aria-hidden", "true"); b2.appendChild(s);
+  }
+  // long bullet warning marker
+  const lb = $("#long-bullet"); if (lb) lb.classList.toggle("long-warn", Math.round(lb.offsetHeight / pitch) >= 3);
+  // readouts
+  const big = $("#fit-big");
+  big.textContent = overflow ? "Over the 2-page limit" : `${fit.pages} of 2 pages`;
+  big.classList.toggle("over", overflow);
+  $("#fit-note").textContent = overflow ? "Content runs past page 2. Try Standard or Compact, or shorten a bullet." : `${fit.spare} line${fit.spare === 1 ? "" : "s"} spare on page 2`;
+  $("#s-pages").textContent = overflow ? "3 / 2" : `${fit.pages} / 2`;
+  $("#s-spare").textContent = fit.spare;
+  drawRuler(pitch, avail, spare, overflow);
+  updateMarks();
+}
+function drawRuler(pitch, avail, spare, overflow) {
+  const padY = parseFloat(getComputedStyle($("#p1")).paddingTop);
+  const r1 = $("#r1"), r2 = $("#r2");
+  r1.innerHTML = `<span class="lbl" style="top:${padY - 7}px">line 1</span><span class="lbl" style="top:${padY + avail - 14}px">${Math.floor(avail / pitch)}</span>`;
+  r2.innerHTML = `<span class="lbl" style="top:${padY - 7}px">page 2</span>` +
+    `<span class="lim" style="top:${padY + avail}px"></span><span class="lbl" style="top:${padY + avail + 4}px">limit</span>` +
+    (!overflow && spare > 0 ? `<span class="sp" style="top:${padY + avail - spare * pitch}px;height:${spare * pitch}px"></span><span class="lbl" style="top:${padY + avail - spare * pitch - 16}px;color:var(--signal)">${spare} spare</span>` : "");
+}
+function updateMarks() {
+  $$(".cmark").forEach(m => m.remove());
+  claims.forEach(c => {
+    if (c.status === "dismissed") return;
+    let host;
+    if (c.status === "incv" && c.kind === "bullet") host = blocks.find(b => b.dataset.claim == c.id);
+    else host = blocks.find(b => b.dataset.anchor === c.anchor);
+    if (!host || !host.isConnected) return;
+    const m = document.createElement("span");
+    m.className = "cmark" + (c.status === "incv" ? " solid" : ""); m.dataset.claim = c.id; m.textContent = "S" + c.id; m.setAttribute("aria-hidden", "true");
+    // stack marks for the same anchor
+    const same = claims.filter(x => x.status !== "dismissed" && x.anchor === c.anchor && !(x.status === "incv" && x.kind === "bullet"));
+    const idx = same.indexOf(c);
+    m.style.top = (c.status === "incv" && c.kind === "bullet") ? "-4px" : (idx * 30 - 4) + "px";
+    if (c.kind === "bullet" && !(c.status === "incv")) m.style.left = (-44 - 0) + "px";
+    host.classList.add("anchor"); host.appendChild(m);
+  });
+}
+
+/* ---------- leader lines ---------- */
+function drawLeaders() {
+  const svg = $("#leaders");
+  if ($("#v-workspace").hidden || doc !== "cv" || side !== "claims" || getComputedStyle(svg).display === "none") { svg.innerHTML = ""; return; }
+  const base = $("#doc-cv").getBoundingClientRect();
+  const gut = $(".gutter").getBoundingClientRect();
+  const leaf1 = $("#leaf1").getBoundingClientRect();
+  let out = "";
+  claims.forEach(c => {
+    if (c.status === "dismissed") return;
+    const card = $(`#claims [data-id="${c.id}"] .balloon`);
+    const mark = $(`.cmark[data-claim="${c.id}"]`);
+    if (!card || !mark) return;
+    // Start at the claims panel's right edge, level with the balloon, so the line runs in the gutter only and never through card text.
+    const a = card.getBoundingClientRect(), b = mark.getBoundingClientRect(), panel = $(".src").getBoundingClientRect();
+    const x1 = panel.right - base.left, y1 = a.top + a.height / 2 - base.top;
+    const x2 = b.left - base.left, y2 = b.top + b.height / 2 - base.top;
+    const gx1 = gut.left - base.left + 12, gx2 = gut.right - base.left - 12;
+    const dash = c.status === "incv" ? "" : 'stroke-dasharray="4 3"';
+    let pts;
+    const leaf = mark.closest(".leaf").getBoundingClientRect();
+    if (leaf.left > leaf1.right) {
+      // Mark sits on a page to the right (spread): run above the pages, then down the gap before that page, so the line never crosses page 1's text.
+      const yTop = leaf1.top - base.top - 6, xGap = leaf.left - base.left - 12;
+      pts = `${x1},${y1} ${Math.max(x1 + 8, gx1)},${y1} ${gx2},${yTop} ${xGap},${yTop} ${xGap},${y2} ${x2},${y2}`;
+    } else {
+      pts = `${x1},${y1} ${Math.max(x1 + 8, gx1)},${y1} ${gx2},${y2} ${x2},${y2}`;
+    }
+    out += `<polyline points="${pts}" fill="none" stroke="var(--signal)" stroke-width="1" ${dash}/>`;
+    out += `<circle cx="${x1}" cy="${y1}" r="2" fill="var(--signal)"/>`;
+  });
+  svg.innerHTML = out;
+}
+
+/* ---------- width-driven layout ---------- */
+const LEAF_W = 664, MIN_K = 520 / 600, MAX_K = 820 / 600, GAP = 24;
+let layoutMode = "", userView = "auto";
+const kFor = (avail, n) => Math.min((avail - 8 - (n - 1) * GAP) / (n * LEAF_W), MAX_K);
+const slots = { checks: "#side-checks", changes: "#side-changes", fresh: "#side-fresh" };
+function setMode(mode) {
+  if (mode === layoutMode) return;
+  layoutMode = mode;
+  const bench = $("#doc-cv"); bench.dataset.mode = mode;
+  const src = $(".src");
+  if (mode === "four") {
+    // Inspector rail: checks, changes and freshness all visible at once; the left panel is claims only.
+    Object.entries(slots).forEach(([k, sel]) => { const p = $(sel); $(`[data-slot="${k}"]`).appendChild(p); p.hidden = false; });
+    side = "claims";
+    $$("[data-side]").forEach(x => x.setAttribute("aria-selected", String(x.dataset.side === "claims")));
+    $("#side-claims").hidden = false;
+  } else {
+    Object.values(slots).forEach(sel => { const p = $(sel); if (p.parentElement !== src) src.appendChild(p); p.hidden = side !== sel.slice(6); });
+  }
+}
+function layout() {
+  const ws = $("#v-workspace");
+  if (ws.hidden) return;
+  const w = ws.clientWidth;
+  setMode(w >= 1600 ? "four" : w >= 1024 ? "three" : w >= 720 ? "two" : "one");
+  if (doc === "cv") {
+    // Width the document zone could have, before the inspector absorbs what a capped single page cannot use.
+    const bench = $("#doc-cv"), bw = bench.clientWidth;
+    let avail = $("#doc-cv .out").clientWidth;
+    if (layoutMode === "four") avail = bw - $(".src").offsetWidth - $(".gutter").offsetWidth - Math.min(Math.max(300, bw * .18), 380) - 24;
+    const fits = { single: true, spread: kFor(avail, 2) >= MIN_K, cvletter: kFor(avail, 3) >= MIN_K };
+    const auto = w >= 3000 && fits.cvletter ? "cvletter" : w >= 2300 && fits.spread ? "spread" : "single";
+    if (userView !== "auto" && !fits[userView]) userView = "auto";
+    const view = userView === "auto" ? auto : userView;
+    const names = { single: "Single page", spread: "Spread", cvletter: "CV + letter" };
+    const sel = $("#view-mode");
+    const opts = [["auto", `Automatic (${names[auto]})`], ...Object.keys(names).filter(v => fits[v]).map(v => [v, names[v]])];
+    sel.innerHTML = opts.map(([v, l]) => `<option value="${v}"${v === userView ? " selected" : ""}>${l}</option>`).join("");
+    const n = view === "cvletter" ? 3 : view === "spread" ? 2 : 1;
+    const k = kFor(avail, n);
+    document.documentElement.style.setProperty("--k", k.toFixed(4));
+    $("#pages").dataset.view = view;
+    bench.dataset.view = view;
+    // Pages at their size cap leave width over: hand it to the inspector rather than leave an empty margin.
+    bench.dataset.capped = String(k >= MAX_K - 1e-4);
+    bench.style.setProperty("--doc-max", Math.ceil(n * LEAF_W * MAX_K + (n - 1) * GAP + 10) + "px");
+    $("#leaf3").hidden = view !== "cvletter";
+  } else if (doc === "letter") {
+    const avail = $("#doc-letter .out").clientWidth;
+    document.documentElement.style.setProperty("--kl", kFor(avail, 1).toFixed(4));
+  }
+  requestAnimationFrame(drawLeaders);
+}
+$("#view-mode").addEventListener("change", e => { userView = e.target.value; layout(); });
+let rsT = 0;
+const relayout = () => { clearTimeout(rsT); rsT = setTimeout(() => { layout(); drawLeaders(); }, 80); };
+window.addEventListener("resize", relayout);
+if (window.ResizeObserver) new ResizeObserver(relayout).observe($("#v-workspace"));
+
+/* ---------- inline bullet editing ---------- */
+let pendingEdits = new Set();
+const original = new WeakMap();
+const counter = $("#edit-counter");
+document.addEventListener("click", e => {
+  const b = e.target.closest(".sheet .cv-b[data-editable]");
+  if (!b || b.isContentEditable) return;
+  if (!original.has(b)) original.set(b, b.textContent);
+  b.contentEditable = "true"; b.setAttribute("role", "textbox"); b.setAttribute("aria-label", "Edit bullet, limit 320 characters"); b.focus();
+  showCounter(b);
+});
+function showCounter(b) {
+  const r = b.getBoundingClientRect(), host = $(".out").getBoundingClientRect();
+  counter.hidden = false;
+  counter.style.left = (r.left - host.left) + "px"; counter.style.top = (r.bottom - host.top + 4) + "px";
+  const n = b.textContent.length;
+  counter.textContent = `${n} / 320${n > 320 ? ", over the limit" : ""}`;
+  counter.style.color = n > 320 ? "var(--bad)" : "var(--muted)";
+  $(".out").style.position = "relative";
+}
+document.addEventListener("input", e => {
+  const b = e.target.closest && e.target.closest(".cv-b[contenteditable=true]"); if (!b) return;
+  showCounter(b);
+  if (b.textContent !== original.get(b)) { b.classList.add("edited"); pendingEdits.add(b); } else { b.classList.remove("edited"); pendingEdits.delete(b); }
+  updateEditBar();
+});
+document.addEventListener("focusout", e => {
+  const b = e.target.closest && e.target.closest(".cv-b[contenteditable=true]"); if (!b) return;
+  b.contentEditable = "false"; b.removeAttribute("role"); counter.hidden = true;
+});
+document.addEventListener("keydown", e => {
+  const b = e.target.closest && e.target.closest(".cv-b[contenteditable=true]");
+  if (b && e.key === "Escape") { b.blur(); e.stopPropagation(); }
+  if (b && e.key === "Enter") { e.preventDefault(); b.blur(); }
+}, true);
+function updateEditBar() {
+  const n = pendingEdits.size;
+  $("#edit-bar").hidden = n === 0;
+  $("#edit-note").textContent = `${n} manual edit${n === 1 ? "" : "s"} not yet rendered`;
+}
+$("#discard-edits").addEventListener("click", () => {
+  pendingEdits.forEach(b => { b.textContent = original.get(b); b.classList.remove("edited"); });
+  pendingEdits.clear(); updateEditBar(); paginate(); drawLeaders();
+});
+$("#rerender").addEventListener("click", () => {
+  const btn = $("#rerender"); btn.disabled = true; btn.textContent = "Rendering";
+  setTimeout(() => {
+    const n = pendingEdits.size;
+    pendingEdits.forEach(b => original.set(b, b.textContent)); pendingEdits.clear();
+    paginate(); drawLeaders();
+    btn.disabled = false; btn.textContent = "Re-render (free)"; updateEditBar();
+    $("#fmt-note").textContent = `Rendered with ${n} manual edit${n === 1 ? "" : "s"}, saved as a new version. Manual edits are marked M.`;
+  }, 700);
+});
+$("#show-long").addEventListener("click", () => {
+  const lb = $("#long-bullet"); lb.scrollIntoView({ block: "center" }); lb.classList.remove("cv-flash"); void lb.offsetWidth; lb.classList.add("cv-flash");
+});
+
+/* density + format */
+const densities = { comfortable: ["12.6px", "19px"], standard: ["12px", "18px"], compact: ["11.4px", "16.5px"] };
+$("#density").addEventListener("change", e => {
+  const [s, p] = densities[e.target.value];
+  document.documentElement.style.setProperty("--doc-size", s); document.documentElement.style.setProperty("--pitch", p);
+  paginate(); drawLeaders();
+});
+$$("[data-fmt]").forEach(b => b.addEventListener("click", () => {
+  $$("[data-fmt]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  $("#fmt-note").textContent = b.dataset.fmt === "pdf" ? "PDF rendered with pdflatex. Click any bullet to edit it." : "Word file paginated with LibreOffice: 2 pages, same breaks as the PDF.";
+}));
+$$("[data-lay]").forEach(b => b.addEventListener("click", () => $$("[data-lay]").forEach(x => x.setAttribute("aria-pressed", String(x === b)))));
+
+/* freshness regenerate */
+$("#regen-area").addEventListener("click", e => {
+  const area = $("#regen-area");
+  if (e.target.id === "regen") {
+    area.innerHTML = `<div class="confirm" tabindex="-1" role="group" aria-labelledby="regen-lead" aria-describedby="regen-desc"><p id="regen-desc"><b id="regen-lead">This run is paid.</b> It sends your profile (mira-okafor) and the saved posting to OpenRouter for claude-sonnet-5-5. A new draft is always charged; the cache is not used. Estimated $0.18 to $0.24; it stops if it would pass the $2.00 cap.</p><div class="acts"><button class="btn primary" id="regen-go">Start paid regeneration</button><button class="btn quiet" id="regen-no">Cancel</button></div></div>`;
+    area.querySelector(".confirm").focus();
+  } else if (e.target.id === "regen-no") { area.innerHTML = `<button class="btn" id="regen">Regenerate (paid, about $0.20)</button>`; $("#regen").focus(); }
+  else if (e.target.id === "regen-go") { location.hash = "#new"; setTimeout(startRun, 50); }
+});
+
+/* ---------- letter ---------- */
+const letter = [
+  "Fernhill Logistics is moving its planning data onto a shared platform while volumes through Rotterdam keep rising, and the Senior Analytics Engineer role sits where I have spent the last four years: between freight operations and the warehouse. At Northwind Freight I rebuilt the shipment-margin model in dbt and cut its nightly run from over three hours to under fifty minutes, so planners now start the day with yesterday's numbers.",
+  "Your posting asks for dbt at scale and for engineers who treat models as products. I introduced data contracts between our transport management team and analytics, which now catch breaking schema changes before they reach reporting, and I designed a Snowflake cost dashboard that reduced monthly credit spend by 22 percent. Both changes came from sitting with the people who use the data and asking what slowed them down.",
+  "Before Northwind I worked as a data analyst at Calder & Pike Retail, where I built store-level demand forecasts for 140 stores and moved sixty spreadsheet reports into Looker with shared definitions. That work taught me that a metric only helps when operations, finance and analytics agree on what it means, and I would bring the same habit of writing definitions down to your depot and route reporting.",
+  "I live in Rotterdam and hold an EU Blue Card, so I can start without a new permit application. I would welcome the chance to discuss how my experience with freight data, dbt and Snowflake could support your planning teams, and I can share examples of the models and dashboards described here."
+];
+const letterHTML = `<div class="cv-name" style="font-size:20px;line-height:28px">Mira Okafor</div><div class="cv-contact">Rotterdam, Netherlands &nbsp;|&nbsp; mira@example.com</div><p>Hiring team, Fernhill Logistics<br>28 November 2026</p>` + letter.map(p => `<p>${esc(p)}</p>`).join("");
+$("#letter-body").innerHTML = letterHTML;
+$("#letter-body-spread").innerHTML = letterHTML;
+const words = letter.join(" ").split(/\s+/).filter(Boolean).length;
+$("#lw").textContent = words; $("#lw2").textContent = words;
+
+/* answers */
+function bindCount(id, lim) { const t = $("#" + id), c = $("#" + id + "c"); const u = () => { c.textContent = `${t.value.length.toLocaleString("en")} / ${lim.toLocaleString("en")}`; c.style.color = t.value.length > lim ? "var(--bad)" : ""; }; t.addEventListener("input", u); u(); }
+bindCount("a1", 1000); bindCount("a2", 200);
+$$(".qlist button").forEach(b => b.addEventListener("click", () => {
+  const q = b.dataset.q;
+  $$(".qlist button").forEach(x => x.setAttribute("aria-current", String(x === b)));
+  $$(".qa[data-q]").forEach(x => x.dataset.sel = String(x.dataset.q === q));
+  $$("[data-ev]").forEach(x => x.hidden = x.dataset.ev !== q);
+}));
+$$("[data-copy]").forEach(b => b.addEventListener("click", () => {
+  const t = $("#" + b.dataset.copy);
+  const done = () => { b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy answer", 1600); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(done, () => { t.select(); b.textContent = "Selected, press Ctrl C"; });
+  else { t.select(); }
+}));
+
+/* ---------- new application run ---------- */
+const stages = [
+  ["Reading posting", 0.9, 0], ["Matching profile", 1.1, 0], ["Drafting CV", 2.4, 0.12],
+  ["Checking layout, attempt 1 of 3", 1.3, 0], ["Drafting cover letter", 1.7, 0.07], ["Rendering PDF and Word", 1.2, 0]
+];
+let running = false, timer = null, t0 = 0, cancelled = false;
+$("#run-area").addEventListener("click", e => {
+  const area = $("#run-area");
+  if (e.target.id === "draft") {
+    area.innerHTML = `<div class="confirm" tabindex="-1" role="group" aria-labelledby="draft-lead" aria-describedby="draft-desc"><p id="draft-desc"><b id="draft-lead">This run is paid.</b> It sends your profile (mira-okafor) and this posting to OpenRouter for claude-sonnet-5-5. Estimated $0.18 to $0.24; it stops if it would pass the $2.00 cap.</p><div class="acts"><button class="btn primary" id="go">Start paid draft</button><button class="btn quiet" id="back">Back to edit</button></div></div>`;
+    area.querySelector(".confirm").focus();
+  } else if (e.target.id === "back") { area.innerHTML = `<button class="btn primary" id="draft">Draft CV and cover letter (paid, about $0.20)</button>`; $("#draft").focus(); }
+  else if (e.target.id === "go") startRun();
+});
+$("#country").addEventListener("change", e => {
+  const v = e.target.value;
+  $("#rule-text").innerHTML = v === "Netherlands" ? "<b>Netherlands rule:</b> the cover letter mentions that you hold an EU Blue Card; the CV carries no permit text."
+    : v === "Other country" ? "<b>No rule for this country.</b> Work authorization is left out of both documents. Add a country rule in your profile to change this."
+    : `<b>${v} rule:</b> the cover letter states you need employer support for a work permit; the CV carries no permit text.`;
+});
+function startRun() {
+  running = true; cancelled = false;
+  $("#new-form").hidden = true; $("#progress").hidden = false;
+  $("#cancel-run").hidden = false;
+  $("#timeline").innerHTML = stages.map(() => "<i></i>").join("");
+  $("#stages").innerHTML = stages.map(s => `<li data-s="wait"><span class="sq" aria-hidden="true"></span><span>${s[0]}</span><span class="num n">waiting</span><span class="num n"></span></li>`).join("");
+  $("#prog-foot").querySelector("span").textContent = "You can leave this page; the run continues and the Desk shows when it is done.";
+  t0 = performance.now();
+  let i = 0, stageStart = t0, spent = 0;
+  const rows = $$("#stages li"), ticks = $$("#timeline i");
+  const begin = k => { rows[k].dataset.s = "run"; ticks[k].className = "run"; $("#prog-live").textContent = stages[k][0]; $("#s-stage").textContent = stages[k][0]; };
+  begin(0);
+  timer = setInterval(() => {
+    const now = performance.now(), el = (now - t0) / 1000, st = (now - stageStart) / 1000;
+    rows[i].children[2].textContent = st.toFixed(1) + " s";
+    $("#prog-total").textContent = `${Math.floor(el / 60)}:${String(Math.floor(el % 60)).padStart(2, "0")} elapsed, $${spent.toFixed(2)} spent`;
+    if (st >= stages[i][1]) {
+      spent += stages[i][2];
+      rows[i].dataset.s = "done"; ticks[i].className = "done"; rows[i].children[3].textContent = stages[i][2] ? "$" + stages[i][2].toFixed(2) : "free";
+      i++; stageStart = now;
+      if (i >= stages.length) { finish(spent); return; }
+      begin(i);
+    }
+  }, 100);
+}
+function finish(spent) {
+  clearInterval(timer); running = false;
+  $("#prog-title").textContent = "Draft ready for Fernhill Logistics";
+  $("#prog-live").textContent = "Draft ready";
+  $("#s-stage").textContent = "Draft ready";
+  const f = $("#prog-foot");
+  f.innerHTML = `<span style="font-size:13px">CV 2 of 2 pages, letter 301 words. Spent $${spent.toFixed(2)}.</span><span style="display:flex;gap:8px"><button class="btn quiet" id="again">Start another</button><a class="btn primary" href="#workspace">Open workspace</a></span>`;
+}
+$("#progress").addEventListener("click", e => {
+  if (e.target.id === "cancel-run") {
+    clearInterval(timer); running = false;
+    const done = $$("#stages li[data-s=done]").length;
+    const spent = stages.slice(0, done).reduce((a, s) => a + s[2], 0);
+    const cur = $("#stages li[data-s=run]"); if (cur) { cur.dataset.s = "wait"; cur.children[2].textContent = "stopped"; }
+    $("#prog-title").textContent = "Run cancelled";
+    $("#s-stage").textContent = "Run cancelled";
+    $("#prog-live").textContent = "Run cancelled";
+    $("#prog-foot").innerHTML = `<span style="font-size:13px">Stopped after ${done ? stages[done - 1][0].toLowerCase() : "starting"}. Spent $${spent.toFixed(2)}. Nothing was saved to the library.</span><button class="btn" id="again">Back to the posting</button>`;
+  }
+  if (e.target.id === "again") {
+    $("#progress").hidden = true; $("#new-form").hidden = false;
+    $("#run-area").innerHTML = `<button class="btn primary" id="draft">Draft CV and cover letter (paid, about $0.20)</button>`;
+    $("#prog-title").textContent = "Drafting for Fernhill Logistics";
+    $("#prog-foot").innerHTML = `<span class="muted" style="font-size:13px"></span><button class="btn" id="cancel-run">Cancel run</button>`;
+  }
+});
+
+/* ---------- library ---------- */
+const lib = [
+  { company: "Fernhill Logistics", role: "Senior Analytics Engineer", country: "Netherlands", created: "2026-11-27", status: "Additions to review", pages: 2, cost: 0.21, health: "Current" },
+  { company: "Oostkade Energy", role: "Analytics Engineer, Grid Data", country: "Netherlands", created: "2026-11-21", status: "Draft ready", pages: 2, cost: 0.19, health: "Stale" },
+  { company: "Brightwater Health", role: "Data Platform Engineer", country: "Germany", created: "2026-11-14", status: "Sent", pages: 2, cost: 0.24, health: "Current" },
+  { company: "Lumen Payments", role: "Analytics Engineer", country: "Ireland", created: "2026-11-06", status: "Interview", pages: 2, cost: 0.18, health: "Current" },
+  { company: "Halden Grid", role: "BI Engineer", country: "Norway", created: "2026-10-30", status: "Sent", pages: 2, cost: 0.22, health: "Check failed" },
+  { company: "Corvid Maps", role: "Senior Data Analyst", country: "Netherlands", created: "2026-10-22", status: "Sent", pages: 1, cost: 0.15, health: "Current" },
+  { company: "Tessel Studio", role: "Analytics Lead", country: "Belgium", created: "2026-10-09", status: "Draft ready", pages: 2, cost: 0.20, health: "Current" }
+];
+let sortKey = "created", sortDir = -1, libSel = 0;
+const fmtDate = d => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const healthMark = h => h === "Current" ? '<svg width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="var(--ok)"/></svg>'
+  : h === "Stale" ? '<svg width="10" height="10" aria-hidden="true"><path d="M5 1 9.5 9H.5z" fill="var(--warn)"/></svg>'
+  : '<svg width="10" height="10" aria-hidden="true"><rect x="1" y="1" width="8" height="8" fill="var(--bad)"/></svg>';
+const statusMark = s => ({ "Additions to review": '<span class="balloon" style="width:16px;height:16px;font-size:0;border-width:1.5px" aria-hidden="true"></span>', "Draft ready": '<svg width="10" height="10" aria-hidden="true"><rect x="1" y="1" width="8" height="8" fill="none" stroke="var(--ctl)" stroke-width="1.5"/></svg>', "Sent": '<svg width="10" height="10" aria-hidden="true"><rect x="1" y="1" width="8" height="8" fill="var(--ink)"/></svg>', "Interview": '<svg width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="var(--signal)"/></svg>' }[s]);
+function renderLib() {
+  const q = $("#lib-filter").value.trim().toLowerCase(), st = $("#lib-status").value;
+  const rows = lib.filter(r => (!q || (r.company + " " + r.role).toLowerCase().includes(q)) && (!st || r.status === st))
+    .sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
+  $("#lib-body").innerHTML = rows.map(r => `<tr tabindex="0" data-open data-idx="${lib.indexOf(r)}" aria-selected="${lib.indexOf(r) === libSel}"><td><b style="font-weight:600">${esc(r.company)}</b></td><td>${esc(r.role)}</td><td>${r.country}</td><td>${fmtDate(r.created)}</td><td><span class="st">${statusMark(r.status)}${r.status}</span></td><td class="n">${r.pages}</td><td class="n">$${r.cost.toFixed(2)}</td><td><span class="st">${healthMark(r.health)}${r.health}</span></td></tr>`).join("");
+  $("#lib-empty").hidden = rows.length > 0;
+  syncLibPreview();
+  $$("#lib thead th").forEach(th => { const k = th.querySelector("button").dataset.sort; th.setAttribute("aria-sort", k === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none"); });
+}
+$$("#lib thead button").forEach(b => b.addEventListener("click", () => { const k = b.dataset.sort; if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; } renderLib(); }));
+$("#lib-filter").addEventListener("input", renderLib);
+$("#lib-status").addEventListener("change", renderLib);
+$("#lib-clear").addEventListener("click", () => { $("#lib-filter").value = ""; $("#lib-status").value = ""; renderLib(); });
+const libWide = () => !$("#v-library").hidden && $("#v-library").clientWidth >= 1600;
+const healthNote = { "Current": "Matches your current profile and rules.", "Stale": "Your profile changed after this draft. Regenerating is optional and paid.", "Check failed": "The rules re-check found a 2-page letter. Open it to see the failing check." };
+function syncLibPreview() {
+  const r = lib[libSel], el = $("#lib-prev");
+  if (!r || !el) return;
+  $$("#lib-body tr").forEach(tr => tr.setAttribute("aria-selected", String(+tr.dataset.idx === libSel)));
+  el.innerHTML = `<div><h2>${esc(r.company)}</h2><p class="muted" style="font-size:13px">${esc(r.role)}</p></div>
+    <dl><dt>Country</dt><dd>${r.country}</dd><dt>Created</dt><dd>${fmtDate(r.created)}</dd><dt>Status</dt><dd><span class="st">${statusMark(r.status)}${r.status}</span></dd><dt>CV</dt><dd>${r.pages} of 2 pages</dd><dt>Cost</dt><dd class="num">$${r.cost.toFixed(2)}</dd><dt>Health</dt><dd><span class="st">${healthMark(r.health)}${r.health}</span><div class="muted" style="font-size:12px;margin-top:2px">${healthNote[r.health]}</div></dd></dl>
+    <div class="files"><span class="muted">Files</span><span>CV, PDF and Word</span><span>Cover letter, PDF and Word</span><span>Portal answers, 2 questions</span></div>
+    <div class="acts"><a class="btn primary" href="#workspace">Open workspace</a><button class="btn quiet">Set status</button></div>`;
+}
+document.addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-open]"); if (!tr) return;
+  if (tr.dataset.idx !== undefined && libWide()) { libSel = +tr.dataset.idx; syncLibPreview(); tr.focus(); return; }
+  location.hash = "#workspace";
+});
+document.addEventListener("dblclick", e => { if (e.target.closest("#lib-body tr[data-open]")) location.hash = "#workspace"; });
+$("#lib-body").addEventListener("focusin", e => { const tr = e.target.closest("tr[data-idx]"); if (tr && libWide()) { libSel = +tr.dataset.idx; syncLibPreview(); } });
+renderLib();
+
+/* desk */
+$("#verify-key").addEventListener("click", e => {
+  const b = e.target; b.disabled = true; b.textContent = "Checking";
+  setTimeout(() => { $("#key-t").textContent = "API key verified"; $("#key-d").textContent = "OpenRouter accepted the key. Nothing was generated."; b.textContent = "Verified"; }, 900);
+});
+
+/* candidate switch */
+$("#candidate").addEventListener("change", e => {
+  const v = e.target.value;
+  $("#cand-id").textContent = v;
+  $("#cand-banner").hidden = false;
+  $("#cand-banner-text").textContent = v === "test-candidate" ? "Switched to Test Candidate. Open drafts, search results and editors from Mira Okafor were cleared. This mock-up keeps showing Mira's data." : "Switched to Mira Okafor.";
+});
+$("#cand-undo").addEventListener("click", () => { $("#candidate").value = "mira-okafor"; $("#cand-id").textContent = "mira-okafor"; $("#cand-banner").hidden = true; });
+
+/* ---------- palette ---------- */
+const actions = [
+  ["Go to Desk", () => location.hash = "#desk", ""],
+  ["Start a new application", () => location.hash = "#new", ""],
+  ["Open Library", () => location.hash = "#library", ""],
+  ["Open Fernhill Logistics workspace", () => location.hash = "#workspace", ""],
+  ["Show cover letter", () => { location.hash = "#workspace"; setDoc("letter"); }, ""],
+  ["Show portal answers", () => { location.hash = "#workspace"; setDoc("answers"); }, ""],
+  ["Next suggested addition", () => { location.hash = "#workspace"; setDoc("cv"); moveClaim(1); }, "J"],
+  ["Restore last dismissed suggestion", () => { location.hash = "#workspace"; setDoc("cv"); const id = dismissedStack[dismissedStack.length - 1]; const c = claims.find(x => x.id === id); if (c) act(c, "restore"); else live("No dismissed suggestions to restore."); }, "U"],
+  ["Re-render CV (free)", () => { if (pendingEdits.size) $("#rerender").click(); }, ""],
+  ["Switch theme", () => $("#theme").click(), ""],
+  ["Keyboard shortcuts", () => $("#keys").showModal(), "?"]
+];
+let palSel = 0, palItems = actions;
+function renderPal() {
+  const q = $("#pal-in").value.toLowerCase();
+  palItems = actions.filter(a => a[0].toLowerCase().includes(q));
+  palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+  $("#pal-list").innerHTML = palItems.length ? palItems.map((a, i) => `<li role="option" id="po-${i}" aria-selected="${i === palSel}" data-i="${i}"><span>${a[0]}</span>${a[2] ? `<kbd>${a[2]}</kbd>` : ""}</li>`).join("") : `<li aria-disabled="true" class="muted">No action matches. Try "claim" or "letter".</li>`;
+  $("#pal-in").setAttribute("aria-activedescendant", palItems.length ? "po-" + palSel : "");
+}
+function openPal() { $("#pal-in").value = ""; palSel = 0; renderPal(); $("#pal").showModal(); $("#pal-in").focus(); }
+function runPal(i) { const a = palItems[i]; if (!a) return; $("#pal").close(); a[1](); }
+$("#open-pal").addEventListener("click", openPal);
+$("#pal-in").addEventListener("input", () => { palSel = 0; renderPal(); });
+$("#pal-in").addEventListener("keydown", e => {
+  if (e.key === "ArrowDown") { palSel = Math.min(palSel + 1, palItems.length - 1); renderPal(); e.preventDefault(); }
+  if (e.key === "ArrowUp") { palSel = Math.max(palSel - 1, 0); renderPal(); e.preventDefault(); }
+  if (e.key === "Enter") { runPal(palSel); e.preventDefault(); }
+});
+$("#pal-list").addEventListener("click", e => { const li = e.target.closest("li[data-i]"); if (li) runPal(+li.dataset.i); });
+$("#pal").addEventListener("click", e => { if (e.target === $("#pal")) $("#pal").close(); });
+$("#keys-close").addEventListener("click", () => $("#keys").close());
+
+/* ---------- keyboard ---------- */
+function moveClaim(d) {
+  const cards = $$("#claims .claim"); if (!cards.length) return;
+  const cur = document.activeElement && document.activeElement.closest(".claim");
+  let i = cur ? cards.indexOf(cur) + d : (d > 0 ? 0 : cards.length - 1);
+  i = Math.max(0, Math.min(cards.length - 1, i));
+  cards[i].focus(); cards[i].scrollIntoView({ block: "nearest" });
+}
+function moveRow(d, tbody) {
+  const rows = $$("tr[tabindex]", tbody); const cur = document.activeElement.closest("tr");
+  let i = rows.indexOf(cur); i = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + d)); rows[i] && rows[i].focus();
+}
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPal(); return; }
+  const t = e.target;
+  const typing = t.matches && (t.matches("input, textarea, select") || t.isContentEditable);
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
+  if (e.key === "?") { $("#keys").showModal(); e.preventDefault(); return; }
+  const k = e.key.toLowerCase();
+  if (!$("#v-library").hidden || (t.closest && t.closest("tbody"))) {
+    const tb = t.closest && t.closest("tbody") || $("#lib-body");
+    if (k === "j" || e.key === "ArrowDown") { moveRow(1, tb); e.preventDefault(); return; }
+    if (k === "k" || e.key === "ArrowUp") { moveRow(-1, tb); e.preventDefault(); return; }
+    if (e.key === "Enter" && t.matches("tr[data-open]")) { location.hash = "#workspace"; return; }
+  }
+  if ($("#v-workspace").hidden || doc !== "cv" || side !== "claims") return;
+  if (k === "j") { moveClaim(1); e.preventDefault(); }
+  else if (k === "k") { moveClaim(-1); e.preventDefault(); }
+  else if (["a", "e", "d", "u"].includes(k)) {
+    const card = t.closest && t.closest(".claim"); if (!card) return;
+    const c = claims.find(x => x.id === +card.dataset.id);
+    act(c, k === "u" ? (c.status === "dismissed" ? "restore" : "undo") : { a: "confirm", e: "edit", d: "dismiss" }[k]); e.preventDefault();
+  }
+});
+
+/* Esc backs out of a claim's confirm, edit or CV-wording step and returns focus to the card. */
+$("#claims").addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const card = e.target.closest && e.target.closest(".claim"); if (!card) return;
+  const c = claims.find(x => x.id === +card.dataset.id);
+  const back = { confirming: "cancel-confirm", editing: "cancel-edit", cvedit: "cancel-use" }[c.status];
+  if (!back) return;
+  e.preventDefault(); e.stopPropagation();
+  act(c, back);
+  $(`#claims [data-id="${c.id}"]`)?.focus();
+});
+
+/* ---------- boot ---------- */
+renderClaims();
+route();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { paginate(); drawLeaders(); });
+})();
+</script>
+<script>
+(() => {
+  const top = document.querySelector('.top'), nav = top && top.querySelector('nav.main');
+  if (!nav) return;
+  let raf = 0;
+  const fit = () => {
+    raf = 0;
+    top.classList.remove('stacked');
+    const over = nav.scrollWidth > nav.clientWidth + 1;
+    top.classList.toggle('stacked', over);
+    const pinned = getComputedStyle(top).position === 'sticky';
+    document.documentElement.style.setProperty('--top-h', (pinned ? top.offsetHeight : 0) + 'px');
+    fitStatus();
+  };
+  // Status line: hide the lowest-priority segments until it fits; data-pri 0 (shortcuts) is never hidden.
+  const status = document.querySelector('.status');
+  const segs = status ? [...status.querySelectorAll('[data-pri]')] : [];
+  const fitStatus = () => {
+    if (!status) return;
+    segs.forEach(x => { x.hidden = false; });
+    const order = segs.filter(x => +x.dataset.pri > 0).sort((a, b) => b.dataset.pri - a.dataset.pri);
+    for (const x of order) { if (status.scrollWidth <= status.clientWidth + 1) break; x.hidden = true; }
+  };
+  if (status && window.MutationObserver) new MutationObserver(() => queue()).observe(status, { childList: true, characterData: true, subtree: true });
+  const queue = () => { if (!raf) raf = requestAnimationFrame(fit); };
+  addEventListener('resize', queue);
+  document.getElementById('candidate')?.addEventListener('change', () => setTimeout(queue, 0));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(queue);
+  fit();
+})();
+</script>
